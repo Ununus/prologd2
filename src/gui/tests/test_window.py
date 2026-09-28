@@ -45,6 +45,32 @@ PRIMES = """\
 ?простое(4).
 """
 
+#: Reads two numbers and prints them: two input requests in one run.
+#: `ПС` is the library's newline (`ПС :- ВВКОД(10)`), because `ВЫВОД` prints
+#: without one — the first version of this test expected separate lines and got
+#: `79` glued together.
+READS_TWO = "?ВВОДЦЕЛ(А),ВВОДЦЕЛ(Б),ВЫВОД(А),ПС,ВЫВОД(Б),ПС.\n"
+
+
+def wait_for_result(window) -> None:
+    """Waits until the interpreter has finished answering the query."""
+    done = pump(window, lambda: "решение" in window.status_text())
+    assert done, f"the run never finished: {ascii(window.output_text())}"
+
+
+def echoed_lines(window) -> list[str]:
+    """The answers the window fed to the program, prefixed with `>`."""
+    return [line for line in window.output_text().splitlines() if line.startswith("> ")]
+
+
+def printed_lines(window) -> list[str]:
+    """What the program printed: everything that is neither our note nor an echo."""
+    return [
+        line
+        for line in window.output_text().splitlines()
+        if line and not line.startswith(("---", ">", "***"))
+    ]
+
 #: Kept so the temporary directories outlive the windows that read from them.
 _SETTINGS_DIRECTORIES: list[tempfile.TemporaryDirectory] = []
 
@@ -329,6 +355,81 @@ def test_cancelling_the_encoding_question_opens_nothing(
         discard_changes(window)
 
 
+def test_the_input_field_feeds_the_program(executable: str) -> None:
+    """Lines from the input pane answer the requests, one after another.
+
+    Two values, no dialog: a program that reads a few numbers should be runnable
+    without a box per number.  A blank line between them is skipped rather than
+    offered as an answer.
+    """
+    window = empty_window(executable)
+    try:
+        window.editor().setPlainText(READS_TWO)
+        window.input_pane().setPlainText("7\n\n9\n")
+        asked: list[str] = []
+        window._ask_input = lambda kind: asked.append(kind) or "0"
+
+        window.run_program()
+        wait_for_result(window)
+
+        assert asked == [], "the dialog was used even though the field had answers"
+        assert echoed_lines(window) == ["> 7", "> 9"], echoed_lines(window)
+        assert printed_lines(window) == ["7", "9", "А=7", "Б=9"], printed_lines(window)
+        assert window.pending_input() == [], "the queue was not emptied"
+        print("ok: the input field answers the requests without a dialog")
+    finally:
+        discard_changes(window)
+
+
+def test_the_dialog_is_asked_only_after_the_queue(executable: str) -> None:
+    window = empty_window(executable)
+    try:
+        window.editor().setPlainText(READS_TWO)
+        window.input_pane().setPlainText("7\n")
+        asked: list[str] = []
+
+        def answer(kind: str) -> str:
+            asked.append(kind)
+            return "9"
+
+        window._ask_input = answer
+        window.run_program()
+        wait_for_result(window)
+
+        assert asked == ["token"], asked
+        assert echoed_lines(window) == ["> 7"], "the prepared line was not used first"
+        assert printed_lines(window) == ["7", "9", "А=7", "Б=9"], printed_lines(window)
+        print("ok: the dialog is asked once the prepared answers run out")
+    finally:
+        discard_changes(window)
+
+
+def test_cancelling_input_stops_the_run(executable: str) -> None:
+    """«Отмена» stops the program and the run asks nothing else."""
+    window = empty_window(executable)
+    try:
+        window.editor().setPlainText(READS_TWO)
+        asked: list[str] = []
+        window._ask_input = lambda kind: asked.append(kind) or None
+
+        window.run_program()
+        assert pump(window, lambda: not window.session.is_running()), "the run was not stopped"
+
+        assert len(asked) == 1, f"asked again after the cancellation: {asked}"
+        assert "ввод отменён" in window.output_text(), ascii(window.output_text())
+        assert "ввод отменён" in window.status_text(), window.status_text()
+
+        # A new run starts a new session and may ask again.
+        window._ask_input = lambda kind: "5"
+        window.run_program()
+        wait_for_result(window)
+        assert echoed_lines(window) == []
+        assert "5" in window.output_text(), ascii(window.output_text())
+        print("ok: cancelling input stops the run, and the next run asks again")
+    finally:
+        discard_changes(window)
+
+
 def test_a_run_uses_the_tab_that_is_showing(executable: str) -> None:
     window = empty_window(executable)
     try:
@@ -523,6 +624,9 @@ def main(argv: list[str]) -> int:
         test_a_file_dropped_on_the_editor_opens_in_a_tab(executable, files)
         test_saving_clears_the_marker_and_keeps_the_file_shape(executable, files)
         test_cancelling_the_encoding_question_opens_nothing(executable, files)
+        test_the_input_field_feeds_the_program(executable)
+        test_the_dialog_is_asked_only_after_the_queue(executable)
+        test_cancelling_input_stops_the_run(executable)
         test_a_run_uses_the_tab_that_is_showing(executable)
     print("all window checks passed")
     del application

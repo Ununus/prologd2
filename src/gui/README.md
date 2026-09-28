@@ -149,6 +149,12 @@ failure (for example an interrupted query).
   appends its own `НЕТ` for `found == false` prints the answer twice — which
   looks like a bug in the user's program.  The window keeps it for the status
   bar only.
+* **Input is a question, not a stream.**  The interpreter asks with
+  `input_request` and waits for exactly one `input` request with the answer, so a
+  front-end may answer out of its own prepared list.  The window feeds the lines
+  typed into the field under the output pane, one per request, and falls back to
+  a single-line dialog when that list is empty; cancelling the dialog stops the
+  session instead of answering an empty string.
 * `ready` carries `keywords`: every reserved name the lexer knows, with its kind
   (`predicate`, `operator`, `directive`) and its arities — `[]` for operators,
   directives and the variadic `ВЫВОД`, which is marked with `"variadic":true`.

@@ -68,6 +68,12 @@ class MainWindow(QMainWindow):
         #: True while the whole window is closing, so closing the last tab does
         #: not open a fresh one on the way out.
         self._closing = False
+        #: Answers taken from the input field, one per request; refilled by every
+        #: run (see `run_program`).
+        self._queued_input: list[str] = []
+        #: Set when the user cancelled an input question: the run is stopped and
+        #: nothing else is asked during it.
+        self._stopped_input = False
         self._recent = documents.RecentFiles(self._settings.recent_files)
 
         self._build_ui()
@@ -106,6 +112,20 @@ class MainWindow(QMainWindow):
         # A dropped program opens in a tab wherever it lands (see `dropEvent`).
         self._output.fileDropped.connect(self.open_path)
 
+        # The input queue lives under the output: one line per answer the program
+        # will ask for, fed automatically until the list runs out (`_input_lines`).
+        self._input_pane = ZoomablePlainTextEdit(
+            font_family=self._settings.font_family,
+            font_size=self._settings.font_size,
+        )
+        self._input_pane.setPlaceholderText("ввод: по строке на каждый запрос")
+        self._input_pane.setToolTip(
+            "Строки для ВВКОД, ВВОДСТР, ВВОДСИМВ и подобных: по одной на каждый запрос.\n"
+            "Пустые строки пропускаются. Когда строки кончатся, окно спросит в диалоге."
+        )
+        self._input_pane.zoomChanged.connect(self._on_zoom_changed)
+        self._input_pane.fileDropped.connect(self.open_path)
+
         self._query_line = QLineEdit()
         # The same face as the panes, so a goal looks like the program it asks
         # about; `_on_zoom_changed` keeps it in step.
@@ -119,9 +139,15 @@ class MainWindow(QMainWindow):
         editor_layout.addWidget(self._tabs)
         editor_layout.addWidget(self._query_line)
 
+        # The output on top, the input queue under it.
+        right = QSplitter(Qt.Orientation.Vertical)
+        right.addWidget(self._output)
+        right.addWidget(self._input_pane)
+        right.setSizes([420, 110])
+
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.addWidget(editor_area)
-        splitter.addWidget(self._output)
+        splitter.addWidget(right)
         splitter.setSizes([600, 400])
         self.setCentralWidget(splitter)
         # A dropped program opens in its own tab; see `dropEvent`.
@@ -211,8 +237,15 @@ class MainWindow(QMainWindow):
             return
         path = buffer.model.path
         self._output.clear()
+        # Every run starts with the prepared answers from the field: that is what
+        # makes a program that reads several values runnable without a dialog per
+        # value — and a cancelled question applies to this run only.
+        self._stopped_input = False
+        self._queued_input = self._input_lines()
         self._session.start()
         self._append_output("--- загрузка программы ---\n")
+        if self._queued_input:
+            self._append_output(f"--- ввод из поля, строк — {len(self._queued_input)} ---\n")
         if path is not None and not buffer.is_modified():
             # A saved, unmodified buffer is loaded by path: `ИМПОРТ` resolves
             # against the file's own directory and diagnostics name the file.
@@ -655,6 +688,18 @@ class MainWindow(QMainWindow):
         """The read-only output pane (task_27 gives it a place of its own)."""
         return self._output
 
+    def input_pane(self) -> ZoomablePlainTextEdit:
+        """The input queue under the output: one line per answer."""
+        return self._input_pane
+
+    def pending_input(self) -> list[str]:
+        """The prepared answers that are left for the running program."""
+        return list(self._queued_input)
+
+    def status_text(self) -> str:
+        """What the status bar says — the running program's state, in words."""
+        return self._status.text()
+
     def output_text(self) -> str:
         return self._output.toPlainText()
 
@@ -687,6 +732,7 @@ class MainWindow(QMainWindow):
         for buffer in self._buffers:
             buffer.set_font_size(size)
         self._output.set_font_size(size)
+        self._input_pane.set_font_size(size)
         self._query_line.setFont(self._output.font())
         self._status.setText(f"шрифт {size:.0f} pt")
 
@@ -699,13 +745,55 @@ class MainWindow(QMainWindow):
         """
         self._status.setText("решение найдено" if found else "решения нет")
 
+    # -- input requests ----------------------------------------------------
     def _on_input_request(self, kind: str) -> None:
+        """Feeds the program: the prepared lines first, the dialog only after them.
+
+        The lines come from the field under the output pane, one per request, and
+        are echoed with `>` so it stays visible what the program was given.  Only
+        when that list is empty does the window ask the user.
+        """
+        if self._stopped_input:
+            # Cancelled earlier in this run: the interpreter is on its way out and
+            # must not be given anything else to wait for.
+            self._session.answer_input("")
+            return
+        if self._queued_input:
+            line = self._queued_input.pop(0)
+            self._append_output(f"> {line}\n")
+            self._session.answer_input(line)
+            self._status.setText(f"ввод из поля, осталось строк — {len(self._queued_input)}")
+            return
+        answer = self._ask_input(kind)
+        if answer is None:
+            self._stopped_input = True
+            self._append_output("--- ввод отменён: программа остановлена ---\n")
+            self._session.stop()
+            self._status.setText("ввод отменён, выполнение остановлено")
+            return
+        self._session.answer_input(answer)
+
+    def _input_lines(self) -> list[str]:
+        """The input field, one answer per line, blank lines dropped.
+
+        A line is taken as written — leading spaces can matter for a string — but
+        a line that is empty or only spaces is an answer to nothing, and skipping
+        it is what keeps the field easy to read.
+        """
+        return [line for line in self._input_pane.toPlainText().split("\n") if line.strip()]
+
+    def _ask_input(self, kind: str) -> str | None:
+        """One line from the user; `None` when the question was cancelled.
+
+        A method of its own, like `_ask_save`: a modal box cannot be driven from a
+        headless test, and a test that forgets to replace it hangs instead of
+        failing.  The field is single-line on purpose — `Enter` answers, the way it
+        does in the query line, and a whole line of program input is rarely a
+        paragraph.
+        """
         prompt = {"token": "Слово", "line": "Строка", "codepoint": "Символ"}.get(kind, "Ввод")
-        if kind == "codepoint":
-            answer, accepted = QInputDialog.getText(self, "Ввод", prompt + ":")
-        else:
-            answer, accepted = QInputDialog.getMultiLineText(self, "Ввод", prompt + ":")
-        self._session.answer_input(answer if accepted else "")
+        answer, accepted = QInputDialog.getText(self, "Ввод", prompt + ":")
+        return answer if accepted else None
 
     def _on_failed(self, kind: str, message: str) -> None:
         self._append_output(f"*** {kind}: {message}\n")

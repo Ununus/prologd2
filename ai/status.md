@@ -284,3 +284,16 @@ Resolved on 2026-09-29 (GUI planning):
   — keys, tabs and prompts, encodings, completion, what is *not* there yet.  Its
   tables had to be written as `#table(...)`: Typst has no pipe tables, and the
   markdown-like version rendered as literal text.
+* GUI hand-testing round, part 10: the input mechanism was redesigned to the
+  user's shape.  Under the output pane there is now an **input field**: its lines
+  are the answers, one per request, split on newlines with blank lines dropped, and
+  each answer is echoed into the output with `>` so it is visible what the program
+  received.  The modal dialog is the *fallback* once the prepared lines run out
+  (single line, `Enter` answers, like the query line), and **«Отмена» now stops the
+  run** instead of answering an empty string: the flag makes the rest of that run
+  ask nothing, and the next run starts clean.  The tests drive this through the
+  same kind of replaceable seam as the save prompt (`_ask_input`), and the status
+  line reports how many prepared lines are left.  A test detail worth keeping: the
+  window's `status_text()` is what the tests wait on — waiting for the *output* was
+  ambiguous, because the echo of an answer and the value the program prints are the
+  same characters.
