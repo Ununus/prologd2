@@ -93,6 +93,13 @@ class MainWindow(QMainWindow):
 
     # -- actions -----------------------------------------------------------
     def _run_program(self) -> None:
+        # A run starts from a clean slate: a fresh interpreter (no clauses, RNG
+        # seed, redirected files or preloaded input left from the previous run)
+        # and an empty output pane.  Reusing the session would accumulate the
+        # clauses and every solution would appear twice; `start()` stops a live
+        # process first.
+        self._output.clear()
+        self._session.start()
         self._append_output("--- загрузка программы ---\n")
         self._session.load_text(self._editor.toPlainText())
 
@@ -117,7 +124,6 @@ class MainWindow(QMainWindow):
         self._session.stop()
         self._status.setText("остановлено")
         self._append_output("--- остановлено ---\n")
-        self._session.start()
 
     def _clear_output(self) -> None:
         self._output.clear()

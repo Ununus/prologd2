@@ -72,6 +72,13 @@ failure (for example an interrupted query).
 
 ### Notes for front-ends
 
+* **A run is a new session.**  The clause database, the `СЛУЧ` seed, the
+  `ЗАПИСЬ_В`/`ЧТЕНИЕ_ИЗ` redirection and the preloaded `$` input lines all live
+  in the interpreter process, so loading a second program into a session that
+  already ran one *accumulates* clauses and prints every solution twice.  Start a
+  fresh process for a run — that is what **Запустить** does — and keep one session
+  only for the queries that belong together.  A request written before the
+  interpreter announced itself is queued by `session.py` rather than lost.
 * `ready` carries `keywords`: every reserved name the lexer knows, with its kind
   (`predicate`, `operator`, `directive`) and its arities — `[]` for operators,
   directives and the variadic `ВЫВОД`, which is marked with `"variadic":true`.

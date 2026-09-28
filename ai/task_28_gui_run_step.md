@@ -39,9 +39,15 @@ Run
       had it), but it is no longer needed for imports to resolve.
 - [ ] **Запуск с трассировкой**: the same with the trace enabled, so the
       reference-style trace text appears in the pane (grey).
-- [ ] Restart policy: a session is reused while it is alive; a tab switch,
-      a run after a stop, or a crashed child starts a fresh process.  The status
-      bar always shows which state the session is in.
+- [ ] Restart policy: **every run starts a fresh interpreter process** and clears
+      the output pane.  The clause database, the RNG seed, file redirection and
+      the preloaded input lines all live in the process, so a reused session
+      accumulates clauses and prints every solution twice — found by hand in the
+      skeleton, where a second **Запустить** doubled the output.  A tab switch, a
+      run after a stop and a crashed child also start fresh; one session is kept
+      for the queries that belong together.  Setting (task_29): «не сбрасывать
+      перед запуском» for a REPL-like workflow, off by default.  The status bar
+      always shows which state the session is in.
 
 Stop
 

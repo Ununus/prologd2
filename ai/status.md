@@ -90,18 +90,24 @@ session.
 | task_29_gui_settings | not started | settings dialog and persistence |
 | task_30_gui_formatter | not started | soft/hard formatting in prlib + protocol |
 | task_31_gui_shortcuts | not started | layout-independent `Ctrl`+ key combinations |
-| task_32_import_search_report | not started | `ИМПОРТ` failure names the directories tried |
+| task_32_import_search_report | done | `ИМПОРТ` failure names the directories tried, with reasons |
 
 ## Test suite
 
-116 tests, about a second: 106 Catch2 cases plus 10 command-line and
-integration tests (seven option tests, two `--list-keywords` tests and the JSON
-protocol session). Groups:
+119 tests, about a second: 108 Catch2 cases plus 11 command-line and
+integration tests (seven option tests, two `--list-keywords` tests, the
+import-search report and the JSON protocol session). Groups:
 BigInt, lexer, keywords, parser, unification, engine, every built-in group, `НАЙТИВСЁ`,
-module loader, the I/O seams, typical tasks (factorial, Fibonacci, GCD,
-insertion sort, 4-queens, knapsack), ported lesson/example programs (golden
-output) and the CLI (`-s`, `--source`, `--source=`, positional, `-I`, `--help`,
-`--version`, `--list-keywords`, `--protocol json`).
+module loader (including the import search report), the I/O seams, typical tasks
+(factorial, Fibonacci, GCD, insertion sort, 4-queens, knapsack), ported
+lesson/example programs (golden output) and the CLI (`-s`, `--source`,
+`--source=`, positional, `-I`, `--help`, `--version`, `--list-keywords`,
+`--protocol json`).
+
+The front-end has its own headless checks, run by hand (they need PySide6 or a
+build, so CI does not run them yet): `src/gui/tests/protocol_smoke.py`,
+`test_keywords.py` (the keyword table from both sides) and `test_session.py`
+(request queueing and the clean-slate restart), all invoked as plain scripts.
 
 ## Known gaps / next steps
 
@@ -109,15 +115,13 @@ output) and the CLI (`-s`, `--source`, `--source=`, positional, `-I`, `--help`,
    VS 2026; locally the MSVC 2026 build and the whole suite are green.
 2. `--dump-ast` and `--dump-clauses` (task_16) are dropped: the parser produces a
    `ParsedProgram`, not a tree worth printing, and no workflow asked for them.
-3. Note for anyone building from CMake Tools: Catch2 test discovery decodes the
-   test executable's stdout with the console code page, so on a cp437/cp1252
-   machine the Cyrillic test names land in `prlib_tests-*_tests.cmake` mangled
-   and ctest reports 32 "No test cases matched" failures.  Build, or regenerate
-   that file, from a UTF-8 console (`chcp 65001`).  Verified fix for later: the
-   decoding happens only for piped output — `execute_process(... OUTPUT_FILE
-   ...)` keeps the bytes untouched — so a project-local discovery step that
-   writes the `--list-tests --reporter json` listing to a file would make the
-   names immune to the console code page.
+3. Catch2 test discovery decodes the test executable's stdout with the console
+   code page, so on a cp437/cp1252 machine non-ASCII test *names* would land in
+   `prlib_tests-*_tests.cmake` mangled and ctest would report "No test cases
+   matched".  The test names are ASCII now, which removes the failure mode; the
+   underlying fix (a project-local discovery step writing `--list-tests
+   --reporter json` to a *file*, which `execute_process(... OUTPUT_FILE ...)`
+   leaves byte-exact) is still a possible improvement.
 4. Optional: first-argument clause indexing if a real program needs more speed.
 5. Optional: `is/2` and infix comparison operators next to `#expr#`.
 6. GUI: task_21 is the skeleton only (protocol, `src/gui` window with an editor,
@@ -169,4 +173,17 @@ Resolved on 2026-09-29 (GUI planning):
 * GUI planning session: read the previous Qt front-end
   (`ai/_ref/prolog/src/gui/`, kept locally and git-ignored) for reference —
   highlighting, actions, panes and the formatter — and broke the requested
-  feature list down into task_22–task_31.
+  feature list down into task_22–task_31.* GUI implementation session, part 1: task_23 (one source of truth for the
+  reserved names: `--list-keywords`, protocol 2 with `keywords` in `ready`, the
+  Qt-free `prologd_gui/keywords.py`) and task_32 (the loader reports the
+  directories it searched).  The keyword tests immediately found that `ВЫП/1` is
+  answered by the *engine* (`Solver::unifyGoal`) and never reaches the dispatch
+  table, so the classification has an explicit list for such names.  `PySide6
+  6.11.2` was installed into `.venv` (the abi3 wheel works on Python 3.14).
+* GUI implementation session, part 2: running the skeleton by hand found two
+  defects — a second **Запустить** printed every solution twice (state lives in
+  the interpreter process, so a run must start a fresh one) and **Остановить**
+  did not actually stop anything (`terminate()` does not end a console child on
+  Windows and `kill()` was not waited for, so the next `start()` failed with
+  "Process is already running").  Both fixed in `session.py`/`window.py` and
+  covered by the new `src/gui/tests/test_session.py`.
