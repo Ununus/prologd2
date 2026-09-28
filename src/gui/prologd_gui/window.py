@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pathlib
+
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QFont
 from PySide6.QtWidgets import (
@@ -41,7 +43,13 @@ class MainWindow(QMainWindow):
         self._session.failed.connect(self._on_failed)
         self._session.ended.connect(self._on_ended)
 
+        #: The file the buffer belongs to, or None for an untitled buffer.  It is
+        #: not only a label: `ИМПОРТ` resolves against the directory of the file
+        #: the loader is given, so a run passes it to the interpreter.
+        self._path: str | None = None
+
         self._build_ui()
+        self._editor.document().modificationChanged.connect(self._update_title)
         self._session.start()
 
     # -- construction ------------------------------------------------------
@@ -77,10 +85,10 @@ class MainWindow(QMainWindow):
 
         toolbar = QToolBar("Управление", self)
         self.addToolBar(toolbar)
-        self._add_action(toolbar, "Запустить", self._run_program, "Ctrl+R")
+        self._add_action(toolbar, "Запустить", self.run_program, "Ctrl+R")
         self._add_action(toolbar, "Открыть…", self._open_file, "Ctrl+O")
-        self._add_action(toolbar, "Остановить", self._stop, "Ctrl+.")
-        self._add_action(toolbar, "Очистить вывод", self._clear_output, "Ctrl+L")
+        self._add_action(toolbar, "Остановить", self.stop_program, "Ctrl+.")
+        self._add_action(toolbar, "Очистить вывод", self.clear_output, "Ctrl+L")
 
         self._status = QLabel("запуск…")
         self.statusBar().addWidget(self._status)
@@ -92,16 +100,25 @@ class MainWindow(QMainWindow):
         toolbar.addAction(action)
 
     # -- actions -----------------------------------------------------------
-    def _run_program(self) -> None:
+    def run_program(self) -> None:
         # A run starts from a clean slate: a fresh interpreter (no clauses, RNG
         # seed, redirected files or preloaded input left from the previous run)
-        # and an empty output pane.  Reusing the session would accumulate the
-        # clauses and every solution would appear twice; `start()` stops a live
-        # process first.
+        # and an empty output pane.  Reusing the session accumulates clauses —
+        # with a duplicated `факториал/2` the factorial example returns 64
+        # solutions instead of one, which looks like a loop — so `start()` stops
+        # a live process first.
         self._output.clear()
         self._session.start()
         self._append_output("--- загрузка программы ---\n")
-        self._session.load_text(self._editor.toPlainText())
+        if self._path is not None and not self._editor.document().isModified():
+            # A saved, unmodified buffer is loaded by path: `ИМПОРТ` resolves
+            # against the file's own directory and diagnostics name the file.
+            self._session.load_file(self._path)
+        else:
+            # Otherwise the text comes from the editor, and the path, when there
+            # is one, is what the loader treats as the importing file.
+            self._session.load_text(self._editor.toPlainText(), self._path or "<buffer>")
+        self._status.setText("выполняется")
 
     def _run_query(self) -> None:
         text = self._query_line.text().strip()
@@ -114,23 +131,66 @@ class MainWindow(QMainWindow):
 
     def _open_file(self) -> None:
         path, _ = QFileDialog.getOpenFileName(self, "Открыть программу", "", "PrologD (*.pld);;Все файлы (*)")
-        if not path:
-            return
-        with open(path, encoding="utf-8") as stream:
-            self._editor.setPlainText(stream.read())
-        self._session.load_file(path)
+        if path:
+            self.open_path(path)
 
-    def _stop(self) -> None:
+    def open_path(self, path: str) -> None:
+        """Loads a file into the editor — and *only* into the editor.
+
+        Opening must not run anything: `load` adds clauses to the live
+        interpreter (that is what `ИМПОРТ` needs), so opening a file into a
+        session that already ran something put a second copy of the program in
+        it.  With duplicated recursive clauses every solution multiplies, which
+        is why opening the factorial example twice looked like an endless loop.
+        Running is F5.
+        """
+        try:
+            # `utf-8-sig` drops a byte-order mark, which the lexer also ignores;
+            # otherwise the first line would start with an invisible character.
+            with open(path, encoding="utf-8-sig") as stream:
+                text = stream.read()
+        except (OSError, UnicodeDecodeError) as error:
+            self._append_output(f"*** не могу открыть {path}: {error}\n")
+            return
+        self._editor.setPlainText(text)
+        self._editor.document().setModified(False)
+        self._path = path
+        self._update_title()
+        self._status.setText(f"открыт {path}")
+
+    def stop_program(self) -> None:
         self._session.stop()
         self._status.setText("остановлено")
         self._append_output("--- остановлено ---\n")
 
-    def _clear_output(self) -> None:
+    def clear_output(self) -> None:
         self._output.clear()
+
+    def _update_title(self) -> None:
+        name = pathlib.Path(self._path).name if self._path else "Без имени"
+        marker = "*" if self._editor.document().isModified() else ""
+        self.setWindowTitle(f"{marker}{name} — PrologD")
+
+    # -- accessors for the actions and the tests ---------------------------
+    # task_25 replaces these with a document model (tabs, modified flag, save).
+    @property
+    def session(self) -> PrologSession:
+        """The interpreter session; the window owns exactly one until task_25."""
+        return self._session
+
+    def editor_text(self) -> str:
+        return self._editor.toPlainText()
+
+    def output_text(self) -> str:
+        return self._output.toPlainText()
+
+    def current_path(self) -> str | None:
+        return self._path
 
     # -- session events ----------------------------------------------------
     def _on_ready(self, version: str) -> None:
         self._status.setText(f"PrologD {version} готов")
+        self._update_title()
 
     def _on_result(self, found: bool) -> None:
         if not found:

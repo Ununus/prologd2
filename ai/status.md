@@ -106,8 +106,9 @@ lesson/example programs (golden output) and the CLI (`-s`, `--source`,
 
 The front-end has its own headless checks, run by hand (they need PySide6 or a
 build, so CI does not run them yet): `src/gui/tests/protocol_smoke.py`,
-`test_keywords.py` (the keyword table from both sides) and `test_session.py`
-(request queueing and the clean-slate restart), all invoked as plain scripts.
+`test_keywords.py` (the keyword table from both sides), `test_session.py`
+(request queueing and the clean-slate restart) and `test_window.py` (opening a
+file does not run it; a run is repeatable), all invoked as plain scripts.
 
 ## Known gaps / next steps
 
@@ -187,3 +188,12 @@ Resolved on 2026-09-29 (GUI planning):
   Windows and `kill()` was not waited for, so the next `start()` failed with
   "Process is already running").  Both fixed in `session.py`/`window.py` and
   covered by the new `src/gui/tests/test_session.py`.
+* GUI implementation session, part 3: **Открыть** stopped running the program.
+  It used to push the file into the live interpreter, so a run followed by an
+  open — or two opens with a run between them — left two copies of the clauses;
+  the factorial example then answered 64 times instead of once, which the user
+  read as an endless loop.  Opening now only fills the editor, and a run loads a
+  saved, unmodified buffer *by path* (so `ИМПОРТ` and the diagnostics use the
+  file's own directory) or the editor text under the file's name.  The window
+  exposes `open_path`/`run_program`/`stop_program`/`clear_output` and a `session`
+  property, which is what `src/gui/tests/test_window.py` drives offscreen.

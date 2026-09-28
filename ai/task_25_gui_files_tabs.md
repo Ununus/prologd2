@@ -51,6 +51,17 @@ keep track of which file each tab shows.
 - [ ] The split state (one or two panes, which document in which pane, splitter
       position and orientation) is restored on start when "восстанавливать
       вкладки" is on.
+- [ ] **Открыть не запускает программу.**  Opening fills the editor and nothing
+      else.  `load` *adds* clauses to the live interpreter (that is what
+      `ИМПОРТ` needs), so an open into a session that had already run something
+      duplicated the program — and with duplicated recursive clauses every
+      solution multiplies: the factorial example answered 64 times instead of
+      once, which reads as an endless loop.  Running stays F5, and a run starts a
+      fresh session (task_28).
+- [ ] Running uses the file: a saved, unmodified buffer is loaded **by path**,
+      so `ИМПОРТ` resolves against the file's own directory and diagnostics name
+      it; an edited or untitled buffer is loaded as text whose `name` is the file
+      path when there is one (see task_28 for the table).
 - [ ] Tests: `src/gui/tests/test_documents.py` (Qt-free) for titles, the
       untitled counter, `modified` bookkeeping, eol detection and recent-file
       pruning; the tab/prompt behaviour goes into the manual checklist below.
