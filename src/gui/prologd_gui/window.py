@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .highlighter import PrologHighlighter
 from .session import PrologSession
 
 WELCOME = """% PrologD — пример программы
@@ -60,6 +61,10 @@ class MainWindow(QMainWindow):
         self._editor = QPlainTextEdit(WELCOME)
         self._editor.setFont(monospace)
         self._editor.setPlaceholderText("текст программы")
+        # The highlighter learns the reserved names when the interpreter
+        # announces itself (`_on_ready`); until then every name is an atom or a
+        # variable, which is also what an interpreter older than protocol 2 gives.
+        self._highlighter = PrologHighlighter(self._editor.document())
 
         self._output = QPlainTextEdit()
         self._output.setFont(monospace)
@@ -200,6 +205,7 @@ class MainWindow(QMainWindow):
 
     # -- session events ----------------------------------------------------
     def _on_ready(self, version: str) -> None:
+        self._highlighter.set_keywords(self._session.keywords)
         self._status.setText(f"PrologD {version} готов")
         self._update_title()
 

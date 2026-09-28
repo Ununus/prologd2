@@ -6,4 +6,4 @@ this directory for the protocol contract and `src/cli/protocol.cpp` for the C++
 side of it.
 """
 
-__all__ = ["keywords", "protocol", "session", "window"]
+__all__ = ["highlighter", "keywords", "protocol", "session", "theme", "tokens", "window"]

@@ -20,11 +20,12 @@ no mangled line endings, no lost trailing newline.
       string, quoted atom, integer, float, `#expr#` block, built-in name,
       variable (`X`, `_X`, `_`), atom, punctuation, plus a
       `latin`/`cyrillic` attribute on every identifier.
-- [ ] `prologd_gui/highlighter.py` — `QSyntaxHighlighter` that maps token kinds
-      to formats from the settings, using `tokens.py`.  Highlighting must not
-      run regular expressions over the whole document per keystroke:
-      `highlightBlock` works line by line and carries only the multi-line state
-      (inside a `"…"` string, inside a `#…#` expression).
+- [x] `prologd_gui/highlighter.py` — `QSyntaxHighlighter` that maps a token to a
+      format, with the palette kept in `theme.py` as data.  `highlightBlock`
+      works line by line over `tokens.py` — no regular expressions over the whole
+      document per keystroke — and carries no state between lines (see below).
+      A line holding an astral character gets its offsets mapped, because Qt
+      counts UTF-16 units while Python counts code points.
 - [ ] `prologd_gui/editor.py` — `CodeEditor(QPlainTextEdit)`:
   * line number area with the current line emphasised;
   * an error marker in the margin and a red background on the line reported by
@@ -47,12 +48,15 @@ no mangled line endings, no lost trailing newline.
       prompt otherwise), write UTF-8 without BOM, keep the dominant line ending
       of the loaded file (LF by default), preserve a trailing newline if the
       file had one.
-- [ ] Colour scheme (defaults, all overridable in task_29):
-      built-in names dark blue bold; **Latin identifiers `#800000`**, **Cyrillic
-      identifiers `#7B1FA2`** — the colours the user asked for to tell the two
-      alphabets apart; numbers `#505000`; comments dark green; `#expr#` blocks
-      and quoted atoms/strings a distinct hue; query lines (`?…`) blue `#0A22D6`
-      like the reference GUI.
+- [x] Colour scheme as defaults in `prologd_gui/theme.py` (task_29 puts them
+      behind the settings dialog): built-in names dark blue bold (`#00008b`);
+      **Latin names `#800000`**, **Cyrillic names `#7b1fa2`**, typesetting
+      `#4a148c` if an identifier mixes the two; variables a shade of their own
+      (`#00695c` Latin, `#ad1457` Cyrillic) so variables and atoms are not
+      confused either; numbers `#505000`; comments `#0f7f0f`; strings `#a31515`;
+      `?` and `#` `#0a22d6`, as in the reference front-end.  The palette is
+      lowercase, which is what `QColor.name()` returns, so it can be compared
+      directly.
 - [ ] Tests: `src/gui/tests/test_tokens.py` (Qt-free, table of tricky lines),
       `src/gui/tests/test_editor.py` (offscreen, needs PySide6, skipped when it
       is not installed) checking line-number width, comment/uncomment round
