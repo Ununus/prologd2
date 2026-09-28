@@ -5,7 +5,7 @@ from __future__ import annotations
 import pathlib
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction, QFont
+from PySide6.QtGui import QAction, QFont, QKeySequence
 from PySide6.QtWidgets import (
     QFileDialog,
     QInputDialog,
@@ -85,17 +85,28 @@ class MainWindow(QMainWindow):
 
         toolbar = QToolBar("Управление", self)
         self.addToolBar(toolbar)
-        self._add_action(toolbar, "Запустить", self.run_program, "Ctrl+R")
-        self._add_action(toolbar, "Открыть…", self._open_file, "Ctrl+O")
-        self._add_action(toolbar, "Остановить", self.stop_program, "Ctrl+.")
-        self._add_action(toolbar, "Очистить вывод", self.clear_output, "Ctrl+L")
+        self._add_action(toolbar, "Запустить", self.run_program, ["F5", "Ctrl+R"])
+        self._add_action(toolbar, "Открыть…", self._open_file, ["Ctrl+O"])
+        self._add_action(toolbar, "Остановить", self.stop_program, ["Shift+F5", "Ctrl+."])
+        self._add_action(toolbar, "Очистить вывод", self.clear_output, ["Ctrl+L"])
 
         self._status = QLabel("запуск…")
         self.statusBar().addWidget(self._status)
 
-    def _add_action(self, toolbar: QToolBar, title: str, slot, shortcut: str) -> None:
+    def _add_action(self, toolbar: QToolBar, title: str, slot, shortcuts: str | list[str]) -> None:
+        """Adds a toolbar button whose tooltip names its keys.
+
+        `setShortcuts` takes a *list*: a comma inside `QKeySequence` would mean a
+        two-stroke sequence (Ctrl+K, Ctrl+C) and not an alternative.  A shortcut
+        shorter than the action it names is the defect this makes impossible to
+        repeat — **Запустить** was bound to `Ctrl+R` while the plan promised F5,
+        so the key did nothing.
+        """
+        if isinstance(shortcuts, str):
+            shortcuts = [shortcuts]
         action = QAction(title, self)
-        action.setShortcut(shortcut)
+        action.setShortcuts([QKeySequence(shortcut) for shortcut in shortcuts])
+        action.setToolTip(f"{title} ({shortcuts[0]})")
         action.triggered.connect(slot)
         toolbar.addAction(action)
 

@@ -79,6 +79,44 @@ def test_a_run_is_repeatable(executable: str) -> None:
         window.close()
 
 
+def test_the_documented_shortcuts_are_bound(executable: str) -> None:
+    """A key that the plan documents must actually be bound to the action.
+
+    **Запустить** was bound to `Ctrl+R` while the plan promised `F5`, so pressing
+    the documented key did nothing at all.
+    """
+    from PySide6.QtWidgets import QToolBar
+
+    from prologd_gui.window import MainWindow
+
+    window = MainWindow(executable, [])
+    try:
+        assert pump(window, lambda: bool(window.session.keywords)), "the session never said ready"
+        actions = {
+            action.text(): action
+            for bar in window.findChildren(QToolBar)
+            for action in bar.actions()
+        }
+        bound = {action: {key.toString() for key in actions[action].shortcuts()} for action in actions}
+        for text, expected in (
+            ("Запустить", {"F5", "Ctrl+R"}),
+            ("Остановить", {"Shift+F5", "Ctrl+."}),
+            ("Открыть…", {"Ctrl+O"}),
+            ("Очистить вывод", {"Ctrl+L"}),
+        ):
+            assert text in actions, f"no {text} action, got {sorted(actions)}"
+            assert expected <= bound[text], f"{text} is bound to {sorted(bound[text])}"
+
+        # The key press runs the action: trigger is the same path a shortcut takes.
+        window.open_path(str(EXAMPLE))
+        actions["Запустить"].trigger()
+        assert pump(window, lambda: ANSWER in window.output_text()), window.output_text()
+        print("ok: F5/Shift+F5 are bound and the action runs the program")
+    finally:
+        window.stop_program()
+        window.close()
+
+
 def main(argv: list[str]) -> int:
     if QApplication is None:
         print("skipped: PySide6 is not installed")
@@ -95,6 +133,7 @@ def main(argv: list[str]) -> int:
     print(f"interpreter: {executable}")
     test_opening_does_not_run(executable)
     test_a_run_is_repeatable(executable)
+    test_the_documented_shortcuts_are_bound(executable)
     print("all window checks passed")
     del application
     return 0
