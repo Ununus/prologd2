@@ -39,7 +39,11 @@ Editor
 Highlighting
 
 - [ ] цвета по видам токенов, отдельно **цвет латиницы** и **цвет кириллицы**
-      (task_22), светлая/тёмная тема, "использовать системные цвета".
+      (task_22), светлая/тёмная тема, "использовать системные цвета".  `light`
+      and `system` exist already (`--theme`, task_22); a **dark** theme is not a
+      switch but a second syntax palette — bright colours for a dark background —
+      and the palette must keep WCAG contrast 4.5 against its own background
+      (there is a helper for that: `theme.contrast_ratio`).
 
 Formatting
 

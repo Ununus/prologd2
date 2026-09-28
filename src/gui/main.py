@@ -8,6 +8,7 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
+from prologd_gui import appearance  # noqa: E402
 from prologd_gui.window import MainWindow  # noqa: E402
 
 from PySide6.QtWidgets import QApplication  # noqa: E402
@@ -32,6 +33,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="PrologD graphical front-end")
     parser.add_argument("--exe", default=default_executable(), help="path to the prologd executable")
     parser.add_argument("--include", action="append", default=[], help="import search directory (repeatable)")
+    parser.add_argument(
+        "--theme",
+        default=appearance.LIGHT,
+        choices=appearance.THEMES,
+        help="window appearance: light (default — the syntax colours need a light background) or system",
+    )
     arguments = parser.parse_args(argv)
 
     if not pathlib.Path(arguments.exe).exists():
@@ -39,7 +46,10 @@ def main(argv: list[str] | None = None) -> int:
         print("build it first (cmake --preset windows-msvc && cmake --build build/windows-msvc --config Release)", file=sys.stderr)
         return 1
 
-    application = QApplication(sys.argv)
+    # Qt must not see our own options: it parses the arguments it is given and
+    # would complain about `--theme`.
+    application = QApplication(sys.argv[:1])
+    appearance.apply_theme(application, arguments.theme)
     window = MainWindow(arguments.exe, arguments.include)
     window.show()
     return application.exec()

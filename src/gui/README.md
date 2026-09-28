@@ -24,12 +24,23 @@ cmake --build build/windows-msvc --config Release
 
 python -m venv .venv
 .venv\Scripts\python -m pip install -r src/gui/requirements.txt
-.venv\Scripts\python src/gui/main.py --include examples/lib
+.venv\Scripts\python.exe src/gui/main.py --include examples/lib
 ```
 
 `--exe` overrides the interpreter path (by default the newest build under
 `build/` is used), `--include` adds an `ИМПОРТ` search directory and may be
 repeated.
+
+Activating the environment is optional: calling `.venv\Scripts\python.exe`
+directly needs no `Set-ExecutionPolicy` and makes it obvious which interpreter is
+meant.
+
+`--theme light|system` chooses the appearance.  **`light` is the default and is
+forced** through the Fusion style with an explicit palette, because Qt 6 follows
+the Windows dark theme and the syntax colours are chosen for a *white*
+background — on a dark one they are unreadable.  `system` keeps the platform
+choice: what a light desktop wants, and the hook for a real dark theme, which
+needs its own syntax palette rather than just this switch (task_29).
 
 Headless check of the protocol, without PySide6 installed:
 

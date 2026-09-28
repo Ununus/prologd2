@@ -41,6 +41,12 @@ no mangled line endings, no lost trailing newline.
       step.  Unlike the reference implementation, the `%` is inserted at the
       first non-blank column, never in the middle of a line, and uncomment
       removes only the first `%` of the leading run.
+- [x] `prologd_gui/appearance.py` — a forced light palette (Fusion style, the
+      roles set by hand) with `--theme light|system`, so the editor does not
+      inherit a dark desktop and turn the syntax colours into mud.  The test
+      checks the property that matters: a light `Base`, dark `Text`, and every
+      syntax colour at WCAG contrast 4.5 or better against the background it is
+      drawn on.
 - [ ] Standard editing actions wired to the editor's undo stack: undo, redo,
       cut, copy, paste, delete, select all, duplicate line, and find/replace
       (task_26 puts them in the menu, task_25 keeps them per document).

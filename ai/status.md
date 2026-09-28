@@ -108,7 +108,9 @@ The front-end has its own headless checks, run by hand (they need PySide6 or a
 build, so CI does not run them yet): `src/gui/tests/protocol_smoke.py`,
 `test_keywords.py` (the keyword table from both sides), `test_tokens.py` (the
 highlighting rules, including a sweep over the example programs),
-`test_highlighter.py` (the palette reaching the document), `test_session.py`
+`test_highlighter.py` (the palette reaching the document),
+`test_appearance.py` (forced light palette and contrast of every syntax colour),
+`test_session.py`
 (request queueing and the clean-slate restart) and `test_window.py` (opening a
 file does not run it; the documented keys are bound), all invoked as plain
 scripts.

@@ -80,3 +80,34 @@ class Theme:
         # Latin by default: a name without letters at all (say `_`) is not worth
         # a third colour.
         return latin
+
+    def colors(self) -> list[str]:
+        """Every colour of the palette, for checks and the settings dialog."""
+        return [
+            value
+            for name, value in vars(self).items()
+            if isinstance(value, str) and value.startswith("#")
+        ]
+
+
+def relative_luminance(color: str) -> float:
+    """WCAG relative luminance of a `#rrggbb` colour."""
+
+    def channel(value: float) -> float:
+        return value / 12.92 if value <= 0.04045 else ((value + 0.055) / 1.055) ** 2.4
+
+    red, green, blue = (int(color[index : index + 2], 16) / 255 for index in (1, 3, 5))
+    return 0.2126 * channel(red) + 0.7152 * channel(green) + 0.0722 * channel(blue)
+
+
+def contrast_ratio(first: str, second: str) -> float:
+    """WCAG contrast ratio between two colours, 1.0 (same) to 21.0 (black/white).
+
+    Used to keep a palette readable: 4.5 is the WCAG AA threshold for body text,
+    and it is the check that would have caught the dark-theme complaint before a
+    user did — the syntax colours are only correct *against a white background*.
+    """
+    lighter, darker = sorted(
+        (relative_luminance(first), relative_luminance(second)), reverse=True
+    )
+    return (lighter + 0.05) / (darker + 0.05)
