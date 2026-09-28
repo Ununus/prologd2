@@ -46,7 +46,7 @@ TEST_CASE("cut commits to the first clause") {
   REQUIRE(result.output == "F=5040\n");
 }
 
-TEST_CASE("ВЫП performs a meta-call") {
+TEST_CASE("meta-call runs the goal") {
   const auto result = runProgram(
       "цель(5).\n"
       "проверка(X) :- ВЫП(цель(X)).\n"
@@ -55,7 +55,7 @@ TEST_CASE("ВЫП performs a meta-call") {
   REQUIRE(result.output == "Y=5\n");
 }
 
-TEST_CASE("НЕ is negation as failure") {
+TEST_CASE("negation as failure") {
   const auto result = runProgram(
       "цель(5).\n"
       "нет_цели(X) :- НЕ(цель(X)).\n"
@@ -65,7 +65,7 @@ TEST_CASE("НЕ is negation as failure") {
   REQUIRE(result.output == "НЕТ\nДА\n");
 }
 
-TEST_CASE("ИЛИ is disjunction") {
+TEST_CASE("disjunction") {
   const auto result = runProgram(
       "a(1).\n"
       "b(2).\n"
@@ -90,7 +90,7 @@ TEST_CASE("deep recursion does not overflow the C++ stack") {
   REQUIRE(result.output == "ДА\n");
 }
 
-TEST_CASE("ТИХО suppresses solution output for its query only") {
+TEST_CASE("quiet suppresses solution output for its query only") {
   const auto result = runProgram(
       "?ТИХО, ВЫВОД(фыв).\n"
       "?ВЫВОД(куц).\n"

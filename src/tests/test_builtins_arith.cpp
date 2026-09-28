@@ -4,7 +4,7 @@
 
 using prologd::test::runProgram;
 
-TEST_CASE("СЛОЖЕНИЕ is reversible") {
+TEST_CASE("addition is reversible") {
   const auto result = runProgram(
       "?СЛОЖЕНИЕ(100, 100, A).\n"
       "?СЛОЖЕНИЕ(100, A, 100).\n"
@@ -13,7 +13,7 @@ TEST_CASE("СЛОЖЕНИЕ is reversible") {
   REQUIRE(result.output == "A=200\nA=0\nA=50\n");
 }
 
-TEST_CASE("УМНОЖЕНИЕ/4 implements the documented reversible cases") {
+TEST_CASE("multiplication/4 implements the documented reversible cases") {
   const auto result = runProgram(
       "?УМНОЖЕНИЕ(10, 2, 2, 22).\n"
       "?УМНОЖЕНИЕ(10, 2, 2, A).\n"
@@ -24,7 +24,7 @@ TEST_CASE("УМНОЖЕНИЕ/4 implements the documented reversible cases") {
   REQUIRE(result.output == "ДА\nA=22\nA=2\nA=2\nA=10\n");
 }
 
-TEST_CASE("УМНОЖЕНИЕ/3 divides with remainder detection") {
+TEST_CASE("multiplication/3 divides with remainder detection") {
   const auto result = runProgram(
       "?УМНОЖЕНИЕ(5, 7, X).\n"
       "?УМНОЖЕНИЕ(X, 7, 35).\n");
@@ -32,7 +32,7 @@ TEST_CASE("УМНОЖЕНИЕ/3 divides with remainder detection") {
   REQUIRE(result.output == "X=35\nX=5\n");
 }
 
-TEST_CASE("БОЛЬШЕ compares numbers and text") {
+TEST_CASE("greater-than compares numbers and text") {
   const auto result = runProgram(
       "?БОЛЬШЕ(5, 3).\n"
       "?БОЛЬШЕ(3, 5).\n"
@@ -79,7 +79,7 @@ TEST_CASE("long arithmetic") {
           "Ч=15241578780673678546105778281054720515622620750190521\n");
 }
 
-TEST_CASE("ЦЕЛВЕЩ, СТРЦЕЛ, СТРВЕЩ conversions") {
+TEST_CASE("conversions between numbers and strings") {
   const auto result = runProgram(
       "?ЦЕЛВЕЩ(3, X).\n"
       "?ЦЕЛВЕЩ(X, 3.7).\n"

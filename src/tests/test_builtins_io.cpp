@@ -7,25 +7,25 @@
 
 using prologd::test::runProgram;
 
-TEST_CASE("ВЫВОД writes terms without a newline") {
+TEST_CASE("output writes terms without a newline") {
   const auto result = runProgram("?ВЫВОД(1, 2, 3).\n");
   REQUIRE(result.loaded);
   REQUIRE(result.output == "123\nДА\n");
 }
 
-TEST_CASE("ВЫВОД prints strings unquoted and lists") {
+TEST_CASE("output prints strings unquoted and lists") {
   const auto result = runProgram("?ВЫВОД(\"Ёё\", [1,2]).\n");
   REQUIRE(result.loaded);
   REQUIRE(result.output == "Ёё[1,2]\nДА\n");
 }
 
-TEST_CASE("ПС writes a newline") {
+TEST_CASE("writes a newline") {
   const auto result = runProgram("?ВЫВОД(а), ПС, ВЫВОД(б).\n");
   REQUIRE(result.loaded);
   REQUIRE(result.output == "а\nб\nДА\n");
 }
 
-TEST_CASE("ВВОДЦЕЛ reads integers") {
+TEST_CASE("reads integers") {
   const auto result = runProgram(
       "?ВВОДЦЕЛ(2).\n"
       "?ВВОДЦЕЛ(3).\n"
@@ -36,13 +36,13 @@ TEST_CASE("ВВОДЦЕЛ reads integers") {
   REQUIRE(result.output == "ДА\nНЕТ\nF=7\nДА\n");
 }
 
-TEST_CASE("ВВОДВЕЩ reads floats") {
+TEST_CASE("reads floats") {
   const auto result = runProgram("?ВВОДВЕЩ(X).\n?ВВОДВЕЩ(2.5).\n", "3.5 2.5\n");
   REQUIRE(result.loaded);
   REQUIRE(result.output == "X=3.5\nДА\n");
 }
 
-TEST_CASE("ВВОДСИМВ and ВВОДСТР read tokens and lines") {
+TEST_CASE("reads tokens and lines") {
   const auto result = runProgram(
       "?ВВОДСИМВ(S).\n"
       "?ВВОДСТР(L).\n",
@@ -51,7 +51,7 @@ TEST_CASE("ВВОДСИМВ and ВВОДСТР read tokens and lines") {
   REQUIRE(result.output == "S=привет\nL=мир\n");
 }
 
-TEST_CASE("ЗАПИСЬ_В and ЧТЕНИЕ_ИЗ round-trip through a file") {
+TEST_CASE("file write and read round-trip") {
   const auto path = (std::filesystem::temp_directory_path() / "prologd_io_test.txt").string();
   const std::string source = ":- ЗАПИСЬ_В(\"" + path + "\").\n" +
                              ":- ВЫВОД(\"данные\").\n" +

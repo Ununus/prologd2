@@ -4,7 +4,7 @@
 
 using prologd::test::runProgram;
 
-TEST_CASE("СЦЕП concatenates and splits") {
+TEST_CASE("concatenates and splits") {
   const auto result = runProgram(
       "?СЦЕП(\"аб\", \"вг\", X).\n"
       "?СЦЕП(X, \"бвг\", \"-абвг\").\n"
@@ -14,7 +14,7 @@ TEST_CASE("СЦЕП concatenates and splits") {
   REQUIRE(result.output == "X=абвг\nX=-а\nX=вг\nДА\n");
 }
 
-TEST_CASE("КОПИЯ extracts and searches substrings") {
+TEST_CASE("extracts and searches substrings") {
   const auto result = runProgram(
       "?КОПИЯ(\"ПРОЛОГ\", X, Y, \"ЛОГ\").\n"
       "?КОПИЯ(\"ПРОЛОГ\", X, 1, \"О\").\n"
@@ -25,7 +25,7 @@ TEST_CASE("КОПИЯ extracts and searches substrings") {
   REQUIRE(result.output == "X=4\nY=3\nX=3\nX=5\nX=РОЛ\nДА\n");
 }
 
-TEST_CASE("ДЛИНА measures strings") {
+TEST_CASE("measures strings") {
   const auto result = runProgram(
       "?ДЛИНА(\"ПРОЛОГ\", X).\n"
       "?ДЛИНА(\"ПРОЛОГ\", 6).\n"
@@ -34,7 +34,7 @@ TEST_CASE("ДЛИНА measures strings") {
   REQUIRE(result.output == "X=6\nДА\nНЕТ\n");
 }
 
-TEST_CASE("БУКВА and ЦИФРА locate characters") {
+TEST_CASE("locates letters and digits") {
   const auto result = runProgram(
       "?БУКВА(\"абв\", 1).\n"
       "?БУКВА(\"25689\", 5).\n"

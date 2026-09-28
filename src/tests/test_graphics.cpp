@@ -29,7 +29,7 @@ TEST_CASE("graphics predicates call the backend") {
   REQUIRE(backend->calls()[3].kind == GraphicsCall::Kind::FloodFill);
 }
 
-TEST_CASE("ТОЧКА with a variable reads a pixel colour") {
+TEST_CASE("point with a variable reads a pixel colour") {
   auto backend = std::make_shared<RecordingGraphicsBackend>();
   const auto result = runProgram("?ТОЧКА(1, 2, C).\n", "", backend);
   REQUIRE(result.loaded);

@@ -44,7 +44,7 @@ TEST_CASE("insertion sort") {
   REQUIRE(result.output == "R=[1,2,3,5,8,9]\n");
 }
 
-TEST_CASE("N-queens counted with НАЙТИВСЁ") {
+TEST_CASE("N-queens counted with findall") {
   const auto result = runProgram(
       "ферзь(0, N, [], A) :- список(N, A), !.\n"
       "ферзь(N, M, [[N,X]|A], C) :- ферзь(#N-1#, #M+1#, A, B), выбрать(X, B, C),\n"

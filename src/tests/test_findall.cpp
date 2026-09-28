@@ -4,7 +4,7 @@
 
 using prologd::test::runProgram;
 
-TEST_CASE("НАЙТИВСЁ collects the required example") {
+TEST_CASE("findall collects the required example") {
   const auto result = runProgram(
       "студент(вова, корчагин).\n"
       "студент(данил, ахмеров).\n"
@@ -21,7 +21,7 @@ TEST_CASE("НАЙТИВСЁ collects the required example") {
           "А=[[вова,корчагин],[данил,ахмеров],[ваня,петров]]\n");
 }
 
-TEST_CASE("НАЙТИВСЁ enumerates a goal in order") {
+TEST_CASE("findall enumerates a goal in order") {
   const auto result = runProgram(
       "член(X, [X|_]).\n"
       "член(X, [_|T]) :- член(X, T).\n"
@@ -30,14 +30,14 @@ TEST_CASE("НАЙТИВСЁ enumerates a goal in order") {
   REQUIRE(result.output == "X=_1\nL=[1,2,3]\n");
 }
 
-TEST_CASE("НАЙТИВСЁ yields an empty list when the goal fails") {
+TEST_CASE("findall yields an empty list when the goal fails") {
   const auto result = runProgram(
       "?НАЙТИВСЁ(X, ЛОЖЬ, L).\n");
   REQUIRE(result.loaded);
   REQUIRE(result.output == "X=_1\nL=[]\n");
 }
 
-TEST_CASE("НАЙТИВСЁ does not leak bindings") {
+TEST_CASE("findall does not leak bindings") {
   const auto result = runProgram(
       "значение(1).\n"
       "значение(2).\n"
@@ -46,7 +46,7 @@ TEST_CASE("НАЙТИВСЁ does not leak bindings") {
   REQUIRE(result.output == "Z=0\nX=_1\nL=[1,2]\n");
 }
 
-TEST_CASE("НАЙТИВСЁ copies template variables") {
+TEST_CASE("findall copies template variables") {
   const auto result = runProgram(
       "значение(1).\n"
       "значение(2).\n"
