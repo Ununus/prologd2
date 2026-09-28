@@ -28,7 +28,7 @@ class Theme:
     than not.
     """
 
-    comment: str = "#0f7f0f"
+    comment: str = "#0d6a0d"
     string: str = "#a31515"
     quoted_atom: str = "#b03060"
     keyword: str = "#00008b"  # reserved names: built-ins, `mod`/`div`, `ИМПОРТ`
@@ -38,7 +38,7 @@ class Theme:
     query: str = "#0a22d6"
     expression: str = "#0a22d6"
     atom_latin: str = "#800000"
-    atom_cyrillic: str = "#7b1fa2"
+    atom_cyrillic: str = "#6a1b9a"
     variable_latin: str = "#00695c"
     variable_cyrillic: str = "#ad1457"
     mixed: str = "#4a148c"  # an identifier that mixes the two alphabets
