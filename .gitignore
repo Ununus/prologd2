@@ -1,0 +1,18 @@
+# Local AI working folder (see ai/README.md) and reference data
+ai/
+data/
+
+# CMake FetchContent dependencies (populated by the build)
+3rdparty/
+src/3rdparty/
+
+# Build directories
+build/
+out/
+cmake-build-*/
+
+# Tooling artifacts
+compile_commands.json
+.cache/
+.vscode/
+.idea/

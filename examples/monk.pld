@@ -1,0 +1,27 @@
+monk(N):-begin(N,A,B,C),move(N,1,2,3,A,B,C,D,E,F).
+move(1,X,Y,Z,A,B,C,D,E,F):-make(X,Y,A,B,C,D,E,F).
+move(N,X,Y,Z,A,B,C,D,E,F):-БОЛЬШЕ(N,1),move(#N-1#,X,Z,Y,A,B,C,A_,B_,C_),make(X,Y,A_,B_,C_,D_,E_,F_), move(#N-1#,Z,Y,X,D_,E_,F_,D,E,F).
+begin(N,A,[],[]):-БОЛЬШЕ(N,0),МЕНЬШЕ(N,15),list(N,B),rev(B,A),pyr(A).
+list(1,[1]).
+list(N,[N|M]):-БОЛЬШЕ(N,1),list(#N-1#,M).
+rev([],[]).
+rev([H|T_],L):-rev(T_,T),conc(T,[H],L).
+conc([],L,L).
+conc([H|A],B,[H|C]):-conc(A,B,C).
+len([],0).
+len([A_|B_],L_):-len(B_,M),СЛОЖЕНИЕ(M,1,L_).
+pyr([]).
+pyr([N|T_]):-len(T_,H),disk(N,1,H,N),pyr(T_).
+make(1,2,[A_|A],B,C,A,[A_|B],C):-len(A,D_),disk(A_,1,D_,15),len(B,E_),disk(A_,2,E_,A_).
+make(1,3,[A_|A],B,C,A,B,[A_|C]):-len(A,D_),disk(A_,1,D_,15),len(C,E_),disk(A_,3,E_,A_).
+make(2,3,A,[B_|B],C,A,B,[B_|C]):-len(B,D_),disk(B_,2,D_,15),len(C,E_),disk(B_,3,E_,B_).
+make(2,1,A,[B_|B],C,[B_|A],B,C):-len(B,D_),disk(B_,2,D_,15),len(A,E_),disk(B_,1,E_,B_).
+make(3,2,A,B,[C_|C],A,[C_|B],C):-len(C,D_),disk(C_,3,D_,15),len(B,E_),disk(C_,2,E_,C_).
+make(3,1,A,B,[C_|C],[C_|A],B,C):-len(C,D_),disk(C_,3,D_,15),len(A,E_),disk(C_,1,E_,C_).
+disk(N,S,H,C_):-box(#S*160-5*N#,#300-10*H-1#,#S*160+5*N#,#300-10*H-10#,C_).
+	
+%box(a,b,c,d,e):-ЛИНИЯ(a,b,a,d,e),ЛИНИЯ(a,d,c,d,e),ЛИНИЯ(c,d,c,b,e),ЛИНИЯ(c,b,a,b,e),ЗАКРАСКА(#a+1#,#b-1#,e).
+%?monk(14).
+
+box(A_,B_,C_,D_,E_):-ЛИНИЯ(A_,B_,A_,D_,E_),ЛИНИЯ(A_,D_,C_,D_,E_),ЛИНИЯ(C_,D_,C_,B_,E_),ЛИНИЯ(C_,B_,A_,B_,E_),ЗАКРАСКА(#A_+1#,#B_-1#,E_),ЖДИ(100).
+?monk(6).

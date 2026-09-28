@@ -1,0 +1,7 @@
+% Пример импорта модуля.  Запуск:
+%   prologd -I examples/lib -s examples/import_demo.pld
+
+:- ИМПОРТ("library.pld").
+
+?удвоить(21, Y).
+?привет(X).

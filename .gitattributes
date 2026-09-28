@@ -1,0 +1,12 @@
+# Keep line endings stable across Linux and Windows.  The PrologD lexer treats
+# CR as whitespace, but normalizing to LF keeps diffs and golden test output
+# predictable.
+* text=auto eol=lf
+
+*.png binary
+*.ico binary
+*.jpg binary
+*.pdf binary
+*.exe binary
+*.dll binary
+*.lib binary

@@ -1,0 +1,111 @@
+#pragma once
+
+#include <cstdint>
+#include <functional>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <unordered_map>
+#include <utility>
+#include <vector>
+
+#include "prlib/diagnostics.hpp"
+#include "prlib/lexer.hpp"
+#include "prlib/program.hpp"
+#include "prlib/source_location.hpp"
+#include "prlib/term.hpp"
+
+namespace prologd {
+
+/// A module import request found in the source.
+struct ImportDirective {
+  std::string path;
+  SourceLocation location;
+};
+
+/// A parsed query (`?Goal, Goal.`) together with its named variables in the
+/// order of first occurrence.
+struct Query {
+  std::vector<Term> goals;
+  std::vector<std::pair<std::string, VarId>> variables;
+  SourceLocation location;
+  /// True for `:- Goal.` directives (executed quietly, no solution report).
+  bool isDirective = false;
+};
+
+/// Position of a statement in a parsed unit, preserving source order.
+struct StatementRef {
+  enum class Kind { Clause, Query, Import };
+  Kind kind = Kind::Clause;
+  std::size_t index = 0;
+};
+
+/// Result of parsing one source unit.
+struct ParsedProgram {
+  std::vector<Clause> clauses;
+  std::vector<Query> queries;
+  std::vector<ImportDirective> imports;
+  /// Source order of the statements above.
+  std::vector<StatementRef> order;
+  bool ok = true;
+};
+
+/// Recursive-descent parser for the PrologD surface language.
+///
+/// The parser never allocates `VarId`s by itself: it calls the allocator passed
+/// to the constructor.  The engine supplies an allocator backed by its
+/// `Bindings`; tests may supply a simple counter.
+class Parser {
+ public:
+  using VarAllocator = std::function<VarId(std::string_view name)>;
+
+  Parser(std::vector<Token> tokens, VarAllocator allocator, DiagnosticSink* sink);
+
+  /// Parse the whole token stream.
+  ParsedProgram parseProgram();
+
+  /// Parse a single statement (used by the REPL).  Returns `nullopt` at EOF.
+  std::optional<ParsedProgram> parseOne();
+
+ private:
+  const Token& peek(std::size_t lookahead = 0) const;
+  const Token& previous() const;
+  Token advance();
+  bool check(TokenKind kind) const;
+  bool match(TokenKind kind);
+  bool atEnd() const;
+
+  void report(ErrorCode code, const SourceLocation& location, std::string message = {});
+  void recoverToStatementEnd();
+
+  // Statements.
+  bool parseStatement(ParsedProgram& out);
+  bool parseQueryOrDirective(ParsedProgram& out);
+  bool parseClause(ParsedProgram& out);
+  std::vector<Term> parseGoalList();
+  Term parseGoal();
+
+  // Terms.
+  Term parseTerm();
+  Term parsePrimary();
+  Term parseList();
+  Term parseCompoundOrAtom();
+  Term parseArithmetic();
+  Term parseAdditive();
+  Term parseMultiplicative();
+  Term parseUnaryArithmetic();
+  Term parsePrimaryArithmetic();
+
+  VarId variableFor(std::string_view name, bool anonymous);
+  void beginScope();
+
+  std::vector<Token> tokens_;
+  std::size_t position_ = 0;
+  VarAllocator allocator_;
+  DiagnosticSink* sink_;
+  std::unordered_map<std::string, VarId> scope_;
+  std::vector<std::pair<std::string, VarId>> query_variables_;
+  bool failed_ = false;
+};
+
+}  // namespace prologd
