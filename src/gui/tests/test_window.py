@@ -32,6 +32,19 @@ except ImportError:  # pragma: no cover - main() reports it
 EXAMPLE = pathlib.Path(__file__).resolve().parents[3] / "examples" / "factorial.pld"
 ANSWER = "Ф=720\n"
 
+#: A failing ground query: the interpreter answers `НЕТ` itself, so the window
+#: must not answer a second time.  Kept as the user wrote it.
+PRIMES = """\
+делится(Х,У):-УМНОЖЕНИЕ(У,М,0,Х).
+проверка(Х,1):-!.
+проверка(Х,У):-НЕ(делится(Х,У)),проверка(Х,#У-1#).
+простое(1):-!.
+простое(Х):-проверка(Х,#Х/2#).
+
+?простое(3).
+?простое(4).
+"""
+
 #: Kept so the temporary directories outlive the windows that read from them.
 _SETTINGS_DIRECTORIES: list[tempfile.TemporaryDirectory] = []
 
@@ -74,12 +87,21 @@ def test_opening_does_not_run(executable: str) -> None:
 
 
 def test_the_editor_remembers_the_font_size(executable: str) -> None:
-    """Zoom is written straight to the settings, so it survives a restart."""
+    """Zoom is written straight to the settings and reaches every pane.
+
+    The output pane is read-only but it is read next to the program, so it grows
+    with the editor; storing the size once is what makes it survive a restart in
+    both places.
+    """
     window = make_window(executable)
     path = window._settings.path
     try:
-        window.editor().zoom_by(3)
+        assert window.output().font_size == window.editor().font_size
+        window.editor().set_font_size(17)
         size = window.editor().font_size
+        assert size == 17
+        assert window.output().font_size == size, "the output must zoom with the editor"
+        assert window._query_line.font().pointSizeF() == size, "and so must the query line"
         assert window._settings.font_size == size
     finally:
         window.stop_program()
@@ -88,7 +110,33 @@ def test_the_editor_remembers_the_font_size(executable: str) -> None:
     from prologd_gui.settings import Settings
 
     assert Settings(path).font_size == size, "the stored font size did not survive a reopen"
-    print(f"ok: a zoom of {size:.0f} pt is stored in {path.name}")
+    print(f"ok: a zoom of {size:.0f} pt reaches every pane and is stored in {path.name}")
+
+
+def test_a_query_is_answered_once(executable: str) -> None:
+    """The answer's text comes from the interpreter, never from the window.
+
+    `result` only says the query is over.  A failing `?простое(4).` used to print
+    `НЕТ` twice, which reads as a bug in the user's program: the second one was
+    appended by the window, and the program was correct all along.
+    """
+    window = make_window(executable)
+    try:
+        assert pump(window, lambda: bool(window.session.keywords)), "the session never said ready"
+        window.editor().setPlainText(PRIMES)
+        window.run_program()
+        answer = pump(window, lambda: "НЕТ" in window.output_text())
+        assert answer, f"no answer yet: {ascii(window.output_text())}"
+        # `ascii()` on purpose: a failure is printed by a *piped* process, whose
+        # stdout is the ANSI code page here, and a raw Cyrillic message cannot be
+        # encoded at all — the crash would hide the failure it reports.
+        text = window.output_text()
+        assert text.count("ДА") == 1, f"expected one yes: {ascii(text)}"
+        assert text.count("НЕТ") == 1, f"the answer is printed twice: {ascii(text)}"
+        print("ok: a failed query is answered once (by the interpreter, not the window)")
+    finally:
+        window.stop_program()
+        window.close()
 
 
 def test_a_run_is_repeatable(executable: str) -> None:
@@ -98,14 +146,14 @@ def test_a_run_is_repeatable(executable: str) -> None:
 
         window.open_path(str(EXAMPLE))
         window.run_program()
-        assert pump(window, lambda: ANSWER in window.output_text()), window.output_text()
-        assert window.output_text().count(ANSWER) == 1, window.output_text()
+        assert pump(window, lambda: ANSWER in window.output_text()), ascii(window.output_text())
+        assert window.output_text().count(ANSWER) == 1, ascii(window.output_text())
 
         # A second run starts from a clean slate: one answer again, not two and
         # not the 2^n explosion a duplicated recursive clause would give.
         window.run_program()
-        assert pump(window, lambda: ANSWER in window.output_text()), window.output_text()
-        assert window.output_text().count(ANSWER) == 1, window.output_text()
+        assert pump(window, lambda: ANSWER in window.output_text()), ascii(window.output_text())
+        assert window.output_text().count(ANSWER) == 1, ascii(window.output_text())
         print("ok: two runs answer once each (fresh session, cleared pane)")
     finally:
         window.stop_program()
@@ -153,7 +201,7 @@ def test_the_documented_shortcuts_are_bound(executable: str) -> None:
         # The key press runs the action: trigger is the same path a shortcut takes.
         window.open_path(str(EXAMPLE))
         actions["Запустить"].trigger()
-        assert pump(window, lambda: ANSWER in window.output_text()), window.output_text()
+        assert pump(window, lambda: ANSWER in window.output_text()), ascii(window.output_text())
         print("ok: F5/Shift+F5, Ctrl+K/U and Ctrl+0 are bound and the action runs the program")
     finally:
         window.stop_program()
@@ -176,6 +224,7 @@ def main(argv: list[str]) -> int:
     print(f"interpreter: {executable}")
     test_opening_does_not_run(executable)
     test_the_editor_remembers_the_font_size(executable)
+    test_a_query_is_answered_once(executable)
     test_a_run_is_repeatable(executable)
     test_the_documented_shortcuts_are_bound(executable)
     print("all window checks passed")

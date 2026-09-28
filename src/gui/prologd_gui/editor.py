@@ -14,6 +14,7 @@ from PySide6.QtGui import QColor, QFont, QKeyEvent, QPainter, QTextCursor, QText
 from PySide6.QtWidgets import QCompleter, QPlainTextEdit, QTextEdit, QWidget
 
 from . import completion, tokens
+from .settings import DEFAULT_FONT_SIZE, MAXIMUM_FONT_SIZE, MINIMUM_FONT_SIZE
 
 #: The comment character of the language: `%` to the end of the line.
 COMMENT_PREFIX = "%"
@@ -26,8 +27,8 @@ _MARGIN_BACKGROUND = "#f0f0f0"
 _MARGIN_TEXT = "#8a8a8a"
 _MARGIN_CURRENT = "#0a22d6"
 
-_MIN_FONT_SIZE = 6.0
-_MAX_FONT_SIZE = 72.0
+_MIN_FONT_SIZE = MINIMUM_FONT_SIZE
+_MAX_FONT_SIZE = MAXIMUM_FONT_SIZE
 
 #: Endings after which the next line continues the same clause, so `Enter`
 #: indents one more step.  A guess, not a parse: the real structure is the
@@ -58,10 +59,16 @@ class LineNumberArea(QWidget):
         self._editor.paint_line_numbers(event)
 
 
-class CodeEditor(QPlainTextEdit):
-    """A `QPlainTextEdit` with what writing PrologD needs."""
+class ZoomablePlainTextEdit(QPlainTextEdit):
+    """A text pane with the editor's font and zoom, and nothing else.
 
-    #: Emitted after `Ctrl`+wheel or a zoom action; carries the new point size.
+    The output pane is read-only: it needs no line numbers, no commands and no
+    completion.  It does need the *same* font as the editor, because a run's
+    answer is read next to the program that produced it — and one stored
+    preference then covers both, so nothing the user sets is lost on restart.
+    """
+
+    #: Emitted after `Ctrl`+wheel or a zoom command; carries the new point size.
     zoomChanged = Signal(float)
 
     def __init__(
@@ -69,36 +76,12 @@ class CodeEditor(QPlainTextEdit):
         parent: QWidget | None = None,
         *,
         font_family: str = "Cascadia Mono",
-        font_size: float = 11.0,
-        line_numbers: bool = True,
-        indent_character: str = "\t",
-        indent_width: int = 1,
-        completion: bool = True,
-        auto_complete_after: int = 2,
+        font_size: float = DEFAULT_FONT_SIZE,
     ) -> None:
         super().__init__(parent)
-        self._indent_character = indent_character
-        self._indent_width = max(1, indent_width)
-        self._line_numbers = line_numbers
-        self._error_line: int | None = None
-        self._keywords: object | None = None
-        self._auto_complete_after = max(1, int(auto_complete_after))
-        self._completion: completion.CompletionModel | None = None
-        self._offers: list[completion.Candidate] = []
-        self._completer: QCompleter | None = None
-        self._offer_list: QStringListModel | None = None
-
-        self._margin = LineNumberArea(self)
         self.setFont(self._make_font(font_family, font_size))
         self.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
         self.setTabChangesFocus(False)
-
-        self.blockCountChanged.connect(self._update_margin_width)
-        self.updateRequest.connect(self._update_margin)
-        self.cursorPositionChanged.connect(self._margin.update)
-        self._update_margin_width()
-        if completion:
-            self.enable_completion(True)
 
     # -- font and zoom ------------------------------------------------------
     @staticmethod
@@ -123,6 +106,7 @@ class CodeEditor(QPlainTextEdit):
         font.setStyleHint(QFont.StyleHint.Monospace)
         font.setFixedPitch(True)
         self.setFont(font)
+        self._font_changed()
 
     def set_font_size(self, size: float) -> None:
         clamped = min(_MAX_FONT_SIZE, max(_MIN_FONT_SIZE, float(size)))
@@ -131,14 +115,17 @@ class CodeEditor(QPlainTextEdit):
         font = self.font()
         font.setPointSizeF(clamped)
         self.setFont(font)
-        self._update_margin_width()
+        self._font_changed()
         self.zoomChanged.emit(clamped)
+
+    def _font_changed(self) -> None:
+        """Hook for what a pane has to recompute when the font changes."""
 
     def zoom_by(self, steps: float) -> None:
         self.set_font_size(self.font_size + steps)
 
     def reset_zoom(self) -> None:
-        self.set_font_size(11.0)
+        self.set_font_size(DEFAULT_FONT_SIZE)
 
     def wheelEvent(self, event: QWheelEvent) -> None:  # noqa: N802 - Qt spelling
         if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
@@ -148,6 +135,48 @@ class CodeEditor(QPlainTextEdit):
             event.accept()
             return
         super().wheelEvent(event)
+
+
+class CodeEditor(ZoomablePlainTextEdit):
+    """A `QPlainTextEdit` with what writing PrologD needs."""
+
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        *,
+        font_family: str = "Cascadia Mono",
+        font_size: float = DEFAULT_FONT_SIZE,
+        line_numbers: bool = True,
+        indent_character: str = "\t",
+        indent_width: int = 1,
+        completion: bool = True,
+        auto_complete_after: int = 2,
+    ) -> None:
+        super().__init__(parent, font_family=font_family, font_size=font_size)
+        self._indent_character = indent_character
+        self._indent_width = max(1, indent_width)
+        self._line_numbers = line_numbers
+        self._error_line: int | None = None
+        self._keywords: object | None = None
+        self._auto_complete_after = max(1, int(auto_complete_after))
+        self._completion: completion.CompletionModel | None = None
+        self._offers: list[completion.Candidate] = []
+        self._completer: QCompleter | None = None
+        self._offer_list: QStringListModel | None = None
+
+        self._margin = LineNumberArea(self)
+        self.blockCountChanged.connect(self._update_margin_width)
+        self.updateRequest.connect(self._update_margin)
+        self.cursorPositionChanged.connect(self._margin.update)
+        self._update_margin_width()
+        if completion:
+            self.enable_completion(True)
+
+    # -- font and zoom ------------------------------------------------------
+    def _font_changed(self) -> None:
+        # The margin is as wide as the number of digits in the widest number, so
+        # it has to be measured again, not just repainted.
+        self._update_margin_width()
 
     # -- line numbers -------------------------------------------------------
     def set_line_numbers(self, enabled: bool) -> None:

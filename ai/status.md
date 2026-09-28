@@ -239,3 +239,15 @@ Resolved on 2026-09-29 (GUI planning):
   pre-filtered — so `Enter` on the fresh popup did nothing and inserted a newline
   — and typing in a comment was one rule away from offering names, which the
   tokenizer now decides instead.
+* GUI hand-testing session, part 7: the user's own prime program printed `НЕТ`
+  twice for `?простое(4).`.  The interpreter was right — the **window** appended a
+  second `НЕТ` on the `result` event, which carries no text at all; the answer's
+  text arrives as `output`.  Fixed, and the contract is now written down in
+  `src/gui/README.md`, with the program itself as an offline regression test.
+  Two smaller things from the same pass: the output pane and the query line were
+  drawn in a hard-coded font, so the size the user set did not reach them — the
+  font and the zoom now live in `ZoomablePlainTextEdit`, shared by the editor and
+  the output and stored once.  And a piped run of a test that prints a Cyrillic
+  message dies with `UnicodeEncodeError` (piped stdout uses the ANSI code page,
+  1252 here, while the console is 65001) — the test messages are ASCII now, and
+  the rule is in `ai/conventions.md`.

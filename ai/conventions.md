@@ -65,6 +65,15 @@ literals. Never split a multi-byte character.
 
 ## Testing policy
 
+* Front-end test scripts (`src/gui/tests/*.py`) print **ASCII only** — use
+  `ascii(value)` for a value that may contain Cyrillic.  The reason is not
+  tidiness: when their output is piped (through `Select-String`, `grep`, a
+  redirect) Python encodes stdout with the *ANSI code page*, and on a cp1252
+  machine a raw Cyrillic message raises `UnicodeEncodeError` while printing the
+  failure — hiding the failure it was reporting.  Unpiped output goes to the
+  console code page (65001 here) and would have worked, which is exactly why the
+  trap is easy to walk into.
+
 Tests are written **together with** the feature, never after.
 
 * Framework: Catch2 v3 via `FetchContent`.

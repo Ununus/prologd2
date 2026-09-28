@@ -117,6 +117,12 @@ failure (for example an interrupted query).
   fresh process for a run — that is what **Запустить** does — and keep one session
   only for the queries that belong together.  A request written before the
   interpreter announced itself is queued by `session.py` rather than lost.
+* **`result` carries no text.**  The answer is printed by the interpreter itself
+  (`ДА`, `НЕТ`, or `X=1` lines) and arrives as `output`; `result` only says the
+  query is over, with `found` telling whether anything matched.  A front-end that
+  appends its own `НЕТ` for `found == false` prints the answer twice — which
+  looks like a bug in the user's program.  The window keeps it for the status
+  bar only.
 * `ready` carries `keywords`: every reserved name the lexer knows, with its kind
   (`predicate`, `operator`, `directive`) and its arities — `[]` for operators,
   directives and the variadic `ВЫВОД`, which is marked with `"variadic":true`.

@@ -49,6 +49,10 @@ instead of only a modal dialog.
 
 ## Design notes
 
+* The output pane already exists (read-only `ZoomablePlainTextEdit`), and the
+  query line under the editor, but they are arranged by a plain `QSplitter` with
+  no docking, no tabs and no per-pane toolbar.  The font size is shared with the
+  editor on purpose (task_29 splits it).
 * Everything about the panes is presentation, so nothing here may require an
   interpreter change: `output`, `error` and `input_request` events already carry
   all the information (task_21).

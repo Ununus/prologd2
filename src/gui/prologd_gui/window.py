@@ -5,21 +5,20 @@ from __future__ import annotations
 import pathlib
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction, QFont, QKeySequence
+from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QFileDialog,
     QInputDialog,
     QLabel,
     QLineEdit,
     QMainWindow,
-    QPlainTextEdit,
     QSplitter,
     QToolBar,
     QVBoxLayout,
     QWidget,
 )
 
-from .editor import CodeEditor
+from .editor import CodeEditor, ZoomablePlainTextEdit
 from .highlighter import PrologHighlighter
 from .session import PrologSession
 from .settings import Settings
@@ -66,9 +65,6 @@ class MainWindow(QMainWindow):
 
     # -- construction ------------------------------------------------------
     def _build_ui(self) -> None:
-        monospace = QFont("Cascadia Mono")
-        monospace.setStyleHint(QFont.StyleHint.Monospace)
-
         self._editor = CodeEditor(
             font_family=self._settings.font_family,
             font_size=self._settings.font_size,
@@ -84,13 +80,21 @@ class MainWindow(QMainWindow):
         # variable, which is also what an interpreter older than protocol 2 gives.
         self._highlighter = PrologHighlighter(self._editor.document())
 
-        self._output = QPlainTextEdit()
-        self._output.setFont(monospace)
+        # The output is read-only, but it is monospace and it zooms with the
+        # editor: one stored size covers both, so what the user set is still
+        # there next time in every pane.  (task_29 can split them.)
+        self._output = ZoomablePlainTextEdit(
+            font_family=self._settings.font_family,
+            font_size=self._settings.font_size,
+        )
         self._output.setReadOnly(True)
         self._output.setPlaceholderText("вывод интерпретатора")
+        self._output.zoomChanged.connect(self._on_zoom_changed)
 
         self._query_line = QLineEdit()
-        self._query_line.setFont(monospace)
+        # The same face as the panes, so a goal looks like the program it asks
+        # about; `_on_zoom_changed` keeps it in step.
+        self._query_line.setFont(self._output.font())
         self._query_line.setPlaceholderText("?цель(X). — Enter, чтобы выполнить")
         self._query_line.returnPressed.connect(self._run_query)
 
@@ -232,6 +236,10 @@ class MainWindow(QMainWindow):
         """The code editor itself, for the commands that act on a selection."""
         return self._editor
 
+    def output(self) -> ZoomablePlainTextEdit:
+        """The read-only output pane (task_27 gives it a place of its own)."""
+        return self._output
+
     def output_text(self) -> str:
         return self._output.toPlainText()
 
@@ -249,12 +257,26 @@ class MainWindow(QMainWindow):
         self._update_title()
 
     def _on_zoom_changed(self, size: float) -> None:
+        """One size for the editor, the output and the query line, stored at once.
+
+        Setting the size on the other pane emits `zoomChanged` again; that call
+        changes nothing and stops there, because `set_font_size` returns early
+        when the size is already the one asked for.
+        """
         self._settings.font_size = size
+        for pane in (self._editor, self._output):
+            pane.set_font_size(size)
+        self._query_line.setFont(self._output.font())
         self._status.setText(f"шрифт {size:.0f} pt")
 
     def _on_result(self, found: bool) -> None:
-        if not found:
-            self._append_output("НЕТ\n")
+        """Records the outcome; the text of the answer already arrived as output.
+
+        The interpreter prints `ДА`, `НЕТ` or the bindings itself, and `result`
+        only says the query is over.  Appending another `НЕТ` here is what made a
+        failing query print it twice — the program was never wrong.
+        """
+        self._status.setText("решение найдено" if found else "решения нет")
 
     def _on_input_request(self, kind: str) -> None:
         prompt = {"token": "Слово", "line": "Строка", "codepoint": "Символ"}.get(kind, "Ввод")
