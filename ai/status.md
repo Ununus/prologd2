@@ -80,6 +80,17 @@ session.
 | task_19_windows_portability | done | verified locally on VS 2026: build + 108/108 tests (ADR-013); the CI image still has to be confirmed |
 | task_20_gui_future | superseded | the Qt C++ plan became PySide6 over a JSON protocol (ADR-014) |
 | task_21_gui_pyside | in progress | protocol, `IoContext` input seam, `externalStop`, `src/gui` skeleton |
+| task_22_gui_editor | not started | highlighting (separate Cyrillic/Latin colours), line numbers, font zoom, comment/uncomment |
+| task_23_gui_keyword_source | not started | `--list-keywords` + `keywords` in `ready`; removes the third copy of the built-in list |
+| task_24_gui_completion | not started | completion from the keyword source plus the document's own predicates |
+| task_25_gui_files_tabs | not started | tabs, untitled buffers, save prompts, split editor |
+| task_26_gui_toolbar | not started | menus, toolbar, icon audit (27 icons present, 18 to draw) |
+| task_27_gui_panels | not started | output and input panes, output bottom/right |
+| task_28_gui_run_step | not started | run, step (new engine seam + protocol v2), stop, error line |
+| task_29_gui_settings | not started | settings dialog and persistence |
+| task_30_gui_formatter | not started | soft/hard formatting in prlib + protocol |
+| task_31_gui_shortcuts | not started | layout-independent `Ctrl`+ key combinations |
+| task_32_import_search_report | not started | `ИМПОРТ` failure names the directories tried |
 
 ## Test suite
 
@@ -108,13 +119,29 @@ output) and the CLI (`-s`, `--source`, `--source=`, positional, `-I`, `--help`,
    names immune to the console code page.
 4. Optional: first-argument clause indexing if a real program needs more speed.
 5. Optional: `is/2` and infix comparison operators next to `#expr#`.
-6. GUI (task_21): editor highlighting, a graphics pane over `GraphicsBackend`,
-   stepping over the `ТРАССА` stream, settings persistence.
+6. GUI: task_21 is the skeleton only (protocol, `src/gui` window with an editor,
+   a query line and an output pane).  The feature work is task_22–task_31, see
+   the board above.
 
 ## Open questions for the user
 
 1. String positions are code-point based (not CP1251 bytes) --- confirmed as the
    intended UTF-8 behaviour unless told otherwise.
+
+Resolved on 2026-09-29 (GUI planning):
+
+* formatter (task_30): trailing whitespace is removed, the continuation indent
+  is one tab, the soft width is 80 columns;
+* shortcuts (task_31): the modifier is `Ctrl`, not `Alt` (which focuses the menu
+  bar), and `?`/`:` get both physical keys --- `Ctrl+/` + `Ctrl+7` and `Ctrl+;` +
+  `Ctrl+6`;
+* split editor (task_25): two independent panes, each with its own tab bar;
+* running a buffer (task_28): a modified buffer is loaded as text whose `name`
+  is the file's path, so `ИМПОРТ` resolves exactly as it does for the saved
+  file;
+* the working folder (task_29) is a search directory passed as `-I`, so it is
+  searched alongside the importing file's own directory — before and after an
+  untitled buffer is saved (task_32 reports what was tried).
 
 ## Session log
 
@@ -138,3 +165,7 @@ output) and the CLI (`-s`, `--source`, `--source=`, positional, `-I`, `--help`,
 * GUI session: added `--protocol json` to the CLI, the `IoContext` input seam
   and `EngineOptions::externalStop` to prlib (Ctrl+C included), and the PySide6
   skeleton plus a headless protocol test in `src/gui` (ADR-014, task_21).
+* GUI planning session: read the previous Qt front-end
+  (`ai/_ref/prolog/src/gui/`, kept locally and git-ignored) for reference —
+  highlighting, actions, panes and the formatter — and broke the requested
+  feature list down into task_22–task_31.

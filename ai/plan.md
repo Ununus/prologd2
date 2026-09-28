@@ -48,8 +48,10 @@ exactly as specified. The requirement examples are quoted in
    water jugs, knapsack, monkey & bananas), and the stated requirements.
 9. Russian documentation in `doc/technical.typ`, `doc/help.typ`,
    `doc/prologd-diff.typ`, compiled with Typst when available.
-10. GUI is out of scope, but the graphics/UI boundary is isolated behind an
-    interface with a documented null implementation.
+10. The graphics/UI boundary is isolated behind an interface with a documented
+    null implementation.  The GUI itself is a separate front-end
+    (`src/gui`, PySide6 over the JSON session, milestone M11) that never links
+    against `prlib`.
 
 ## 3. Chosen architecture (summary)
 
@@ -130,6 +132,7 @@ Removed from PrologD:
 | M8 | Documentation | 18 |
 | M9 | Examples port and typical-task tests | 19 |
 | M10 | Windows portability and CI | 20 |
+| M11 | GUI front-end (PySide6) | 21–32 |
 
 ## 6. Risks and mitigations
 

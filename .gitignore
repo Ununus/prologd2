@@ -13,8 +13,9 @@ compile_commands.json
 .vscode/
 .idea/
 
-# Python front-end (src/gui) and the ai/ working virtualenv
+# Python front-end (src/gui) and the ai/ working folders
 __pycache__/
 *.pyc
 .venv/
 ai/_venv/
+ai/_ref/

@@ -45,6 +45,11 @@ the regression corpus and the Qt GUI — is published at
 original; it was an explicit requirement of this rewrite. Its examples are
 quoted in `task_13_findall.md` and in `examples/findall_demo.pld`.
 
+`_ref/` is a local, git-ignored copy of parts of that implementation, kept for
+reference while porting — today mainly the previous front-end
+(`_ref/prolog/src/gui/`, see task_22–task_31).  It is *not* part of the
+repository: do not link to it from anything that ships, and do not edit it.
+
 ## Language rules for this project
 
 * Markdown and AI docs: **English**.
