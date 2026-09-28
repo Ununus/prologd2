@@ -15,6 +15,7 @@ from __future__ import annotations
 import os
 import pathlib
 import sys
+import tempfile
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -31,11 +32,27 @@ except ImportError:  # pragma: no cover - main() reports it
 EXAMPLE = pathlib.Path(__file__).resolve().parents[3] / "examples" / "factorial.pld"
 ANSWER = "Ф=720\n"
 
+#: Kept so the temporary directories outlive the windows that read from them.
+_SETTINGS_DIRECTORIES: list[tempfile.TemporaryDirectory] = []
 
-def test_opening_does_not_run(executable: str) -> None:
+
+def make_window(executable: str):
+    """A window whose preferences live in a throw-away file.
+
+    Without this the window would read (and, on zoom, write) the settings of the
+    person running the tests.
+    """
+    from prologd_gui.settings import Settings
     from prologd_gui.window import MainWindow
 
-    window = MainWindow(executable, [])
+    directory = tempfile.TemporaryDirectory(prefix="prologd_gui_test_")
+    _SETTINGS_DIRECTORIES.append(directory)
+    settings = Settings(pathlib.Path(directory.name) / "gui.ini")
+    return MainWindow(executable, [], settings)
+
+
+def test_opening_does_not_run(executable: str) -> None:
+    window = make_window(executable)
     try:
         assert pump(window, lambda: bool(window.session.keywords)), "the session never said ready"
 
@@ -56,10 +73,26 @@ def test_opening_does_not_run(executable: str) -> None:
         window.close()
 
 
-def test_a_run_is_repeatable(executable: str) -> None:
-    from prologd_gui.window import MainWindow
+def test_the_editor_remembers_the_font_size(executable: str) -> None:
+    """Zoom is written straight to the settings, so it survives a restart."""
+    window = make_window(executable)
+    path = window._settings.path
+    try:
+        window.editor().zoom_by(3)
+        size = window.editor().font_size
+        assert window._settings.font_size == size
+    finally:
+        window.stop_program()
+        window.close()
 
-    window = MainWindow(executable, [])
+    from prologd_gui.settings import Settings
+
+    assert Settings(path).font_size == size, "the stored font size did not survive a reopen"
+    print(f"ok: a zoom of {size:.0f} pt is stored in {path.name}")
+
+
+def test_a_run_is_repeatable(executable: str) -> None:
+    window = make_window(executable)
     try:
         assert pump(window, lambda: bool(window.session.keywords)), "the session never said ready"
 
@@ -87,9 +120,7 @@ def test_the_documented_shortcuts_are_bound(executable: str) -> None:
     """
     from PySide6.QtWidgets import QToolBar
 
-    from prologd_gui.window import MainWindow
-
-    window = MainWindow(executable, [])
+    window = make_window(executable)
     try:
         assert pump(window, lambda: bool(window.session.keywords)), "the session never said ready"
         actions = {
@@ -107,11 +138,23 @@ def test_the_documented_shortcuts_are_bound(executable: str) -> None:
             assert text in actions, f"no {text} action, got {sorted(actions)}"
             assert expected <= bound[text], f"{text} is bound to {sorted(bound[text])}"
 
+        # Editing commands live on the window rather than on the toolbar, which
+        # task_26 fills with the real set of buttons.
+        window_actions = {action.text(): action for action in window.actions()}
+        for text, expected in (
+            ("Закомментировать", "Ctrl+K"),
+            ("Раскомментировать", "Ctrl+U"),
+            ("Сбросить масштаб", "Ctrl+0"),
+        ):
+            assert text in window_actions, f"no {text} action, got {sorted(window_actions)}"
+            keys = {key.toString() for key in window_actions[text].shortcuts()}
+            assert keys == {expected}, f"{text} is bound to {sorted(keys)}"
+
         # The key press runs the action: trigger is the same path a shortcut takes.
         window.open_path(str(EXAMPLE))
         actions["Запустить"].trigger()
         assert pump(window, lambda: ANSWER in window.output_text()), window.output_text()
-        print("ok: F5/Shift+F5 are bound and the action runs the program")
+        print("ok: F5/Shift+F5, Ctrl+K/U and Ctrl+0 are bound and the action runs the program")
     finally:
         window.stop_program()
         window.close()
@@ -132,6 +175,7 @@ def main(argv: list[str]) -> int:
     application = QApplication(sys.argv[:1])
     print(f"interpreter: {executable}")
     test_opening_does_not_run(executable)
+    test_the_editor_remembers_the_font_size(executable)
     test_a_run_is_repeatable(executable)
     test_the_documented_shortcuts_are_bound(executable)
     print("all window checks passed")

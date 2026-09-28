@@ -19,8 +19,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .editor import CodeEditor
 from .highlighter import PrologHighlighter
 from .session import PrologSession
+from .settings import Settings
 
 WELCOME = """% PrologD — пример программы
 студент(вова, корчагин).
@@ -31,10 +33,19 @@ WELCOME = """% PrologD — пример программы
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, executable: str, includes: list[str] | None = None):
+    def __init__(
+        self,
+        executable: str,
+        includes: list[str] | None = None,
+        settings: Settings | None = None,
+    ):
         super().__init__()
         self.setWindowTitle("PrologD")
         self.resize(1000, 700)
+
+        #: Preferences; tests pass a file of their own so a run cannot touch the
+        #: user's real settings.
+        self._settings = settings if settings is not None else Settings()
 
         self._session = PrologSession(executable, includes, self)
         self._session.ready.connect(self._on_ready)
@@ -58,9 +69,14 @@ class MainWindow(QMainWindow):
         monospace = QFont("Cascadia Mono")
         monospace.setStyleHint(QFont.StyleHint.Monospace)
 
-        self._editor = QPlainTextEdit(WELCOME)
-        self._editor.setFont(monospace)
+        self._editor = CodeEditor(
+            font_family=self._settings.font_family,
+            font_size=self._settings.font_size,
+            line_numbers=self._settings.line_numbers,
+        )
+        self._editor.setPlainText(WELCOME)
         self._editor.setPlaceholderText("текст программы")
+        self._editor.zoomChanged.connect(self._on_zoom_changed)
         # The highlighter learns the reserved names when the interpreter
         # announces itself (`_on_ready`); until then every name is an atom or a
         # variable, which is also what an interpreter older than protocol 2 gives.
@@ -95,11 +111,18 @@ class MainWindow(QMainWindow):
         self._add_action(toolbar, "Остановить", self.stop_program, ["Shift+F5", "Ctrl+."])
         self._add_action(toolbar, "Очистить вывод", self.clear_output, ["Ctrl+L"])
 
+        # Registered on the window without a button: the menu bar and the real
+        # toolbar come in task_26, and zoom deliberately has no key of its own
+        # besides the wheel — `Ctrl+=` and `Ctrl++` belong to task_31's combos.
+        self._add_window_action("Закомментировать", self._editor.comment, "Ctrl+K")
+        self._add_window_action("Раскомментировать", self._editor.uncomment, "Ctrl+U")
+        self._add_window_action("Сбросить масштаб", self._editor.reset_zoom, "Ctrl+0")
+
         self._status = QLabel("запуск…")
         self.statusBar().addWidget(self._status)
 
-    def _add_action(self, toolbar: QToolBar, title: str, slot, shortcuts: str | list[str]) -> None:
-        """Adds a toolbar button whose tooltip names its keys.
+    def _make_action(self, title: str, slot, shortcuts: str | list[str]) -> QAction:
+        """One action, used by the toolbar, the window and (task_26) the menus.
 
         `setShortcuts` takes a *list*: a comma inside `QKeySequence` would mean a
         two-stroke sequence (Ctrl+K, Ctrl+C) and not an alternative.  A shortcut
@@ -107,13 +130,19 @@ class MainWindow(QMainWindow):
         repeat — **Запустить** was bound to `Ctrl+R` while the plan promised F5,
         so the key did nothing.
         """
-        if isinstance(shortcuts, str):
-            shortcuts = [shortcuts]
+        keys = [shortcuts] if isinstance(shortcuts, str) else list(shortcuts)
         action = QAction(title, self)
-        action.setShortcuts([QKeySequence(shortcut) for shortcut in shortcuts])
-        action.setToolTip(f"{title} ({shortcuts[0]})")
+        action.setShortcuts([QKeySequence(key) for key in keys])
+        action.setToolTip(f"{title} ({keys[0]})")
         action.triggered.connect(slot)
-        toolbar.addAction(action)
+        return action
+
+    def _add_action(self, toolbar: QToolBar, title: str, slot, shortcuts: str | list[str]) -> None:
+        toolbar.addAction(self._make_action(title, slot, shortcuts))
+
+    def _add_window_action(self, title: str, slot, shortcuts: str | list[str]) -> None:
+        """Registers a key binding without a toolbar button."""
+        self.addAction(self._make_action(title, slot, shortcuts))
 
     # -- actions -----------------------------------------------------------
     def run_program(self) -> None:
@@ -197,6 +226,10 @@ class MainWindow(QMainWindow):
     def editor_text(self) -> str:
         return self._editor.toPlainText()
 
+    def editor(self) -> CodeEditor:
+        """The code editor itself, for the commands that act on a selection."""
+        return self._editor
+
     def output_text(self) -> str:
         return self._output.toPlainText()
 
@@ -208,6 +241,10 @@ class MainWindow(QMainWindow):
         self._highlighter.set_keywords(self._session.keywords)
         self._status.setText(f"PrologD {version} готов")
         self._update_title()
+
+    def _on_zoom_changed(self, size: float) -> None:
+        self._settings.font_size = size
+        self._status.setText(f"шрифт {size:.0f} pt")
 
     def _on_result(self, found: bool) -> None:
         if not found:

@@ -1,7 +1,9 @@
 # task_22 — GUI: code editor (highlighting, line numbers, editing)
 
-**Status:** in progress — the tokenizer is in (`tokens.py`, tested); the
-highlighter, the line numbers, the editing commands and the font live below.
+**Status:** done except for the standard editing actions (the undo stack works;
+find/replace and duplicate-line arrive with the menus in task_26) and writing
+files (task_25).  The tokenizer, highlighter, editor, appearance and the minimal
+settings store are in and tested.
 **Depends on:** task_21 (skeleton), task_23 (keyword source)
 **Milestone:** M11
 
@@ -26,7 +28,7 @@ no mangled line endings, no lost trailing newline.
       document per keystroke — and carries no state between lines (see below).
       A line holding an astral character gets its offsets mapped, because Qt
       counts UTF-16 units while Python counts code points.
-- [ ] `prologd_gui/editor.py` — `CodeEditor(QPlainTextEdit)`:
+- [x] `prologd_gui/editor.py` — `CodeEditor(QPlainTextEdit)`:
   * line number area with the current line emphasised;
   * an error marker in the margin and a red background on the line reported by
     the last diagnostic (filled in by task_28);
@@ -36,7 +38,10 @@ no mangled line endings, no lost trailing newline.
   * selection, block indent/outdent (`Tab`/`Shift+Tab` on a selection);
   * auto-indent on `Enter` inside a clause body (continuation indent), and no
     auto-indent after a clause terminator.
-- [ ] `comment()` / `uncomment()` on the current selection or line (Ctrl+K /
+  The font size, family, line numbers and indent are read from and written to
+  `prologd_gui/settings.py` (a minimal store: task_29 adds the dialog and the
+  rest of the list, and can read keys this version does not know).
+- [x] `comment()` / `uncomment()` on the current selection or line (Ctrl+K /
       Ctrl+U), inserting and removing a leading `%` per line, as a single undo
       step.  Unlike the reference implementation, the `%` is inserted at the
       first non-blank column, never in the middle of a line, and uncomment
@@ -59,15 +64,18 @@ no mangled line endings, no lost trailing newline.
       **Latin names `#800000`**, **Cyrillic names `#7b1fa2`**, typesetting
       `#4a148c` if an identifier mixes the two; variables a shade of their own
       (`#00695c` Latin, `#ad1457` Cyrillic) so variables and atoms are not
-      confused either; numbers `#505000`; comments `#0f7f0f`; strings `#a31515`;
+      confused either; numbers `#505000`; comments `#0d6a0d`; strings `#a31515`;
       `?` and `#` `#0a22d6`, as in the reference front-end.  The palette is
       lowercase, which is what `QColor.name()` returns, so it can be compared
-      directly.
-- [ ] Tests: `src/gui/tests/test_tokens.py` (Qt-free, table of tricky lines),
+      directly.  Purple (Cyrillic names) and green (comments) were darkened once
+      the first test measured them: both were legible but tiring on a light
+      background, and the worst ratio in the palette is now 6.1.
+- [x] Tests: `src/gui/tests/test_tokens.py` (Qt-free, table of tricky lines),
       `src/gui/tests/test_editor.py` (offscreen, needs PySide6, skipped when it
       is not installed) checking line-number width, comment/uncomment round
       trip and that highlighting assigns the expected format to a Cyrillic and
-      a Latin identifier.
+      a Latin identifier.  `test_settings.py` covers the store: defaults,
+      persistence, clamping and surviving keys a later version adds.
 
 ## Design notes
 
@@ -92,6 +100,10 @@ no mangled line endings, no lost trailing newline.
   tell a keyword from an identical-looking atom inside a string.
 * Comments start with `%` and there is no block comment, so highlighting is
   line-local except for strings and `#…#` blocks.
+* **A command keeps the lines it changed selected.**  `Ctrl+K` then `Ctrl+U`
+  has to act on the same text; with the cursor collapsed by the first command,
+  the second only touched the current line.  `test_editor.py` asserts the
+  selection, because the defect is invisible in a screenshot.
 
 ## Acceptance
 

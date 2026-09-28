@@ -80,7 +80,7 @@ session.
 | task_19_windows_portability | done | verified locally on VS 2026: build + 108/108 tests (ADR-013); the CI image still has to be confirmed |
 | task_20_gui_future | superseded | the Qt C++ plan became PySide6 over a JSON protocol (ADR-014) |
 | task_21_gui_pyside | in progress | protocol, `IoContext` input seam, `externalStop`, `src/gui` skeleton |
-| task_22_gui_editor | in progress | `tokens.py`, `theme.py`, `highlighter.py` done and tested; line numbers, editing commands, font next |
+| task_22_gui_editor | done | tokenizer, palette, highlighter, line numbers, Ctrl+K/U, zoom and the settings store are in and tested; find/replace and duplicate line come with the task_26 menus, saving a file with task_25 |
 | task_23_gui_keyword_source | done | `--list-keywords` + `keywords` in `ready` (protocol 2); one source for the built-in list |
 | task_24_gui_completion | not started | completion from the keyword source plus the document's own predicates |
 | task_25_gui_files_tabs | not started | tabs, untitled buffers, save prompts, split editor |
@@ -110,10 +110,13 @@ build, so CI does not run them yet): `src/gui/tests/protocol_smoke.py`,
 highlighting rules, including a sweep over the example programs),
 `test_highlighter.py` (the palette reaching the document),
 `test_appearance.py` (forced light palette and contrast of every syntax colour),
+`test_editor.py` (comment/uncomment and indent as single undo steps, the Tab and
+Enter keys, zoom bounds, line-number width, the error marker),
+`test_settings.py` (defaults, persistence, clamping, keys a later version adds),
 `test_session.py`
 (request queueing and the clean-slate restart) and `test_window.py` (opening a
-file does not run it; the documented keys are bound), all invoked as plain
-scripts.
+file does not run it; the documented keys are bound; zoom reaches the settings
+file), all invoked as plain scripts.
 
 ## Known gaps / next steps
 
@@ -131,8 +134,10 @@ scripts.
 4. Optional: first-argument clause indexing if a real program needs more speed.
 5. Optional: `is/2` and infix comparison operators next to `#expr#`.
 6. GUI: task_21 is the skeleton only (protocol, `src/gui` window with an editor,
-   a query line and an output pane).  The feature work is task_22–task_31, see
-   the board above.
+   a query line and an output pane); task_22 adds the code editor itself and
+   task_23 the keyword source.  The rest is task_24–task_31, see the board above.
+   The settings file is written to `%LOCALAPPDATA%\PrologD\gui\gui.ini`; the
+   dialog that edits it is task_29, and `--settings FILE` overrides the path.
 
 ## Open questions for the user
 
@@ -179,7 +184,8 @@ Resolved on 2026-09-29 (GUI planning):
 * GUI planning session: read the previous Qt front-end
   (`ai/_ref/prolog/src/gui/`, kept locally and git-ignored) for reference —
   highlighting, actions, panes and the formatter — and broke the requested
-  feature list down into task_22–task_31.* GUI implementation session, part 1: task_23 (one source of truth for the
+  feature list down into task_22–task_31.
+* GUI implementation session, part 1: task_23 (one source of truth for the
   reserved names: `--list-keywords`, protocol 2 with `keywords` in `ready`, the
   Qt-free `prologd_gui/keywords.py`) and task_32 (the loader reports the
   directories it searched).  The keyword tests immediately found that `ВЫП/1` is
@@ -202,3 +208,22 @@ Resolved on 2026-09-29 (GUI planning):
   file's own directory) or the editor text under the file's name.  The window
   exposes `open_path`/`run_program`/`stop_program`/`clear_output` and a `session`
   property, which is what `src/gui/tests/test_window.py` drives offscreen.
+* GUI implementation session, part 4: syntax highlighting stopped being a colour
+  scheme on paper.  `tokens.py` mirrors the lexer's rules (whitespace is not a
+  token; nothing spans lines), `theme.py` keeps the palette as data and
+  `highlighter.py` maps token to format in one pass per line instead of the
+  reference's fifty regular expressions.  Running it by hand showed the syntax
+  colours drowning in the desktop's dark theme, so the window now forces a light
+  Fusion palette (`--theme light|system`), built by hand because
+  `QStyle.standardPalette()` follows the platform since Qt 6.5.  A test measures
+  the WCAG contrast of every colour; purple and green were darkened after the
+  first measurement (worst ratio now 6.1).
+* GUI implementation session, part 5: the editor proper.  `editor.py` adds a
+  line-number margin, Ctrl+wheel zoom bounded 6…72 pt, Tab/Shift+Tab block
+  indent, `Enter` continuation indent and the error-line marker task_28 will
+  drive; a minimal `settings.py` (ini under `%LOCALAPPDATA%\PrologD\gui`, with
+  `--settings FILE`) stores font, line numbers, indent and theme, and the tests
+  are given a temporary file so they never touch the user's own.  Writing the
+  test for comment/uncomment found a real defect: the command collapsed the
+  selection, so `Ctrl+U` right after `Ctrl+K` acted on one line — the transformed
+  lines now stay selected, which the test asserts.

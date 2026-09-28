@@ -42,6 +42,30 @@ background — on a dark one they are unreadable.  `system` keeps the platform
 choice: what a light desktop wants, and the hook for a real dark theme, which
 needs its own syntax palette rather than just this switch (task_29).
 
+`--settings FILE` chooses the settings file; by default it is
+`%LOCALAPPDATA%\PrologD\gui\gui.ini`, holding the font family and size, line
+numbers, the indent character and width, and the theme.  A value that cannot be
+read falls back to the default instead of refusing to start, and keys this
+version does not know are left alone (task_29 adds the dialog).
+
+## Editor keys
+
+| Key | Command |
+| --- | --- |
+| `F5`, `Ctrl+R` | **Запустить** — a run in a fresh interpreter |
+| `Shift+F5`, `Ctrl+.` | **Остановить** |
+| `Ctrl+O` | **Открыть…** — fills the editor and does not run |
+| `Ctrl+L` | clear the output pane |
+| `Ctrl+K` / `Ctrl+U` | comment / uncomment the selection or the current line |
+| `Ctrl`+wheel, `Ctrl+0` | font size (6…72 pt) and its reset |
+| `Tab` / `Shift+Tab` | indent / outdent the selected lines |
+| `Enter` | continues the indent after `,`, `:-` or `<-` |
+
+Neither list is final: the menu bar and the toolbar icons are task_26, the rest
+of the combinations task_31.  Zoom deliberately has no key pair of its own —
+`Ctrl+=`, `Ctrl++` and `Ctrl+-` will insert a `РАВНО(…)`, `СЛОЖЕНИЕ(…)` or
+`ВЫЧИТАНИЕ(…)` skeleton there.
+
 Headless check of the protocol, without PySide6 installed:
 
 ```powershell
@@ -111,9 +135,9 @@ failure (for example an interrupted query).
 
 ## Roadmap
 
-* Syntax highlighting for the editor, driven by the lexer's keyword set and the
-  `doc/help.typ` keyword table.
 * A graphics pane fed by a `GraphicsBackend` that emits protocol events
   (`ТОЧКА`, `ЛИНИЯ`, … currently reach a null backend).
 * Step-by-step execution over the `ТРАССА` stream.
-* Settings persistence (interpreter path, include directories, window layout).
+* Settings persistence: the file and the editor's values exist; the dialog and
+  the rest of the list (interpreter path, include directories, window layout)
+  are task_29.

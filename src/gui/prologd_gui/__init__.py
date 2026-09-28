@@ -8,10 +8,12 @@ side of it.
 
 __all__ = [
     "appearance",
+    "editor",
     "highlighter",
     "keywords",
     "protocol",
     "session",
+    "settings",
     "theme",
     "tokens",
     "window",
