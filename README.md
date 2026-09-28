@@ -142,10 +142,14 @@ groups (control, types, conversions, strings, I/O, program database, graphics
 stubs), `НАЙТИВСЁ/3`, the module loader (`ИМПОРТ`) and the CLI.
 
 Ported examples live in `examples/` (lessons, typical tasks, the required
-`НАЙТИВСЁ` demo) and are covered by golden tests. A PySide6 front-end skeleton
-in `src/gui` drives the interpreter through the JSON protocol. Documentation is
-in `doc/` (`help.typ`, `technical.typ`, `prologd-diff.typ`); build the PDFs with
-`cmake --build build --target docs` when Typst is installed.
+`НАЙТИВСЁ` demo) and are covered by golden tests. The PySide6 front-end in
+`src/gui` drives the interpreter through the JSON protocol: tabs, syntax
+highlighting that tells Latin names from Cyrillic ones, completion built from
+the reserved names and the program's own, run/stop with a fresh interpreter per
+run, and the usual file handling (save prompts, line endings and encodings kept).
+Documentation is in `doc/` (`help.typ`, `gui.typ`, `technical.typ`,
+`prologd-diff.typ`); `cmake --build build --target docs` writes the PDFs into the
+same directory when Typst is installed.
 
 CI builds and tests on Linux (GCC and Clang) and Windows (MSVC); see
 `.github/workflows/ci.yml` and `CMakePresets.json`. Current status and the task

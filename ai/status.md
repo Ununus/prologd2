@@ -75,7 +75,7 @@ session.
 | task_14_modules_import | done | loader + tests (cycles, root, include path) |
 | task_15_graphics_stubs | done | |
 | task_16_cli | done | conventional CLI (ADR-012); Ctrl+C stop, exit codes and `--protocol json` added |
-| task_17_docs_typst | done | three Russian documents + `doc/README.md` |
+| task_17_docs_typst | done | four Russian documents + `doc/README.md`; the PDFs are written into `doc/` (git-ignored) |
 | task_18_examples_acceptance | done | lessons ported; golden tests |
 | task_19_windows_portability | done | verified locally on VS 2026: build + 108/108 tests (ADR-013); the CI image still has to be confirmed |
 | task_20_gui_future | superseded | the Qt C++ plan became PySide6 over a JSON protocol (ADR-014) |
@@ -83,7 +83,7 @@ session.
 | task_22_gui_editor | done | tokenizer, palette, highlighter, line numbers, Ctrl+K/U, zoom and the settings store are in and tested; find/replace and duplicate line come with the task_26 menus, saving a file with task_25 |
 | task_23_gui_keyword_source | done | `--list-keywords` + `keywords` in `ready` (protocol 2); one source for the built-in list |
 | task_24_gui_completion | done | popup over the reserved names *and* the document's own names, with arities; no completion in a comment, string or `#…#`; `Ctrl+Space` |
-| task_25_gui_files_tabs | in progress | tabs, file actions, save prompts, encodings, drag & drop and recent files are in; the split editor (`Ctrl+\`) is next |
+| task_25_gui_files_tabs | in progress | tabs, file actions, save prompts, encodings, drop anywhere and recent files are in; the split editor (`Ctrl+\`) is next |
 | task_26_gui_toolbar | not started | menus, toolbar, icon audit (27 icons present, 18 to draw) |
 | task_27_gui_panels | not started | output and input panes, output bottom/right |
 | task_28_gui_run_step | not started | run, step (new engine seam + protocol v2), stop, error line |
@@ -181,7 +181,8 @@ Resolved on 2026-09-29 (GUI planning):
   page manifest for `prologd`/`prlib_tests`, and `toUtf8Path`/`toUtf8PathGeneric`
   instead of `path::string()`); verified the release build and the whole suite on
   MSVC 19.51 (ADR-013); fixed the `docs` target, which never created
-  `build/doc` and therefore always failed with typst `os error 3`.
+  `build/doc` and therefore always failed with typst `os error 3`.  The PDFs now
+  go to `doc/` next to their sources and are ignored by git.
 * GUI session: added `--protocol json` to the CLI, the `IoContext` input seam
   and `EngineOptions::externalStop` to prlib (Ctrl+C included), and the PySide6
   skeleton plus a headless protocol test in `src/gui` (ADR-014, task_21).
@@ -266,3 +267,20 @@ Resolved on 2026-09-29 (GUI planning):
   forgets to replace one does not fail, it *hangs*.  The window and the tab bar
   share one order: `tabMoved` re-orders the buffer list, and a single empty buffer
   is a placeholder that the first opened file replaces.
+* GUI hand-testing round, part 9: four things the user found and asked for.
+  (1) The editor drew its text in the application font size on start and after
+  opening a file, until the first zoom: a `QTextDocument` carries its *own*
+  default font, and the plain text layout measures blocks with it, so the
+  document has to be told the pane's font when it is handed over — the widget's
+  font is not enough.  (2) Closing all tabs now walks through them: the tab being
+  asked about is made current, disappears as soon as the question is answered, and
+  the next one follows — asking about everything before closing anything kept the
+  files but told nobody which file each question was about.  (3) A file dropped on
+  the editor is now opened instead of pasted: a `QPlainTextEdit` accepts a file
+  drop and inserts its text, so the window never saw the event; the pane reports
+  the drop itself.  (The event must be sent to the pane's **viewport** — a scroll
+  area delivers drag and drop there, which is why the first version of the test
+  saw nothing.)  (4) `doc/gui.typ`: a fourth Typst paper describing the interface
+  — keys, tabs and prompts, encodings, completion, what is *not* there yet.  Its
+  tables had to be written as `#table(...)`: Typst has no pipe tables, and the
+  markdown-like version rendered as literal text.

@@ -140,20 +140,20 @@ endif()
 # ---------------------------------------------------------------------------
 # Documentation (optional: requires the `typst` binary)
 # ---------------------------------------------------------------------------
+# The PDFs are written next to their sources, in the source tree: they are what
+# the reader is handed, and a build directory is not somewhere anyone looks for
+# them.  The PDFs are ignored by git (.gitignore) — the `.typ` files are the
+# sources of truth, the PDFs are an artefact.
 find_program(TYPST_EXECUTABLE typst)
 add_custom_target(prologd_docs
   COMMENT "Building Typst documentation")
 if(TYPST_EXECUTABLE)
-  # typst does not create the output directory itself and fails with
-  # "failed to write PDF file (os error 3)" when it is missing.
-  add_custom_command(TARGET prologd_docs POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/doc")
-  foreach(doc IN ITEMS help technical prologd-diff)
+  foreach(doc IN ITEMS help technical prologd-diff gui)
     add_custom_command(TARGET prologd_docs POST_BUILD
       COMMAND ${TYPST_EXECUTABLE} compile
               "${CMAKE_SOURCE_DIR}/doc/${doc}.typ"
-              "${CMAKE_BINARY_DIR}/doc/${doc}.pdf"
-      COMMENT "typst: ${doc}.typ -> ${doc}.pdf")
+              "${CMAKE_SOURCE_DIR}/doc/${doc}.pdf"
+      COMMENT "typst: doc/${doc}.typ -> doc/${doc}.pdf")
   endforeach()
   add_custom_target(docs DEPENDS prologd_docs)
 else()
@@ -162,6 +162,6 @@ else()
             "typst not found, skipping PDF generation")
   add_custom_command(TARGET prologd_docs POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E echo
-            "install Typst to build the documentation PDFs")
+            "install Typst to build the documentation PDFs into doc/")
   add_custom_target(docs DEPENDS prologd_docs)
 endif()

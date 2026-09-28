@@ -30,14 +30,26 @@ keep track of which file each tab shows.
       through `closeEvent`).  Only the first three have toolbar buttons until
       task_26 builds the menus.
 - [x] Modified-buffer prompts: closing a tab, closing the window and `Выход` ask
-      **Сохранить / Не сохранять / Отмена** per modified buffer; cancelling
-      aborts the whole close, it must not close the tabs processed earlier.
-      `close_all()` therefore asks about every modified buffer *before* it closes
-      any of them, and `Enter` lands on **Отмена**.
+      **Сохранить / Не сохранять / Отмена** per modified buffer.
+      **Changed by the user after hand-testing:** `close_all()` walks through the
+      tabs instead of asking about all of them first — the tab is made current,
+      the question is asked about *that* file, and it is closed as soon as the
+      answer is given.  Asking everything first kept the buffers open but left the
+      user guessing which file each box was about, which is the worse failure.
+      Cancelling therefore stops where it happened.  `Enter` lands on **Отмена**
+      either way, and a save that fails keeps the buffer.
 - [x] New/recent: the last opened directory is remembered and used by both
       dialogs, the ten most recent files are stored (the menu is task_26), a
-      `.pld` dropped on the window opens in a new tab, and **Перечитать с диска**
-      (`Ctrl+Shift+R`) reloads the current tab after asking about its changes.
+      program dropped **anywhere on the window** (tab bar, editor, output pane)
+      opens in a new tab, and **Перечитать с диска** (`Ctrl+Shift+R`) reloads the
+      current tab after asking about its changes.  The drop had to be taken away
+      from the text panes: a `QPlainTextEdit` accepts a file drop and inserts the
+      file's *text*, so the window never saw it.
+- [x] `doc/gui.typ` — the user-facing paper for the interface: keys, tabs and
+      files, prompts and encodings, the editor, completion, running, the mouse,
+      settings, and a section listing what is *not* implemented yet.  Not in the
+      original deliverable list; the user asked for it, and a feature nobody can
+      look up is half a feature.
 - [x] Running uses the file's own path: a saved tab is loaded with
       `{"cmd":"load","path":…}` so `ИМПОРТ` resolves relative to *that* file; an
       untitled tab is loaded as text and `ИМПОРТ` resolves against the working

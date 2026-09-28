@@ -1,5 +1,9 @@
 #set document(title: "Пролог-Д 2.0: изменения языка", author: "Проект PrologD")
-#set page(numbering: "1", margin: 2.2cm)
+#set page(
+  paper: "a5",
+  numbering: "1",
+  margin: (left: 1.0cm, right: 0.8cm, top: 0.8cm, bottom: 0.8cm),
+)
 #set text(lang: "ru", size: 11pt)
 #set par(justify: true)
 #show heading.where(level: 1): it => pagebreak(weak: true) + it

@@ -1,10 +1,11 @@
 # Документация PrologD
 
-В этом каталоге лежат три документа на языке Typst:
+В этом каталоге лежат четыре документа на языке Typst:
 
 | Файл | Назначение |
 |------|------------|
 | `help.typ` | руководство пользователя: синтаксис, типы данных, все встроенные предикаты, примеры, командная строка |
+| `gui.typ` | графический интерфейс: запуск, вкладки и файлы, редактор, автодополнение, горячие клавиши, настройки |
 | `technical.typ` | техническое описание: модель термов, унификация, машина вывода, длинная арифметика, разбор, модули, тестирование |
 | `prologd-diff.typ` | изменения синтаксиса и поведения относительно первоначального Пролога-Д, с примерами «было/стало» |
 
@@ -20,12 +21,21 @@
 cmake --build build --target docs
 ```
 
-PDF-файлы появятся в `build/doc/`. Можно собрать и вручную:
+PDF-файлы кладутся рядом с исходниками, в этот же каталог `doc/`. Они — артефакт,
+а не исходный текст, поэтому перечислены в `.gitignore`; правьте `.typ`, а PDF
+пересобирайте. Можно собрать и вручную:
 
 ```sh
-typst compile doc/help.typ        doc/help.pdf
-typst compile doc/technical.typ   doc/technical.pdf
+typst compile doc/help.typ       doc/help.pdf
+typst compile doc/gui.typ        doc/gui.pdf
+typst compile doc/technical.typ  doc/technical.pdf
 typst compile doc/prologd-diff.typ doc/prologd-diff.pdf
+```
+
+Отдельную страницу можно посмотреть, не открывая PDF:
+
+```sh
+typst compile --format png --ppi 105 --pages 2-3 doc/gui.typ "$env:TEMP/g{p}.png"
 ```
 
 Если `typst` не установлен, его можно поставить как Python-пакет (компилятор

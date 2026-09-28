@@ -50,6 +50,22 @@ Produce the three Russian Typst documents required by the request.
 - [ ] Add a `docs` CMake target (custom target) that runs `typst compile` when
   the `typst` binary is found; skip with a warning otherwise.
 
+### Added later (GUI round)
+
+- [x] `doc/gui.typ` — a fourth paper, for the graphical interface (task_25).
+      Written to be looked things up in: keys, tabs and files, save prompts,
+      encodings, the editor, completion, running, the mouse, settings, and an
+      honest section on what is not implemented yet.
+- [x] **The PDFs go to `doc/`, next to their sources**, and are ignored by git
+      (`doc/*.pdf`).  They used to be written into `build/doc`, where nobody looks
+      for them: the user built the PDFs by hand because the target seemed to do
+      nothing.  All four documents also share the same A5 page (`paper: "a5"`,
+      narrow margins) — the user set that in `prologd-diff.typ` first.
+- [x] Typst has **no pipe tables**: the markdown-like `| a | b |` blocks in the
+      first draft of `gui.typ` rendered as literal text.  Tables are `#table(...)`
+      with `columns: (auto, 1fr)` and `inset: 5pt`; keep the `auto` column short,
+      because it does not wrap.
+
 ## Design notes
 
 * No `typst` binary is assumed to be installed; CI must not fail if it is
