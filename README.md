@@ -5,9 +5,9 @@ interpreter: UTF-8 native, console first, with Russian built-in predicates,
 arbitrary precision integers and the `НАЙТИВСЁ/3` (`findall`) predicate.
 
 The original PrologD sources (CP1251, C++/Qt) are not bundled with this
-repository. Planning, task breakdown and architecture notes live in the local
-`ai/` working folder (not versioned); user and technical documentation is in
-`doc/`.
+repository; the previous implementation is published at
+<https://github.com/Ununus/prologd>. Planning, task breakdown and architecture
+notes live in `ai/`; user and technical documentation is in `doc/`.
 
 ## Quick start
 
@@ -87,6 +87,7 @@ Usage: prologd [options] [files...]
 -e, --error FILE      write diagnostics to this file
 -q, --questions       echo queries before executing them
 -t, --trace           start with tracing enabled
+    --protocol FORM   front-end protocol: text (default) or json
 -h, --help            show help and exit
     --version         show version and exit
 ```
@@ -102,6 +103,17 @@ Lines starting with `$` in a source file are preloaded as program input (the
 historical test-harness feature). Diagnostics use the usual compiler format:
 `file:line:column: error: message`.
 
+Exit codes: `0` success, `1` usage error, `2` a source file could not be loaded
+ or parsed, `3` a runtime error (including an interrupted query).
+
+### Front-end protocol
+
+`prologd --protocol json` replaces the human-readable console with a session
+for front-ends: requests are JSON objects on stdin, events are JSON objects on
+stdout, one per line. `-i`/`-o`/`-e` are refused in this mode — the protocol
+owns both streams. The Python/PySide6 GUI in `src/gui` is built on it; see
+`src/gui/README.md` for the full contract.
+
 ## Project layout
 
 ```
@@ -109,12 +121,13 @@ CMakeLists.txt        top-level build
 CMakePresets.json     configure/build/test presets (Linux, Windows)
 src/prlib/            interpreter library
 src/cli/              console front-end
+src/gui/              PySide6 front-end (drives the CLI over the JSON protocol)
 src/tests/            Catch2 test suite and CLI integration tests
 src/3rdparty/         FetchContent dependencies (gitignored)
 doc/                  Typst documentation (Russian)
 examples/             example PrologD programs
 .github/workflows/    CI (Linux GCC/Clang, Windows MSVC)
-ai/                   local plan/tasks/notes (gitignored, not versioned)
+ai/                   plan, task breakdown and notes for the AI agent
 ```
 
 ## Status
@@ -125,11 +138,12 @@ arithmetic with a hand-written `BigInt`, all documented built-in predicate
 groups (control, types, conversions, strings, I/O, program database, graphics
 stubs), `НАЙТИВСЁ/3`, the module loader (`ИМПОРТ`) and the CLI.
 
-Ported examples live in `examples/` (lessons, typical tasks, the teacher's
-`НАЙТИВСЁ` demo) and are covered by golden tests. Documentation is in `doc/`
-(`help.typ`, `technical.typ`, `prologd-diff.typ`); build the PDFs with
+Ported examples live in `examples/` (lessons, typical tasks, the required
+`НАЙТИВСЁ` demo) and are covered by golden tests. A PySide6 front-end skeleton
+in `src/gui` drives the interpreter through the JSON protocol. Documentation is
+in `doc/` (`help.typ`, `technical.typ`, `prologd-diff.typ`); build the PDFs with
 `cmake --build build --target docs` when Typst is installed.
 
 CI builds and tests on Linux (GCC and Clang) and Windows (MSVC); see
 `.github/workflows/ci.yml` and `CMakePresets.json`. Current status and the task
-board are kept in the local (unversioned) `ai/status.md`.
+board are kept in `ai/status.md`.

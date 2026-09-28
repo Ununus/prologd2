@@ -4,7 +4,7 @@
 
 using prologd::test::runProgram;
 
-TEST_CASE("НАЙТИВСЁ collects the teacher's example") {
+TEST_CASE("НАЙТИВСЁ collects the required example") {
   const auto result = runProgram(
       "студент(вова, корчагин).\n"
       "студент(данил, ахмеров).\n"
