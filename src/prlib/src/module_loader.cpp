@@ -9,6 +9,44 @@
 
 namespace prologd {
 
+namespace {
+
+/// The candidate list of a failed import: absolute paths in the order they were
+/// tried, capped so a long `-I` chain cannot flood the output.  One line, so the
+/// `file:line:column: error: message` shape survives.
+std::string describeImportSearch(const std::vector<ModuleLoader::SearchStep>& steps) {
+  constexpr std::size_t kMaxEntries = 5;
+  std::string text;
+  const std::size_t shown = std::min(steps.size(), kMaxEntries);
+  for (std::size_t index = 0; index < shown; ++index) {
+    if (index != 0) {
+      text += "; ";
+    }
+    // Absolute, because the first candidate of an unsaved buffer is relative to
+    // the process working directory and an empty prefix would say nothing.
+    std::error_code code;
+    const std::filesystem::path absolute = std::filesystem::absolute(steps[index].path, code);
+    text += toUtf8Path(code ? steps[index].path : absolute);
+    switch (steps[index].outcome) {
+      case ModuleLoader::SearchOutcome::NotAFile:
+        text += " (это каталог)";
+        break;
+      case ModuleLoader::SearchOutcome::OutsideRoot:
+        text += " (вне корневого каталога)";
+        break;
+      case ModuleLoader::SearchOutcome::Found:
+      case ModuleLoader::SearchOutcome::Missing:
+        break;
+    }
+  }
+  if (steps.size() > shown) {
+    text += "; …";
+  }
+  return text;
+}
+
+}  // namespace
+
 ModuleLoader::ModuleLoader(Engine& engine, std::vector<std::filesystem::path> include_paths,
                            std::optional<std::filesystem::path> root)
     : engine_(engine), include_paths_(std::move(include_paths)), root_(std::move(root)) {}
@@ -46,7 +84,9 @@ bool ModuleLoader::withinRoot(const std::filesystem::path& candidate) const {
 }
 
 std::optional<std::filesystem::path> ModuleLoader::resolve(
-    const std::string& name, const std::filesystem::path& importer) const {
+    const std::string& name, const std::filesystem::path& importer,
+    std::vector<SearchStep>* steps) const {
+  steps->clear();
   if (name.empty()) {
     return std::nullopt;
   }
@@ -55,6 +95,8 @@ std::optional<std::filesystem::path> ModuleLoader::resolve(
   if (requested.is_absolute()) {
     candidates.push_back(requested);
   } else {
+    // The importing file's own directory first, then every `-I` directory in
+    // the order the user gave them: a local module wins over a shared one.
     candidates.push_back(importer / requested);
     for (const auto& directory : include_paths_) {
       candidates.push_back(directory / requested);
@@ -63,11 +105,18 @@ std::optional<std::filesystem::path> ModuleLoader::resolve(
   for (const auto& candidate : candidates) {
     std::error_code code;
     if (!std::filesystem::exists(candidate, code) || code) {
+      steps->push_back(SearchStep{candidate, SearchOutcome::Missing});
+      continue;
+    }
+    if (!std::filesystem::is_regular_file(candidate, code) || code) {
+      steps->push_back(SearchStep{candidate, SearchOutcome::NotAFile});
       continue;
     }
     if (!withinRoot(candidate)) {
+      steps->push_back(SearchStep{candidate, SearchOutcome::OutsideRoot});
       continue;
     }
+    steps->push_back(SearchStep{candidate, SearchOutcome::Found});
     return std::filesystem::weakly_canonical(candidate, code);
   }
   return std::nullopt;
@@ -173,11 +222,16 @@ bool ModuleLoader::process(const ParsedProgram& program, const std::filesystem::
         break;
       case StatementRef::Kind::Import: {
         const ImportDirective& directive = program.imports[statement.index];
-        const auto resolved = resolve(directive.path, file.parent_path());
+        std::vector<SearchStep> search;
+        const auto resolved = resolve(directive.path, file.parent_path(), &search);
         if (!resolved) {
           if (error != nullptr) {
-            *error = "Не найден импортируемый файл '" + directive.path + "' (" +
-                     directive.location.toString() + ")";
+            std::string message = "Не найден импортируемый файл '" + directive.path +
+                                  "' (" + directive.location.toString() + ")";
+            if (!search.empty()) {
+              message += ". Искался в: " + describeImportSearch(search);
+            }
+            *error = std::move(message);
           }
           return false;
         }

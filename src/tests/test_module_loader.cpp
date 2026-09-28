@@ -119,6 +119,8 @@ TEST_CASE("import rejects paths outside the root") {
             ":- ИМПОРТ(\"../" + outside.path().filename().string() + "/secret.pld\").\n");
   const LoadOutcome outcome = load(dir.path() / "main.pld", {}, dir.path());
   REQUIRE_FALSE(outcome.ok);
+  // A candidate that exists but is rejected must say why, not just disappear.
+  REQUIRE(outcome.error.find("вне корневого каталога") != std::string::npos);
 }
 
 TEST_CASE("import reports a missing file") {
@@ -127,6 +129,32 @@ TEST_CASE("import reports a missing file") {
   const LoadOutcome outcome = load(dir.path() / "main.pld");
   REQUIRE_FALSE(outcome.ok);
   REQUIRE(outcome.error.find("nope.pld") != std::string::npos);
+}
+
+TEST_CASE("a missing import names the directories that were tried") {
+  TempDir dir;
+  TempDir shared;
+  dir.write("main.pld", ":- ИМПОРТ(\"нет.pld\").\n");
+  const LoadOutcome outcome = load(dir.path() / "main.pld", {shared.path()});
+  REQUIRE_FALSE(outcome.ok);
+  REQUIRE(outcome.error.find("Искался в:") != std::string::npos);
+
+  // Absolute paths, in the order they were tried: next to the importing file
+  // first, then the include directory, so a user sees which one to fix.
+  const std::size_t importer_first = outcome.error.find(toUtf8Path(dir.path()));
+  const std::size_t include_second = outcome.error.find(toUtf8Path(shared.path()));
+  REQUIRE(importer_first != std::string::npos);
+  REQUIRE(include_second != std::string::npos);
+  REQUIRE(importer_first < include_second);
+}
+
+TEST_CASE("a directory named like the import is reported as a directory") {
+  TempDir dir;
+  fs::create_directories(dir.path() / fromUtf8Path("модуль.pld"));
+  dir.write("main.pld", ":- ИМПОРТ(\"модуль.pld\").\n");
+  const LoadOutcome outcome = load(dir.path() / "main.pld");
+  REQUIRE_FALSE(outcome.ok);
+  REQUIRE(outcome.error.find("(это каталог)") != std::string::npos);
 }
 
 TEST_CASE("import works with UTF-8 file names") {

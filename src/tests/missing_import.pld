@@ -1,0 +1,4 @@
+% Used by the cli_import_search_report test (task_32).  The import below cannot
+% be resolved, so the diagnostic has to name the directories that were searched
+% — the point of the test is the message, not the failure.
+:- ИМПОРТ("нет_такого_файла.pld").

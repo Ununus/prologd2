@@ -61,6 +61,13 @@ if(TARGET prologd)
   set_tests_properties(cli_include PROPERTIES
     PASS_REGULAR_EXPRESSION "Y=42")
 
+  # task_32: an import that cannot be resolved must name the directories that
+  # were searched, so a working-folder mistake is visible in the front-end.
+  add_test(NAME cli_import_search_report
+    COMMAND prologd -s "${CMAKE_CURRENT_SOURCE_DIR}/missing_import.pld")
+  set_tests_properties(cli_import_search_report PROPERTIES
+    PASS_REGULAR_EXPRESSION "Искался в:")
+
   # `--list-keywords` is a query: it prints `name/arity` lines and exits without
   # loading anything.  The Catch2 test covers the content; these two cover the
   # CLI shape — `/3` for a predicate, `/+` for the variadic ВЫВОД.

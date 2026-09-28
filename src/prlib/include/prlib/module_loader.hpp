@@ -26,6 +26,21 @@ class ModuleLoader {
                         std::vector<std::filesystem::path> include_paths = {},
                         std::optional<std::filesystem::path> root = std::nullopt);
 
+  /// How one attempted import path ended.  Kept so a failed import can name the
+  /// directories it tried instead of only the file it wanted (task_32).
+  enum class SearchOutcome {
+    Found,        ///< the file was there and usable
+    Missing,      ///< nothing at that path
+    NotAFile,     ///< something is there, but it is a directory
+    OutsideRoot,  ///< a file, but outside the configured root
+  };
+
+  /// One place the import search visited, in the order it was visited.
+  struct SearchStep {
+    std::filesystem::path path;
+    SearchOutcome outcome = SearchOutcome::Missing;
+  };
+
   /// Load `path` and everything it imports.  Returns false on error.
   bool loadFile(const std::filesystem::path& path, std::string* error = nullptr);
 
@@ -43,7 +58,8 @@ class ModuleLoader {
   bool process(const ParsedProgram& program, const std::filesystem::path& file,
                std::string* error);
   std::optional<std::filesystem::path> resolve(const std::string& name,
-                                               const std::filesystem::path& importer) const;
+                                               const std::filesystem::path& importer,
+                                               std::vector<SearchStep>* steps) const;
   bool withinRoot(const std::filesystem::path& candidate) const;
   static std::optional<std::string> readFileText(const std::filesystem::path& path,
                                                  std::string* error);
