@@ -10,7 +10,16 @@ undo that takes two presses, an indent that eats a selection.
 from __future__ import annotations
 
 from PySide6.QtCore import QRect, QSize, QStringListModel, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QKeyEvent, QPainter, QTextCursor, QTextFormat, QWheelEvent
+from PySide6.QtGui import (
+    QColor,
+    QFont,
+    QKeyEvent,
+    QPainter,
+    QTextCursor,
+    QTextDocument,
+    QTextFormat,
+    QWheelEvent,
+)
 from PySide6.QtWidgets import QCompleter, QPlainTextEdit, QTextEdit, QWidget
 
 from . import completion, tokens
@@ -71,6 +80,9 @@ class ZoomablePlainTextEdit(QPlainTextEdit):
     #: Emitted after `Ctrl`+wheel or a zoom command; carries the new point size.
     zoomChanged = Signal(float)
 
+    #: A file was dropped on the pane; the window opens it in a tab.
+    fileDropped = Signal(str)
+
     def __init__(
         self,
         parent: QWidget | None = None,
@@ -82,6 +94,43 @@ class ZoomablePlainTextEdit(QPlainTextEdit):
         self.setFont(self._make_font(font_family, font_size))
         self.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
         self.setTabChangesFocus(False)
+
+    # -- the document ------------------------------------------------------
+    def setDocument(self, document: QTextDocument) -> None:  # noqa: N802 - Qt spelling
+        """Takes a document and gives it this pane's font.
+
+        A `QTextDocument` carries its *own* default font, and the plain text
+        layout measures every block with it — not with the widget's font.  A
+        document made outside the editor therefore arrived with the application's
+        font size, and the text stayed small until something forced a relayout
+        (the first zoom, or a scroll).  Setting the font on the widget is not
+        enough; the document has to be told as well.
+        """
+        super().setDocument(document)
+        document.setDefaultFont(self.font())
+        self.viewport().update()
+
+    # -- drag and drop -----------------------------------------------------
+    def dragEnterEvent(self, event) -> None:  # noqa: N802 - Qt spelling
+        if any(url.isLocalFile() for url in event.mimeData().urls()):
+            event.acceptProposedAction()
+            return
+        super().dragEnterEvent(event)
+
+    def dropEvent(self, event) -> None:  # noqa: N802 - Qt spelling
+        """A dropped file is for the window to open, not for the pane to paste.
+
+        A `QPlainTextEdit` accepts a file drop and inserts the file's URL as text,
+        so the event never reached the window: dropping a program on the editor
+        pasted its path.  The pane now reports the drop and the window opens it.
+        """
+        paths = [url.toLocalFile() for url in event.mimeData().urls() if url.isLocalFile()]
+        if not paths:
+            super().dropEvent(event)
+            return
+        for path in paths:
+            self.fileDropped.emit(path)
+        event.acceptProposedAction()
 
     # -- font and zoom ------------------------------------------------------
     @staticmethod
@@ -119,7 +168,8 @@ class ZoomablePlainTextEdit(QPlainTextEdit):
         self.zoomChanged.emit(clamped)
 
     def _font_changed(self) -> None:
-        """Hook for what a pane has to recompute when the font changes."""
+        """The document measures with its own font, so it has to be told too."""
+        self.document().setDefaultFont(self.font())
 
     def zoom_by(self, steps: float) -> None:
         self.set_font_size(self.font_size + steps)
@@ -174,6 +224,7 @@ class CodeEditor(ZoomablePlainTextEdit):
 
     # -- font and zoom ------------------------------------------------------
     def _font_changed(self) -> None:
+        super()._font_changed()
         # The margin is as wide as the number of digits in the widest number, so
         # it has to be measured again, not just repainted.
         self._update_margin_width()

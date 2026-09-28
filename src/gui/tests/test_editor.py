@@ -170,6 +170,31 @@ def test_the_error_line_is_marked_and_cleared() -> None:
     print("ok: the error line is marked, cleared, and a stale line is ignored")
 
 
+def test_a_document_made_outside_takes_the_pane_font() -> None:
+    """A `QTextDocument` has its own default font, and the layout measures with it.
+
+    Handing the editor a document built elsewhere left the text at the
+    application's font size while the margins, the output pane and the query line
+    were all right — until the first zoom forced a relayout.
+    """
+    from PySide6.QtGui import QTextDocument
+
+    heights: list[int] = []
+    for size in (8.0, 21.0):
+        editor = CodeEditor(font_size=size)
+        document = QTextDocument()
+        document.setPlainText("факт(1).\nфакт(2).\n")
+        editor.setDocument(document)
+        assert document.defaultFont().pointSizeF() == size, document.defaultFont().pointSizeF()
+        heights.append(editor.blockBoundingRect(editor.document().firstBlock()).height())
+
+    assert heights[1] > heights[0], f"the text is not laid out at the requested size: {heights}"
+    # A zoom reaches the document as well, not only the widget.
+    editor.set_font_size(30.0)
+    assert editor.document().defaultFont().pointSizeF() == 30.0
+    print(f"ok: a document given to the editor is measured at its size ({heights[0]}px, {heights[1]}px)")
+
+
 def main() -> int:
     application = QApplication(sys.argv[:1])
     test_commenting_a_selection_is_one_undo_step()
@@ -181,6 +206,7 @@ def main() -> int:
     test_zoom_is_bounded_and_reported()
     test_line_number_width_grows_with_the_document()
     test_the_error_line_is_marked_and_cleared()
+    test_a_document_made_outside_takes_the_pane_font()
     print("all editor checks passed")
     del application
     return 0

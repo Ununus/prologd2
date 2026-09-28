@@ -179,10 +179,15 @@ def test_closing_a_modified_tab_asks_first(executable: str, directory: pathlib.P
         discard_changes(window)
 
 
-def test_closing_everything_asks_before_closing_anything(
+def test_closing_everything_walks_through_the_tabs(
     executable: str, directory: pathlib.Path
 ) -> None:
-    """A cancel must leave *all* the buffers open, not just the last one."""
+    """Each tab is shown *before* its question, and closes as soon as it is answered.
+
+    Asking about every buffer first kept them all open, but nothing on screen said
+    which file each question was about.  Now the tab being asked about is the
+    current one, and it is gone as soon as the answer is given.
+    """
     from prologd_gui import window as window_module
 
     first = directory / "первый.pld"
@@ -198,18 +203,79 @@ def test_closing_everything_asks_before_closing_anything(
         window.buffers()[1].editor.insertPlainText("% другое\n")
         assert [buffer.is_modified() for buffer in window.buffers()] == [True, True]
 
+        seen: list[tuple[str, str | None]] = []
         answers = iter([window_module.DISCARD, window_module.CANCEL])
-        asked: list[str] = []
 
         def answer(name: str) -> str:
-            asked.append(name)
+            # What the user sees when the box opens: the tab that is current.
+            seen.append((name, window.current_path()))
             return next(answers)
 
         window._ask_save = answer
         assert window.close_all() is False, "the cancel was ignored"
-        assert window.tab_count() == 2, "a cancelled close must not have closed anything"
-        assert asked == [first.name, second.name], asked
-        print("ok: cancelling a close-all leaves every buffer open")
+        assert seen == [(first.name, str(first)), (second.name, str(second))], seen
+        assert window.tab_count() == 1, "the first tab was answered and must be closed"
+        assert window.current_path() == str(second)
+        print("ok: closing all shows each tab before asking and closes it at once")
+    finally:
+        discard_changes(window)
+
+
+def test_a_file_dropped_on_the_editor_opens_in_a_tab(
+    executable: str, directory: pathlib.Path
+) -> None:
+    """A dropped file is opened, not pasted.
+
+    A `QPlainTextEdit` accepts a file drop and inserts the file's text, so the
+    event never reached the window: dropping a program on the editor put the
+    program into the buffer instead of opening it.
+
+    The event is sent to the **viewport**: a scroll area delivers drag and drop to
+    its viewport, so that is where the pane's own handler runs — sending it to the
+    widget itself would test a path the platform never takes.
+    """
+    from PySide6.QtCore import QMimeData, QPoint, QPointF, QUrl, Qt
+    from PySide6.QtGui import QDragEnterEvent, QDropEvent
+    from PySide6.QtWidgets import QApplication
+
+    dropped = directory / "брошенный.pld"
+    dropped.write_text("снег.\n", encoding="utf-8")
+
+    window = empty_window(executable)
+    try:
+        window.editor().setPlainText("факт(1).\n")
+        window.buffers()[0].mark_saved()
+        before = window.editor_text()
+
+        mime = QMimeData()
+        mime.setUrls([QUrl.fromLocalFile(str(dropped))])
+        viewport = window.editor().viewport()
+        QApplication.sendEvent(
+            viewport,
+            QDragEnterEvent(
+                QPoint(4, 4),
+                Qt.DropAction.CopyAction,
+                mime,
+                Qt.MouseButton.LeftButton,
+                Qt.KeyboardModifier.NoModifier,
+            ),
+        )
+        QApplication.sendEvent(
+            viewport,
+            QDropEvent(
+                QPointF(4.0, 4.0),
+                Qt.DropAction.CopyAction,
+                mime,
+                Qt.MouseButton.LeftButton,
+                Qt.KeyboardModifier.NoModifier,
+            ),
+        )
+
+        assert window.tab_count() == 2, "the drop did not open a tab"
+        assert window.current_path() == str(dropped)
+        assert window.editor_text() == "снег.\n"
+        assert window.buffers()[0].text() == before, "the dropped program was pasted into the buffer"
+        print("ok: a file dropped on the editor opens in a tab instead of being pasted")
     finally:
         discard_changes(window)
 
@@ -453,7 +519,8 @@ def main(argv: list[str]) -> int:
         test_two_files_open_in_two_tabs(executable, files)
         test_an_edit_marks_only_its_own_tab(executable, files)
         test_closing_a_modified_tab_asks_first(executable, files)
-        test_closing_everything_asks_before_closing_anything(executable, files)
+        test_closing_everything_walks_through_the_tabs(executable, files)
+        test_a_file_dropped_on_the_editor_opens_in_a_tab(executable, files)
         test_saving_clears_the_marker_and_keeps_the_file_shape(executable, files)
         test_cancelling_the_encoding_question_opens_nothing(executable, files)
         test_a_run_uses_the_tab_that_is_showing(executable)

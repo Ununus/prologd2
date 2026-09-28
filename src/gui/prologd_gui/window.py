@@ -103,6 +103,8 @@ class MainWindow(QMainWindow):
         self._output.setReadOnly(True)
         self._output.setPlaceholderText("вывод интерпретатора")
         self._output.zoomChanged.connect(self._on_zoom_changed)
+        # A dropped program opens in a tab wherever it lands (see `dropEvent`).
+        self._output.fileDropped.connect(self.open_path)
 
         self._query_line = QLineEdit()
         # The same face as the panes, so a goal looks like the program it asks
@@ -354,21 +356,20 @@ class MainWindow(QMainWindow):
         return True
 
     def close_all(self) -> bool:
-        """Closes every tab, asking about all of them *before* closing any.
+        """Closes every tab, one at a time, showing the one that is closing.
 
-        Closing and asking in one pass would mean that cancelling on the third
-        buffer leaves the first two closed, which is not what «Отмена» means.
+        The tab is made current *before* the question, so the file the box is
+        about is the one on screen, and it disappears as soon as the question is
+        answered.  Cancelling therefore stops where it happened, leaving the
+        buffers closed so far closed — the earlier rule (ask about everything
+        first, then close) kept the tabs open but gave no clue *which* file each
+        of the questions was about, which is worse in practice.
         """
-        for buffer in list(self._buffers):
-            if not buffer.is_modified():
-                continue
-            answer = self._ask_save(buffer.model.name)
-            if answer == CANCEL:
+        while self._buffers:
+            self._tabs.setCurrentIndex(0)
+            if not self._confirm_close(self._buffers[0]):
                 return False
-            if answer == SAVE and not self.save_buffer(buffer):
-                return False
-        for index in reversed(range(len(self._buffers))):
-            self._drop_buffer(index)
+            self._drop_buffer(0)
         return True
 
     # -- prompts -----------------------------------------------------------
@@ -491,6 +492,9 @@ class MainWindow(QMainWindow):
         buffer = Buffer(model, self._settings, self)
         buffer.editor.setPlaceholderText("текст программы")
         buffer.editor.zoomChanged.connect(self._on_zoom_changed)
+        # A file dropped on the editor opens in its own tab, as it does on the
+        # output pane: the pane reports the drop instead of pasting the path.
+        buffer.editor.fileDropped.connect(self.open_path)
         # The reserved names arrive with `ready`; a buffer opened after that gets
         # them here, and a buffer created before it is served by `_on_ready`.
         buffer.set_keywords(self._session.keywords)
