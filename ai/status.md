@@ -80,7 +80,7 @@ session.
 | task_19_windows_portability | done | verified locally on VS 2026: build + 108/108 tests (ADR-013); the CI image still has to be confirmed |
 | task_20_gui_future | superseded | the Qt C++ plan became PySide6 over a JSON protocol (ADR-014) |
 | task_21_gui_pyside | in progress | protocol, `IoContext` input seam, `externalStop`, `src/gui` skeleton |
-| task_22_gui_editor | not started | highlighting (separate Cyrillic/Latin colours), line numbers, font zoom, comment/uncomment |
+| task_22_gui_editor | in progress | `tokens.py` (highlighting rules) done and tested; highlighter, line numbers, editing commands next |
 | task_23_gui_keyword_source | done | `--list-keywords` + `keywords` in `ready` (protocol 2); one source for the built-in list |
 | task_24_gui_completion | not started | completion from the keyword source plus the document's own predicates |
 | task_25_gui_files_tabs | not started | tabs, untitled buffers, save prompts, split editor |
@@ -106,9 +106,11 @@ lesson/example programs (golden output) and the CLI (`-s`, `--source`,
 
 The front-end has its own headless checks, run by hand (they need PySide6 or a
 build, so CI does not run them yet): `src/gui/tests/protocol_smoke.py`,
-`test_keywords.py` (the keyword table from both sides), `test_session.py`
+`test_keywords.py` (the keyword table from both sides), `test_tokens.py` (the
+highlighting rules, including a sweep over the example programs), `test_session.py`
 (request queueing and the clean-slate restart) and `test_window.py` (opening a
-file does not run it; a run is repeatable), all invoked as plain scripts.
+file does not run it; the documented keys are bound), all invoked as plain
+scripts.
 
 ## Known gaps / next steps
 

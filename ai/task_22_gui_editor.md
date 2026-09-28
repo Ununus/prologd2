@@ -1,6 +1,7 @@
 # task_22 — GUI: code editor (highlighting, line numbers, editing)
 
-**Status:** not started
+**Status:** in progress — the tokenizer is in (`tokens.py`, tested); the
+highlighter, the line numbers, the editing commands and the font live below.
 **Depends on:** task_21 (skeleton), task_23 (keyword source)
 **Milestone:** M11
 
@@ -15,7 +16,7 @@ no mangled line endings, no lost trailing newline.
 
 ## Deliverables
 
-- [ ] `prologd_gui/tokens.py` — Qt-free tokenizer for highlighting: comment,
+- [x] `prologd_gui/tokens.py` — Qt-free tokenizer for highlighting: comment,
       string, quoted atom, integer, float, `#expr#` block, built-in name,
       variable (`X`, `_X`, `_`), atom, punctuation, plus a
       `latin`/`cyrillic` attribute on every identifier.
@@ -70,6 +71,11 @@ no mangled line endings, no lost trailing newline.
   execution.  Keep it small and table-driven so the two stay comparable, and
   cover every rule with a test line.  The keyword list itself comes from the
   interpreter (task_23), not from a copy.
+* What the tests already found: whitespace is not a token (nothing to colour,
+  and the sweep asserts the stronger property that every other character is
+  inside exactly one token), and no state is carried between lines — neither a
+  string nor `#…#` may span lines in PrologD, so a line-local pass is enough and
+  an unterminated string is simply coloured to the end of its own line.
 * The reference `Highlighter.cpp` builds one `QRegularExpression` per keyword —
   about 50 patterns applied to every line, plus a keyword list duplicated in
   `MainWindow.cpp`.  A single tokenizer pass is both faster and the only way to
