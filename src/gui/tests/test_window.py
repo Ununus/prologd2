@@ -63,6 +63,222 @@ def make_window(executable: str):
     settings = Settings(pathlib.Path(directory.name) / "gui.ini")
     return MainWindow(executable, [], settings)
 
+def empty_window(executable: str):
+    """A ready window with one empty buffer, so a file takes its place.
+
+    The welcome program otherwise keeps a tab of its own and every count of tabs
+    would be off by one.
+    """
+    window = make_window(executable)
+    assert pump(window, lambda: bool(window.session.keywords)), "the session never said ready"
+    window.editor().setPlainText("")
+    window.buffers()[0].mark_saved()  # an empty buffer is not unsaved work
+    return window
+
+
+def discard_changes(window) -> None:
+    """Closes a test window without a modal box ever appearing.
+
+    A test that leaves a buffer modified and then closes the window would open a
+    real `QMessageBox` and *hang* — no failure, no output, just a stuck suite.  So
+    every test closes through here, where the answer is `DISCARD`.
+    """
+    from prologd_gui import window as window_module
+
+    window._ask_save = lambda name: window_module.DISCARD
+    window.close_all()
+    window.close()
+
+
+def test_a_file_takes_the_place_of_the_empty_buffer(executable: str) -> None:
+    window = empty_window(executable)
+    try:
+        assert window.open_path(str(EXAMPLE))
+        assert window.tab_count() == 1, "an empty buffer is a placeholder, not a tab"
+        assert window.buffers()[0].title() == EXAMPLE.name
+        assert window.windowTitle() == f"{EXAMPLE.name} — PrologD"
+
+        # Opening the same file again shows its tab instead of a second copy.
+        assert window.open_path(str(EXAMPLE))
+        assert window.tab_count() == 1
+        print("ok: an opened file replaces the empty buffer and never opens twice")
+    finally:
+        discard_changes(window)
+
+
+def test_two_files_open_in_two_tabs(executable: str, directory: pathlib.Path) -> None:
+    other = directory / "другой.pld"
+    other.write_text("факт(1).\n", encoding="utf-8")
+
+    window = empty_window(executable)
+    try:
+        assert window.open_path(str(EXAMPLE))
+        assert window.open_path(str(other))
+        assert window.tab_count() == 2
+        assert [buffer.title() for buffer in window.buffers()] == [EXAMPLE.name, other.name]
+        assert window.current_path() == str(other), "the new tab is current"
+
+        # Switching tabs switches the buffer, and the text with it.
+        window._tabs.setCurrentIndex(0)
+        assert window.current_path() == str(EXAMPLE)
+        assert "факториал" in window.editor_text()
+        window._next_tab()
+        assert window.current_path() == str(other)
+        assert window.editor_text() == "факт(1).\n"
+        print("ok: two files, two tabs, and the current one follows the tab bar")
+    finally:
+        discard_changes(window)
+
+
+def test_an_edit_marks_only_its_own_tab(executable: str, directory: pathlib.Path) -> None:
+    other = directory / "второй.pld"
+    other.write_text("факт(1).\n", encoding="utf-8")
+
+    window = empty_window(executable)
+    try:
+        window.open_path(str(EXAMPLE))
+        window.open_path(str(other))
+        assert window.editor_text() == "факт(1).\n"
+
+        # Typing marks this buffer, not the other one.
+        window.editor().insertPlainText("снег.\n")
+        titles = [buffer.title() for buffer in window.buffers()]
+        assert titles[0] == EXAMPLE.name, titles
+        assert titles[1] == "*" + other.name, titles
+        assert window.windowTitle() == f"*{other.name} — PrologD"
+        print("ok: the modified marker is on the tab that changed, not on every tab")
+    finally:
+        discard_changes(window)
+
+
+def test_closing_a_modified_tab_asks_first(executable: str, directory: pathlib.Path) -> None:
+    from prologd_gui import window as window_module
+
+    target = directory / "правки.pld"
+    target.write_text("факт(1).\n", encoding="utf-8")
+
+    window = empty_window(executable)
+    try:
+        window.open_path(str(target))
+        window.editor().insertPlainText("снег.\n")
+
+        # «Отмена» keeps the buffer, and nothing is written.
+        window._ask_save = lambda name: window_module.CANCEL
+        assert window.close_buffer(0) is False
+        assert window.tab_count() == 1
+        assert target.read_text(encoding="utf-8") == "факт(1).\n"
+
+        # «Сохранить» writes the file and then closes the tab.
+        asked: list[str] = []
+        window._ask_save = lambda name: asked.append(name) or window_module.SAVE
+        assert window.close_buffer(0) is True
+        assert asked == [target.name], asked
+        assert target.read_text(encoding="utf-8") == "снег.\nфакт(1).\n", target.read_text("utf-8")
+        print("ok: a modified buffer asks, cancelling keeps it, saving writes it")
+    finally:
+        discard_changes(window)
+
+
+def test_closing_everything_asks_before_closing_anything(
+    executable: str, directory: pathlib.Path
+) -> None:
+    """A cancel must leave *all* the buffers open, not just the last one."""
+    from prologd_gui import window as window_module
+
+    first = directory / "первый.pld"
+    second = directory / "второй2.pld"
+    for path in (first, second):
+        path.write_text("факт(1).\n", encoding="utf-8")
+
+    window = empty_window(executable)
+    try:
+        window.open_path(str(first))
+        window.open_path(str(second))
+        window.buffers()[0].editor.insertPlainText("% правило\n")
+        window.buffers()[1].editor.insertPlainText("% другое\n")
+        assert [buffer.is_modified() for buffer in window.buffers()] == [True, True]
+
+        answers = iter([window_module.DISCARD, window_module.CANCEL])
+        asked: list[str] = []
+
+        def answer(name: str) -> str:
+            asked.append(name)
+            return next(answers)
+
+        window._ask_save = answer
+        assert window.close_all() is False, "the cancel was ignored"
+        assert window.tab_count() == 2, "a cancelled close must not have closed anything"
+        assert asked == [first.name, second.name], asked
+        print("ok: cancelling a close-all leaves every buffer open")
+    finally:
+        discard_changes(window)
+
+
+def test_saving_clears_the_marker_and_keeps_the_file_shape(
+    executable: str, directory: pathlib.Path
+) -> None:
+    """A CRLF file with Cyrillic stays CRLF cp1251 after a save."""
+    target = directory / "cp1251.pld"
+    target.write_bytes("факт(1).\r\n".encode("cp1251"))
+
+    window = empty_window(executable)
+    try:
+        # Text that is not UTF-8 is never decoded by guesswork: the window asks,
+        # and the answer is what opens the file.
+        asked: list[str] = []
+        window._ask_encoding = lambda path: asked.append(path) or "cp1251"
+        assert window.open_path(str(target)) is True
+        assert asked == [str(target)], asked
+        assert window.editor_text() == "факт(1).\n"
+        window.editor().insertPlainText("снег.\n")
+        assert window.buffers()[0].title().startswith("*")
+
+        assert window.save_buffer() is True
+        # The whole file is written in the line ending it came with, including the
+        # line that was just typed, and in its own encoding.
+        from prologd_gui import documents
+
+        expected = documents.with_eol("снег.\nфакт(1).\n", "\r\n").encode("cp1251")
+        assert target.read_bytes() == expected, ascii(str(target.read_bytes()))
+        assert window.buffers()[0].title() == target.name, "the marker must be gone"
+        print("ok: save keeps the line ending and the encoding, and clears the marker")
+    finally:
+        discard_changes(window)
+
+
+def test_cancelling_the_encoding_question_opens_nothing(
+    executable: str, directory: pathlib.Path
+) -> None:
+    target = directory / "не-utf8.pld"
+    target.write_bytes("факт(1).\n".encode("cp1251"))
+
+    window = empty_window(executable)
+    try:
+        window._ask_encoding = lambda path: None  # the user closed the box
+        assert window.open_path(str(target)) is False
+        assert window.tab_count() == 1 and window.current_path() is None
+        assert target.name in window.output_text(), "the file that failed is named"
+        print("ok: a cancelled encoding question opens nothing and says why")
+    finally:
+        discard_changes(window)
+
+
+def test_a_run_uses_the_tab_that_is_showing(executable: str) -> None:
+    window = empty_window(executable)
+    try:
+        window.open_path(str(EXAMPLE))
+        index = window.new_buffer()
+        assert index == 1
+        # The same program with a different goal: if the run used the *first*
+        # tab, the answer would be 720.
+        program = EXAMPLE.read_text(encoding="utf-8").replace("(6,Ф)", "(5,Ф)")
+        window.editor().setPlainText(program)
+        window.run_program()
+        assert pump(window, lambda: "Ф=120" in window.output_text()), ascii(window.output_text())
+        assert "720" not in window.output_text(), "the other tab's program ran"
+        print("ok: a run uses the current tab, not the first one")
+    finally:
+        discard_changes(window)
 
 def test_opening_does_not_run(executable: str) -> None:
     window = make_window(executable)
@@ -73,7 +289,11 @@ def test_opening_does_not_run(executable: str) -> None:
         assert window.current_path() == str(EXAMPLE)
         # The editor works in lines, so the file's CRLF becomes LF here.
         expected = EXAMPLE.read_text(encoding="utf-8").replace("\r\n", "\n")
-        assert window.editor_text() == expected
+        got = window.editor_text()
+        assert got == expected, (
+            f"the editor holds {len(got)} characters, the file {len(expected)}: "
+            f"{ascii(got[:60])} vs {ascii(expected[:60])}"
+        )
         assert EXAMPLE.name in window.windowTitle()
 
         # Opening it again must be harmless: nothing has been executed, so there
@@ -227,6 +447,16 @@ def main(argv: list[str]) -> int:
     test_a_query_is_answered_once(executable)
     test_a_run_is_repeatable(executable)
     test_the_documented_shortcuts_are_bound(executable)
+    with tempfile.TemporaryDirectory(prefix="prologd_gui_files_") as name:
+        files = pathlib.Path(name)
+        test_a_file_takes_the_place_of_the_empty_buffer(executable)
+        test_two_files_open_in_two_tabs(executable, files)
+        test_an_edit_marks_only_its_own_tab(executable, files)
+        test_closing_a_modified_tab_asks_first(executable, files)
+        test_closing_everything_asks_before_closing_anything(executable, files)
+        test_saving_clears_the_marker_and_keeps_the_file_shape(executable, files)
+        test_cancelling_the_encoding_question_opens_nothing(executable, files)
+        test_a_run_uses_the_tab_that_is_showing(executable)
     print("all window checks passed")
     del application
     return 0

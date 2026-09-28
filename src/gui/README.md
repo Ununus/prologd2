@@ -55,7 +55,13 @@ version does not know are left alone (task_29 adds the dialog).
 | --- | --- |
 | `F5`, `Ctrl+R` | **Запустить** — a run in a fresh interpreter |
 | `Shift+F5`, `Ctrl+.` | **Остановить** |
-| `Ctrl+O` | **Открыть…** — fills the editor and does not run |
+| `Ctrl+N` | **Новый** — an empty untitled buffer |
+| `Ctrl+O` | **Открыть…** — a new tab; it does not run |
+| `Ctrl+S`, `Ctrl+Shift+S` | **Сохранить**, **Сохранить как…** |
+| `Ctrl+W` | close the tab (asks about unsaved changes) |
+| `Ctrl+Tab`, `Ctrl+Shift+Tab` | next, previous tab |
+| `Ctrl+Shift+R` | **Перечитать с диска** |
+| `Ctrl+Q` | exit (asks about every modified buffer) |
 | `Ctrl+L` | clear the output pane |
 | `Ctrl+K` / `Ctrl+U` | comment / uncomment the selection or the current line |
 | `Ctrl+Space` | completion popup — it also opens by itself after two letters |
@@ -68,6 +74,26 @@ Neither list is final: the menu bar and the toolbar icons are task_26, the rest
 of the combinations task_31.  Zoom deliberately has no key pair of its own —
 `Ctrl+=`, `Ctrl++` and `Ctrl+-` will insert a `РАВНО(…)`, `СЛОЖЕНИЕ(…)` or
 `ВЫЧИТАНИЕ(…)` skeleton there.
+
+## Tabs and files
+
+A tab is one program.  **Запустить** runs the tab that is showing; a saved,
+unmodified buffer is loaded *by path* (so `ИМПОРТ` resolves against the file's own
+directory and diagnostics name it), while an edited or untitled buffer is loaded
+as text — the status bar says which of the two is running.  Nothing is dropped
+quietly: closing a tab, closing the window and `Ctrl+Q` ask **Сохранить / Не
+сохранять / Отмена** per modified buffer, `Enter` lands on **Отмена**, and a
+cancel cancels the whole close rather than only the last question.
+
+A file keeps its shape: the line ending (LF or CRLF) and the encoding it was read
+in are the ones it is written back with, a byte-order mark is dropped, and text
+that is not valid UTF-8 asks which encoding to use instead of being decoded by
+guesswork.  Dropping a `.pld` file on the window opens it in a new tab — it is not
+run.  The last directory and the ten most recent files are remembered in the
+settings file; the menu that shows them is task_26.
+
+The window is halfway through task_25: the *split editor* (`Ctrl+\`, two panes
+side by side sharing one text per buffer) is the remaining half.
 
 Headless check of the protocol, without PySide6 installed:
 

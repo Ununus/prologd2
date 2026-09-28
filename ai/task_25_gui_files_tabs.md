@@ -1,6 +1,7 @@
 # task_25 — GUI: tabs, files, untitled buffers, save prompts
 
-**Status:** not started
+**Status:** in progress — tabs, files, prompts and text I/O are in; the split
+editor (the second half) is next.
 **Depends on:** task_22
 **Milestone:** M11
 
@@ -12,32 +13,40 @@ keep track of which file each tab shows.
 
 ## Deliverables
 
-- [ ] `prologd_gui/documents.py` — Qt-free document model:
+- [x] `prologd_gui/documents.py` — Qt-free document model:
   * `name` (`"Без имени"`, `"Без имени 2"`, … for new buffers), `path` or
-    `None`, `text`, `modified`, `eol` (`\n`/`\r\n`), `undo_available`;
+    `None`, `text`, `modified`, `eol` (`\n`/`\r\n`), `encoding`;
   * `tab_title()` — `имя` plus `*` when modified;
-  * `window_title()` — `имя — PrologD`, `*имя — PrologD` when modified.
-- [ ] Tab bar (`QTabWidget`) over the editors: close button per tab, `Ctrl+W`
+  * `window_title()` — `имя — PrologD`, `*имя — PrologD` when modified;
+  * file I/O: `from_file` reads (dropping a byte-order mark, reporting text that
+    is not UTF-8), `save` writes the encoding and the line ending it came with.
+- [x] Tab bar (`QTabWidget`) over the editors: close button per tab, `Ctrl+W`
       closes the current tab, `Ctrl+Tab`/`Ctrl+Shift+Tab` cycle, the tab shows
       the modified marker, and a double click on the tab bar starts a new file.
-- [ ] File actions: **Новый** (`Ctrl+N`), **Открыть…** (`Ctrl+O`), **Сохранить**
+      Dragging a tab is allowed and the buffer list follows it (`tabMoved`).
+- [x] File actions: **Новый** (`Ctrl+N`), **Открыть…** (`Ctrl+O`), **Сохранить**
       (`Ctrl+S`), **Сохранить как…** (`Ctrl+Shift+S`), **Сохранить все**,
-      **Закрыть** (`Ctrl+W`), **Закрыть все**, **Выход** (`Alt+F4`) — the same
-      set the reference GUI had.
-- [ ] Modified-buffer prompts: closing a tab, closing the window and `Выход` ask
+      **Закрыть** (`Ctrl+W`), **Закрыть все**, **Выход** (`Ctrl+Q`, and `Alt+F4`
+      through `closeEvent`).  Only the first three have toolbar buttons until
+      task_26 builds the menus.
+- [x] Modified-buffer prompts: closing a tab, closing the window and `Выход` ask
       **Сохранить / Не сохранять / Отмена** per modified buffer; cancelling
       aborts the whole close, it must not close the tabs processed earlier.
-- [ ] New/recent: last opened directory remembered, recent files list (10
-      entries, missing files pruned when the menu opens), drag & drop of `.pld`
-      files onto the window, **Перечитать с диска** for the current tab.
-- [ ] Running uses the file's own path: a saved tab is loaded with
+      `close_all()` therefore asks about every modified buffer *before* it closes
+      any of them, and `Enter` lands on **Отмена**.
+- [x] New/recent: the last opened directory is remembered and used by both
+      dialogs, the ten most recent files are stored (the menu is task_26), a
+      `.pld` dropped on the window opens in a new tab, and **Перечитать с диска**
+      (`Ctrl+Shift+R`) reloads the current tab after asking about its changes.
+- [x] Running uses the file's own path: a saved tab is loaded with
       `{"cmd":"load","path":…}` so `ИМПОРТ` resolves relative to *that* file; an
       untitled tab is loaded as text and `ИМПОРТ` resolves against the working
-      directory and the `-I` directories.  The window says which case is active
-      (so a failing import is not a mystery).
-- [ ] Text I/O: UTF-8, the `eol` of the loaded file preserved on save, a file
-      that is not valid UTF-8 asks the user to pick an encoding instead of
-      silently replacing bytes.
+      directory and the `-I` directories.  The status bar says which case is
+      running, so a failing import is not a mystery.
+- [x] Text I/O: UTF-8, the `eol` and the `encoding` of the loaded file preserved
+      on save, a file that is not valid UTF-8 asks which encoding to use (and a
+      character the file's own encoding cannot hold offers UTF-8 instead of
+      writing replacement characters).
 - [ ] **Разделить редактор** (`Ctrl+\`): the window holds one or two
       **independent** editor panes side by side, each with its own tab bar, so
       the left pane can show `lesson_1.pld` while the right shows `lesson_4.pld`.
@@ -65,8 +74,32 @@ keep track of which file each tab shows.
 - [ ] Tests: `src/gui/tests/test_documents.py` (Qt-free) for titles, the
       untitled counter, `modified` bookkeeping, eol detection and recent-file
       pruning; the tab/prompt behaviour goes into the manual checklist below.
+      `test_documents.py` is written: line endings, byte-order marks, cp1251
+      round trips, the untitled counter and the recent list.  The tab, save and
+      prompt behaviour is in `test_window.py` offscreen, where the modal box is
+      replaced by a one-line `_ask_save` stub — the decision is what matters, and
+      a real `QMessageBox` cannot be driven headless.
 
 ## Design notes
+
+The layout is held together by one rule: **the buffer list and the tab bar are
+the same order**.  `Buffer` (in `buffers.py`) owns a model, one
+`QTextDocument` and one editor; the window keeps a list of them and uses the tab
+index everywhere.  Dragging a tab reorders the widget only, so `tabMoved`
+re-orders the list, and a second pane (the remaining half of this task) will add
+a second *view* of the same `QTextDocument` rather than a second copy of the
+text.
+
+* **`QPlainTextEdit.setDocument` needs `QPlainTextDocumentLayout`.**  Handing
+  it a plain `QTextDocument` makes Qt print one warning and *silently* leave the
+  pane empty while the document does hold the text — `editor.toPlainText()` came
+  back as `''` with 88 characters in the document.  The layout is set before the
+  document is handed over.
+* A single empty, unmodified buffer is treated as a placeholder: the first file
+  that is opened takes its place instead of leaving an empty tab behind.  The
+  welcome program is not empty, so it stays until the user closes it — a rule
+  that is one line of code and one test, rather than "the first tab is always
+  reused".
 
 * The reference `MainWindow.cpp` kept one `QTabWidget` of `Editor` widgets and
   tracked the file name per editor — a structure worth keeping, but the

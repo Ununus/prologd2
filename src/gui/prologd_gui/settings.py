@@ -26,6 +26,8 @@ INDENT_WIDTH = "editor/indent_width"
 COMPLETION = "editor/completion"
 AUTO_COMPLETE_AFTER = "editor/auto_complete_after"
 THEME = "view/theme"
+RECENT_FILES = "files/recent"
+LAST_DIRECTORY = "files/last_directory"
 
 DEFAULT_FONT_FAMILY = "Cascadia Mono"
 DEFAULT_FONT_SIZE = 11.0
@@ -180,3 +182,25 @@ class Settings:
     @theme.setter
     def theme(self, value: str) -> None:
         self._write(THEME, str(value))
+
+    # -- files -------------------------------------------------------------
+    @property
+    def recent_files(self) -> list[str]:
+        """Newest first.  A single value comes back as a string, not a list."""
+        value = self._store.value(RECENT_FILES, [])
+        if isinstance(value, str):
+            value = [value] if value else []
+        return [str(item) for item in value or [] if str(item)]
+
+    @recent_files.setter
+    def recent_files(self, paths) -> None:
+        self._write(RECENT_FILES, [str(path) for path in paths])
+
+    @property
+    def last_directory(self) -> str:
+        """Where the open/save dialogs start; empty means "the current one"."""
+        return self._text(LAST_DIRECTORY, "")
+
+    @last_directory.setter
+    def last_directory(self, value: str) -> None:
+        self._write(LAST_DIRECTORY, str(value))

@@ -8,7 +8,9 @@ side of it.
 
 __all__ = [
     "appearance",
+    "buffers",
     "completion",
+    "documents",
     "editor",
     "highlighter",
     "keywords",

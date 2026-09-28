@@ -83,7 +83,7 @@ session.
 | task_22_gui_editor | done | tokenizer, palette, highlighter, line numbers, Ctrl+K/U, zoom and the settings store are in and tested; find/replace and duplicate line come with the task_26 menus, saving a file with task_25 |
 | task_23_gui_keyword_source | done | `--list-keywords` + `keywords` in `ready` (protocol 2); one source for the built-in list |
 | task_24_gui_completion | done | popup over the reserved names *and* the document's own names, with arities; no completion in a comment, string or `#…#`; `Ctrl+Space` |
-| task_25_gui_files_tabs | not started | tabs, untitled buffers, save prompts, split editor |
+| task_25_gui_files_tabs | in progress | tabs, file actions, save prompts, encodings, drag & drop and recent files are in; the split editor (`Ctrl+\`) is next |
 | task_26_gui_toolbar | not started | menus, toolbar, icon audit (27 icons present, 18 to draw) |
 | task_27_gui_panels | not started | output and input panes, output bottom/right |
 | task_28_gui_run_step | not started | run, step (new engine seam + protocol v2), stop, error line |
@@ -114,6 +114,8 @@ highlighting rules, including a sweep over the example programs),
 Enter keys, zoom bounds, line-number width, the error marker),
 `test_completion.py` (what is offered and in which order, and the popup driven
 by real key events),
+`test_documents.py` (line endings, byte-order marks, cp1251 round trips, the
+untitled counter, the recent list),
 `test_settings.py` (defaults, persistence, clamping, keys a later version adds),
 `test_session.py`
 (request queueing and the clean-slate restart) and `test_window.py` (opening a
@@ -251,3 +253,16 @@ Resolved on 2026-09-29 (GUI planning):
   message dies with `UnicodeEncodeError` (piped stdout uses the ANSI code page,
   1252 here, while the console is 65001) — the test messages are ASCII now, and
   the rule is in `ai/conventions.md`.
+* GUI implementation session, part 8: task_25, first half — tabs, files and the
+  prompts that keep work from disappearing.  `documents.py` (Qt-free) owns what a
+  buffer knows about its file: name, path, line ending, encoding and the modified
+  flag; `buffers.py` owns the `QTextDocument` and the editor per tab, which is
+  also where the split editor's second *view* will go.  Two Qt facts cost real
+  time here: `QPlainTextEdit.setDocument` refuses a document without
+  `QPlainTextDocumentLayout` — Qt prints one warning and the pane stays *empty*
+  while the document holds the text, so nothing looks like an error — and both
+  modal questions (save on close, which encoding to use) had to become
+  replaceable methods (`_ask_save`, `_ask_encoding`), because a headless test that
+  forgets to replace one does not fail, it *hangs*.  The window and the tab bar
+  share one order: `tabMoved` re-orders the buffer list, and a single empty buffer
+  is a placeholder that the first opened file replaces.

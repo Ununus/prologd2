@@ -1,4 +1,4 @@
-"""Main window: a program editor, a query line and an output pane."""
+"""Main window: tabs of programs, a query line and an output pane."""
 
 from __future__ import annotations
 
@@ -12,14 +12,17 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMainWindow,
+    QMessageBox,
     QSplitter,
+    QTabWidget,
     QToolBar,
     QVBoxLayout,
     QWidget,
 )
 
+from . import documents
+from .buffers import Buffer
 from .editor import CodeEditor, ZoomablePlainTextEdit
-from .highlighter import PrologHighlighter
 from .session import PrologSession
 from .settings import Settings
 
@@ -29,6 +32,11 @@ WELCOME = """% PrologD — пример программы
 
 ?студент(X, Y).
 """
+
+#: The three answers to "save before closing?".
+SAVE = "save"
+DISCARD = "discard"
+CANCEL = "cancel"
 
 
 class MainWindow(QMainWindow):
@@ -54,31 +62,36 @@ class MainWindow(QMainWindow):
         self._session.failed.connect(self._on_failed)
         self._session.ended.connect(self._on_ended)
 
-        #: The file the buffer belongs to, or None for an untitled buffer.  It is
-        #: not only a label: `ИМПОРТ` resolves against the directory of the file
-        #: the loader is given, so a run passes it to the interpreter.
-        self._path: str | None = None
+        #: The open programs, in tab order.  The tab bar is kept in step with
+        #: this list, including after a tab is dragged to another position.
+        self._buffers: list[Buffer] = []
+        #: True while the whole window is closing, so closing the last tab does
+        #: not open a fresh one on the way out.
+        self._closing = False
+        self._recent = documents.RecentFiles(self._settings.recent_files)
 
         self._build_ui()
-        self._editor.document().modificationChanged.connect(self._update_title)
+        # The welcome program goes into the first tab and is *not* unsaved work —
+        # the flag is left clear, so closing it asks nothing.
+        welcome = documents.Document.untitled(documents.untitled_name([]))
+        welcome.text = WELCOME
+        self._add_buffer(welcome)
         self._session.start()
 
     # -- construction ------------------------------------------------------
     def _build_ui(self) -> None:
-        self._editor = CodeEditor(
-            font_family=self._settings.font_family,
-            font_size=self._settings.font_size,
-            line_numbers=self._settings.line_numbers,
-            completion=self._settings.completion,
-            auto_complete_after=self._settings.auto_complete_after,
-        )
-        self._editor.setPlainText(WELCOME)
-        self._editor.setPlaceholderText("текст программы")
-        self._editor.zoomChanged.connect(self._on_zoom_changed)
-        # The highlighter learns the reserved names when the interpreter
-        # announces itself (`_on_ready`); until then every name is an atom or a
-        # variable, which is also what an interpreter older than protocol 2 gives.
-        self._highlighter = PrologHighlighter(self._editor.document())
+        self._tabs = QTabWidget(self)
+        self._tabs.setTabsClosable(True)
+        self._tabs.setMovable(True)
+        self._tabs.setDocumentMode(True)
+        self._tabs.tabCloseRequested.connect(self.close_buffer)
+        self._tabs.currentChanged.connect(self._on_tab_changed)
+        # Dragging a tab reorders the widget, not this list: without this the
+        # index of a buffer and the index of its tab would drift apart.
+        self._tabs.tabBar().tabMoved.connect(self._on_tab_moved)
+        # A double click on the empty part of the bar (index -1) starts a new
+        # file — the gesture the reference front-end had.
+        self._tabs.tabBar().tabBarDoubleClicked.connect(self._on_tab_bar_double_clicked)
 
         # The output is read-only, but it is monospace and it zooms with the
         # editor: one stored size covers both, so what the user set is still
@@ -98,36 +111,54 @@ class MainWindow(QMainWindow):
         self._query_line.setPlaceholderText("?цель(X). — Enter, чтобы выполнить")
         self._query_line.returnPressed.connect(self._run_query)
 
-        left = QWidget()
-        left_layout = QVBoxLayout(left)
-        left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.addWidget(self._editor)
-        left_layout.addWidget(self._query_line)
+        editor_area = QWidget()
+        editor_layout = QVBoxLayout(editor_area)
+        editor_layout.setContentsMargins(0, 0, 0, 0)
+        editor_layout.addWidget(self._tabs)
+        editor_layout.addWidget(self._query_line)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.addWidget(left)
+        splitter.addWidget(editor_area)
         splitter.addWidget(self._output)
         splitter.setSizes([600, 400])
         self.setCentralWidget(splitter)
+        # A dropped program opens in its own tab; see `dropEvent`.
+        self.setAcceptDrops(True)
 
         toolbar = QToolBar("Управление", self)
         self.addToolBar(toolbar)
         self._add_action(toolbar, "Запустить", self.run_program, ["F5", "Ctrl+R"])
-        self._add_action(toolbar, "Открыть…", self._open_file, ["Ctrl+O"])
         self._add_action(toolbar, "Остановить", self.stop_program, ["Shift+F5", "Ctrl+."])
+        toolbar.addSeparator()
+        self._add_action(toolbar, "Новый", lambda: self.new_buffer(), ["Ctrl+N"])
+        self._add_action(toolbar, "Открыть…", self._open_file, ["Ctrl+O"])
+        self._add_action(toolbar, "Сохранить", lambda: self.save_buffer(), ["Ctrl+S"])
+        toolbar.addSeparator()
         self._add_action(toolbar, "Очистить вывод", self.clear_output, ["Ctrl+L"])
 
-        # Registered on the window without a button: the menu bar and the real
-        # toolbar come in task_26, and zoom deliberately has no key of its own
-        # besides the wheel — `Ctrl+=` and `Ctrl++` belong to task_31's combos.
-        self._add_window_action("Закомментировать", self._editor.comment, "Ctrl+K")
-        self._add_window_action("Раскомментировать", self._editor.uncomment, "Ctrl+U")
-        self._add_window_action("Сбросить масштаб", self._editor.reset_zoom, "Ctrl+0")
+        # The commands task_26 puts into the menus; the keys already work.  Zoom
+        # deliberately has no key pair of its own — `Ctrl+=`, `Ctrl++` and
+        # `Ctrl+-` belong to the `РАВНО`/`СЛОЖЕНИЕ`/`ВЫЧИТАНИЕ` skeletons of
+        # task_31.  `Alt+F4` needs no binding: it closes the window, and
+        # `closeEvent` is where the save prompts live.
+        self._add_window_action("Сохранить как…", self._save_as, "Ctrl+Shift+S")
+        self._add_window_action("Сохранить все", self._save_all)
+        self._add_window_action("Закрыть вкладку", self._close_current, "Ctrl+W")
+        self._add_window_action("Закрыть все", self._close_all_tabs)
+        self._add_window_action("Выход", self.close, "Ctrl+Q")
+        self._add_window_action("Перечитать с диска", self.reload_buffer, "Ctrl+Shift+R")
+        self._add_window_action("Следующая вкладка", self._next_tab, "Ctrl+Tab")
+        self._add_window_action("Предыдущая вкладка", self._previous_tab, "Ctrl+Shift+Tab")
+        self._add_window_action("Закомментировать", self._comment, "Ctrl+K")
+        self._add_window_action("Раскомментировать", self._uncomment, "Ctrl+U")
+        self._add_window_action("Сбросить масштаб", self._reset_zoom, "Ctrl+0")
 
         self._status = QLabel("запуск…")
         self.statusBar().addWidget(self._status)
 
-    def _make_action(self, title: str, slot, shortcuts: str | list[str]) -> QAction:
+    def _make_action(
+        self, title: str, slot, shortcuts: str | list[str] | None = None
+    ) -> QAction:
         """One action, used by the toolbar, the window and (task_26) the menus.
 
         `setShortcuts` takes a *list*: a comma inside `QKeySequence` would mean a
@@ -135,41 +166,65 @@ class MainWindow(QMainWindow):
         shorter than the action it names is the defect this makes impossible to
         repeat — **Запустить** was bound to `Ctrl+R` while the plan promised F5,
         so the key did nothing.
+
+        `shortcuts=None` is allowed: a menu entry does not have to have a key.
         """
-        keys = [shortcuts] if isinstance(shortcuts, str) else list(shortcuts)
+        if shortcuts is None:
+            keys: list[str] = []
+        elif isinstance(shortcuts, str):
+            keys = [shortcuts]
+        else:
+            keys = list(shortcuts)
         action = QAction(title, self)
-        action.setShortcuts([QKeySequence(key) for key in keys])
-        action.setToolTip(f"{title} ({keys[0]})")
+        if keys:
+            action.setShortcuts([QKeySequence(key) for key in keys])
+            action.setToolTip(f"{title} ({keys[0]})")
+        else:
+            action.setToolTip(title)
         action.triggered.connect(slot)
         return action
 
     def _add_action(self, toolbar: QToolBar, title: str, slot, shortcuts: str | list[str]) -> None:
         toolbar.addAction(self._make_action(title, slot, shortcuts))
 
-    def _add_window_action(self, title: str, slot, shortcuts: str | list[str]) -> None:
-        """Registers a key binding without a toolbar button."""
+    def _add_window_action(
+        self, title: str, slot, shortcuts: str | list[str] | None = None
+    ) -> None:
+        """Registers a command on the window, with or without a key."""
         self.addAction(self._make_action(title, slot, shortcuts))
 
     # -- actions -----------------------------------------------------------
     def run_program(self) -> None:
-        # A run starts from a clean slate: a fresh interpreter (no clauses, RNG
-        # seed, redirected files or preloaded input left from the previous run)
-        # and an empty output pane.  Reusing the session accumulates clauses —
-        # with a duplicated `факториал/2` the factorial example returns 64
-        # solutions instead of one, which looks like a loop — so `start()` stops
-        # a live process first.
+        """Runs the current buffer in a fresh interpreter.
+
+        A run starts from a clean slate: a fresh interpreter (no clauses, RNG
+        seed, redirected files or preloaded input left from the previous run)
+        and an empty output pane.  Reusing the session accumulates clauses —
+        with a duplicated `факториал/2` the factorial example returns 64
+        solutions instead of one, which looks like a loop — so `start()` stops
+        a live process first.
+        """
+        buffer = self.current_buffer()
+        if buffer is None:
+            return
+        path = buffer.model.path
         self._output.clear()
         self._session.start()
         self._append_output("--- загрузка программы ---\n")
-        if self._path is not None and not self._editor.document().isModified():
+        if path is not None and not buffer.is_modified():
             # A saved, unmodified buffer is loaded by path: `ИМПОРТ` resolves
             # against the file's own directory and diagnostics name the file.
-            self._session.load_file(self._path)
+            self._session.load_file(path)
+            self._status.setText(f"выполняется {pathlib.Path(path).name}")
         else:
             # Otherwise the text comes from the editor, and the path, when there
-            # is one, is what the loader treats as the importing file.
-            self._session.load_text(self._editor.toPlainText(), self._path or "<buffer>")
-        self._status.setText("выполняется")
+            # is one, is what the loader treats as the importing file.  The
+            # status line says which case is running, so a failing `ИМПОРТ` is
+            # not a mystery: without a path it searches only the working
+            # directory and the `-I` directories.
+            self._session.load_text(buffer.text(), path or "<buffer>")
+            name = pathlib.Path(path).name if path else "буфер без имени"
+            self._status.setText(f"выполняется {name} (есть несохранённые правки)")
 
     def _run_query(self) -> None:
         text = self._query_line.text().strip()
@@ -180,13 +235,16 @@ class MainWindow(QMainWindow):
             text = "?" + text
         self._session.run_query(text)
 
-    def _open_file(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, "Открыть программу", "", "PrologD (*.pld);;Все файлы (*)")
-        if path:
-            self.open_path(path)
+    # -- files -------------------------------------------------------------
+    def new_buffer(self, name: str | None = None) -> int:
+        """Adds an empty tab and makes it current."""
+        used = [buffer.model.name for buffer in self._buffers]
+        return self._add_buffer(
+            documents.Document.untitled(name or documents.untitled_name(used))
+        )
 
-    def open_path(self, path: str) -> None:
-        """Loads a file into the editor — and *only* into the editor.
+    def open_path(self, path: str, encoding: str | None = None) -> bool:
+        """Opens a file in its own tab — and *only* into the editor.
 
         Opening must not run anything: `load` adds clauses to the live
         interpreter (that is what `ИМПОРТ` needs), so opening a file into a
@@ -195,19 +253,229 @@ class MainWindow(QMainWindow):
         is why opening the factorial example twice looked like an endless loop.
         Running is F5.
         """
+        path = str(pathlib.Path(path))
+        index = self._index_of_path(path)
+        if index is not None:
+            # Already open: show that tab instead of a second copy of the file.
+            self._tabs.setCurrentIndex(index)
+            return True
         try:
-            # `utf-8-sig` drops a byte-order mark, which the lexer also ignores;
-            # otherwise the first line would start with an invisible character.
-            with open(path, encoding="utf-8-sig") as stream:
-                text = stream.read()
-        except (OSError, UnicodeDecodeError) as error:
+            model = documents.Document.from_file(path, encoding)
+        except documents.DecodeFailure as failure:
+            return self._open_with_encoding(failure)
+        except OSError as error:
             self._append_output(f"*** не могу открыть {path}: {error}\n")
-            return
-        self._editor.setPlainText(text)
-        self._editor.document().setModified(False)
-        self._path = path
-        self._update_title()
+            return False
+
+        if len(self._buffers) == 1 and self._is_placeholder(self._buffers[0]):
+            # A single empty buffer is a placeholder, not work: the file takes
+            # its place instead of leaving an empty tab behind.  The welcome
+            # program is not empty, so it stays until it is closed.
+            self._replace_buffer(0, model)
+        else:
+            self._add_buffer(model)
+        self._remember(path)
         self._status.setText(f"открыт {path}")
+        return True
+
+    def save_buffer(self, buffer: Buffer | None = None, path: str | None = None) -> bool:
+        """Writes a buffer, asking for a name when it has none.  False = not saved.
+
+        `False` matters: whoever asked must not close anything when the file
+        could not be written.
+        """
+        buffer = buffer or self.current_buffer()
+        if buffer is None:
+            return False
+        if path is None and buffer.model.path is None:
+            path = self._ask_save_path(buffer)
+            if not path:
+                return False
+        buffer.take_text()
+        try:
+            written = buffer.model.save(path)
+        except UnicodeEncodeError as error:
+            # A file read as cp1251 cannot hold every character.  Replacement
+            # characters would corrupt it silently, so UTF-8 is offered instead.
+            if not self._offer_utf8(buffer, error):
+                return False
+            try:
+                written = buffer.model.save(path)
+            except OSError as retry_error:
+                self._append_output(
+                    f"*** не могу записать {path or buffer.model.path}: {retry_error}\n"
+                )
+                self._status.setText("не сохранено")
+                return False
+        except OSError as error:
+            self._append_output(f"*** не могу записать {path or buffer.model.path}: {error}\n")
+            self._status.setText("не сохранено")
+            return False
+        buffer.mark_saved()
+        self._refresh_titles()
+        self._remember(written)
+        self._status.setText(f"сохранён {written}")
+        return True
+
+    def reload_buffer(self) -> bool:
+        """Re-reads the current tab from its file (`Ctrl+Shift+R`)."""
+        buffer = self.current_buffer()
+        if buffer is None or buffer.model.path is None:
+            self._status.setText("буфер не связан с файлом")
+            return False
+        if buffer.is_modified():
+            answer = self._ask_save(buffer.model.name)
+            if answer == CANCEL:
+                return False
+            if answer == SAVE and not self.save_buffer(buffer):
+                return False
+        try:
+            model = documents.Document.from_file(buffer.model.path, buffer.model.encoding)
+        except (OSError, documents.DecodeFailure) as error:
+            self._append_output(f"*** не могу перечитать {buffer.model.path}: {error}\n")
+            return False
+        buffer.editor.setPlainText(model.text)
+        buffer.model.eol = model.eol
+        buffer.mark_saved()
+        self._refresh_titles()
+        self._status.setText(f"перечитан {buffer.model.path}")
+        return True
+
+    def close_buffer(self, index: int) -> bool:
+        """Closes one tab, asking first.  Cancelling keeps it open."""
+        if not 0 <= index < len(self._buffers):
+            return False
+        if not self._confirm_close(self._buffers[index]):
+            return False
+        self._drop_buffer(index)
+        if not self._buffers and not self._closing:
+            self.new_buffer()  # there is always somewhere to type
+        self._refresh_titles()
+        return True
+
+    def close_all(self) -> bool:
+        """Closes every tab, asking about all of them *before* closing any.
+
+        Closing and asking in one pass would mean that cancelling on the third
+        buffer leaves the first two closed, which is not what «Отмена» means.
+        """
+        for buffer in list(self._buffers):
+            if not buffer.is_modified():
+                continue
+            answer = self._ask_save(buffer.model.name)
+            if answer == CANCEL:
+                return False
+            if answer == SAVE and not self.save_buffer(buffer):
+                return False
+        for index in reversed(range(len(self._buffers))):
+            self._drop_buffer(index)
+        return True
+
+    # -- prompts -----------------------------------------------------------
+    def _ask_save(self, name: str) -> str:
+        """Save, discard or cancel for one modified buffer.
+
+        A method of its own so it can be replaced: a modal box cannot be driven
+        from a headless test, and the *decision* is what the tests are about.
+        """
+        box = QMessageBox(self)
+        box.setWindowTitle("PrologD")
+        box.setText(f"Сохранить изменения в «{name}»?")
+        save = box.addButton("Сохранить", QMessageBox.ButtonRole.AcceptRole)
+        discard = box.addButton("Не сохранять", QMessageBox.ButtonRole.DestructiveRole)
+        cancel = box.addButton("Отмена", QMessageBox.ButtonRole.RejectRole)
+        # Enter lands on «Отмена»: throwing work away has to be a click, not a
+        # reflex, and the destructive button sits last for the same reason.
+        box.setDefaultButton(cancel)
+        box.exec()
+        clicked = box.clickedButton()
+        if clicked is save:
+            return SAVE
+        if clicked is discard:
+            return DISCARD
+        return CANCEL
+
+    def _ask_save_path(self, buffer: Buffer) -> str | None:
+        """A file name for a buffer that has none."""
+        start = buffer.model.path or str(
+            pathlib.Path(self._settings.last_directory or ".") / f"{buffer.model.name}.pld"
+        )
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Сохранить программу", start, "PrologD (*.pld);;Все файлы (*)"
+        )
+        return path or None
+
+    def _confirm_close(self, buffer: Buffer) -> bool:
+        if not buffer.is_modified():
+            return True
+        answer = self._ask_save(buffer.model.name)
+        if answer == CANCEL:
+            return False
+        if answer == DISCARD:
+            return True
+        # A save that failed must not lose the buffer either.
+        return self.save_buffer(buffer)
+
+    def _offer_utf8(self, buffer: Buffer, error: UnicodeEncodeError) -> bool:
+        character = error.object[error.start]
+        answer = QMessageBox.question(
+            self,
+            "PrologD",
+            f"В кодировке {buffer.model.encoding} нет символа «{character}» "
+            f"(позиция {error.start}).\nСохранить файл в UTF-8?",
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return False
+        buffer.model.encoding = documents.DEFAULT_ENCODING
+        return True
+
+    def _ask_encoding(self, path: str) -> str | None:
+        """Which encoding to use for a file that is not UTF-8.
+
+        Replaceable for the same reason as `_ask_save`: a modal box cannot be
+        driven from a headless test, and a test that forgets to replace it does
+        not fail — it *hangs*.
+        """
+        choice, accepted = QInputDialog.getItem(
+            self,
+            "Кодировка",
+            f"{pathlib.Path(path).name} не читается как UTF-8.\nВыберите кодировку файла:",
+            list(documents.SUGGESTED_ENCODINGS),
+            0,
+            False,
+        )
+        return choice if accepted else None
+
+    def _open_with_encoding(self, failure: documents.DecodeFailure) -> bool:
+        """Asks which encoding to use — a file is never decoded by guesswork."""
+        choice = self._ask_encoding(failure.path)
+        if choice is None:
+            self._append_output(f"*** {failure}\n")
+            return False
+        return self.open_path(failure.path, encoding=choice)
+
+    def _open_file(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Открыть программу",
+            self._settings.last_directory,
+            "PrologD (*.pld);;Все файлы (*)",
+        )
+        if path:
+            self.open_path(path)
+
+    def _save_as(self) -> None:
+        buffer = self.current_buffer()
+        if buffer is None:
+            return
+        path = self._ask_save_path(buffer)
+        if path:
+            self.save_buffer(buffer, path)
+
+    def _save_all(self) -> None:
+        for buffer in list(self._buffers):
+            if buffer.is_modified() and not self.save_buffer(buffer):
+                return
 
     def stop_program(self) -> None:
         self._session.stop()
@@ -217,24 +485,167 @@ class MainWindow(QMainWindow):
     def clear_output(self) -> None:
         self._output.clear()
 
-    def _update_title(self) -> None:
-        name = pathlib.Path(self._path).name if self._path else "Без имени"
-        marker = "*" if self._editor.document().isModified() else ""
-        self.setWindowTitle(f"{marker}{name} — PrologD")
+    # -- buffers -----------------------------------------------------------
+    def _add_buffer(self, model: documents.Document) -> int:
+        """Adds a tab for `model` and makes it current."""
+        buffer = Buffer(model, self._settings, self)
+        buffer.editor.setPlaceholderText("текст программы")
+        buffer.editor.zoomChanged.connect(self._on_zoom_changed)
+        # The reserved names arrive with `ready`; a buffer opened after that gets
+        # them here, and a buffer created before it is served by `_on_ready`.
+        buffer.set_keywords(self._session.keywords)
+        buffer.changed.connect(self._refresh_titles)
+        self._buffers.append(buffer)
+        index = self._tabs.addTab(buffer.editor, buffer.title())
+        self._tabs.setCurrentIndex(index)
+        self._refresh_titles()
+        return index
+
+    def _replace_buffer(self, index: int, model: documents.Document) -> int:
+        """Turns a placeholder tab into the file that takes its place."""
+        self._drop_buffer(index)
+        return self._add_buffer(model)
+
+    def _drop_buffer(self, index: int) -> None:
+        """Removes a tab and the buffer behind it.  No questions are asked here."""
+        self._tabs.removeTab(index)
+        buffer = self._buffers.pop(index)
+        buffer.editor.deleteLater()
+        buffer.setParent(None)
+        buffer.deleteLater()
+
+    def _is_placeholder(self, buffer: Buffer) -> bool:
+        """An empty untitled buffer with nothing in it to lose."""
+        return (
+            buffer.model.path is None
+            and not buffer.is_modified()
+            and not buffer.text().strip()
+        )
+
+    def _index_of_path(self, path: str) -> int | None:
+        wanted = pathlib.Path(path)
+        for index, buffer in enumerate(self._buffers):
+            if buffer.model.path and pathlib.Path(buffer.model.path) == wanted:
+                return index
+        return None
+
+    def _remember(self, path: str) -> None:
+        """Records the file and its directory for the next dialog."""
+        self._settings.recent_files = self._recent.add(path)
+        self._settings.last_directory = str(pathlib.Path(path).parent)
+
+    # -- tabs --------------------------------------------------------------
+    def _on_tab_changed(self, index: int) -> None:
+        self._refresh_titles()
+        buffer = self.current_buffer()
+        if buffer is not None and buffer.model.path:
+            self._status.setText(f"открыт {buffer.model.path}")
+
+    def _on_tab_moved(self, source: int, target: int) -> None:
+        """Keeps the buffer list in the tab bar's order — the indices are shared."""
+        if 0 <= source < len(self._buffers):
+            self._buffers.insert(target, self._buffers.pop(source))
+
+    def _on_tab_bar_double_clicked(self, index: int) -> None:
+        if index < 0:  # the empty part of the bar, not a tab
+            self.new_buffer()
+
+    def _refresh_titles(self) -> None:
+        for index, buffer in enumerate(self._buffers):
+            self._tabs.setTabText(index, buffer.title())
+        buffer = self.current_buffer()
+        self.setWindowTitle(buffer.model.window_title() if buffer is not None else "PrologD")
+
+    def _next_tab(self) -> None:
+        self._cycle_tab(1)
+
+    def _previous_tab(self) -> None:
+        self._cycle_tab(-1)
+
+    def _cycle_tab(self, step: int) -> None:
+        if len(self._buffers) < 2:
+            return
+        self._tabs.setCurrentIndex((self._tabs.currentIndex() + step) % len(self._buffers))
+
+    def _close_current(self) -> None:
+        self.close_buffer(self._tabs.currentIndex())
+
+    def _close_all_tabs(self) -> None:
+        if self.close_all():
+            self.new_buffer()
+
+    def closeEvent(self, event) -> None:  # noqa: N802 - Qt spelling
+        """Closing the window asks about every modified buffer first."""
+        self._closing = True
+        try:
+            if self.close_all():
+                event.accept()
+            else:
+                event.ignore()
+        finally:
+            self._closing = False
+
+    # -- commands that act on the current tab ------------------------------
+    def _comment(self) -> None:
+        buffer = self.current_buffer()
+        if buffer is not None:
+            buffer.editor.comment()
+
+    def _uncomment(self) -> None:
+        buffer = self.current_buffer()
+        if buffer is not None:
+            buffer.editor.uncomment()
+
+    def _reset_zoom(self) -> None:
+        buffer = self.current_buffer()
+        if buffer is not None:
+            buffer.editor.reset_zoom()
+
+    # -- drag and drop -----------------------------------------------------
+    def dragEnterEvent(self, event) -> None:  # noqa: N802 - Qt spelling
+        if any(url.isLocalFile() for url in event.mimeData().urls()):
+            event.acceptProposedAction()
+
+    def dropEvent(self, event) -> None:  # noqa: N802 - Qt spelling
+        """A dropped program opens in its own tab.  It is not run: a run is F5."""
+        for url in event.mimeData().urls():
+            if url.isLocalFile():
+                self.open_path(url.toLocalFile())
+        event.acceptProposedAction()
 
     # -- accessors for the actions and the tests ---------------------------
-    # task_25 replaces these with a document model (tabs, modified flag, save).
     @property
     def session(self) -> PrologSession:
-        """The interpreter session; the window owns exactly one until task_25."""
+        """The interpreter session; the window owns exactly one."""
         return self._session
 
-    def editor_text(self) -> str:
-        return self._editor.toPlainText()
+    def buffers(self) -> list[Buffer]:
+        """The open programs, in tab order."""
+        return list(self._buffers)
+
+    def tab_count(self) -> int:
+        return len(self._buffers)
+
+    def current_buffer(self) -> Buffer | None:
+        """The tab that is showing, or None in the moment the last one closes."""
+        index = self._tabs.currentIndex()
+        if 0 <= index < len(self._buffers):
+            return self._buffers[index]
+        return None
 
     def editor(self) -> CodeEditor:
-        """The code editor itself, for the commands that act on a selection."""
-        return self._editor
+        """The current tab's editor, for the commands that act on a selection.
+
+        There is always one while the window is open: the last tab is never
+        closed without a replacement being made.
+        """
+        buffer = self.current_buffer()
+        assert buffer is not None, "окно без вкладок"
+        return buffer.editor
+
+    def editor_text(self) -> str:
+        buffer = self.current_buffer()
+        return buffer.text() if buffer is not None else ""
 
     def output(self) -> ZoomablePlainTextEdit:
         """The read-only output pane (task_27 gives it a place of its own)."""
@@ -244,28 +655,34 @@ class MainWindow(QMainWindow):
         return self._output.toPlainText()
 
     def current_path(self) -> str | None:
-        return self._path
+        buffer = self.current_buffer()
+        return buffer.model.path if buffer is not None else None
+
+    def recent_files(self) -> list[str]:
+        """What the recent-files menu of task_26 will show, newest first."""
+        return self._recent.paths()
 
     # -- session events ----------------------------------------------------
     def _on_ready(self, version: str) -> None:
-        self._highlighter.set_keywords(self._session.keywords)
-        # The popup offers the reserved names with their arities once the
-        # interpreter has announced them; before that it offers the document's
-        # own names only, which is already most of the typing saved.
-        self._editor.set_completion_keywords(self._session.keywords)
+        # The reserved names reach every open buffer, including the ones opened
+        # before the interpreter announced itself; those created later are served
+        # by `_add_buffer`.
+        for buffer in self._buffers:
+            buffer.set_keywords(self._session.keywords)
         self._status.setText(f"PrologD {version} готов")
-        self._update_title()
+        self._refresh_titles()
 
     def _on_zoom_changed(self, size: float) -> None:
-        """One size for the editor, the output and the query line, stored at once.
+        """One size for every editor, the output and the query line, stored at once.
 
-        Setting the size on the other pane emits `zoomChanged` again; that call
-        changes nothing and stops there, because `set_font_size` returns early
-        when the size is already the one asked for.
+        Setting the size on the other panes emits `zoomChanged` again; those
+        calls change nothing and stop there, because `set_font_size` returns
+        early when the size is already the one asked for.
         """
         self._settings.font_size = size
-        for pane in (self._editor, self._output):
-            pane.set_font_size(size)
+        for buffer in self._buffers:
+            buffer.set_font_size(size)
+        self._output.set_font_size(size)
         self._query_line.setFont(self._output.font())
         self._status.setText(f"шрифт {size:.0f} pt")
 
