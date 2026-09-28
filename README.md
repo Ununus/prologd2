@@ -88,6 +88,7 @@ Usage: prologd [options] [files...]
 -q, --questions       echo queries before executing them
 -t, --trace           start with tracing enabled
     --protocol FORM   front-end protocol: text (default) or json
+    --list-keywords   print the reserved names as name/arity and exit
 -h, --help            show help and exit
     --version         show version and exit
 ```
@@ -112,7 +113,9 @@ Exit codes: `0` success, `1` usage error, `2` a source file could not be loaded
 for front-ends: requests are JSON objects on stdin, events are JSON objects on
 stdout, one per line. `-i`/`-o`/`-e` are refused in this mode — the protocol
 owns both streams. The Python/PySide6 GUI in `src/gui` is built on it; see
-`src/gui/README.md` for the full contract.
+`src/gui/README.md` for the full contract. Protocol version 2 adds the reserved
+names and their arities to the `ready` event, so a front-end never keeps its own
+copy of the built-in list (`prologd --list-keywords` prints the same table).
 
 ## Project layout
 

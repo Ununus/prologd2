@@ -2,6 +2,7 @@ add_executable(prlib_tests
   test_smoke.cpp
   test_big_int.cpp
   test_lexer.cpp
+  test_keywords.cpp
   test_parser.cpp
   test_unify.cpp
   test_engine.cpp
@@ -59,6 +60,17 @@ if(TARGET prologd)
             -s "${CMAKE_SOURCE_DIR}/examples/import_demo.pld")
   set_tests_properties(cli_include PROPERTIES
     PASS_REGULAR_EXPRESSION "Y=42")
+
+  # `--list-keywords` is a query: it prints `name/arity` lines and exits without
+  # loading anything.  The Catch2 test covers the content; these two cover the
+  # CLI shape — `/3` for a predicate, `/+` for the variadic ВЫВОД.
+  add_test(NAME cli_list_keywords COMMAND prologd --list-keywords)
+  set_tests_properties(cli_list_keywords PROPERTIES
+    PASS_REGULAR_EXPRESSION "НАЙТИВСЁ/3")
+
+  add_test(NAME cli_list_keywords_variadic COMMAND prologd --list-keywords)
+  set_tests_properties(cli_list_keywords_variadic PROPERTIES
+    PASS_REGULAR_EXPRESSION "ВЫВОД/\\+")
 
   # The JSON session needs byte-exact stdin, so it is driven by a CMake script
   # instead of the usual PASS_REGULAR_EXPRESSION form.

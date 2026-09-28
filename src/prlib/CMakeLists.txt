@@ -5,6 +5,7 @@ add_library(prlib STATIC
   src/term_print.cpp
   src/diagnostics.cpp
   src/lexer.cpp
+  src/keywords.cpp
   src/parser.cpp
   src/program.cpp
   src/bindings.cpp

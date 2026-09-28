@@ -1,6 +1,9 @@
+#include <algorithm>
 #include <chrono>
+#include <string>
 #include <thread>
 #include <unordered_map>
+#include <vector>
 
 #include "builtins_internal.hpp"
 #include "prlib/version.hpp"
@@ -334,6 +337,34 @@ BuiltinFn findBuiltin(std::string_view name, std::size_t arity) {
     return nullptr;
   }
   return it->second;
+}
+
+BuiltinArities builtinArities(std::string_view name) {
+  // `ВЫВОД` has no table entry to enumerate: `findBuiltin` accepts any positive
+  // arity for it.
+  if (name == "ВЫВОД") {
+    return BuiltinArities{{}, true};
+  }
+  BuiltinArities result;
+  for (const auto& entry : builtinTable()) {
+    if (entry.first.name == name) {
+      result.arities.push_back(entry.first.arity);
+    }
+  }
+  std::sort(result.arities.begin(), result.arities.end());
+  return result;
+}
+
+std::vector<std::string> builtinNames() {
+  std::vector<std::string> result;
+  result.reserve(builtinTable().size() + 1);
+  for (const auto& entry : builtinTable()) {
+    result.push_back(entry.first.name);
+  }
+  result.emplace_back("ВЫВОД");  // variadic, the one name without a table entry
+  std::sort(result.begin(), result.end());
+  result.erase(std::unique(result.begin(), result.end()), result.end());
+  return result;
 }
 
 }  // namespace prologd

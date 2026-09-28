@@ -13,7 +13,8 @@ import json
 from typing import Any, Iterator
 
 #: Bumped by the interpreter whenever a request or an event changes shape.
-PROTOCOL_VERSION = 1
+#: 2: the `ready` event carries `keywords` (the reserved names and their arities).
+PROTOCOL_VERSION = 2
 
 #: Event names the interpreter emits.
 EVENTS = ("ready", "output", "result", "input_request", "error", "bye")

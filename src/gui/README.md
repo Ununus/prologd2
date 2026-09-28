@@ -37,11 +37,13 @@ Headless check of the protocol, without PySide6 installed:
 python src/gui/tests/protocol_smoke.py
 ```
 
-## Protocol contract (version 1)
+## Protocol contract (version 2)
 
 One JSON object per line in both directions; the interpreter writes nothing else
 to stdout.  The C++ side lives in `src/cli/protocol.cpp`, the Python side in
-`prologd_gui/protocol.py`.
+`prologd_gui/protocol.py`.  Version 2 added the reserved names to `ready`;
+version 1 sessions are still understood by the Python client (the table is then
+empty and completion falls back to the document's own predicates).
 
 ### Requests
 
@@ -58,7 +60,7 @@ to stdout.  The C++ side lives in `src/cli/protocol.cpp`, the Python side in
 
 | Event | Meaning |
 |-------|---------|
-| `{"event":"ready","protocol":1,"version":"2.0.0"}` | the session is up |
+| `{"event":"ready","protocol":2,"version":"2.0.0","keywords":[…]}` | the session is up |
 | `{"event":"output","text":"…"}` | program output (`ВЫВОД`, query results, traces) |
 | `{"event":"result","found":true}` | one query finished; `found` is false when nothing matched |
 | `{"event":"input_request","kind":"line"}` | `ВВОДСТР`/`ВВОДСИМВ`/`ВВКОД` waits for an answer; `kind` is `token`, `line` or `codepoint` |
@@ -69,6 +71,14 @@ Exit codes: `0` clean, `1` usage error, `2` load/parse failure, `3` runtime
 failure (for example an interrupted query).
 
 ### Notes for front-ends
+
+* `ready` carries `keywords`: every reserved name the lexer knows, with its kind
+  (`predicate`, `operator`, `directive`) and its arities — `[]` for operators,
+  directives and the variadic `ВЫВОД`, which is marked with `"variadic":true`.
+  The same table is printed by `prologd --list-keywords`, one `name/arity` per
+  line (`ВЫВОД/+` for the variadic one), so a front-end never keeps its own copy
+  of the built-in list.  Highlighting, completion and the shortcut cheat-sheet
+  all read it.
 
 * Read the interpreter's stdout line by line and never merge it with stderr; in
   protocol mode all diagnostics travel as `error` events.

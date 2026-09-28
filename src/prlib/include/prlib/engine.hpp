@@ -62,6 +62,21 @@ using BuiltinFn = BuiltinResult (*)(Engine&, std::span<const Term>);
 /// Look up a built-in by name and arity; nullptr when none.
 BuiltinFn findBuiltin(std::string_view name, std::size_t arity);
 
+/// Arity information for a registered built-in.  Both fields are empty/false
+/// when the name is not in the dispatch table.  `ВЫВОД` accepts any positive
+/// arity, so it reports `variadic` instead of enumerating arities.
+struct BuiltinArities {
+  std::vector<std::size_t> arities;  ///< sorted ascending
+  bool variadic = false;
+};
+
+BuiltinArities builtinArities(std::string_view name);
+
+/// Every name the dispatch table can call, plus the variadic `ВЫВОД`, sorted and
+/// unique.  Used to keep the reserved-name table and the dispatcher in step
+/// (`prlib/keywords.hpp`).
+std::vector<std::string> builtinNames();
+
 /// The interpreter: term store, clause database, streams and resolution.
 class Engine {
  public:

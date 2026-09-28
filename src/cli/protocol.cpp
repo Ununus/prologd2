@@ -10,6 +10,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "prlib/keywords.hpp"
 #include "prlib/utf8_path.hpp"
 #include "prlib/version.hpp"
 
@@ -19,7 +20,8 @@ namespace {
 using Json = nlohmann::json;
 
 /// Wire format version; bump it whenever a command or an event changes shape.
-constexpr int kProtocolVersion = 1;
+/// 2: the `ready` event carries `keywords`.
+constexpr int kProtocolVersion = 2;
 
 [[nodiscard]] std::string inputKindName(InputRequestKind kind) {
   switch (kind) {
@@ -41,6 +43,27 @@ constexpr int kProtocolVersion = 1;
   return text;
 }
 
+/// The reserved names with their kind and arities, so a front-end can colour
+/// and complete them without a second round trip.  `variadic` appears only when
+/// it is true, which keeps the event small.
+[[nodiscard]] Json keywordList() {
+  Json list = Json::array();
+  for (const KeywordInfo& keyword : reservedKeywords()) {
+    Json entry{{"name", std::string(keyword.name)},
+               {"kind", std::string(keywordKindName(keyword.kind))}};
+    Json arities = Json::array();
+    for (const std::size_t arity : keyword.arities) {
+      arities.push_back(arity);
+    }
+    entry["arities"] = std::move(arities);
+    if (keyword.variadic) {
+      entry["variadic"] = true;
+    }
+    list.push_back(std::move(entry));
+  }
+  return list;
+}
+
 /// One JSON-line session: the request loop, event emission and the bridge that
 /// turns `ВВОДСТР`/`ВВОДСИМВ`/`ВВКОД` into `input_request`/`input` pairs.
 class Session {
@@ -58,7 +81,8 @@ class Session {
 
     emit(Json{{"event", "ready"},
               {"protocol", kProtocolVersion},
-              {"version", std::string(versionString())}});
+              {"version", std::string(versionString())},
+              {"keywords", keywordList()}});
 
     std::string line;
     while (std::getline(in_, line)) {

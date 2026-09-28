@@ -74,10 +74,13 @@ def main(argv: list[str]) -> int:
     assert code == 0, f"exit code {code}"
     ready = find(events, "ready")
     assert ready["protocol"] == protocol.PROTOCOL_VERSION, ready
+    reserved = {entry["name"] for entry in ready["keywords"]}
+    assert {"НАЙТИВСЁ", "ВЫП", "ПС"} <= reserved, sorted(reserved)
     assert find(events, "output", text="X=1\nX=2\n"), events
     assert len([e for e in events if e.get("event") == "result"]) == 2, events
     assert events[-1].get("event") == "bye", events
     print("ok: load, query, output and result events")
+    print(f"ok: ready carries {len(reserved)} reserved names")
 
     code, events = run_session(
         executable,

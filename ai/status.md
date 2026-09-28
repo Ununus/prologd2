@@ -81,7 +81,7 @@ session.
 | task_20_gui_future | superseded | the Qt C++ plan became PySide6 over a JSON protocol (ADR-014) |
 | task_21_gui_pyside | in progress | protocol, `IoContext` input seam, `externalStop`, `src/gui` skeleton |
 | task_22_gui_editor | not started | highlighting (separate Cyrillic/Latin colours), line numbers, font zoom, comment/uncomment |
-| task_23_gui_keyword_source | not started | `--list-keywords` + `keywords` in `ready`; removes the third copy of the built-in list |
+| task_23_gui_keyword_source | done | `--list-keywords` + `keywords` in `ready` (protocol 2); one source for the built-in list |
 | task_24_gui_completion | not started | completion from the keyword source plus the document's own predicates |
 | task_25_gui_files_tabs | not started | tabs, untitled buffers, save prompts, split editor |
 | task_26_gui_toolbar | not started | menus, toolbar, icon audit (27 icons present, 18 to draw) |
@@ -94,13 +94,14 @@ session.
 
 ## Test suite
 
-108 tests, about a second: 100 Catch2 cases plus 8 command-line and
-integration tests (seven option tests and the JSON protocol session). Groups:
-BigInt, lexer, parser, unification, engine, every built-in group, `НАЙТИВСЁ`,
+116 tests, about a second: 106 Catch2 cases plus 10 command-line and
+integration tests (seven option tests, two `--list-keywords` tests and the JSON
+protocol session). Groups:
+BigInt, lexer, keywords, parser, unification, engine, every built-in group, `НАЙТИВСЁ`,
 module loader, the I/O seams, typical tasks (factorial, Fibonacci, GCD,
 insertion sort, 4-queens, knapsack), ported lesson/example programs (golden
 output) and the CLI (`-s`, `--source`, `--source=`, positional, `-I`, `--help`,
-`--version`, `--protocol json`).
+`--version`, `--list-keywords`, `--protocol json`).
 
 ## Known gaps / next steps
 

@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "prlib/engine.hpp"
+#include "prlib/keywords.hpp"
 #include "prlib/module_loader.hpp"
 #include "prlib/utf8_path.hpp"
 #include "prlib/version.hpp"
@@ -87,6 +88,7 @@ int main(int argc, char** argv) {
   std::string errorFile;
   bool questions = false;
   bool trace = false;
+  bool listKeywords = false;
   std::string protocol = "text";
 
   app.add_option("-s,--source", sources, "Interpret the given source file (repeatable)");
@@ -98,6 +100,8 @@ int main(int argc, char** argv) {
   app.add_flag("-t,--trace", trace, "Start with tracing enabled");
   app.add_option("--protocol", protocol, "Front-end protocol: text (default) or json")
       ->check(CLI::IsMember({"text", "json"}));
+  app.add_flag("--list-keywords", listKeywords,
+               "Print the reserved names as name/arity and exit");
   app.add_option("files", positional, "Source files");
 
   try {
@@ -108,6 +112,22 @@ int main(int argc, char** argv) {
 
   for (const std::string& file : positional) {
     sources.push_back(file);
+  }
+
+  // A query, not a run mode: answer and exit before anything is loaded.  One
+  // `name/arity` per line, a bare name for an operator or directive, and `name/+`
+  // for the variadic `ВЫВОД`.
+  if (listKeywords) {
+    for (const prologd::KeywordInfo& keyword : prologd::reservedKeywords()) {
+      if (keyword.arities.empty()) {
+        std::cout << keyword.name << (keyword.variadic ? "/+" : "") << '\n';
+        continue;
+      }
+      for (const std::size_t arity : keyword.arities) {
+        std::cout << keyword.name << '/' << arity << '\n';
+      }
+    }
+    return 0;
   }
 
   if (protocol == "json" &&

@@ -1,0 +1,118 @@
+#include <catch2/catch_test_macros.hpp>
+
+#include <algorithm>
+#include <set>
+#include <string>
+#include <string_view>
+#include <vector>
+
+#include "prlib/engine.hpp"
+#include "prlib/keywords.hpp"
+#include "prlib/lexer.hpp"
+
+namespace {
+
+const prologd::KeywordInfo* findKeyword(const std::vector<prologd::KeywordInfo>& keywords,
+                                        std::string_view name) {
+  const auto it = std::find_if(keywords.begin(), keywords.end(),
+                               [name](const prologd::KeywordInfo& keyword) {
+                                 return keyword.name == name;
+                               });
+  return it == keywords.end() ? nullptr : &*it;
+}
+
+}  // namespace
+
+TEST_CASE("reserved names match the lexer's set") {
+  const auto& reserved = prologd::reservedBuiltinNames();
+  const std::vector<prologd::KeywordInfo> keywords = prologd::reservedKeywords();
+  REQUIRE(keywords.size() == reserved.size());
+  for (const prologd::KeywordInfo& keyword : keywords) {
+    INFO("name: " << std::string(keyword.name));
+    REQUIRE(reserved.count(std::string(keyword.name)) == 1);
+  }
+}
+
+TEST_CASE("the keyword list is sorted by name and has no duplicates") {
+  const std::vector<prologd::KeywordInfo> keywords = prologd::reservedKeywords();
+  REQUIRE(std::is_sorted(keywords.begin(), keywords.end(),
+                         [](const prologd::KeywordInfo& left,
+                            const prologd::KeywordInfo& right) {
+                           return left.name < right.name;
+                         }));
+  std::set<std::string_view> seen;
+  for (const prologd::KeywordInfo& keyword : keywords) {
+    REQUIRE(seen.insert(keyword.name).second);
+  }
+}
+
+TEST_CASE("every registered built-in is reserved") {
+  // The other direction of the drift check: a built-in that the lexer does not
+  // reserve would be parsed as a variable and never called.
+  for (const std::string& name : prologd::builtinNames()) {
+    INFO("name: " << name);
+    REQUIRE(prologd::isReservedBuiltinName(name));
+  }
+}
+
+TEST_CASE("reserved names are classified") {
+  // `mod` and `div` are infix operators, `ИМПОРТ` is the loader's directive and
+  // everything else must be callable.  A reserved name with no arity and no
+  // classification is exactly the drift this test exists to catch.
+  for (const prologd::KeywordInfo& keyword : prologd::reservedKeywords()) {
+    INFO("name: " << std::string(keyword.name)
+                  << " kind: " << std::string(prologd::keywordKindName(keyword.kind)));
+    if (keyword.kind == prologd::KeywordKind::Predicate) {
+      REQUIRE((keyword.variadic || !keyword.arities.empty()));
+    } else {
+      REQUIRE(keyword.arities.empty());
+      REQUIRE_FALSE(keyword.variadic);
+    }
+  }
+}
+
+TEST_CASE("keyword arities come from the dispatch table") {
+  const std::vector<prologd::KeywordInfo> keywords = prologd::reservedKeywords();
+
+  const prologd::KeywordInfo* findall = findKeyword(keywords, "НАЙТИВСЁ");
+  REQUIRE(findall != nullptr);
+  REQUIRE(findall->kind == prologd::KeywordKind::Predicate);
+  REQUIRE(findall->arities == std::vector<std::size_t>{3});
+
+  const prologd::KeywordInfo* call = findKeyword(keywords, "ВЫП");
+  REQUIRE(call != nullptr);
+  REQUIRE(call->arities == std::vector<std::size_t>{1});
+
+  // Two arities are reported in ascending order, not in registration order.
+  const prologd::KeywordInfo* multiplication = findKeyword(keywords, "УМНОЖЕНИЕ");
+  REQUIRE(multiplication != nullptr);
+  REQUIRE(multiplication->arities == std::vector<std::size_t>{3, 4});
+
+  // `ВЫВОД` is variadic: no arities, and it must still be listed.
+  const prologd::KeywordInfo* output = findKeyword(keywords, "ВЫВОД");
+  REQUIRE(output != nullptr);
+  REQUIRE(output->kind == prologd::KeywordKind::Predicate);
+  REQUIRE(output->variadic);
+  REQUIRE(output->arities.empty());
+
+  // A latin name that is both a type word and a unary predicate.
+  const prologd::KeywordInfo* toInt = findKeyword(keywords, "int");
+  REQUIRE(toInt != nullptr);
+  REQUIRE(toInt->arities == std::vector<std::size_t>{1});
+
+  const prologd::KeywordInfo* modulus = findKeyword(keywords, "mod");
+  REQUIRE(modulus != nullptr);
+  REQUIRE(modulus->kind == prologd::KeywordKind::Operator);
+
+  const prologd::KeywordInfo* import = findKeyword(keywords, "ИМПОРТ");
+  REQUIRE(import != nullptr);
+  REQUIRE(import->kind == prologd::KeywordKind::Directive);
+}
+
+TEST_CASE("an unknown name carries no arity information") {
+  const prologd::BuiltinArities nothing = prologd::builtinArities("такого_нет");
+  REQUIRE(nothing.arities.empty());
+  REQUIRE_FALSE(nothing.variadic);
+  REQUIRE(prologd::findBuiltin("такого_нет", 1) == nullptr);
+  REQUIRE(findKeyword(prologd::reservedKeywords(), "такого_нет") == nullptr);
+}

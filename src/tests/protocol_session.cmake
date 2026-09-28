@@ -30,7 +30,9 @@ execute_process(
   RESULT_VARIABLE exit_code)
 
 set(expected_events
-  "{\"event\":\"ready\",\"protocol\":1"
+  "{\"event\":\"ready\","
+  "\"protocol\":2"
+  "\"keywords\":"
   "{\"event\":\"result\",\"found\":true}"
   "{\"event\":\"output\",\"text\":\"X=1\\nX=2\\n\"}"
   "{\"event\":\"input_request\",\"kind\":\"line\"}"

@@ -11,6 +11,7 @@ from __future__ import annotations
 from PySide6.QtCore import QObject, QProcess, Signal
 
 from . import protocol
+from .keywords import Keywords
 
 
 class PrologSession(QObject):
@@ -28,6 +29,11 @@ class PrologSession(QObject):
     failed = Signal(str, str)
     #: The session ended; carries the process exit code.
     ended = Signal(int)
+
+    #: The reserved names from the `ready` event.  Empty until a session is up,
+    #: and stays empty with an interpreter older than protocol 2 — which is why
+    #: every consumer must treat an empty table as "no keyword list available".
+    keywords = Keywords()
 
     def __init__(self, executable: str, includes: list[str] | None = None, parent=None):
         super().__init__(parent)
@@ -97,6 +103,7 @@ class PrologSession(QObject):
     def _dispatch(self, event: dict) -> None:
         name = event.get("event")
         if name == "ready":
+            self.keywords = Keywords.from_event(event)
             self.ready.emit(str(event.get("version", "")))
         elif name == "output":
             self.output.emit(str(event.get("text", "")))
