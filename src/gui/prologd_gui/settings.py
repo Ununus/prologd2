@@ -28,6 +28,9 @@ AUTO_COMPLETE_AFTER = "editor/auto_complete_after"
 THEME = "view/theme"
 RECENT_FILES = "files/recent"
 LAST_DIRECTORY = "files/last_directory"
+SPLIT_EDITOR = "view/split"
+SPLIT_SIZES = "view/split_sizes"
+RESTORE_SPLIT = "view/restore_split"
 
 DEFAULT_FONT_FAMILY = "Cascadia Mono"
 DEFAULT_FONT_SIZE = 11.0
@@ -204,3 +207,45 @@ class Settings:
     @last_directory.setter
     def last_directory(self, value: str) -> None:
         self._write(LAST_DIRECTORY, str(value))
+
+    # -- the split editor ---------------------------------------------------
+    @property
+    def split_editor(self) -> bool:
+        """Whether the second editor pane was open."""
+        return self._flag(SPLIT_EDITOR, False)
+
+    @split_editor.setter
+    def split_editor(self, value: bool) -> None:
+        self._write(SPLIT_EDITOR, bool(value))
+
+    @property
+    def split_sizes(self) -> list[int]:
+        """The widths of the two editor panes, as last seen."""
+        value = self._store.value(SPLIT_SIZES, [])
+        if isinstance(value, (int, str)):  # a single value is not a list
+            value = [value] if value != "" else []
+        sizes: list[int] = []
+        for item in value or []:
+            try:
+                sizes.append(int(item))
+            except (TypeError, ValueError):
+                continue
+        return sizes
+
+    @split_sizes.setter
+    def split_sizes(self, sizes) -> None:
+        self._write(SPLIT_SIZES, [int(size) for size in sizes])
+
+    @property
+    def restore_split(self) -> bool:
+        """Reopen the split editor on the next start.
+
+        Named apart from the «восстанавливать вкладки» switch of task_29: this one
+        only decides the panes, because the documents themselves are not reopened
+        yet.
+        """
+        return self._flag(RESTORE_SPLIT, True)
+
+    @restore_split.setter
+    def restore_split(self, value: bool) -> None:
+        self._write(RESTORE_SPLIT, bool(value))

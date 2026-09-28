@@ -65,6 +65,11 @@ class PrologHighlighter(QSyntaxHighlighter):
     def theme(self) -> Theme:
         return self._theme
 
+    @property
+    def keywords(self) -> Keywords:
+        """The reserved names in force — a new view needs them for its popup too."""
+        return self._keywords
+
     # -- QSyntaxHighlighter -------------------------------------------------
     def highlightBlock(self, text: str) -> None:  # noqa: N802 - Qt spelling
         offsets = _utf16_offsets(text) if _has_astral(text) else None

@@ -1,7 +1,6 @@
 # task_25 — GUI: tabs, files, untitled buffers, save prompts
 
-**Status:** in progress — tabs, files, prompts and text I/O are in; the split
-editor (the second half) is next.
+**Status:** done — the second half (the split editor) is in as well.
 **Depends on:** task_22
 **Milestone:** M11
 
@@ -59,19 +58,26 @@ keep track of which file each tab shows.
       on save, a file that is not valid UTF-8 asks which encoding to use (and a
       character the file's own encoding cannot hold offers UTF-8 instead of
       writing replacement characters).
-- [ ] **Разделить редактор** (`Ctrl+\`): the window holds one or two
-      **independent** editor panes side by side, each with its own tab bar, so
-      the left pane can show `lesson_1.pld` while the right shows `lesson_4.pld`.
-      The current document is *also* shown in the new pane (the usual editor
-      behaviour) and **Объединить редакторы** closes it again.  The active pane
-      owns the run/format/comment actions and the status bar says which one it
-      is.
-- [ ] Implementation of the split: the two views share one `QTextDocument` per
+- [x] **Разделить редактор** (`Ctrl+\`): the window holds one or two panes side by
+      side, each with its own tab bar *and its own current tab*, so the left pane
+      can show `lesson_1.pld` while the right shows `lesson_4.pld`.  The panes show
+      the same set of documents in the same order (a tab dragged in one moves in
+      the other); what each pane chooses is which of them it is looking at.  The
+      current document is what the new pane starts on, and **Объединить
+      редакторы** (`Ctrl+Shift+\`) closes it again, keeping every document open and
+      the eyes on the same program.
+      Chosen over the "each pane keeps its own list of documents" of the plan
+      because it is far less state to keep consistent, and the use case — two
+      programs side by side — works exactly the same.  Per-pane document sets are
+      noted as the refinement, not done.
+- [x] Implementation of the split: the views share one `QTextDocument` per
       document (`setDocument`), so an edit in one pane appears in the other for
-      free — never keep two copies of the text.
-- [ ] The split state (one or two panes, which document in which pane, splitter
-      position and orientation) is restored on start when "восстанавливать
-      вкладки" is on.
+      free — never two copies of the text.  A `Buffer` owns the document and any
+      number of views; a `Pane` owns the views it shows.
+- [x] The split state is restored on start (`view/split`, `view/split_sizes`,
+      switched by `view/restore_split`).  The *documents* are not reopened yet —
+      that belongs with «восстанавливать вкладки», which task_29 still has to add,
+      so only the panes and their widths come back today.
 - [ ] **Открыть не запускает программу.**  Opening fills the editor and nothing
       else.  `load` *adds* clauses to the live interpreter (that is what
       `ИМПОРТ` needs), so an open into a session that had already run something

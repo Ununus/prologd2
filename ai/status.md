@@ -83,7 +83,7 @@ session.
 | task_22_gui_editor | done | tokenizer, palette, highlighter, line numbers, Ctrl+K/U, zoom and the settings store are in and tested; find/replace and duplicate line come with the task_26 menus, saving a file with task_25 |
 | task_23_gui_keyword_source | done | `--list-keywords` + `keywords` in `ready` (protocol 2); one source for the built-in list |
 | task_24_gui_completion | done | popup over the reserved names *and* the document's own names, with arities; no completion in a comment, string or `#…#`; `Ctrl+Space` |
-| task_25_gui_files_tabs | in progress | tabs, file actions, save prompts, encodings, drop anywhere and recent files are in; the split editor (`Ctrl+\`) is next |
+| task_25_gui_files_tabs | done | tabs, files, save prompts, encodings, input queue, drop anywhere and the split editor (two panes, one text per document) |
 | task_26_gui_toolbar | not started | menus, toolbar, icon audit (27 icons present, 18 to draw) |
 | task_27_gui_panels | not started | output and input panes, output bottom/right |
 | task_28_gui_run_step | not started | run, step (new engine seam + protocol v2), stop, error line |
@@ -297,3 +297,20 @@ Resolved on 2026-09-29 (GUI planning):
   window's `status_text()` is what the tests wait on — waiting for the *output* was
   ambiguous, because the echo of an answer and the value the program prints are the
   same characters.
+* GUI implementation session, part 11: **task_25 finished** — the split editor.
+  A `Buffer` now owns one `QTextDocument` and *any number of views* of it; a `Pane`
+  (`panes.py`) owns the views it shows.  `Ctrl+\` adds a second pane; both panes
+  show the same set of documents in the same order but each keeps its own current
+  tab, so the left can show one program while the right shows another, and every
+  command follows the pane that was used last (clicking a view makes it active,
+  and the status bar says which pane it is).  An edit in one pane appears in the
+  other because it *is* the same text: `setDocument` shares the document, and a new
+  view is told the pane's font as well (the Qt trap from part 9).  `Ctrl+Shift+\`
+  merges, keeping every document open.  The panes and their widths are stored
+  (`view/split`, `view/split_sizes`, `view/restore_split`) and come back on the
+  next start — the documents themselves wait for «восстанавливать вкладки», which
+  task_29 still owes.  Deliberate simplification: the panes share one document
+  *set* rather than keeping a list each; the use case (two programs side by side)
+  works the same and there is far less state to keep consistent.  `ВЫВОД` prints
+  without a newline and `ПС` breaks the line — the window's own notes now start on a
+  fresh line when the program left the cursor mid-line.

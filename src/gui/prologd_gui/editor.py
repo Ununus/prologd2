@@ -83,6 +83,13 @@ class ZoomablePlainTextEdit(QPlainTextEdit):
     #: A file was dropped on the pane; the window opens it in a tab.
     fileDropped = Signal(str)
 
+    #: The pane holding this editor was used: the commands act on it now.
+    activated = Signal()
+
+    def focusInEvent(self, event) -> None:  # noqa: N802 - Qt spelling
+        super().focusInEvent(event)
+        self.activated.emit()
+
     def __init__(
         self,
         parent: QWidget | None = None,

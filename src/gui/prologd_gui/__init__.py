@@ -14,6 +14,7 @@ __all__ = [
     "editor",
     "highlighter",
     "keywords",
+    "panes",
     "protocol",
     "session",
     "settings",

@@ -145,7 +145,7 @@ def test_two_files_open_in_two_tabs(executable: str, directory: pathlib.Path) ->
         assert window.current_path() == str(other), "the new tab is current"
 
         # Switching tabs switches the buffer, and the text with it.
-        window._tabs.setCurrentIndex(0)
+        window.active_pane().set_current(window.buffers()[0])
         assert window.current_path() == str(EXAMPLE)
         assert "факториал" in window.editor_text()
         window._next_tab()
@@ -167,7 +167,7 @@ def test_an_edit_marks_only_its_own_tab(executable: str, directory: pathlib.Path
         assert window.editor_text() == "факт(1).\n"
 
         # Typing marks this buffer, not the other one.
-        window.editor().insertPlainText("снег.\n")
+        window.view_for(window.buffers()[1]).insertPlainText("снег.\n")
         titles = [buffer.title() for buffer in window.buffers()]
         assert titles[0] == EXAMPLE.name, titles
         assert titles[1] == "*" + other.name, titles
@@ -190,14 +190,14 @@ def test_closing_a_modified_tab_asks_first(executable: str, directory: pathlib.P
 
         # «Отмена» keeps the buffer, and nothing is written.
         window._ask_save = lambda name: window_module.CANCEL
-        assert window.close_buffer(0) is False
+        assert window.close_buffer(window.buffers()[0]) is False
         assert window.tab_count() == 1
         assert target.read_text(encoding="utf-8") == "факт(1).\n"
 
         # «Сохранить» writes the file and then closes the tab.
         asked: list[str] = []
         window._ask_save = lambda name: asked.append(name) or window_module.SAVE
-        assert window.close_buffer(0) is True
+        assert window.close_buffer(window.buffers()[0]) is True
         assert asked == [target.name], asked
         assert target.read_text(encoding="utf-8") == "снег.\nфакт(1).\n", target.read_text("utf-8")
         print("ok: a modified buffer asks, cancelling keeps it, saving writes it")
@@ -225,8 +225,8 @@ def test_closing_everything_walks_through_the_tabs(
     try:
         window.open_path(str(first))
         window.open_path(str(second))
-        window.buffers()[0].editor.insertPlainText("% правило\n")
-        window.buffers()[1].editor.insertPlainText("% другое\n")
+        window.view_for(window.buffers()[0]).insertPlainText("% правило\n")
+        window.view_for(window.buffers()[1]).insertPlainText("% другое\n")
         assert [buffer.is_modified() for buffer in window.buffers()] == [True, True]
 
         seen: list[tuple[str, str | None]] = []
@@ -434,8 +434,8 @@ def test_a_run_uses_the_tab_that_is_showing(executable: str) -> None:
     window = empty_window(executable)
     try:
         window.open_path(str(EXAMPLE))
-        index = window.new_buffer()
-        assert index == 1
+        window.new_buffer()
+        assert window.tab_count() == 2
         # The same program with a different goal: if the run used the *first*
         # tab, the answer would be 720.
         program = EXAMPLE.read_text(encoding="utf-8").replace("(6,Ф)", "(5,Ф)")
@@ -446,6 +446,125 @@ def test_a_run_uses_the_tab_that_is_showing(executable: str) -> None:
         print("ok: a run uses the current tab, not the first one")
     finally:
         discard_changes(window)
+
+
+def test_the_split_editor_shares_one_document(executable: str) -> None:
+    """Two panes, one text: an edit in either is the same edit."""
+    window = empty_window(executable)
+    try:
+        assert window.pane_count() == 1
+        assert window.split_editor() is True
+        assert window.pane_count() == 2
+        assert window.split_editor() is False, "splitting twice is not a third pane"
+
+        buffer = window.buffers()[0]
+        left, right = window.panes()
+        assert len(buffer.views()) == 2, "each pane needs its own view"
+        assert left.current_buffer() is buffer and right.current_buffer() is buffer
+
+        # Typing on the left appears on the right: one document, not two copies.
+        left.view_for(buffer).setPlainText("факт(1).\n")
+        assert right.view_for(buffer).toPlainText() == "факт(1).\n"
+        left.view_for(buffer).insertPlainText("снег.\n")
+        assert right.view_for(buffer).toPlainText() == "снег.\nфакт(1).\n"
+        assert window.editor_text() == "снег.\nфакт(1).\n"
+        print("ok: the split editor shows one document in both panes")
+    finally:
+        discard_changes(window)
+
+
+def test_each_pane_has_its_own_current_tab(
+    executable: str, directory: pathlib.Path
+) -> None:
+    """The panes show one set of documents but their own current tab."""
+    other = directory / "правая.pld"
+    other.write_text("факт(2).\n", encoding="utf-8")
+
+    window = empty_window(executable)
+    try:
+        window.open_path(str(EXAMPLE))
+        window.open_path(str(other))
+        window.split_editor()
+        left, right = window.panes()
+
+        left.set_current(window.buffers()[0])
+        right.set_current(window.buffers()[1])
+        assert left.current_buffer().model.name == EXAMPLE.name
+        assert right.current_buffer().model.name == other.name
+
+        # The commands follow the pane that was used last.
+        left.view_for(window.buffers()[0]).activated.emit()
+        assert window.current_path() == str(EXAMPLE)
+        right.view_for(window.buffers()[1]).activated.emit()
+        assert window.current_path() == str(other)
+        assert "панель 2 из 2" in window.status_text(), window.status_text()
+        print("ok: each pane keeps its own tab and the commands follow the used one")
+    finally:
+        discard_changes(window)
+
+
+def test_merging_the_editor_keeps_the_documents(
+    executable: str, directory: pathlib.Path
+) -> None:
+    other = directory / "вторая.pld"
+    other.write_text("факт(3).\n", encoding="utf-8")
+
+    window = empty_window(executable)
+    try:
+        window.open_path(str(EXAMPLE))
+        window.open_path(str(other))
+        window.split_editor()
+        left, right = window.panes()
+        right.set_current(window.buffers()[1])
+
+        assert window.merge_editor() is True
+        assert window.pane_count() == 1
+        assert window.tab_count() == 2, "merging the editor must not close documents"
+        assert window.current_path() == str(other), "the eyes stay on the same program"
+        assert len(window.buffers()[1].views()) == 1
+        assert window.merge_editor() is False
+        print("ok: merging the editor keeps every document open")
+    finally:
+        discard_changes(window)
+
+
+def test_the_split_survives_a_restart(executable: str) -> None:
+    """The panes are remembered when «восстанавливать» is on."""
+    from prologd_gui.settings import Settings
+    from prologd_gui.window import MainWindow
+
+    window = empty_window(executable)
+    path = window._settings.path
+    try:
+        window.split_editor()
+        window._editor_splitter.setSizes([300, 700])
+        window._save_split_state()
+    finally:
+        discard_changes(window)
+
+    settings = Settings(path)
+    assert settings.split_editor is True
+    saved = settings.split_sizes
+    assert len(saved) == 2 and all(size > 0 for size in saved), saved
+
+    reopened = MainWindow(executable, [], settings)
+    try:
+        assert reopened.pane_count() == 2, "the second pane did not come back"
+        # Qt fits the requested widths to the space there is, so the *ratio* is
+        # what can be compared — the window is not even shown here.
+        actual = reopened._editor_splitter.sizes()
+        assert len(actual) == 2, actual
+        assert abs(actual[0] / sum(actual) - saved[0] / sum(saved)) < 0.05, (actual, saved)
+        settings.restore_split = False
+    finally:
+        discard_changes(reopened)
+
+    third = MainWindow(executable, [], settings)
+    try:
+        assert third.pane_count() == 1, "«не восстанавливать» must be obeyed"
+        print("ok: the split editor is remembered, and can be switched off")
+    finally:
+        discard_changes(third)
 
 def test_opening_does_not_run(executable: str) -> None:
     window = make_window(executable)
@@ -628,6 +747,10 @@ def main(argv: list[str]) -> int:
         test_the_dialog_is_asked_only_after_the_queue(executable)
         test_cancelling_input_stops_the_run(executable)
         test_a_run_uses_the_tab_that_is_showing(executable)
+        test_the_split_editor_shares_one_document(executable)
+        test_each_pane_has_its_own_current_tab(executable, files)
+        test_merging_the_editor_keeps_the_documents(executable, files)
+        test_the_split_survives_a_restart(executable)
     print("all window checks passed")
     del application
     return 0

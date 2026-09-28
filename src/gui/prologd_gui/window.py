@@ -1,4 +1,10 @@
-"""Main window: tabs of programs, a query line and an output pane."""
+"""Main window: panes of programs, a query line, the output and the input queue.
+
+One program is one `Buffer` (a model, a text document and its views).  The window
+owns the open documents; a `Pane` shows them in tabs, and the split editor is two
+panes over the same set of documents — so the left pane can show one program while
+the right shows another, and both views edit the same text.
+"""
 
 from __future__ import annotations
 
@@ -14,7 +20,6 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QSplitter,
-    QTabWidget,
     QToolBar,
     QVBoxLayout,
     QWidget,
@@ -23,6 +28,7 @@ from PySide6.QtWidgets import (
 from . import documents
 from .buffers import Buffer
 from .editor import CodeEditor, ZoomablePlainTextEdit
+from .panes import Pane
 from .session import PrologSession
 from .settings import Settings
 
@@ -62,10 +68,11 @@ class MainWindow(QMainWindow):
         self._session.failed.connect(self._on_failed)
         self._session.ended.connect(self._on_ended)
 
-        #: The open programs, in tab order.  The tab bar is kept in step with
-        #: this list, including after a tab is dragged to another position.
+        #: The open documents, in the order every pane shows them.  A pane has its
+        #: own *current* tab, but the set and the order are shared: a tab dragged in
+        #: one pane has to move in the other as well.
         self._buffers: list[Buffer] = []
-        #: True while the whole window is closing, so closing the last tab does
+        #: True while the whole window is closing, so closing the last document does
         #: not open a fresh one on the way out.
         self._closing = False
         #: Answers taken from the input field, one per request; refilled by every
@@ -77,6 +84,10 @@ class MainWindow(QMainWindow):
         self._recent = documents.RecentFiles(self._settings.recent_files)
 
         self._build_ui()
+        # The split editor comes back if it was left open, and before the first
+        # document, so the welcome program is shown in both panes on that start.
+        if self._settings.restore_split and self._settings.split_editor:
+            self.split_editor(remember=False, sizes=self._settings.split_sizes)
         # The welcome program goes into the first tab and is *not* unsaved work —
         # the flag is left clear, so closing it asks nothing.
         welcome = documents.Document.untitled(documents.untitled_name([]))
@@ -86,18 +97,12 @@ class MainWindow(QMainWindow):
 
     # -- construction ------------------------------------------------------
     def _build_ui(self) -> None:
-        self._tabs = QTabWidget(self)
-        self._tabs.setTabsClosable(True)
-        self._tabs.setMovable(True)
-        self._tabs.setDocumentMode(True)
-        self._tabs.tabCloseRequested.connect(self.close_buffer)
-        self._tabs.currentChanged.connect(self._on_tab_changed)
-        # Dragging a tab reorders the widget, not this list: without this the
-        # index of a buffer and the index of its tab would drift apart.
-        self._tabs.tabBar().tabMoved.connect(self._on_tab_moved)
-        # A double click on the empty part of the bar (index -1) starts a new
-        # file — the gesture the reference front-end had.
-        self._tabs.tabBar().tabBarDoubleClicked.connect(self._on_tab_bar_double_clicked)
+        # The editor area holds one pane, or two after «Разделить редактор».  The
+        # panes themselves are made at the end of this method, when the status bar
+        # they report to exists.
+        self._panes: list[Pane] = []
+        self._active_pane = 0
+        self._editor_splitter = QSplitter(Qt.Orientation.Horizontal)
 
         # The output is read-only, but it is monospace and it zooms with the
         # editor: one stored size covers both, so what the user set is still
@@ -136,7 +141,7 @@ class MainWindow(QMainWindow):
         editor_area = QWidget()
         editor_layout = QVBoxLayout(editor_area)
         editor_layout.setContentsMargins(0, 0, 0, 0)
-        editor_layout.addWidget(self._tabs)
+        editor_layout.addWidget(self._editor_splitter)
         editor_layout.addWidget(self._query_line)
 
         # The output on top, the input queue under it.
@@ -180,9 +185,14 @@ class MainWindow(QMainWindow):
         self._add_window_action("Закомментировать", self._comment, "Ctrl+K")
         self._add_window_action("Раскомментировать", self._uncomment, "Ctrl+U")
         self._add_window_action("Сбросить масштаб", self._reset_zoom, "Ctrl+0")
+        self._add_window_action("Разделить редактор", self.split_editor, "Ctrl+\\")
+        self._add_window_action("Объединить редакторы", self.merge_editor, "Ctrl+Shift+\\")
 
         self._status = QLabel("запуск…")
         self.statusBar().addWidget(self._status)
+
+        # The first pane, always: the window never has no place to edit in.
+        self._add_pane()
 
     def _make_action(
         self, title: str, slot, shortcuts: str | list[str] | None = None
@@ -221,6 +231,108 @@ class MainWindow(QMainWindow):
         """Registers a command on the window, with or without a key."""
         self.addAction(self._make_action(title, slot, shortcuts))
 
+    # -- panes -------------------------------------------------------------
+    def _add_pane(self) -> Pane:
+        """Adds a pane on the right, showing every open document."""
+        pane = Pane(self._settings, self)
+        # The pane is passed along instead of its index: indices move when a pane
+        # is closed, and a stale index would send the commands to the wrong pane.
+        pane.activated.connect(lambda pane=pane: self._on_pane_activated(pane))
+        pane.closeRequested.connect(self.close_buffer)
+        pane.reordered.connect(self._on_pane_reordered)
+        pane.newFileRequested.connect(lambda: self.new_buffer())
+        pane.zoomChanged.connect(self._on_zoom_changed)
+        pane.fileDropped.connect(self.open_path)
+        self._panes.append(pane)
+        self._editor_splitter.addWidget(pane)
+        pane.set_buffers(self._buffers)
+        return pane
+
+    def split_editor(self, remember: bool = True, sizes: list[int] | None = None) -> bool:
+        """Adds a second pane, showing the current document as well.
+
+        The new pane lists every open document but starts on the one the active
+        pane is showing, which is what a split is usually asked for: the same
+        program beside itself, or another tab selected on the right.  `sizes`
+        restores the widths of a previous session.
+        """
+        if len(self._panes) > 1:
+            return False
+        current = self.current_buffer()
+        pane = self._add_pane()
+        if current is not None:
+            pane.set_current(current)
+        self._editor_splitter.setSizes(sizes or [1, 1])
+        self._active_pane = len(self._panes) - 1
+        if remember:
+            self._save_split_state()
+        self._refresh_titles()
+        self._status.setText("редактор разделён: две панели, одна программа")
+        return True
+
+    def merge_editor(self, remember: bool = True) -> bool:
+        """Closes the second pane; the documents stay open."""
+        if len(self._panes) < 2:
+            return False
+        pane = self._panes.pop()
+        current = pane.current_buffer()
+        # The views belong to the pane; they are detached before it goes, or the
+        # buffers would keep dangling editors (see `Pane.set_buffers`).
+        pane.set_buffers([])
+        self._editor_splitter.widget(1).setParent(None)
+        pane.deleteLater()
+        self._active_pane = 0
+        if current is not None:
+            self._panes[0].set_current(current)  # the eyes stay on that program
+        if remember:
+            self._save_split_state()
+        self._refresh_titles()
+        self._status.setText("редактор объединён: одна панель")
+        return True
+
+    def active_pane(self) -> Pane:
+        return self._panes[self._active_pane]
+
+    def panes(self) -> list[Pane]:
+        """The editor panes, left to right (one, or two when split)."""
+        return list(self._panes)
+
+    def view_for(self, buffer: Buffer) -> CodeEditor | None:
+        """A view of `buffer`, in the active pane.
+
+        Which view is asked for hardly matters: they share one document, so a
+        change made through any of them is the same change.
+        """
+        return self.active_pane().view_for(buffer)
+
+    def pane_count(self) -> int:
+        return len(self._panes)
+
+    def _save_split_state(self) -> None:
+        """Remembers the split editor for the next start."""
+        self._settings.split_editor = len(self._panes) > 1
+        self._settings.split_sizes = list(self._editor_splitter.sizes())
+
+    def _on_pane_activated(self, pane: Pane) -> None:
+        if pane not in self._panes:
+            return
+        self._active_pane = self._panes.index(pane)
+        self._refresh_titles()
+        buffer = self.current_buffer()
+        where = f" — панель {self._active_pane + 1} из {len(self._panes)}" if len(self._panes) > 1 else ""
+        if buffer is not None and buffer.model.path:
+            self._status.setText(f"открыт {buffer.model.path}{where}")
+        elif where:
+            self._status.setText(f"активна левая панель{where}" if self._active_pane == 0 else f"активна правая панель{where}")
+
+    def _on_pane_reordered(self, buffers: list[Buffer]) -> None:
+        """A tab was dragged: the order is shared, so every pane follows it."""
+        if set(buffers) != set(self._buffers):
+            return  # a stale signal from a pane that is being changed
+        self._buffers = list(buffers)
+        for pane in self._panes:
+            pane.set_buffers(self._buffers)
+
     # -- actions -----------------------------------------------------------
     def run_program(self) -> None:
         """Runs the current buffer in a fresh interpreter.
@@ -243,9 +355,9 @@ class MainWindow(QMainWindow):
         self._stopped_input = False
         self._queued_input = self._input_lines()
         self._session.start()
-        self._append_output("--- загрузка программы ---\n")
+        self._append_note("--- загрузка программы ---\n")
         if self._queued_input:
-            self._append_output(f"--- ввод из поля, строк — {len(self._queued_input)} ---\n")
+            self._append_note(f"--- ввод из поля, строк — {len(self._queued_input)} ---\n")
         if path is not None and not buffer.is_modified():
             # A saved, unmodified buffer is loaded by path: `ИМПОРТ` resolves
             # against the file's own directory and diagnostics name the file.
@@ -271,8 +383,8 @@ class MainWindow(QMainWindow):
         self._session.run_query(text)
 
     # -- files -------------------------------------------------------------
-    def new_buffer(self, name: str | None = None) -> int:
-        """Adds an empty tab and makes it current."""
+    def new_buffer(self, name: str | None = None) -> Buffer:
+        """Adds an empty document and makes it current."""
         used = [buffer.model.name for buffer in self._buffers]
         return self._add_buffer(
             documents.Document.untitled(name or documents.untitled_name(used))
@@ -289,24 +401,24 @@ class MainWindow(QMainWindow):
         Running is F5.
         """
         path = str(pathlib.Path(path))
-        index = self._index_of_path(path)
-        if index is not None:
+        existing = self._buffer_for_path(path)
+        if existing is not None:
             # Already open: show that tab instead of a second copy of the file.
-            self._tabs.setCurrentIndex(index)
+            self.active_pane().set_current(existing)
             return True
         try:
             model = documents.Document.from_file(path, encoding)
         except documents.DecodeFailure as failure:
             return self._open_with_encoding(failure)
         except OSError as error:
-            self._append_output(f"*** не могу открыть {path}: {error}\n")
+            self._append_note(f"*** не могу открыть {path}: {error}\n")
             return False
 
         if len(self._buffers) == 1 and self._is_placeholder(self._buffers[0]):
             # A single empty buffer is a placeholder, not work: the file takes
             # its place instead of leaving an empty tab behind.  The welcome
             # program is not empty, so it stays until it is closed.
-            self._replace_buffer(0, model)
+            self._replace_buffer(self._buffers[0], model)
         else:
             self._add_buffer(model)
         self._remember(path)
@@ -337,13 +449,13 @@ class MainWindow(QMainWindow):
             try:
                 written = buffer.model.save(path)
             except OSError as retry_error:
-                self._append_output(
+                self._append_note(
                     f"*** не могу записать {path or buffer.model.path}: {retry_error}\n"
                 )
                 self._status.setText("не сохранено")
                 return False
         except OSError as error:
-            self._append_output(f"*** не могу записать {path or buffer.model.path}: {error}\n")
+            self._append_note(f"*** не могу записать {path or buffer.model.path}: {error}\n")
             self._status.setText("не сохранено")
             return False
         buffer.mark_saved()
@@ -367,42 +479,43 @@ class MainWindow(QMainWindow):
         try:
             model = documents.Document.from_file(buffer.model.path, buffer.model.encoding)
         except (OSError, documents.DecodeFailure) as error:
-            self._append_output(f"*** не могу перечитать {buffer.model.path}: {error}\n")
+            self._append_note(f"*** не могу перечитать {buffer.model.path}: {error}\n")
             return False
-        buffer.editor.setPlainText(model.text)
+        buffer.set_text(model.text)
         buffer.model.eol = model.eol
         buffer.mark_saved()
         self._refresh_titles()
         self._status.setText(f"перечитан {buffer.model.path}")
         return True
 
-    def close_buffer(self, index: int) -> bool:
-        """Closes one tab, asking first.  Cancelling keeps it open."""
-        if not 0 <= index < len(self._buffers):
+    def close_buffer(self, buffer: Buffer) -> bool:
+        """Closes one document, asking first.  Cancelling keeps it open."""
+        if buffer not in self._buffers:
             return False
-        if not self._confirm_close(self._buffers[index]):
+        if not self._confirm_close(buffer):
             return False
-        self._drop_buffer(index)
+        self._drop_buffer(buffer)
         if not self._buffers and not self._closing:
             self.new_buffer()  # there is always somewhere to type
         self._refresh_titles()
         return True
 
     def close_all(self) -> bool:
-        """Closes every tab, one at a time, showing the one that is closing.
+        """Closes every document, one at a time, showing the one that is closing.
 
-        The tab is made current *before* the question, so the file the box is
+        The document is made current *before* the question, so the file the box is
         about is the one on screen, and it disappears as soon as the question is
         answered.  Cancelling therefore stops where it happened, leaving the
-        buffers closed so far closed — the earlier rule (ask about everything
-        first, then close) kept the tabs open but gave no clue *which* file each
-        of the questions was about, which is worse in practice.
+        documents closed so far closed — the earlier rule (ask about everything
+        first, then close) kept them open but gave no clue *which* file each of the
+        questions was about, which is worse in practice.
         """
         while self._buffers:
-            self._tabs.setCurrentIndex(0)
-            if not self._confirm_close(self._buffers[0]):
+            buffer = self._buffers[0]
+            self.active_pane().set_current(buffer)
+            if not self._confirm_close(buffer):
                 return False
-            self._drop_buffer(0)
+            self._drop_buffer(buffer)
         return True
 
     # -- prompts -----------------------------------------------------------
@@ -484,7 +597,7 @@ class MainWindow(QMainWindow):
         """Asks which encoding to use — a file is never decoded by guesswork."""
         choice = self._ask_encoding(failure.path)
         if choice is None:
-            self._append_output(f"*** {failure}\n")
+            self._append_note(f"*** {failure}\n")
             return False
         return self.open_path(failure.path, encoding=choice)
 
@@ -514,41 +627,37 @@ class MainWindow(QMainWindow):
     def stop_program(self) -> None:
         self._session.stop()
         self._status.setText("остановлено")
-        self._append_output("--- остановлено ---\n")
+        self._append_note("--- остановлено ---\n")
 
     def clear_output(self) -> None:
         self._output.clear()
 
     # -- buffers -----------------------------------------------------------
-    def _add_buffer(self, model: documents.Document) -> int:
-        """Adds a tab for `model` and makes it current."""
+    def _add_buffer(self, model: documents.Document) -> Buffer:
+        """Adds a document, shows it in every pane, makes it current."""
         buffer = Buffer(model, self._settings, self)
-        buffer.editor.setPlaceholderText("текст программы")
-        buffer.editor.zoomChanged.connect(self._on_zoom_changed)
-        # A file dropped on the editor opens in its own tab, as it does on the
-        # output pane: the pane reports the drop instead of pasting the path.
-        buffer.editor.fileDropped.connect(self.open_path)
+        buffer.changed.connect(self._refresh_titles)
         # The reserved names arrive with `ready`; a buffer opened after that gets
         # them here, and a buffer created before it is served by `_on_ready`.
         buffer.set_keywords(self._session.keywords)
-        buffer.changed.connect(self._refresh_titles)
         self._buffers.append(buffer)
-        index = self._tabs.addTab(buffer.editor, buffer.title())
-        self._tabs.setCurrentIndex(index)
+        for pane in self._panes:
+            pane.set_buffers(self._buffers)
+        self.active_pane().set_current(buffer)
         self._refresh_titles()
-        return index
+        return buffer
 
-    def _replace_buffer(self, index: int, model: documents.Document) -> int:
+    def _replace_buffer(self, buffer: Buffer, model: documents.Document) -> Buffer:
         """Turns a placeholder tab into the file that takes its place."""
-        self._drop_buffer(index)
+        self._drop_buffer(buffer)
         return self._add_buffer(model)
 
-    def _drop_buffer(self, index: int) -> None:
-        """Removes a tab and the buffer behind it.  No questions are asked here."""
-        self._tabs.removeTab(index)
-        buffer = self._buffers.pop(index)
-        buffer.editor.deleteLater()
-        buffer.setParent(None)
+    def _drop_buffer(self, buffer: Buffer) -> None:
+        """Forgets a document everywhere.  No questions are asked here."""
+        if buffer in self._buffers:
+            self._buffers.remove(buffer)
+        for pane in self._panes:
+            pane.set_buffers(self._buffers)  # detaches the views as well
         buffer.deleteLater()
 
     def _is_placeholder(self, buffer: Buffer) -> bool:
@@ -559,11 +668,11 @@ class MainWindow(QMainWindow):
             and not buffer.text().strip()
         )
 
-    def _index_of_path(self, path: str) -> int | None:
+    def _buffer_for_path(self, path: str) -> Buffer | None:
         wanted = pathlib.Path(path)
-        for index, buffer in enumerate(self._buffers):
+        for buffer in self._buffers:
             if buffer.model.path and pathlib.Path(buffer.model.path) == wanted:
-                return index
+                return buffer
         return None
 
     def _remember(self, path: str) -> None:
@@ -571,25 +680,10 @@ class MainWindow(QMainWindow):
         self._settings.recent_files = self._recent.add(path)
         self._settings.last_directory = str(pathlib.Path(path).parent)
 
-    # -- tabs --------------------------------------------------------------
-    def _on_tab_changed(self, index: int) -> None:
-        self._refresh_titles()
-        buffer = self.current_buffer()
-        if buffer is not None and buffer.model.path:
-            self._status.setText(f"открыт {buffer.model.path}")
-
-    def _on_tab_moved(self, source: int, target: int) -> None:
-        """Keeps the buffer list in the tab bar's order — the indices are shared."""
-        if 0 <= source < len(self._buffers):
-            self._buffers.insert(target, self._buffers.pop(source))
-
-    def _on_tab_bar_double_clicked(self, index: int) -> None:
-        if index < 0:  # the empty part of the bar, not a tab
-            self.new_buffer()
-
+    # -- titles ------------------------------------------------------------
     def _refresh_titles(self) -> None:
-        for index, buffer in enumerate(self._buffers):
-            self._tabs.setTabText(index, buffer.title())
+        for pane in self._panes:
+            pane.refresh_titles()
         buffer = self.current_buffer()
         self.setWindowTitle(buffer.model.window_title() if buffer is not None else "PrologD")
 
@@ -602,10 +696,13 @@ class MainWindow(QMainWindow):
     def _cycle_tab(self, step: int) -> None:
         if len(self._buffers) < 2:
             return
-        self._tabs.setCurrentIndex((self._tabs.currentIndex() + step) % len(self._buffers))
+        pane = self.active_pane()
+        pane.setCurrentIndex((pane.currentIndex() + step) % len(self._buffers))
 
     def _close_current(self) -> None:
-        self.close_buffer(self._tabs.currentIndex())
+        buffer = self.current_buffer()
+        if buffer is not None:
+            self.close_buffer(buffer)
 
     def _close_all_tabs(self) -> None:
         if self.close_all():
@@ -616,6 +713,7 @@ class MainWindow(QMainWindow):
         self._closing = True
         try:
             if self.close_all():
+                self._save_split_state()
                 event.accept()
             else:
                 event.ignore()
@@ -624,31 +722,63 @@ class MainWindow(QMainWindow):
 
     # -- commands that act on the current tab ------------------------------
     def _comment(self) -> None:
-        buffer = self.current_buffer()
-        if buffer is not None:
-            buffer.editor.comment()
+        self.editor().comment()
 
     def _uncomment(self) -> None:
-        buffer = self.current_buffer()
-        if buffer is not None:
-            buffer.editor.uncomment()
+        self.editor().uncomment()
 
     def _reset_zoom(self) -> None:
-        buffer = self.current_buffer()
-        if buffer is not None:
-            buffer.editor.reset_zoom()
+        self.editor().reset_zoom()
 
-    # -- drag and drop -----------------------------------------------------
-    def dragEnterEvent(self, event) -> None:  # noqa: N802 - Qt spelling
-        if any(url.isLocalFile() for url in event.mimeData().urls()):
-            event.acceptProposedAction()
+    # -- input requests ----------------------------------------------------
+    def _on_input_request(self, kind: str) -> None:
+        """Feeds the program: the prepared lines first, the dialog only after them.
 
-    def dropEvent(self, event) -> None:  # noqa: N802 - Qt spelling
-        """A dropped program opens in its own tab.  It is not run: a run is F5."""
-        for url in event.mimeData().urls():
-            if url.isLocalFile():
-                self.open_path(url.toLocalFile())
-        event.acceptProposedAction()
+        The lines come from the field under the output pane, one per request, and
+        are echoed with `>` so it stays visible what the program was given.  Only
+        when that list is empty does the window ask the user.
+        """
+        if self._stopped_input:
+            # Cancelled earlier in this run: the interpreter is on its way out and
+            # must not be given anything else to wait for.
+            self._session.answer_input("")
+            return
+        if self._queued_input:
+            line = self._queued_input.pop(0)
+            self._append_note(f"> {line}\n")
+            self._session.answer_input(line)
+            self._status.setText(f"ввод из поля, осталось строк — {len(self._queued_input)}")
+            return
+        answer = self._ask_input(kind)
+        if answer is None:
+            self._stopped_input = True
+            self._append_note("--- ввод отменён: программа остановлена ---\n")
+            self._session.stop()
+            self._status.setText("ввод отменён, выполнение остановлено")
+            return
+        self._session.answer_input(answer)
+
+    def _input_lines(self) -> list[str]:
+        """The input field, one answer per line, blank lines dropped.
+
+        A line is taken as written — leading spaces can matter for a string — but
+        a line that is empty or only spaces is an answer to nothing, and skipping
+        it is what keeps the field easy to read.
+        """
+        return [line for line in self._input_pane.toPlainText().split("\n") if line.strip()]
+
+    def _ask_input(self, kind: str) -> str | None:
+        """One line from the user; `None` when the question was cancelled.
+
+        A method of its own, like `_ask_save`: a modal box cannot be driven from a
+        headless test, and a test that forgets to replace it hangs instead of
+        failing.  The field is single-line on purpose — `Enter` answers, the way it
+        does in the query line, and a whole line of program input is rarely a
+        paragraph.
+        """
+        prompt = {"token": "Слово", "line": "Строка", "codepoint": "Символ"}.get(kind, "Ввод")
+        answer, accepted = QInputDialog.getText(self, "Ввод", prompt + ":")
+        return answer if accepted else None
 
     # -- accessors for the actions and the tests ---------------------------
     @property
@@ -657,28 +787,25 @@ class MainWindow(QMainWindow):
         return self._session
 
     def buffers(self) -> list[Buffer]:
-        """The open programs, in tab order."""
+        """The open documents, in the order the panes show them."""
         return list(self._buffers)
 
     def tab_count(self) -> int:
         return len(self._buffers)
 
     def current_buffer(self) -> Buffer | None:
-        """The tab that is showing, or None in the moment the last one closes."""
-        index = self._tabs.currentIndex()
-        if 0 <= index < len(self._buffers):
-            return self._buffers[index]
-        return None
+        """The document the commands act on: the active pane's current tab."""
+        return self.active_pane().current_buffer()
 
     def editor(self) -> CodeEditor:
-        """The current tab's editor, for the commands that act on a selection.
+        """The current tab's editor in the active pane.
 
-        There is always one while the window is open: the last tab is never
+        There is always one while the window is open: the last document is never
         closed without a replacement being made.
         """
-        buffer = self.current_buffer()
-        assert buffer is not None, "окно без вкладок"
-        return buffer.editor
+        view = self.active_pane().current_view()
+        assert view is not None, "окно без вкладок"
+        return view
 
     def editor_text(self) -> str:
         buffer = self.current_buffer()
@@ -745,58 +872,8 @@ class MainWindow(QMainWindow):
         """
         self._status.setText("решение найдено" if found else "решения нет")
 
-    # -- input requests ----------------------------------------------------
-    def _on_input_request(self, kind: str) -> None:
-        """Feeds the program: the prepared lines first, the dialog only after them.
-
-        The lines come from the field under the output pane, one per request, and
-        are echoed with `>` so it stays visible what the program was given.  Only
-        when that list is empty does the window ask the user.
-        """
-        if self._stopped_input:
-            # Cancelled earlier in this run: the interpreter is on its way out and
-            # must not be given anything else to wait for.
-            self._session.answer_input("")
-            return
-        if self._queued_input:
-            line = self._queued_input.pop(0)
-            self._append_output(f"> {line}\n")
-            self._session.answer_input(line)
-            self._status.setText(f"ввод из поля, осталось строк — {len(self._queued_input)}")
-            return
-        answer = self._ask_input(kind)
-        if answer is None:
-            self._stopped_input = True
-            self._append_output("--- ввод отменён: программа остановлена ---\n")
-            self._session.stop()
-            self._status.setText("ввод отменён, выполнение остановлено")
-            return
-        self._session.answer_input(answer)
-
-    def _input_lines(self) -> list[str]:
-        """The input field, one answer per line, blank lines dropped.
-
-        A line is taken as written — leading spaces can matter for a string — but
-        a line that is empty or only spaces is an answer to nothing, and skipping
-        it is what keeps the field easy to read.
-        """
-        return [line for line in self._input_pane.toPlainText().split("\n") if line.strip()]
-
-    def _ask_input(self, kind: str) -> str | None:
-        """One line from the user; `None` when the question was cancelled.
-
-        A method of its own, like `_ask_save`: a modal box cannot be driven from a
-        headless test, and a test that forgets to replace it hangs instead of
-        failing.  The field is single-line on purpose — `Enter` answers, the way it
-        does in the query line, and a whole line of program input is rarely a
-        paragraph.
-        """
-        prompt = {"token": "Слово", "line": "Строка", "codepoint": "Символ"}.get(kind, "Ввод")
-        answer, accepted = QInputDialog.getText(self, "Ввод", prompt + ":")
-        return answer if accepted else None
-
     def _on_failed(self, kind: str, message: str) -> None:
-        self._append_output(f"*** {kind}: {message}\n")
+        self._append_note(f"*** {kind}: {message}\n")
 
     def _on_ended(self, exit_code: int) -> None:
         self._status.setText(f"интерпретатор завершился, код {exit_code}")
@@ -807,3 +884,32 @@ class MainWindow(QMainWindow):
         cursor.insertText(text)
         self._output.setTextCursor(cursor)
         self._output.ensureCursorVisible()
+
+    def _append_note(self, text: str) -> None:
+        """Appends a note of our own, starting on a line of its own.
+
+        The interpreter prints without a trailing newline when a program uses
+        `ВЫВОД` and no `ПС` (that is the documented behaviour: `ВЫВОД` prints,
+        `ПС` starts a new line), so a note would otherwise be glued to the last
+        line of the program's output.
+        """
+        current = self._output.toPlainText()
+        if current and not current.endswith("\n"):
+            self._append_output("\n")
+        self._append_output(text)
+
+    # -- drag and drop -----------------------------------------------------
+    def dragEnterEvent(self, event) -> None:  # noqa: N802 - Qt spelling
+        if any(url.isLocalFile() for url in event.mimeData().urls()):
+            event.acceptProposedAction()
+
+    def dropEvent(self, event) -> None:  # noqa: N802 - Qt spelling
+        """A dropped program opens in its own tab.  It is not run: a run is F5.
+
+        The views and the output pane report their own drops (`fileDropped`); this
+        is what catches a drop on the tab bar or anywhere else in the window.
+        """
+        for url in event.mimeData().urls():
+            if url.isLocalFile():
+                self.open_path(url.toLocalFile())
+        event.acceptProposedAction()
