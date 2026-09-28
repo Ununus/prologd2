@@ -8,6 +8,7 @@ side of it.
 
 __all__ = [
     "appearance",
+    "completion",
     "editor",
     "highlighter",
     "keywords",

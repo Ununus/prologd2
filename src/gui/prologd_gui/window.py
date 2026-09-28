@@ -73,6 +73,8 @@ class MainWindow(QMainWindow):
             font_family=self._settings.font_family,
             font_size=self._settings.font_size,
             line_numbers=self._settings.line_numbers,
+            completion=self._settings.completion,
+            auto_complete_after=self._settings.auto_complete_after,
         )
         self._editor.setPlainText(WELCOME)
         self._editor.setPlaceholderText("текст программы")
@@ -239,6 +241,10 @@ class MainWindow(QMainWindow):
     # -- session events ----------------------------------------------------
     def _on_ready(self, version: str) -> None:
         self._highlighter.set_keywords(self._session.keywords)
+        # The popup offers the reserved names with their arities once the
+        # interpreter has announced them; before that it offers the document's
+        # own names only, which is already most of the typing saved.
+        self._editor.set_completion_keywords(self._session.keywords)
         self._status.setText(f"PrologD {version} готов")
         self._update_title()
 

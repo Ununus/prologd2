@@ -23,6 +23,8 @@ FONT_SIZE = "editor/font_size"
 LINE_NUMBERS = "editor/line_numbers"
 INDENT_CHARACTER = "editor/indent_character"
 INDENT_WIDTH = "editor/indent_width"
+COMPLETION = "editor/completion"
+AUTO_COMPLETE_AFTER = "editor/auto_complete_after"
 THEME = "view/theme"
 
 DEFAULT_FONT_FAMILY = "Cascadia Mono"
@@ -31,6 +33,11 @@ DEFAULT_THEME = "light"
 
 MINIMUM_FONT_SIZE = 6.0
 MAXIMUM_FONT_SIZE = 72.0
+
+#: How many characters are typed before the popup appears by itself.
+DEFAULT_AUTO_COMPLETE_AFTER = 2
+MINIMUM_AUTO_COMPLETE_AFTER = 1
+MAXIMUM_AUTO_COMPLETE_AFTER = 10
 
 _TRUE = ("1", "true", "yes", "y", "да")
 
@@ -138,6 +145,32 @@ class Settings:
     @indent_width.setter
     def indent_width(self, value: int) -> None:
         self._write(INDENT_WIDTH, int(min(16, max(1, value))))
+
+    @property
+    def completion(self) -> bool:
+        return self._flag(COMPLETION, True)
+
+    @completion.setter
+    def completion(self, value: bool) -> None:
+        self._write(COMPLETION, bool(value))
+
+    @property
+    def auto_complete_after(self) -> int:
+        return int(
+            self._number(
+                AUTO_COMPLETE_AFTER,
+                DEFAULT_AUTO_COMPLETE_AFTER,
+                MINIMUM_AUTO_COMPLETE_AFTER,
+                MAXIMUM_AUTO_COMPLETE_AFTER,
+            )
+        )
+
+    @auto_complete_after.setter
+    def auto_complete_after(self, value: int) -> None:
+        self._write(
+            AUTO_COMPLETE_AFTER,
+            int(min(MAXIMUM_AUTO_COMPLETE_AFTER, max(MINIMUM_AUTO_COMPLETE_AFTER, value))),
+        )
 
     # -- view ---------------------------------------------------------------
     @property

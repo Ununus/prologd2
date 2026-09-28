@@ -44,7 +44,8 @@ needs its own syntax palette rather than just this switch (task_29).
 
 `--settings FILE` chooses the settings file; by default it is
 `%LOCALAPPDATA%\PrologD\gui\gui.ini`, holding the font family and size, line
-numbers, the indent character and width, and the theme.  A value that cannot be
+numbers, the indent character and width, completion and its threshold, and the
+theme.  A value that cannot be
 read falls back to the default instead of refusing to start, and keys this
 version does not know are left alone (task_29 adds the dialog).
 
@@ -57,6 +58,8 @@ version does not know are left alone (task_29 adds the dialog).
 | `Ctrl+O` | **Открыть…** — fills the editor and does not run |
 | `Ctrl+L` | clear the output pane |
 | `Ctrl+K` / `Ctrl+U` | comment / uncomment the selection or the current line |
+| `Ctrl+Space` | completion popup — it also opens by itself after two letters |
+| `Enter` / `Tab` / `Esc` | take the highlighted completion / close the popup |
 | `Ctrl`+wheel, `Ctrl+0` | font size (6…72 pt) and its reset |
 | `Tab` / `Shift+Tab` | indent / outdent the selected lines |
 | `Enter` | continues the indent after `,`, `:-` or `<-` |

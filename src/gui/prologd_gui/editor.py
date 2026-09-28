@@ -9,9 +9,11 @@ undo that takes two presses, an indent that eats a selection.
 
 from __future__ import annotations
 
-from PySide6.QtCore import QRect, QSize, Qt, Signal
+from PySide6.QtCore import QRect, QSize, QStringListModel, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QKeyEvent, QPainter, QTextCursor, QTextFormat, QWheelEvent
-from PySide6.QtWidgets import QPlainTextEdit, QTextEdit, QWidget
+from PySide6.QtWidgets import QCompleter, QPlainTextEdit, QTextEdit, QWidget
+
+from . import completion, tokens
 
 #: The comment character of the language: `%` to the end of the line.
 COMMENT_PREFIX = "%"
@@ -31,6 +33,15 @@ _MAX_FONT_SIZE = 72.0
 #: indents one more step.  A guess, not a parse: the real structure is the
 #: parser's business (task_30 uses it for the formatter).
 _CONTINUATION_ENDINGS = (",", ":-", "<-")
+
+#: Keys that take the highlighted completion.  With `Shift` they keep their own
+#: meaning: `Shift+Enter` is a newline and `Shift+Tab` an outdent.
+_COMPLETION_ACCEPT_KEYS = (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Tab)
+
+#: Keys that close the popup and still do their job in the editor — the caret
+#: keeps its arrows inside the line.  `Up`/`Down` are deliberately not here:
+#: they walk the list.
+_POPUP_CLOSE_KEYS = (Qt.Key.Key_Left, Qt.Key.Key_Right, Qt.Key.Key_Home, Qt.Key.Key_End)
 
 
 class LineNumberArea(QWidget):
@@ -62,12 +73,20 @@ class CodeEditor(QPlainTextEdit):
         line_numbers: bool = True,
         indent_character: str = "\t",
         indent_width: int = 1,
+        completion: bool = True,
+        auto_complete_after: int = 2,
     ) -> None:
         super().__init__(parent)
         self._indent_character = indent_character
         self._indent_width = max(1, indent_width)
         self._line_numbers = line_numbers
         self._error_line: int | None = None
+        self._keywords: object | None = None
+        self._auto_complete_after = max(1, int(auto_complete_after))
+        self._completion: completion.CompletionModel | None = None
+        self._offers: list[completion.Candidate] = []
+        self._completer: QCompleter | None = None
+        self._offer_list: QStringListModel | None = None
 
         self._margin = LineNumberArea(self)
         self.setFont(self._make_font(font_family, font_size))
@@ -78,6 +97,8 @@ class CodeEditor(QPlainTextEdit):
         self.updateRequest.connect(self._update_margin)
         self.cursorPositionChanged.connect(self._margin.update)
         self._update_margin_width()
+        if completion:
+            self.enable_completion(True)
 
     # -- font and zoom ------------------------------------------------------
     @staticmethod
@@ -297,10 +318,153 @@ class CodeEditor(QPlainTextEdit):
             cursor.setPosition(end, QTextCursor.MoveMode.KeepAnchor)
         self.setTextCursor(cursor)
 
+    # -- completion ---------------------------------------------------------
+    def enable_completion(self, enabled: bool) -> None:
+        """Turns the popup on or off; what it offers stays Qt-free."""
+        if enabled == (self._completer is not None):
+            return
+        if not enabled:
+            self._hide_completion()
+            self._completer = None
+            self._offer_list = None
+            self._completion = None
+            self._offers = []
+            return
+        self._completion = completion.CompletionModel(self._keywords)
+        self._offer_list = QStringListModel(self)
+        completer = QCompleter(self)
+        completer.setModel(self._offer_list)
+        completer.setWidget(self)
+        completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
+        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseSensitive)
+        # A click in the popup is the mouse's Enter.  Keyboard accepts are
+        # handled in `keyPressEvent`, and `activated` is deliberately left
+        # unconnected: Qt emits it for a key press too, which would insert twice.
+        completer.popup().clicked.connect(self._accept_index)
+        self._completer = completer
+
+    def completion_enabled(self) -> bool:
+        return self._completer is not None
+
+    def completion_visible(self) -> bool:
+        return self._completer is not None and self._completer.popup().isVisible()
+
+    def completion_labels(self) -> list[str]:
+        """What the popup is showing, in its own order; empty when it is closed."""
+        if not self.completion_visible():
+            return []
+        return [offer.label for offer in self._offers]
+
+    def set_completion_keywords(self, keywords) -> None:
+        """The reserved names from the interpreter (`ready`); may arrive late."""
+        self._keywords = keywords
+        if self._completion is not None:
+            self._completion.set_keywords(keywords)
+
+    def set_auto_complete_after(self, letters: int) -> None:
+        self._auto_complete_after = max(1, int(letters))
+
+    def show_completion(self) -> None:
+        """Opens the popup on demand (`Ctrl+Space`)."""
+        self._maybe_complete(force=True)
+
+    def _hide_completion(self) -> None:
+        if self._completer is not None:
+            self._completer.popup().hide()
+
+    def _maybe_complete(self, force: bool = False) -> None:
+        if self._completer is None or self._completion is None:
+            return
+        cursor = self.textCursor()
+        if cursor.hasSelection():
+            self._hide_completion()
+            return
+        text = self.toPlainText()
+        position = cursor.position()
+        if not completion.is_code_position(text, position, self._keywords):
+            self._hide_completion()
+            return
+        prefix = completion.word_before(text, position)
+        if not force and len(prefix) < self._auto_complete_after:
+            self._hide_completion()
+            return
+        self._completion.update(text)
+        self._offers = self._completion.candidates(prefix)
+        if not self._offers:
+            self._hide_completion()
+            return
+        self._offer_list.setStringList([offer.label for offer in self._offers])
+        popup = self._completer.popup()
+        rect = self.cursorRect()
+        rect.setWidth(
+            popup.sizeHintForColumn(0) + popup.verticalScrollBar().sizeHint().width()
+        )
+        self._completer.complete(rect)
+        # Qt highlights a row only when it filtered the list itself.  Here the
+        # list arrives already ranked and filtered, so nothing is highlighted —
+        # and `Enter` on an unhighlighted popup does nothing at all.
+        popup.setCurrentIndex(self._offer_list.index(0, 0))
+
+    def _offer_at(self, row: int) -> completion.Candidate | None:
+        if 0 <= row < len(self._offers):
+            return self._offers[row]
+        return None
+
+    def _accept_index(self, index) -> None:
+        """A click in the popup takes that row."""
+        offer = self._offer_at(index.row())
+        if offer is None:
+            return
+        self._hide_completion()
+        self._insert_completion(offer.insert_text)
+
+    def _accept_completion(self) -> bool:
+        """`Enter`/`Tab`: takes the highlighted row.  False when there is none."""
+        if self._completer is None:
+            return False
+        offer = self._offer_at(self._completer.popup().currentIndex().row())
+        self._hide_completion()
+        if offer is None:
+            return False
+        self._insert_completion(offer.insert_text)
+        return True
+
+    def _insert_completion(self, text: str) -> None:
+        """Replaces the word being typed; the arity in the label is not inserted."""
+        cursor = self.textCursor()
+        prefix = completion.word_before(self.toPlainText(), cursor.position())
+        cursor.beginEditBlock()
+        if prefix:
+            cursor.setPosition(
+                cursor.position() - len(prefix), QTextCursor.MoveMode.KeepAnchor
+            )
+        cursor.insertText(text)
+        cursor.endEditBlock()
+        self.setTextCursor(cursor)
+
     # -- keys ---------------------------------------------------------------
     def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802 - Qt spelling
         key = event.key()
         modifiers = event.modifiers()
+
+        if self._completer is not None:
+            if key == Qt.Key.Key_Space and modifiers == Qt.KeyboardModifier.ControlModifier:
+                self._maybe_complete(force=True)
+                event.accept()
+                return
+            if self.completion_visible():
+                if key in _COMPLETION_ACCEPT_KEYS and not (
+                    modifiers & Qt.KeyboardModifier.ShiftModifier
+                ):
+                    if self._accept_completion():
+                        event.accept()
+                        return
+                elif key == Qt.Key.Key_Escape:
+                    self._hide_completion()
+                    event.accept()
+                    return
+                elif key in _POPUP_CLOSE_KEYS:
+                    self._hide_completion()
 
         if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and modifiers == Qt.KeyboardModifier.NoModifier:
             if not self.textCursor().hasSelection():
@@ -318,6 +482,10 @@ class CodeEditor(QPlainTextEdit):
             self.indent_selection(outdent=True)
             return
         super().keyPressEvent(event)
+        # Automatic completion: only after a character that can be part of a
+        # name, and only when the model has something to say.
+        if self._completer is not None and event.text() and tokens.is_name_character(event.text()[-1]):
+            self._maybe_complete()
 
     def _insert_newline_with_indent(self) -> None:
         cursor = self.textCursor()

@@ -82,7 +82,7 @@ session.
 | task_21_gui_pyside | in progress | protocol, `IoContext` input seam, `externalStop`, `src/gui` skeleton |
 | task_22_gui_editor | done | tokenizer, palette, highlighter, line numbers, Ctrl+K/U, zoom and the settings store are in and tested; find/replace and duplicate line come with the task_26 menus, saving a file with task_25 |
 | task_23_gui_keyword_source | done | `--list-keywords` + `keywords` in `ready` (protocol 2); one source for the built-in list |
-| task_24_gui_completion | not started | completion from the keyword source plus the document's own predicates |
+| task_24_gui_completion | done | popup over the reserved names *and* the document's own names, with arities; no completion in a comment, string or `#…#`; `Ctrl+Space` |
 | task_25_gui_files_tabs | not started | tabs, untitled buffers, save prompts, split editor |
 | task_26_gui_toolbar | not started | menus, toolbar, icon audit (27 icons present, 18 to draw) |
 | task_27_gui_panels | not started | output and input panes, output bottom/right |
@@ -112,6 +112,8 @@ highlighting rules, including a sweep over the example programs),
 `test_appearance.py` (forced light palette and contrast of every syntax colour),
 `test_editor.py` (comment/uncomment and indent as single undo steps, the Tab and
 Enter keys, zoom bounds, line-number width, the error marker),
+`test_completion.py` (what is offered and in which order, and the popup driven
+by real key events),
 `test_settings.py` (defaults, persistence, clamping, keys a later version adds),
 `test_session.py`
 (request queueing and the clean-slate restart) and `test_window.py` (opening a
@@ -227,3 +229,13 @@ Resolved on 2026-09-29 (GUI planning):
   test for comment/uncomment found a real defect: the command collapsed the
   selection, so `Ctrl+U` right after `Ctrl+K` acted on one line — the transformed
   lines now stay selected, which the test asserts.
+* GUI implementation session, part 6: completion (task_24).  The popup offers
+  the reserved names with their arities *and* the names the document itself uses,
+  which is where the typing is actually saved — Prolog calls the name written a
+  few lines above.  Collection is a line scan over the tokenizer's output, not a
+  parse: the file may be unparsable mid-edit.  Three defects the tests found: a
+  call with a list argument was measured as `член/4` (commas inside `[]` were
+  counted as separators), Qt does not highlight a row in a list that arrives
+  pre-filtered — so `Enter` on the fresh popup did nothing and inserted a newline
+  — and typing in a comment was one rule away from offering names, which the
+  tokenizer now decides instead.
