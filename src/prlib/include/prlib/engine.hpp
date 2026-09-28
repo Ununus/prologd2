@@ -39,6 +39,12 @@ struct EngineOptions {
   std::size_t maxNestedDepth = 10'000;
   std::size_t maxFindAllSolutions = 1'000'000;
   std::size_t maxSteps = 0;  // 0 = unlimited
+
+  /// Extra stop condition, polled by the solver next to the internal flag.
+  /// A front-end uses it to turn the Ctrl+C signal flag or a GUI "Stop" button
+  /// into a stop request: a signal handler may only touch async-signal-safe
+  /// state, and this hook is the bridge.  Must not throw.
+  std::function<bool()> externalStop;
 };
 
 class Engine;
@@ -122,7 +128,10 @@ class Engine {
   /// false to stop.  Returns true when at least one solution was found.
   bool runQuery(const Query& query, const std::function<bool()>& onSolution = {});
 
-  [[nodiscard]] bool shouldStop() const noexcept { return stop_requested_; }
+  [[nodiscard]] bool shouldStop() const noexcept {
+    return stop_requested_ ||
+           (options_.externalStop && options_.externalStop());
+  }
   void requestStop() noexcept { stop_requested_ = true; }
 
   /// Format a term using the current bindings and arithmetic evaluation.

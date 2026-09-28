@@ -1,5 +1,6 @@
 #include <CLI/CLI.hpp>
 
+#include <csignal>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -11,6 +12,8 @@
 #include "prlib/module_loader.hpp"
 #include "prlib/utf8_path.hpp"
 #include "prlib/version.hpp"
+
+#include "protocol.hpp"
 
 #if defined(_WIN32)
 #include <io.h>
@@ -38,6 +41,23 @@ void enableUtf8Console() {
 #else
 void enableUtf8Console() {}
 #endif
+
+/// Set by the SIGINT/SIGTERM handler.  The engine polls it through
+/// `EngineOptions::externalStop`, which is the only part of an interrupt that
+/// may be done from a signal handler.
+volatile std::sig_atomic_t g_interrupted = 0;
+
+void handleInterruptSignal(int) { g_interrupted = 1; }
+
+/// Consumes a pending interrupt.  The flag is cleared on delivery so that one
+/// Ctrl+C stops one query instead of every later one.
+bool consumeInterrupt() {
+  if (g_interrupted == 0) {
+    return false;
+  }
+  g_interrupted = 0;
+  return true;
+}
 
 std::string queryText(prologd::Engine& engine, const prologd::Query& query) {
   std::string text = "?";
@@ -67,6 +87,7 @@ int main(int argc, char** argv) {
   std::string errorFile;
   bool questions = false;
   bool trace = false;
+  std::string protocol = "text";
 
   app.add_option("-s,--source", sources, "Interpret the given source file (repeatable)");
   app.add_option("-I,--include", includeDirectories, "Add an import search directory");
@@ -75,6 +96,8 @@ int main(int argc, char** argv) {
   app.add_option("-e,--error", errorFile, "Write diagnostics to this file");
   app.add_flag("-q,--questions", questions, "Echo queries before executing them");
   app.add_flag("-t,--trace", trace, "Start with tracing enabled");
+  app.add_option("--protocol", protocol, "Front-end protocol: text (default) or json")
+      ->check(CLI::IsMember({"text", "json"}));
   app.add_option("files", positional, "Source files");
 
   try {
@@ -85,6 +108,12 @@ int main(int argc, char** argv) {
 
   for (const std::string& file : positional) {
     sources.push_back(file);
+  }
+
+  if (protocol == "json" &&
+      (!inputFile.empty() || !outputFile.empty() || !errorFile.empty())) {
+    std::cerr << "error: --protocol json owns stdin and stdout; drop -i/-o/-e\n";
+    return 1;
   }
 
   std::ifstream inputStream;
@@ -122,12 +151,21 @@ int main(int argc, char** argv) {
   engine.initialize();
   engine.setTrace(trace);
 
+  std::signal(SIGINT, handleInterruptSignal);
+#if defined(SIGTERM)
+  std::signal(SIGTERM, handleInterruptSignal);
+#endif
+  engine.options().externalStop = consumeInterrupt;
+
   std::vector<std::filesystem::path> includePaths;
   for (const std::string& directory : includeDirectories) {
     includePaths.push_back(prologd::fromUtf8Path(directory));
   }
 
   prologd::ModuleLoader loader(engine, includePaths);
+  if (protocol == "json") {
+    return prologd::cli::runJsonSession(engine, loader, std::cin, std::cout);
+  }
   int exit_code = 0;
   loader.setQueryRunner([&](const prologd::Query& query) {
     if (questions && !query.isDirective) {
@@ -155,6 +193,7 @@ int main(int argc, char** argv) {
           if (line.empty()) {
             continue;
           }
+          g_interrupted = 0;  // Ctrl+C at the prompt abandons the line
           std::string error;
           if (!loader.loadSource(line, "<stdin>", &error)) {
             engine.io().errorStream() << error << '\n';

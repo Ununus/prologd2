@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -17,8 +18,11 @@ struct RunResult {
 };
 
 /// Run a whole program (clauses and queries) in-memory and capture output.
+/// `configure` runs after `initialize()` and before the program is loaded; it is
+/// the hook for engine options such as `externalStop`.
 inline RunResult runProgram(const std::string& source, const std::string& input = {},
-                            std::shared_ptr<GraphicsBackend> graphics = nullptr) {
+                            std::shared_ptr<GraphicsBackend> graphics = nullptr,
+                            const std::function<void(Engine&)>& configure = {}) {
   std::istringstream inputStream(input);
   std::ostringstream outputStream;
   std::ostringstream errorStream;
@@ -28,6 +32,9 @@ inline RunResult runProgram(const std::string& source, const std::string& input 
   engine.initialize();
   if (graphics) {
     engine.setGraphicsBackend(std::move(graphics));
+  }
+  if (configure) {
+    configure(engine);
   }
 
   ModuleLoader loader(engine);

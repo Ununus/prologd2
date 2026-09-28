@@ -1,0 +1,6 @@
+# The GUI drives the interpreter as a child process; PySide6 is the only
+# dependency.  Install with:
+#
+#   python -m venv .venv
+#   .venv\Scripts\python -m pip install -r src/gui/requirements.txt
+PySide6>=6.6

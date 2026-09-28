@@ -92,6 +92,45 @@ if(PROLOGD_BUILD_CLI AND PROLOGD_FETCH_DEPS)
   FetchContent_MakeAvailable(CLI11)
 endif()
 
+# ---------------------------------------------------------------------------
+# JSON for the front-end protocol (CLI only)
+# ---------------------------------------------------------------------------
+# Only the console front-end needs JSON: it carries the protocol the Python GUI
+# speaks (src/cli/protocol.cpp, src/gui).  prlib stays dependency-free.
+#
+# The library is taken as its single-header release rather than cloned: one
+# 900 KB file instead of a full repository checkout.  The download is pinned by
+# hash, and a stale or truncated file is therefore impossible to keep.
+add_library(prologd_json INTERFACE)
+if(PROLOGD_BUILD_CLI)
+  if(PROLOGD_FETCH_DEPS)
+    set(PROLOGD_JSON_VERSION 3.11.3)
+    set(PROLOGD_JSON_DIR "${PROLOGD_THIRDPARTY_DIR}/json-${PROLOGD_JSON_VERSION}")
+    set(PROLOGD_JSON_HEADER "${PROLOGD_JSON_DIR}/include/nlohmann/json.hpp")
+    if(NOT EXISTS "${PROLOGD_JSON_HEADER}")
+      file(MAKE_DIRECTORY "${PROLOGD_JSON_DIR}/include/nlohmann")
+      file(DOWNLOAD
+        "https://github.com/nlohmann/json/releases/download/v${PROLOGD_JSON_VERSION}/json.hpp"
+        "${PROLOGD_JSON_HEADER}"
+        EXPECTED_HASH SHA256=9bea4c8066ef4a1c206b2be5a36302f8926f7fdc6087af5d20b417d0cf103ea6
+        TLS_VERIFY ON
+        STATUS prologd_json_status)
+      list(GET prologd_json_status 0 prologd_json_code)
+      if(NOT prologd_json_code EQUAL 0)
+        list(GET prologd_json_status 1 prologd_json_message)
+        file(REMOVE "${PROLOGD_JSON_HEADER}")
+        message(FATAL_ERROR
+          "Cannot download nlohmann/json ${PROLOGD_JSON_VERSION}: ${prologd_json_message}")
+      endif()
+      message(STATUS "Downloaded nlohmann/json ${PROLOGD_JSON_VERSION} header")
+    endif()
+    target_include_directories(prologd_json INTERFACE "${PROLOGD_JSON_DIR}/include")
+  else()
+    find_package(nlohmann_json REQUIRED)
+    target_link_libraries(prologd_json INTERFACE nlohmann_json::nlohmann_json)
+  endif()
+endif()
+
 add_subdirectory(src)
 
 if(PROLOGD_BUILD_TESTS)
@@ -105,6 +144,10 @@ find_program(TYPST_EXECUTABLE typst)
 add_custom_target(prologd_docs
   COMMENT "Building Typst documentation")
 if(TYPST_EXECUTABLE)
+  # typst does not create the output directory itself and fails with
+  # "failed to write PDF file (os error 3)" when it is missing.
+  add_custom_command(TARGET prologd_docs POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/doc")
   foreach(doc IN ITEMS help technical prologd-diff)
     add_custom_command(TARGET prologd_docs POST_BUILD
       COMMAND ${TYPST_EXECUTABLE} compile

@@ -28,7 +28,11 @@ void IoContext::newline() {
 
 void IoContext::pushPreloadedLine(std::string line) { preloaded_.push_back(std::move(line)); }
 
-bool IoContext::fetchLine(std::string& line) {
+void IoContext::setInputRequestHandler(InputRequestHandler handler) {
+  input_handler_ = std::move(handler);
+}
+
+bool IoContext::fetchLine(std::string& line, InputRequestKind kind) {
   if (!preloaded_.empty()) {
     line = std::move(preloaded_.front());
     preloaded_.pop_front();
@@ -36,6 +40,14 @@ bool IoContext::fetchLine(std::string& line) {
   }
   if (input_from_file_) {
     return static_cast<bool>(std::getline(file_input_, line));
+  }
+  if (input_handler_) {
+    const std::optional<std::string> answer = input_handler_(kind);
+    if (!answer) {
+      return false;
+    }
+    line = *answer;
+    return true;
   }
   return static_cast<bool>(std::getline(*base_input_, line));
 }
@@ -55,7 +67,7 @@ std::optional<std::string> IoContext::readToken() {
       }
     }
     std::string line;
-    if (!fetchLine(line)) {
+    if (!fetchLine(line, InputRequestKind::Token)) {
       has_current_line_ = false;
       return std::nullopt;
     }
@@ -72,7 +84,7 @@ std::optional<std::string> IoContext::readWholeLine() {
     return rest;
   }
   std::string line;
-  if (!fetchLine(line)) {
+  if (!fetchLine(line, InputRequestKind::Line)) {
     has_current_line_ = false;
     return std::nullopt;
   }
@@ -93,7 +105,7 @@ std::optional<CodePoint> IoContext::readCodePoint() {
       return decoded.code_point;
     }
     std::string line;
-    if (!fetchLine(line)) {
+    if (!fetchLine(line, InputRequestKind::CodePoint)) {
       has_current_line_ = false;
       return std::nullopt;
     }

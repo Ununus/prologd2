@@ -12,6 +12,7 @@ add_executable(prlib_tests
   test_findall.cpp
   test_graphics.cpp
   test_module_loader.cpp
+  test_io_context.cpp
   test_typical_tasks.cpp
   test_lessons.cpp)
 
@@ -58,4 +59,12 @@ if(TARGET prologd)
             -s "${CMAKE_SOURCE_DIR}/examples/import_demo.pld")
   set_tests_properties(cli_include PROPERTIES
     PASS_REGULAR_EXPRESSION "Y=42")
+
+  # The JSON session needs byte-exact stdin, so it is driven by a CMake script
+  # instead of the usual PASS_REGULAR_EXPRESSION form.
+  add_test(NAME cli_json_protocol
+    COMMAND ${CMAKE_COMMAND}
+            "-DPROLOGD_EXE=$<TARGET_FILE:prologd>"
+            "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/protocol_session.cmake")
 endif()
