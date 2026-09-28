@@ -114,6 +114,10 @@ class Buffer(QObject):
         for view in self._views:
             view.set_font_size(size)
 
+    def set_line_numbers(self, enabled: bool) -> None:
+        for view in self._views:
+            view.set_line_numbers(enabled)
+
     def title(self) -> str:
         return self.model.title()
 

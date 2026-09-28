@@ -53,8 +53,15 @@ READS_TWO = "?ВВОДЦЕЛ(А),ВВОДЦЕЛ(Б),ВЫВОД(А),ПС,ВЫВО
 
 
 def wait_for_result(window) -> None:
-    """Waits until the interpreter has finished answering the query."""
-    done = pump(window, lambda: "решение" in window.status_text())
+    """Waits until the interpreter has finished answering the query.
+
+    The status says «решение **найдено**» for an answer and «решения **нет**» for
+    a failing query — two cases of one word, so the *stem* is what is looked for.
+    Matching the whole word missed the failing case exactly, and the run then
+    looked as if it had never finished: the file checks in
+    `test_saving_before_a_run_writes_the_file` were right all along.
+    """
+    done = pump(window, lambda: "решени" in window.status_text())
     assert done, f"the run never finished: {ascii(window.output_text())}"
 
 
@@ -108,11 +115,16 @@ def discard_changes(window) -> None:
     A test that leaves a buffer modified and then closes the window would open a
     real `QMessageBox` and *hang* — no failure, no output, just a stuck suite.  So
     every test closes through here, where the answer is `DISCARD`.
+
+    The interpreter is stopped too: a test window that only closed its buffers
+    left a live `prologd` behind, and a suite of them (one per test) slowed the
+    machine down and made the run before a failure look like a hang.
     """
     from prologd_gui import window as window_module
 
     window._ask_save = lambda name: window_module.DISCARD
     window.close_all()
+    window.stop_program()
     window.close()
 
 
@@ -448,6 +460,173 @@ def test_a_run_uses_the_tab_that_is_showing(executable: str) -> None:
         discard_changes(window)
 
 
+def test_the_menus_come_from_the_action_table(executable: str) -> None:
+    """Every menu entry is an action of the table, in the order the table gives.
+
+    The menus are built *from* `actions.MENUS`, so this is the check that the two
+    have not drifted — a renamed entry, a missing separator, a forgotten command.
+    """
+    from prologd_gui import actions
+
+    window = empty_window(executable)
+    try:
+        menus = {action.text(): action.menu() for action in window.menuBar().actions()}
+        assert list(menus) == [title for title, _ in actions.MENUS], list(menus)
+        for title, entries in actions.MENUS:
+            expected = []
+            for key in entries:
+                if key == actions.SEPARATOR:
+                    expected.append("")
+                elif key == actions.RECENT:
+                    expected.append("Последние файлы")
+                else:
+                    expected.append(actions.BY_KEY[key].title)
+            assert [entry.text() for entry in menus[title].actions()] == expected, title
+        assert set(window._actions) == set(actions.BY_KEY), "the window has stray actions"
+
+        # What is not implemented yet says so instead of doing nothing quietly.
+        step = window._actions["step"]
+        assert step.isEnabled() is False
+        assert "task_28" in step.toolTip(), step.toolTip()
+        assert window._actions["find"].isEnabled() is False
+        print("ok: the menu bar is built from the action table, disabled entries explain themselves")
+    finally:
+        discard_changes(window)
+
+
+def test_the_toolbar_reuses_the_actions(executable: str) -> None:
+    from prologd_gui import actions
+
+    window = empty_window(executable)
+    try:
+        toolbar = window._toolbar
+        assert toolbar.iconSize().width() == 24, "icons are drawn at 24 px"
+        shown = [entry.text() for entry in toolbar.actions() if not entry.isSeparator()]
+        for key in ("new", "open", "save", "run", "stop", "comment", "clear_output"):
+            assert actions.BY_KEY[key].title in shown, (key, shown)
+        assert window._font_size_box.parent() is not None, "the size control is on the toolbar"
+
+        # An icon that exists is set; one that does not leaves a text-only button.
+        assert window._actions["save"].icon().isNull() is False
+        assert window._actions["reload"].icon().isNull() is True, "file-reload.png is not drawn yet"
+        print("ok: the toolbar shows the actions and their icons, text-only where none exists")
+    finally:
+        discard_changes(window)
+
+
+def test_view_switches_are_stored(executable: str) -> None:
+    """Checkable entries write the preference they stand for."""
+    from prologd_gui.settings import Settings
+
+    window = empty_window(executable)
+    path = window._settings.path
+    try:
+        assert window._actions["line_numbers"].isChecked() is True
+        assert window._toolbar.isHidden() is False
+
+        window._actions["line_numbers"].setChecked(False)
+        assert window._settings.line_numbers is False
+        assert window.editor().line_numbers() is False
+        window._actions["toolbar"].setChecked(False)
+        assert window._toolbar.isHidden() is True
+        window._actions["save_before_run"].setChecked(True)
+        assert window._settings.save_before_run is True
+    finally:
+        discard_changes(window)
+
+    stored = Settings(path)
+    assert stored.line_numbers is False
+    assert stored.toolbar_visible is False
+    assert stored.save_before_run is True
+    print("ok: view switches are remembered")
+
+
+def test_the_recent_menu_lists_what_is_still_there(
+    executable: str, directory: pathlib.Path
+) -> None:
+    keep = directory / "остался.pld"
+    gone = directory / "исчез.pld"
+    for path in (keep, gone):
+        path.write_text("факт(1).\n", encoding="utf-8")
+
+    window = empty_window(executable)
+    try:
+        window.open_path(str(keep))
+        window.open_path(str(gone))
+        assert len(window.recent_files()) == 2
+
+        gone.unlink()
+        window._fill_recent_menu()
+        entries = [entry.text() for entry in window._recent_menu.actions() if entry.text()]
+        assert entries[0] == keep.name, entries
+        assert gone.name not in entries, "a deleted file stayed in the list"
+        assert window.recent_files() == [str(keep)]
+
+        window._clear_recent()
+        assert [entry.text() for entry in window._recent_menu.actions()] == ["(пока пусто)"]
+        assert window.recent_files() == []
+        print("ok: the recent-files menu lists what is there, and can be emptied")
+    finally:
+        discard_changes(window)
+
+
+def test_the_context_menu_reuses_the_shared_actions(executable: str) -> None:
+    """Menu, toolbar and context menu hand out the same `QAction` objects."""
+    window = empty_window(executable)
+    try:
+        in_view = window.editor().actions()
+        for key in ("undo", "redo", "copy", "paste", "comment", "uncomment", "select_all"):
+            assert window._actions[key] in in_view, key
+        window._apply_context_actions()
+        assert in_view.count(window._actions["comment"]) == 1, "added twice"
+        print("ok: the editor's context menu reuses the menu actions")
+    finally:
+        discard_changes(window)
+
+
+def test_the_font_control_and_the_wheel_are_one_setting(executable: str) -> None:
+    window = empty_window(executable)
+    try:
+        box = window._font_size_box
+        assert box.currentData() == float(window._settings.font_size), box.currentData()
+
+        box.setCurrentIndex(box.findData(20.0))
+        assert window.editor().font_size == 20.0
+        assert window.output().font_size == 20.0
+        assert window._settings.font_size == 20.0
+
+        # A size from the wheel need not be in the list; the box still shows it.
+        window.editor().set_font_size(23)
+        assert box.currentText() == "23", box.currentText()
+        print("ok: the toolbar's size control and the zoom are one preference")
+    finally:
+        discard_changes(window)
+
+
+def test_saving_before_a_run_writes_the_file(
+    executable: str, directory: pathlib.Path
+) -> None:
+    target = directory / "перед_запуском.pld"
+    target.write_text("факт(1).\n", encoding="utf-8")
+
+    window = empty_window(executable)
+    try:
+        window.open_path(str(target))
+        window.editor().insertPlainText("?факт(1).\n")
+        window._actions["save_before_run"].setChecked(True)
+
+        window.run_program()
+        wait_for_result(window)
+
+        assert target.read_text(encoding="utf-8") == "?факт(1).\nфакт(1).\n"
+        assert window.buffers()[0].is_modified() is False, "the file was not saved before the run"
+        # ASCII only: the test output is piped, and a pipe is not the console —
+        # a Cyrillic «...» here died with UnicodeEncodeError on the way out.
+        print("ok: 'save before run' writes the file before the run")
+    finally:
+        discard_changes(window)
+
+
 def test_the_split_editor_shares_one_document(executable: str) -> None:
     """Two panes, one text: an edit in either is the same edit."""
     window = empty_window(executable)
@@ -667,51 +846,42 @@ def test_a_run_is_repeatable(executable: str) -> None:
 
 
 def test_the_documented_shortcuts_are_bound(executable: str) -> None:
-    """A key that the plan documents must actually be bound to the action.
+    """A key that the documentation promises must be on the action that does it.
 
     **Запустить** was bound to `Ctrl+R` while the plan promised `F5`, so pressing
-    the documented key did nothing at all.
+    the documented key did nothing at all.  Since the menus and the toolbar are
+    built from `actions.ACTIONS`, this is where the keys are checked now.
     """
-    from PySide6.QtWidgets import QToolBar
-
-    window = make_window(executable)
+    window = empty_window(executable)
     try:
-        assert pump(window, lambda: bool(window.session.keywords)), "the session never said ready"
-        actions = {
-            action.text(): action
-            for bar in window.findChildren(QToolBar)
-            for action in bar.actions()
-        }
-        bound = {action: {key.toString() for key in actions[action].shortcuts()} for action in actions}
-        for text, expected in (
-            ("Запустить", {"F5", "Ctrl+R"}),
-            ("Остановить", {"Shift+F5", "Ctrl+."}),
-            ("Открыть…", {"Ctrl+O"}),
-            ("Очистить вывод", {"Ctrl+L"}),
+        for key, expected in (
+            ("run", {"F5", "Ctrl+R"}),
+            ("stop", {"Shift+F5", "Ctrl+."}),
+            ("open", {"Ctrl+O"}),
+            ("save", {"Ctrl+S"}),
+            ("close", {"Ctrl+W"}),
+            ("comment", {"Ctrl+K"}),
+            ("uncomment", {"Ctrl+U"}),
+            ("zoom_reset", {"Ctrl+0"}),
+            ("split", {"Ctrl+\\"}),
+            ("next_tab", {"Ctrl+Tab"}),
+            ("previous_tab", {"Ctrl+Shift+Tab"}),
         ):
-            assert text in actions, f"no {text} action, got {sorted(actions)}"
-            assert expected <= bound[text], f"{text} is bound to {sorted(bound[text])}"
+            bound = {sequence.toString() for sequence in window._actions[key].shortcuts()}
+            assert bound == expected, f"{key} is bound to {sorted(bound)}, documented {sorted(expected)}"
 
-        # Editing commands live on the window rather than on the toolbar, which
-        # task_26 fills with the real set of buttons.
-        window_actions = {action.text(): action for action in window.actions()}
-        for text, expected in (
-            ("Закомментировать", "Ctrl+K"),
-            ("Раскомментировать", "Ctrl+U"),
-            ("Сбросить масштаб", "Ctrl+0"),
-        ):
-            assert text in window_actions, f"no {text} action, got {sorted(window_actions)}"
-            keys = {key.toString() for key in window_actions[text].shortcuts()}
-            assert keys == {expected}, f"{text} is bound to {sorted(keys)}"
+        # Zoom in and out have no key on purpose: `Ctrl+=`, `Ctrl++` and `Ctrl+-`
+        # belong to the `РАВНО`/`СЛОЖЕНИЕ`/`ВЫЧИТАНИЕ` skeletons of task_31.
+        for key in ("zoom_in", "zoom_out"):
+            assert window._actions[key].shortcuts() == [], key
 
-        # The key press runs the action: trigger is the same path a shortcut takes.
+        # Triggering is the same path a shortcut takes.
         window.open_path(str(EXAMPLE))
-        actions["Запустить"].trigger()
+        window._actions["run"].trigger()
         assert pump(window, lambda: ANSWER in window.output_text()), ascii(window.output_text())
-        print("ok: F5/Shift+F5, Ctrl+K/U and Ctrl+0 are bound and the action runs the program")
+        print("ok: the documented keys are bound to the actions, and the action runs the program")
     finally:
-        window.stop_program()
-        window.close()
+        discard_changes(window)
 
 
 def main(argv: list[str]) -> int:
@@ -751,6 +921,13 @@ def main(argv: list[str]) -> int:
         test_each_pane_has_its_own_current_tab(executable, files)
         test_merging_the_editor_keeps_the_documents(executable, files)
         test_the_split_survives_a_restart(executable)
+        test_the_menus_come_from_the_action_table(executable)
+        test_the_toolbar_reuses_the_actions(executable)
+        test_view_switches_are_stored(executable)
+        test_the_recent_menu_lists_what_is_still_there(executable, files)
+        test_the_context_menu_reuses_the_shared_actions(executable)
+        test_the_font_control_and_the_wheel_are_one_setting(executable)
+        test_saving_before_a_run_writes_the_file(executable, files)
     print("all window checks passed")
     del application
     return 0

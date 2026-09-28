@@ -10,9 +10,11 @@ from __future__ import annotations
 
 import pathlib
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction, QKeySequence
+from PySide6.QtCore import QSize, Qt, QUrl
+from PySide6.QtGui import QAction, QDesktopServices, QIntValidator, QKeySequence
 from PySide6.QtWidgets import (
+    QApplication,
+    QComboBox,
     QFileDialog,
     QInputDialog,
     QLabel,
@@ -25,7 +27,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from . import documents
+from . import actions, appearance, assets, documents
 from .buffers import Buffer
 from .editor import CodeEditor, ZoomablePlainTextEdit
 from .panes import Pane
@@ -82,6 +84,8 @@ class MainWindow(QMainWindow):
         #: nothing else is asked during it.
         self._stopped_input = False
         self._recent = documents.RecentFiles(self._settings.recent_files)
+        #: What the interpreter announced in `ready`, for «О программе».
+        self._version = ""
 
         self._build_ui()
         # The split editor comes back if it was left open, and before the first
@@ -158,78 +162,321 @@ class MainWindow(QMainWindow):
         # A dropped program opens in its own tab; see `dropEvent`.
         self.setAcceptDrops(True)
 
-        toolbar = QToolBar("Управление", self)
-        self.addToolBar(toolbar)
-        self._add_action(toolbar, "Запустить", self.run_program, ["F5", "Ctrl+R"])
-        self._add_action(toolbar, "Остановить", self.stop_program, ["Shift+F5", "Ctrl+."])
-        toolbar.addSeparator()
-        self._add_action(toolbar, "Новый", lambda: self.new_buffer(), ["Ctrl+N"])
-        self._add_action(toolbar, "Открыть…", self._open_file, ["Ctrl+O"])
-        self._add_action(toolbar, "Сохранить", lambda: self.save_buffer(), ["Ctrl+S"])
-        toolbar.addSeparator()
-        self._add_action(toolbar, "Очистить вывод", self.clear_output, ["Ctrl+L"])
-
-        # The commands task_26 puts into the menus; the keys already work.  Zoom
-        # deliberately has no key pair of its own — `Ctrl+=`, `Ctrl++` and
-        # `Ctrl+-` belong to the `РАВНО`/`СЛОЖЕНИЕ`/`ВЫЧИТАНИЕ` skeletons of
-        # task_31.  `Alt+F4` needs no binding: it closes the window, and
-        # `closeEvent` is where the save prompts live.
-        self._add_window_action("Сохранить как…", self._save_as, "Ctrl+Shift+S")
-        self._add_window_action("Сохранить все", self._save_all)
-        self._add_window_action("Закрыть вкладку", self._close_current, "Ctrl+W")
-        self._add_window_action("Закрыть все", self._close_all_tabs)
-        self._add_window_action("Выход", self.close, "Ctrl+Q")
-        self._add_window_action("Перечитать с диска", self.reload_buffer, "Ctrl+Shift+R")
-        self._add_window_action("Следующая вкладка", self._next_tab, "Ctrl+Tab")
-        self._add_window_action("Предыдущая вкладка", self._previous_tab, "Ctrl+Shift+Tab")
-        self._add_window_action("Закомментировать", self._comment, "Ctrl+K")
-        self._add_window_action("Раскомментировать", self._uncomment, "Ctrl+U")
-        self._add_window_action("Сбросить масштаб", self._reset_zoom, "Ctrl+0")
-        self._add_window_action("Разделить редактор", self.split_editor, "Ctrl+\\")
-        self._add_window_action("Объединить редакторы", self.merge_editor, "Ctrl+Shift+\\")
+        self._build_actions()
+        self._build_toolbar()
+        self._build_menus()
 
         self._status = QLabel("запуск…")
         self.statusBar().addWidget(self._status)
 
         # The first pane, always: the window never has no place to edit in.
         self._add_pane()
+        self._sync_actions()
 
-    def _make_action(
-        self, title: str, slot, shortcuts: str | list[str] | None = None
-    ) -> QAction:
-        """One action, used by the toolbar, the window and (task_26) the menus.
+    # -- commands ----------------------------------------------------------
+    def _build_actions(self) -> None:
+        """One `QAction` per entry of `actions.ACTIONS`, kept by key.
 
-        `setShortcuts` takes a *list*: a comma inside `QKeySequence` would mean a
-        two-stroke sequence (Ctrl+K, Ctrl+C) and not an alternative.  A shortcut
-        shorter than the action it names is the defect this makes impossible to
-        repeat — **Запустить** was bound to `Ctrl+R` while the plan promised F5,
-        so the key did nothing.
-
-        `shortcuts=None` is allowed: a menu entry does not have to have a key.
+        Built once and reused by the menus, the toolbar and the editor's context
+        menu: that is what keeps a shortcut, a tooltip and an enabled state from
+        existing in three versions.  An entry whose icon file is missing becomes a
+        text-only button (`assets.icon` returns `None` and reports it once).
         """
-        if shortcuts is None:
-            keys: list[str] = []
-        elif isinstance(shortcuts, str):
-            keys = [shortcuts]
-        else:
-            keys = list(shortcuts)
-        action = QAction(title, self)
-        if keys:
-            action.setShortcuts([QKeySequence(key) for key in keys])
-            action.setToolTip(f"{title} ({keys[0]})")
-        else:
-            action.setToolTip(title)
-        action.triggered.connect(slot)
-        return action
+        self._actions: dict[str, QAction] = {}
+        for spec in actions.ACTIONS:
+            action = QAction(spec.title, self)
+            if spec.icon:
+                found = assets.icon(spec.icon)
+                if found is not None:
+                    action.setIcon(found)
+            if spec.shortcuts:
+                action.setShortcuts([QKeySequence(key) for key in spec.shortcuts])
+            action.setCheckable(spec.checkable)
+            action.setEnabled(spec.implemented)
+            hint = spec.tooltip()
+            action.setToolTip(hint)
+            action.setStatusTip(hint)
+            if spec.implemented:
+                slot = self._slot_for(spec.key)
+                if spec.checkable:
+                    action.toggled.connect(slot)
+                else:
+                    action.triggered.connect(slot)
+            self._actions[spec.key] = action
 
-    def _add_action(self, toolbar: QToolBar, title: str, slot, shortcuts: str | list[str]) -> None:
-        toolbar.addAction(self._make_action(title, slot, shortcuts))
+    def _slot_for(self, key: str):
+        """The method an action runs — one place, so nothing is wired twice."""
+        return {
+            "new": lambda: self.new_buffer(),
+            "open": self._open_file,
+            "save": lambda: self.save_buffer(),
+            "save_as": self._save_as,
+            "save_all": self._save_all,
+            "reload": self.reload_buffer,
+            "close": self._close_current,
+            "close_all": self._close_all_tabs,
+            "exit": self.close,
+            "undo": self._undo,
+            "redo": self._redo,
+            "cut": self._cut,
+            "copy": self._copy,
+            "paste": self._paste,
+            "delete": self._delete,
+            "select_all": self._select_all,
+            "comment": self._comment,
+            "uncomment": self._uncomment,
+            "clear_output": self.clear_output,
+            "toolbar": self._toggle_toolbar,
+            "split": self.split_editor,
+            "merge": self.merge_editor,
+            "next_tab": self._next_tab,
+            "previous_tab": self._previous_tab,
+            "line_numbers": self._toggle_line_numbers,
+            "zoom_in": self._zoom_in,
+            "zoom_out": self._zoom_out,
+            "zoom_reset": self._reset_zoom,
+            "theme": self._toggle_theme,
+            "full_screen": self._toggle_full_screen,
+            "run": self.run_program,
+            "stop": self.stop_program,
+            "save_before_run": self._toggle_save_before_run,
+            "help_doc": lambda: self._open_document("help"),
+            "help_gui": lambda: self._open_document("gui"),
+            "about": self._about,
+        }[key]
 
-    def _add_window_action(
-        self, title: str, slot, shortcuts: str | list[str] | None = None
-    ) -> None:
-        """Registers a command on the window, with or without a key."""
-        self.addAction(self._make_action(title, slot, shortcuts))
+    def _build_toolbar(self) -> None:
+        """The toolbar, from `actions.TOOLBAR`.
+
+        The icons are 64 px files drawn at 24: the size is set explicitly so the
+        layout does not depend on the style or the display's scaling.
+        """
+        self._toolbar = QToolBar("Управление", self)
+        self._toolbar.setIconSize(QSize(24, 24))
+        for key in actions.TOOLBAR:
+            if key == actions.SEPARATOR:
+                self._toolbar.addSeparator()
+            elif key == actions.FONT_SIZE:
+                self._toolbar.addWidget(self._build_font_size_box())
+            else:
+                self._toolbar.addAction(self._actions[key])
+        self._toolbar.setVisible(self._settings.toolbar_visible)
+        self.addToolBar(self._toolbar)
+
+    def _build_font_size_box(self) -> QWidget:
+        """The font-size control: the same preference `Ctrl`+wheel writes.
+
+        Editable on purpose.  The wheel produces sizes that are not in any list
+        (23 pt, say), and a control that shows `20` while the text is 23 pt is a
+        small lie; typing a size is a bonus.  The validator keeps it inside the
+        range the editor itself enforces.
+        """
+        self._font_size_box = QComboBox()
+        for size in (8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 32):
+            self._font_size_box.addItem(f"{size}", float(size))
+        self._font_size_box.setEditable(True)
+        self._font_size_box.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        self._font_size_box.lineEdit().setValidator(QIntValidator(6, 72, self))
+        self._font_size_box.setToolTip("Размер шрифта всех панелей, 6…72 pt")
+        self._font_size_box.currentIndexChanged.connect(self._on_font_size_chosen)
+        self._font_size_box.lineEdit().editingFinished.connect(self._on_font_size_typed)
+        self._show_font_size(self._settings.font_size)
+        return self._font_size_box
+
+    def _show_font_size(self, size: float) -> None:
+        """Shows the size in the box without answering for it.
+
+        The box is a *view* of the preference, so its signals are blocked while it
+        is set: answering would write the setting back on every repaint.
+        """
+        if not hasattr(self, "_font_size_box"):
+            return
+        box = self._font_size_box
+        box.blockSignals(True)
+        box.lineEdit().blockSignals(True)
+        index = box.findData(float(size))
+        if index < 0:
+            box.setEditText(f"{size:.0f}")
+        else:
+            box.setCurrentIndex(index)
+        box.lineEdit().blockSignals(False)
+        box.blockSignals(False)
+
+    def _on_font_size_chosen(self, index: int) -> None:
+        size = self._font_size_box.itemData(index)
+        if size:
+            self._on_zoom_changed(float(size))
+
+    def _on_font_size_typed(self) -> None:
+        """A size typed into the box; the validator keeps it 6…72."""
+        text = self._font_size_box.currentText().strip()
+        try:
+            size = float(text)
+        except ValueError:
+            return  # the validator should not have let this through
+        if abs(size - self._settings.font_size) > 0.01:
+            self._on_zoom_changed(size)
+
+    def _build_menus(self) -> None:
+        """The menu bar, from `actions.MENUS`."""
+        bar = self.menuBar()
+        for title, entries in actions.MENUS:
+            menu = bar.addMenu(title)
+            for key in entries:
+                if key == actions.SEPARATOR:
+                    menu.addSeparator()
+                elif key == actions.RECENT:
+                    found = assets.icon(actions.RECENT_ICON)
+                    self._recent_menu = (
+                        menu.addMenu(found, "Последние файлы")
+                        if found is not None
+                        else menu.addMenu("Последние файлы")
+                    )
+                    self._recent_menu.aboutToShow.connect(self._fill_recent_menu)
+                else:
+                    menu.addAction(self._actions[key])
+
+    def _apply_context_actions(self) -> None:
+        """Gives every view the shared editing actions as its context menu."""
+        for pane in self._panes:
+            for buffer in pane.buffers():
+                view = pane.view_for(buffer)
+                if view is None or view.property("prologdContext"):
+                    continue
+                view.setContextMenuPolicy(Qt.ContextMenuPolicy.ActionsContextMenu)
+                for key in actions.CONTEXT:
+                    if key == actions.SEPARATOR:
+                        separator = QAction(self)
+                        separator.setSeparator(True)
+                        view.addAction(separator)
+                    else:
+                        view.addAction(self._actions[key])
+                view.setProperty("prologdContext", True)
+
+    def _sync_actions(self) -> None:
+        """Makes the checkable entries agree with the settings and the panes."""
+        # `isHidden`, not `isVisible`: a toolbar of a window that was never shown
+        # is not visible either, and reading that as "the user hid it" would write
+        # the wrong preference on the first start.
+        self._actions["toolbar"].setChecked(not self._toolbar.isHidden())
+        self._actions["line_numbers"].setChecked(self._settings.line_numbers)
+        self._actions["theme"].setChecked(self._settings.theme == appearance.SYSTEM)
+        self._actions["save_before_run"].setChecked(self._settings.save_before_run)
+        self._actions["full_screen"].setChecked(self.isFullScreen())
+        self._actions["split"].setEnabled(len(self._panes) < 2)
+        self._actions["merge"].setEnabled(len(self._panes) > 1)
+        self._show_font_size(self._settings.font_size)
+
+    # -- editing commands of the current view ------------------------------
+    def _undo(self) -> None:
+        self.editor().undo()
+
+    def _redo(self) -> None:
+        self.editor().redo()
+
+    def _cut(self) -> None:
+        self.editor().cut()
+
+    def _copy(self) -> None:
+        self.editor().copy()
+
+    def _paste(self) -> None:
+        self.editor().paste()
+
+    def _delete(self) -> None:
+        self.editor().textCursor().removeSelectedText()
+
+    def _select_all(self) -> None:
+        self.editor().selectAll()
+
+    def _zoom_in(self) -> None:
+        self.editor().zoom_by(1)
+
+    def _zoom_out(self) -> None:
+        self.editor().zoom_by(-1)
+
+    # -- view switches -----------------------------------------------------
+    def _toggle_toolbar(self, checked: bool) -> None:
+        self._toolbar.setVisible(checked)
+        self._settings.toolbar_visible = checked
+
+    def _toggle_line_numbers(self, checked: bool) -> None:
+        self._settings.line_numbers = checked
+        for buffer in self._buffers:
+            buffer.set_line_numbers(checked)
+
+    def _toggle_save_before_run(self, checked: bool) -> None:
+        self._settings.save_before_run = checked
+
+    def _toggle_full_screen(self, checked: bool) -> None:
+        if checked:
+            self.showFullScreen()
+        else:
+            self.showNormal()
+
+    def _toggle_theme(self, checked: bool) -> None:
+        """`system` when checked, the forced light palette otherwise.
+
+        The syntax colours are chosen for a light background, so the light palette
+        is the one that always reads well; `system` is there for a desktop that
+        wants it (task_29 gives it a dark palette of its own).
+        """
+        name = appearance.SYSTEM if checked else appearance.LIGHT
+        self._settings.theme = name
+        appearance.apply_theme(QApplication.instance(), name)
+        self._status.setText(f"оформление: {name}")
+
+    def _about(self) -> None:
+        QMessageBox.about(
+            self,
+            "О программе",
+            "PrologD 2.0 — графическая оболочка (PySide6).\n\n"
+            f"Интерпретатор: {self._version or 'ещё не ответил'}\n"
+            f"Панелей редактора: {len(self._panes)}\n"
+            f"Настройки: {self._settings.path}",
+        )
+
+    def _open_document(self, name: str) -> None:
+        """Opens a built PDF, or says where it should be.
+
+        The PDFs are written into `doc/` by the `docs` target and are not in
+        version control, so a fresh checkout has none — the message names both the
+        file and the command that builds it.
+        """
+        pdf = pathlib.Path(__file__).resolve().parents[3] / "doc" / f"{name}.pdf"
+        if pdf.is_file():
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(pdf)))
+            return
+        QMessageBox.information(
+            self,
+            "PrologD",
+            f"Файл {pdf} не найден.\n\n"
+            "Документация собирается командой:\n"
+            "cmake --build build --target docs",
+        )
+
+    # -- the recent-files submenu ------------------------------------------
+    def _fill_recent_menu(self) -> None:
+        """Rebuilds the submenu; files that no longer exist are dropped."""
+        menu = self._recent_menu
+        menu.clear()
+        paths = self._recent.prune()
+        self._settings.recent_files = paths
+        if not paths:
+            empty = menu.addAction("(пока пусто)")
+            empty.setEnabled(False)
+            return
+        for path in paths:
+            entry = menu.addAction(pathlib.Path(path).name)
+            entry.setToolTip(path)
+            entry.triggered.connect(lambda _checked=False, path=path: self.open_path(path))
+        menu.addSeparator()
+        menu.addAction("Очистить список", self._clear_recent)
+
+    def _clear_recent(self) -> None:
+        self._recent.clear()
+        self._settings.recent_files = []
+        self._fill_recent_menu()
 
     # -- panes -------------------------------------------------------------
     def _add_pane(self) -> Pane:
@@ -246,6 +493,7 @@ class MainWindow(QMainWindow):
         self._panes.append(pane)
         self._editor_splitter.addWidget(pane)
         pane.set_buffers(self._buffers)
+        self._apply_context_actions()
         return pane
 
     def split_editor(self, remember: bool = True, sizes: list[int] | None = None) -> bool:
@@ -348,6 +596,13 @@ class MainWindow(QMainWindow):
         if buffer is None:
             return
         path = buffer.model.path
+        if self._settings.save_before_run and buffer.is_modified():
+            # The switch of the «Выполнение» menu: a run is then always of what is
+            # on disk, which is what makes `ИМПОРТ` and the diagnostics agree
+            # with the editor about the file's own path.
+            if not self.save_buffer(buffer):
+                self._status.setText("запуск отменён: сохранить не удалось")
+                return
         self._output.clear()
         # Every run starts with the prepared answers from the field: that is what
         # makes a program that reads several values runnable without a dialog per
@@ -644,6 +899,7 @@ class MainWindow(QMainWindow):
         for pane in self._panes:
             pane.set_buffers(self._buffers)
         self.active_pane().set_current(buffer)
+        self._apply_context_actions()
         self._refresh_titles()
         return buffer
 
@@ -714,6 +970,10 @@ class MainWindow(QMainWindow):
         try:
             if self.close_all():
                 self._save_split_state()
+                # The interpreter is this window's child: an unasked-for close
+                # must not leave it running behind the user (and a headless test
+                # suite otherwise collects one live process per test).
+                self.stop_program()
                 event.accept()
             else:
                 event.ignore()
@@ -843,6 +1103,7 @@ class MainWindow(QMainWindow):
         # The reserved names reach every open buffer, including the ones opened
         # before the interpreter announced itself; those created later are served
         # by `_add_buffer`.
+        self._version = version
         for buffer in self._buffers:
             buffer.set_keywords(self._session.keywords)
         self._status.setText(f"PrologD {version} готов")
@@ -861,6 +1122,7 @@ class MainWindow(QMainWindow):
         self._output.set_font_size(size)
         self._input_pane.set_font_size(size)
         self._query_line.setFont(self._output.font())
+        self._show_font_size(size)
         self._status.setText(f"шрифт {size:.0f} pt")
 
     def _on_result(self, found: bool) -> None:

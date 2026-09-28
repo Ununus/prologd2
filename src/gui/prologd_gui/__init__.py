@@ -7,7 +7,9 @@ side of it.
 """
 
 __all__ = [
+    "actions",
     "appearance",
+    "assets",
     "buffers",
     "completion",
     "documents",

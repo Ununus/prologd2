@@ -31,6 +31,8 @@ LAST_DIRECTORY = "files/last_directory"
 SPLIT_EDITOR = "view/split"
 SPLIT_SIZES = "view/split_sizes"
 RESTORE_SPLIT = "view/restore_split"
+TOOLBAR = "view/toolbar"
+SAVE_BEFORE_RUN = "execution/save_before_run"
 
 DEFAULT_FONT_FAMILY = "Cascadia Mono"
 DEFAULT_FONT_SIZE = 11.0
@@ -249,3 +251,21 @@ class Settings:
     @restore_split.setter
     def restore_split(self, value: bool) -> None:
         self._write(RESTORE_SPLIT, bool(value))
+
+    @property
+    def toolbar_visible(self) -> bool:
+        return self._flag(TOOLBAR, True)
+
+    @toolbar_visible.setter
+    def toolbar_visible(self, value: bool) -> None:
+        self._write(TOOLBAR, bool(value))
+
+    # -- execution ----------------------------------------------------------
+    @property
+    def save_before_run(self) -> bool:
+        """Write the current file before running it (the «Выполнение» switch)."""
+        return self._flag(SAVE_BEFORE_RUN, False)
+
+    @save_before_run.setter
+    def save_before_run(self, value: bool) -> None:
+        self._write(SAVE_BEFORE_RUN, bool(value))

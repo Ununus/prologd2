@@ -49,6 +49,12 @@ session.
 * Examples ported to the new syntax (`examples/lessons/lesson_*.pld`,
   `examples/*.pld`) with golden tests; `examples/import_demo.pld` demonstrates
   `ИМПОРТ` and `-I`.
+* PySide6 front-end (`src/gui`): the `prologd` interpreter in its own process over
+  the line-delimited JSON protocol (version 2 carries the reserved names), a code
+  editor with highlighting, completion, line numbers, zoom and settings, tabs and
+  files with save prompts and encodings, an input field with a queue of prepared
+  answers, a split editor over one shared document set, and — with task_26 — one
+  action table feeding the menu bar, the toolbar and the context menu.
 * CMake presets and a GitHub Actions workflow (Linux GCC/Clang, Windows MSVC).
 * Windows verification: the library, CLI and test binary cross-compile to valid
   PE32+ executables for `x86_64-windows-gnu` (Zig toolchain); the MSVC build and
@@ -84,7 +90,7 @@ session.
 | task_23_gui_keyword_source | done | `--list-keywords` + `keywords` in `ready` (protocol 2); one source for the built-in list |
 | task_24_gui_completion | done | popup over the reserved names *and* the document's own names, with arities; no completion in a comment, string or `#…#`; `Ctrl+Space` |
 | task_25_gui_files_tabs | done | tabs, files, save prompts, encodings, input queue, drop anywhere and the split editor (two panes, one text per document) |
-| task_26_gui_toolbar | not started | menus, toolbar, icon audit (27 icons present, 18 to draw) |
+| task_26_gui_toolbar | done | one action table (48 commands, 12 disabled with a reason) feeding the menu bar, the toolbar and the context menu; icon audit in `src/gui/README.md` (41 names referenced, 25 drawn) |
 | task_27_gui_panels | not started | output and input panes, output bottom/right |
 | task_28_gui_run_step | not started | run, step (new engine seam + protocol v2), stop, error line |
 | task_29_gui_settings | not started | settings dialog and persistence |
@@ -117,10 +123,14 @@ by real key events),
 `test_documents.py` (line endings, byte-order marks, cp1251 round trips, the
 untitled counter, the recent list),
 `test_settings.py` (defaults, persistence, clamping, keys a later version adds),
+`test_icons.py` (the icon audit: every referenced name has a file or is in the
+documented `MISSING` set, a missing name has no file, `--icons DIR` works),
 `test_session.py`
 (request queueing and the clean-slate restart) and `test_window.py` (opening a
 file does not run it; the documented keys are bound; zoom reaches the settings
-file), all invoked as plain scripts.
+file; menus, toolbar and context menu come from the action table; the recent
+menu; the font-size control; save-before-run; the split panes), all invoked as
+plain scripts.
 
 ## Known gaps / next steps
 
@@ -142,6 +152,10 @@ file), all invoked as plain scripts.
    task_23 the keyword source.  The rest is task_24–task_31, see the board above.
    The settings file is written to `%LOCALAPPDATA%\PrologD\gui\gui.ini`; the
    dialog that edits it is task_29, and `--settings FILE` overrides the path.
+   Open for the next session: search and replace has **no task file** although
+   the feature list asks for it (the menu entries are there, disabled), the
+   output panel still has one position and one font size (task_27), and
+   `setWindowIcon` is never called, so the window uses the default Qt icon.
 
 ## Open questions for the user
 
@@ -314,3 +328,30 @@ Resolved on 2026-09-29 (GUI planning):
   works the same and there is far less state to keep consistent.  `ВЫВОД` prints
   without a newline and `ПС` breaks the line — the window's own notes now start on a
   fresh line when the program left the cursor mid-line.
+* GUI implementation session, part 12: **task_26** — one action table for the
+  whole window, plus the menu bar, the toolbar and the icon audit.  `actions.py`
+  describes 48 commands (title, icon, keys, checkable, implemented, and what a
+  disabled entry waits for), and `MENUS`/`TOOLBAR`/`CONTEXT` are three views of
+  it; `window.py` makes one `QAction` per entry and builds all three surfaces from
+  that, so a shortcut or an enabled/disabled state cannot exist twice.  Twelve
+  entries are visible but disabled and say why (formatter task_30, settings
+  task_29, search/replace — *no task file exists*, output panel, split orientation
+  and graphics window task_27, tracing and step task_28).  The toolbar keeps the
+  reference grouping and an explicit 24 px icon size; the font size became an
+  editable combo with a validator, because a size chosen by `Ctrl`+wheel (17 pt,
+  23 pt) need not be in its list; the «Последние» submenu refills on open and
+  prunes files that are gone.  The audit is in `src/gui/README.md`: 41 referenced
+  icon names, 25 files present, 16 still to draw, and three files nothing refers
+  to (`prologd2.png` is meant to be the window icon — `setWindowIcon` is still not
+  called).  `test_icons.py` fails on a misspelled name and on a file that is still
+  listed as missing.  Two things came out of the same pass: `closeEvent` now stops
+  the interpreter (a close used to leave a live `prologd` behind, so the headless
+  suite collected one process per test), and a *test* bug that looked exactly like
+  a Qt stall: the status says `решение найдено` for an answer and `решения нет`
+  for a failing one, so a helper waiting for the whole word `решение` never
+  matched a failed query — the finished run looked like a hang for the whole
+  timeout, and the file assertions after it were right all along.  The lesson
+  (match a word *stem*; check the comparison before suspecting the event loop) is
+  in the repo memory.  `doc/gui.typ` gained section 9 (menus, toolbar, icons) and
+  a rewritten "not done yet" list; the Typst trap of the day: bold is one star —
+  `**bold**` is not Markdown, it warns and bolds nothing.

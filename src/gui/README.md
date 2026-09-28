@@ -29,7 +29,8 @@ python -m venv .venv
 
 `--exe` overrides the interpreter path (by default the newest build under
 `build/` is used), `--include` adds an `ИМПОРТ` search directory and may be
-repeated.
+repeated, and `--icons DIR` points the icon loader at another directory (the
+default is `src/gui/assets`).
 
 Activating the environment is optional: calling `.venv\Scripts\python.exe`
 directly needs no `Set-ExecutionPolicy` and makes it obvious which interpreter is
@@ -70,10 +71,73 @@ version does not know are left alone (task_29 adds the dialog).
 | `Tab` / `Shift+Tab` | indent / outdent the selected lines |
 | `Enter` | continues the indent after `,`, `:-` or `<-` |
 
-Neither list is final: the menu bar and the toolbar icons are task_26, the rest
-of the combinations task_31.  Zoom deliberately has no key pair of its own —
+Neither list is final: the rest of the combinations is task_31.  Zoom
+deliberately has no key pair of its own —
 `Ctrl+=`, `Ctrl++` and `Ctrl+-` will insert a `РАВНО(…)`, `СЛОЖЕНИЕ(…)` or
 `ВЫЧИТАНИЕ(…)` skeleton there.
+
+## Menus, toolbar and icons
+
+One table describes every command (`prologd_gui/actions.py`), and the menu bar,
+the toolbar and the editor's context menu are all built from it — so a shortcut,
+a tooltip or an enabled/disabled state cannot exist in two versions and drift
+apart.  The window makes one `QAction` per entry and finds it by key.
+
+The menus are **Файл** (Новый, Открыть…, Последние, Сохранить, Сохранить как…,
+Сохранить все, Перечитать с диска, Закрыть вкладку, Закрыть все, Выход),
+**Правка** (Отменить … Удалить, Выделить всё, Закомментировать,
+Раскомментировать, Форматировать, Настройки…), **Поиск** (Поиск и замена…,
+Далее, Назад, Найти выделенное, Найти выделенное назад), **Вид** (Панель
+инструментов, Панель вывода, Разделить редактор, Объединить редакторы, Сменить
+ориентацию сплита, Номера строк, Увеличить/Уменьшить/Обычный размер шрифта,
+Системная тема, Полный экран), **Выполнение** (Запустить, Запустить с
+трассировкой, Шаг, Остановить, Сохранять перед запуском, Графическое окно) and
+**Справка** (Руководство пользователя, Справка по окну, О программе).
+
+An entry that does not exist yet stays in its menu but is **disabled**, and its
+tooltip names what it waits for: «Форматировать» — task_30, «Настройки…» —
+task_29, «Поиск и замена…» and the four search commands — no task file yet,
+«Панель вывода», «Сменить ориентацию сплита», «Графическое окно» — task_27,
+«Запустить с трассировкой» and «Шаг» — task_28.  A menu that silently lacks half
+of the feature list is worse than one that says so.  The toolbar is grouped as
+the reference front-end had it: file | run/stop/step | editing (comment,
+uncomment, format, clear output) | font size | tools (graphics, settings, help);
+`QToolBar.setIconSize(QSize(24, 24))` is set explicitly so the layout does not
+depend on the style.
+
+### Icon audit
+
+`test_icons.py` is the guard: it fails as soon as a name is misspelled, and it
+also checks that an icon which *does* have a file is not still listed as missing.
+The code references **41** names, **25** of which have a file in
+`src/gui/assets` (64×64 PNG, transparent background).  A missing file is not an
+error: the action is built without a picture, and the name is reported once on
+stderr (`icons: no view-zoom-in.png — the action will have no picture`).
+
+Present (25): `edit-comment`, `edit-copy`, `edit-cut`, `edit-format`,
+`edit-paste`, `edit-redo`, `edit-uncomment`, `edit-undo`, `execution-abort`,
+`execution-execute`, `execution-tracing`, `file-close`, `file-close-all`,
+`file-exit`, `file-new`, `file-open`, `file-save`, `help`, `search-find-next`,
+`search-find-prev`, `search-find-selected-next`, `search-find-selected-prev`,
+`tools-settings`, `view-full-screen`, `view-graphics`.
+
+Still to draw (16 names, listed in `assets.MISSING`) — needed for:
+
+| Name | Needed for |
+|------|------------|
+| `file-save-as`, `file-save-all`, `file-reload` | Сохранить как…, Сохранить все, Перечитать с диска |
+| `file-recent` | the «Последние» submenu (named in `actions.RECENT_ICON`) |
+| `edit-clear`, `edit-find-replace` | Очистить вывод; Поиск и замена… |
+| `view-toolbar`, `view-split-editor`, `view-output-right`, `view-line-numbers` | the view switches |
+| `view-zoom-in`, `view-zoom-out`, `view-zoom-reset`, `view-theme` | zoom (now a combo box with `Ctrl+0`) and the theme switch |
+| `execution-step-into`, `help-about` | Шаг (task_28), О программе |
+
+`MISSING` also names three icons nothing refers to yet — `execution-restart`,
+`execution-step-over`, `view-output-bottom` — which is allowed: they are the
+pictures for features that are not wired (task_27, task_28).  The directory holds
+three files the code never asks for: `file.png`, `search-find.png` (would fit
+Поиск и замена…) and `prologd2.png`, which is meant to be the window icon —
+`setWindowIcon` is not called anywhere yet.
 
 ## Tabs and files
 
@@ -90,10 +154,14 @@ in are the ones it is written back with, a byte-order mark is dropped, and text
 that is not valid UTF-8 asks which encoding to use instead of being decoded by
 guesswork.  Dropping a `.pld` file on the window opens it in a new tab — it is not
 run.  The last directory and the ten most recent files are remembered in the
-settings file; the menu that shows them is task_26.
+settings file and shown in the «Последние» submenu of **Файл**, which prunes the
+entries whose file is gone and can be emptied in one click.
 
-The window is halfway through task_25: the *split editor* (`Ctrl+\`, two panes
-side by side sharing one text per buffer) is the remaining half.
+`Ctrl+\` splits the editor into two panes side by side — each with its own tab
+bar, both over the *same* document set, so an edit in either pane is the same
+edit and re-ordering tabs in one re-orders them in the other.  The split, its
+sizes and whether to restore it at all are settings (`view/split`,
+`view/split_sizes`, `view/restore_split`).
 
 Headless check of the protocol, without PySide6 installed:
 

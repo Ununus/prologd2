@@ -8,7 +8,7 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
-from prologd_gui import appearance  # noqa: E402
+from prologd_gui import appearance, assets  # noqa: E402
 from prologd_gui.settings import Settings  # noqa: E402
 from prologd_gui.window import MainWindow  # noqa: E402
 
@@ -47,7 +47,13 @@ def main(argv: list[str] | None = None) -> int:
         # `%%` because argparse formats the help string: a lone `%` is an error.
         help="settings file (default: %%LOCALAPPDATA%%\\PrologD\\gui\\gui.ini)",
     )
+    parser.add_argument(
+        "--icons",
+        default=None,
+        help="directory with the toolbar icons (default: src/gui/assets)",
+    )
     arguments = parser.parse_args(argv)
+    assets.set_directory(arguments.icons)
 
     if not pathlib.Path(arguments.exe).exists():
         print(f"prologd not found: {arguments.exe}", file=sys.stderr)
