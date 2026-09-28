@@ -42,7 +42,7 @@ jobs:
           path: src/3rdparty
           key: 3rdparty-${{ runner.os }}-${{ hashFiles('CMakeLists.txt') }}
       - name: Configure
-        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+        run: cmake -S . -B build -G "Visual Studio 18 2026" -A x64
       - name: Build
         run: cmake --build build --config Release
       - name: Test

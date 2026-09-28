@@ -22,4 +22,23 @@ inline std::filesystem::path fromUtf8Path(std::string_view text) {
 #endif
 }
 
+/// Render a filesystem path as a UTF-8 string.
+///
+/// The mirror of `fromUtf8Path`.  `path::string()` uses the native narrow
+/// encoding, which on Windows is the ANSI code page: it mangles the text, or
+/// throws `No mapping for the Unicode character exists...`, as soon as the
+/// path holds a character the code page cannot represent (Cyrillic on a 1252
+/// machine, for example).  Use this helper for every path that becomes text
+/// again: error messages, log lines and identity keys.
+inline std::string toUtf8Path(const std::filesystem::path& path) {
+  const std::u8string bytes = path.u8string();
+  return std::string(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+}
+
+/// Same as `toUtf8Path`, but with '/' as the directory separator.
+inline std::string toUtf8PathGeneric(const std::filesystem::path& path) {
+  const std::u8string bytes = path.generic_u8string();
+  return std::string(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+}
+
 }  // namespace prologd

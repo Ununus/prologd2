@@ -47,6 +47,18 @@ else()
 endif()
 
 # ---------------------------------------------------------------------------
+# UTF-8 process encoding (Windows)
+# ---------------------------------------------------------------------------
+# The interpreter is UTF-8 end to end, so the process itself must not fall back
+# to the ANSI code page.  See src/utf8.manifest for the reasoning.
+add_library(prologd_utf8 INTERFACE)
+if(MSVC)
+  target_link_options(prologd_utf8 INTERFACE
+    "/MANIFEST:EMBED"
+    "/MANIFESTINPUT:${CMAKE_SOURCE_DIR}/src/utf8.manifest")
+endif()
+
+# ---------------------------------------------------------------------------
 # Third-party dependencies
 # ---------------------------------------------------------------------------
 if(PROLOGD_FETCH_DEPS)

@@ -18,7 +18,8 @@ add_executable(prlib_tests
 target_link_libraries(prlib_tests PRIVATE
   prlib
   Catch2::Catch2WithMain
-  prologd_warnings)
+  prologd_warnings
+  prologd_utf8)
 
 target_compile_definitions(prlib_tests PRIVATE
   PROLOGD_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/examples")

@@ -29,12 +29,12 @@ The console interpreter is `build/src/cli/prologd`.
 
 ### Windows
 
-Prerequisites: Git, CMake 3.24 or newer, and Visual Studio 2022 with the
+Prerequisites: Git, CMake 3.24 or newer, and Visual Studio 2026 with the
 "Desktop development with C++" workload. The first configure downloads Catch2
 and CLI11 through CMake FetchContent, so it needs network access.
 
 ```powershell
-cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+cmake -S . -B build -G "Visual Studio 18 2026" -A x64
 cmake --build build --config Release
 ctest --test-dir build -C Release --output-on-failure
 ```

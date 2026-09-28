@@ -18,7 +18,7 @@ std::optional<std::string> ModuleLoader::readFileText(const std::filesystem::pat
   std::ifstream stream(path, std::ios::binary);
   if (!stream) {
     if (error != nullptr) {
-      *error = "Не могу открыть файл: " + path.string();
+      *error = "Не могу открыть файл: " + toUtf8Path(path);
     }
     return std::nullopt;
   }
@@ -39,8 +39,8 @@ bool ModuleLoader::withinRoot(const std::filesystem::path& candidate) const {
   if (code) {
     return false;
   }
-  const auto root_text = canonical_root.generic_string();
-  const auto candidate_text = canonical_candidate.generic_string();
+  const auto root_text = toUtf8PathGeneric(canonical_root);
+  const auto candidate_text = toUtf8PathGeneric(canonical_candidate);
   return candidate_text == root_text ||
          candidate_text.rfind(root_text + "/", 0) == 0;
 }
@@ -98,7 +98,7 @@ void ModuleLoader::extractInputLines(std::string& text) const {
 bool ModuleLoader::loadFile(const std::filesystem::path& path, std::string* error) {
   std::error_code code;
   const auto canonical = std::filesystem::weakly_canonical(path, code);
-  const std::string key = (code ? path : canonical).generic_string();
+  const std::string key = toUtf8PathGeneric(code ? path : canonical);
   if (loaded_.count(key) != 0) {
     return true;  // import-once
   }
@@ -116,7 +116,7 @@ bool ModuleLoader::loadFile(const std::filesystem::path& path, std::string* erro
   }
   if (!withinRoot(path)) {
     if (error != nullptr) {
-      *error = "Импорт выходит за пределы корневого каталога: " + path.string();
+      *error = "Импорт выходит за пределы корневого каталога: " + toUtf8Path(path);
     }
     return false;
   }

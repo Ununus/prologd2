@@ -1,6 +1,6 @@
 add_executable(prologd main.cpp)
 
-target_link_libraries(prologd PRIVATE prlib CLI11::CLI11 prologd_warnings)
+target_link_libraries(prologd PRIVATE prlib CLI11::CLI11 prologd_warnings prologd_utf8)
 
 if(MSVC)
   target_compile_options(prologd PRIVATE /utf-8)

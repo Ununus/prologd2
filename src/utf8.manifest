@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <!--
+    prologd is UTF-8 end to end: source files, identifiers and paths all carry
+    Cyrillic.  Windows converts the command line, and every other narrow
+    (char based) API, through the process active code page.  On a machine whose
+    ANSI code page cannot represent Cyrillic that turns "файл.pld" into
+    "????.pld" before main() ever sees it, and `path::string()` throws
+    "No mapping for the Unicode character exists...".
+
+    Declaring UTF-8 as the active code page keeps the narrow encoding equal to
+    the encoding the interpreter uses everywhere.  Supported since Windows 10
+    version 1903; ignored on older systems, where fromUtf8Path/toUtf8Path in
+    prlib still handle the conversion explicitly.
+  -->
+  <application>
+    <windowsSettings>
+      <activeCodePage xmlns="http://schemas.microsoft.com/SMI/2019/WindowsSettings">UTF-8</activeCodePage>
+    </windowsSettings>
+  </application>
+</assembly>

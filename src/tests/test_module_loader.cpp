@@ -7,6 +7,7 @@
 
 #include "prlib/engine.hpp"
 #include "prlib/module_loader.hpp"
+#include "prlib/utf8_path.hpp"
 
 using namespace prologd;
 namespace fs = std::filesystem;
@@ -28,7 +29,7 @@ class TempDir {
   [[nodiscard]] const fs::path& path() const { return path_; }
 
   fs::path write(const std::string& name, const std::string& contents) const {
-    const fs::path file = path_ / name;
+    const fs::path file = path_ / fromUtf8Path(name);
     std::ofstream stream(file, std::ios::binary);
     stream << contents;
     return file;
