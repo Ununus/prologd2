@@ -12,7 +12,7 @@ from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QTextDocument
 from PySide6.QtWidgets import QPlainTextDocumentLayout
 
-from . import documents
+from . import actions, documents
 from .editor import CodeEditor
 from .highlighter import PrologHighlighter
 from .settings import Settings
@@ -97,8 +97,16 @@ class Buffer(QObject):
         return self.document.isModified()
 
     def mark_saved(self) -> None:
+        """Claims the text as saved — and says so, even when the flag was already
+        clear.
+
+        A caller that fills a widget and then marks the result saved would otherwise
+        keep the wrong tab picture: the picture is fetched when `changed` arrives,
+        and `setModified(False)` on an unmodified document emits nothing.
+        """
         self.document.setModified(False)
         self.model.modified = False
+        self.changed.emit()
 
     def sync_modified(self) -> None:
         self.model.modified = self.document.isModified()
@@ -120,6 +128,18 @@ class Buffer(QObject):
 
     def title(self) -> str:
         return self.model.title()
+
+    def icon_name(self) -> str:
+        """Which picture the tab shows.
+
+        A modified buffer is marked whichever way it is saved, and a buffer that
+        has a file looks different from one that was never saved: those are the two
+        things a tab bar has to say about the work in it.  The names come from
+        `actions`, where the icon audit finds them.
+        """
+        if self.is_modified():
+            return actions.MODIFIED_ICON
+        return actions.SAVED_ICON if self.model.path else actions.FILE_ICON
 
     def _on_modification_changed(self, _modified: bool) -> None:
         self.sync_modified()

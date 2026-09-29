@@ -121,20 +121,21 @@ split could not be undone without a restart.
 
 `test_icons.py` is the guard: it fails as soon as a name is misspelled, and it
 also checks that an icon which *does* have a file is not still listed as missing.
-The code references **41** names, **27** of which have a file in
+The code references **46** names, **31** of which have a file in
 `src/gui/assets` (64×64 PNG, transparent background).  A missing file is not an
 error: the action is built without a picture, and the name is reported once on
 stderr (`icons: no view-zoom-in.png — the action will have no picture`).
 
-Present (27): `edit-comment`, `edit-copy`, `edit-cut`, `edit-format`,
+Present (31): `edit-comment`, `edit-copy`, `edit-cut`, `edit-format`,
 `edit-paste`, `edit-redo`, `edit-uncomment`, `edit-undo`, `execution-abort`,
-`execution-execute`, `execution-step-into`, `execution-tracing`, `file-close`,
-`file-close-all`, `file-exit`, `file-new`, `file-open`, `file-save`,
-`file-save-all`, `help`, `search-find-next`, `search-find-prev`,
-`search-find-selected-next`, `search-find-selected-prev`, `tools-settings`,
-`view-full-screen`, `view-graphics`.
+`execution-execute`, `execution-step-into`, `execution-tracing`, `file`,
+`file-close`, `file-close-all`, `file-exit`, `file-new`, `file-open`,
+`file-save`, `file-save-all`, `file-saved`, `file-modified`, `help`,
+`prologd2`, `search-find-next`, `search-find-prev`, `search-find-selected-next`,
+`search-find-selected-prev`, `tools-settings`, `view-full-screen`,
+`view-graphics`.
 
-Still to draw (14 names, listed in `assets.MISSING`) — needed for:
+Still to draw (15 names, listed in `assets.MISSING`) — needed for:
 
 | Name | Needed for |
 |------|------------|
@@ -142,15 +143,16 @@ Still to draw (14 names, listed in `assets.MISSING`) — needed for:
 | `file-recent` | the «Последние» submenu (named in `actions.RECENT_ICON`) |
 | `edit-clear`, `edit-find-replace` | Очистить вывод; Поиск и замена… |
 | `view-toolbar`, `view-split-editor`, `view-output-right`, `view-line-numbers` | the view switches |
-| `view-zoom-in`, `view-zoom-out`, `view-zoom-reset`, `view-theme` | zoom (now a combo box with `Ctrl+0` and the keypad keys) and the theme switch |
-| `help-about` | О программе |
+| `view-zoom-in`, `view-zoom-out`, `view-zoom-reset`, `view-theme` | zoom (combo box, `Ctrl+0` and the keypad keys) and the theme switch |
+| `view-output-bottom`, `help-about` | Сменить ориентацию сплита; О программе |
 
-`MISSING` also names three icons nothing refers to yet — `execution-restart`,
-`execution-step-over`, `view-output-bottom` — which is allowed: they are the
-pictures for features that are not wired (task_27, task_28).  The directory holds
-30 files, of which three are never asked for: `file.png`, `search-find.png`
-(task_33 will want that picture) and `prologd2.png`, which is meant to be the
-window icon — `setWindowIcon` is not called anywhere yet.
+`MISSING` also names two icons nothing refers to yet — `execution-restart` and
+`execution-step-over` — which is allowed: they are the pictures for features that
+are not wired (task_27, task_28).  The directory holds 32 files, and only one is
+never asked for: `search-find.png`, which task_33 wants under its own name.  Four
+of the names are not buttons at all: `file`, `file-saved` and `file-modified` are
+the states of a tab, and `prologd2` is the window icon, shown in «О программе» and
+in the taskbar.
 
 ## The output panel
 
@@ -187,6 +189,20 @@ bar, both over the *same* document set, so an edit in either pane is the same
 edit and re-ordering tabs in one re-orders them in the other.  The split, its
 sizes and whether to restore it at all are settings (`view/split`,
 `view/split_sizes`, `view/restore_split`).
+
+A tab carries its state as a picture: `file` for a buffer that was never saved,
+`file-saved` once it has a file on disk, and `file-modified` while there are
+unsaved changes — saved or not.  The title bar carries the **whole path**, so two
+files with one name are told apart without opening anything; the tab keeps the
+short name, because a tab bar full of paths cannot be read.  The «Последние»
+submenu shows the file picture for the entries that are programs, and the window
+itself carries the application icon (`prologd2.png`), which «О программе» shows
+as well.
+
+Undo and redo follow the document of the tab that is showing — they are enabled
+exactly when there is something to undo in *that* buffer, because the documents do
+not share an undo stack.  A greyed-out «Отменить» with something to undo is a lie
+the user notices at once.
 
 Headless check of the protocol, without PySide6 installed:
 

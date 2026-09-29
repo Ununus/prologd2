@@ -15,8 +15,10 @@ commands follow `active_pane()`.
 from __future__ import annotations
 
 from PySide6.QtCore import Signal
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QTabWidget
 
+from . import assets
 from .buffers import Buffer
 from .editor import CodeEditor
 from .settings import Settings
@@ -130,9 +132,18 @@ class Pane(QTabWidget):
                 self._buffers.insert(target, self._buffers.pop(current))
 
     def refresh_titles(self) -> None:
-        """Re-reads every tab's title from its document."""
+        """Re-reads every tab's title *and picture* from its document."""
         for index, buffer in enumerate(self._buffers):
+            if index >= self.count():
+                # `set_buffers` removes and re-adds tabs one by one, and
+                # `currentChanged` fires in the middle of that: for a moment the
+                # document list is longer than the tab bar, and asking Qt for a tab
+                # that is not there raises inside the signal handler.
+                break
             self.setTabText(index, buffer.title())
+            found = assets.icon(buffer.icon_name())
+            # An empty `QIcon` clears what was there; `None` is not accepted.
+            self.setTabIcon(index, found if found is not None else QIcon())
 
     # -- events ------------------------------------------------------------
     def _on_close_requested(self, index: int) -> None:

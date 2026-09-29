@@ -134,7 +134,8 @@ def test_a_file_takes_the_place_of_the_empty_buffer(executable: str) -> None:
         assert window.open_path(str(EXAMPLE))
         assert window.tab_count() == 1, "an empty buffer is a placeholder, not a tab"
         assert window.buffers()[0].title() == EXAMPLE.name
-        assert window.windowTitle() == f"{EXAMPLE.name} — PrologD"
+        # The title bar carries the whole path; the tab keeps the short name.
+        assert window.windowTitle() == f"{EXAMPLE} — PrologD", window.windowTitle()
 
         # Opening the same file again shows its tab instead of a second copy.
         assert window.open_path(str(EXAMPLE))
@@ -183,7 +184,7 @@ def test_an_edit_marks_only_its_own_tab(executable: str, directory: pathlib.Path
         titles = [buffer.title() for buffer in window.buffers()]
         assert titles[0] == EXAMPLE.name, titles
         assert titles[1] == "*" + other.name, titles
-        assert window.windowTitle() == f"*{other.name} — PrologD"
+        assert window.windowTitle() == f"*{other} — PrologD", window.windowTitle()
         print("ok: the modified marker is on the tab that changed, not on every tab")
     finally:
         discard_changes(window)
@@ -516,6 +517,111 @@ def test_the_output_panel_moves_and_hides(executable: str) -> None:
         print("ok: the panel moves with Ctrl+F4, hides with F4, and comes back")
     finally:
         discard_changes(reopened)
+
+
+def test_the_title_and_the_tabs_show_the_file_state(
+    executable: str, directory: pathlib.Path
+) -> None:
+    """The title bar carries the *whole* path; a tab carries the state as a picture.
+
+    Four states, and the user asked for exactly these: never saved (`file`), never
+    saved with changes (`file-modified`), saved (`file-saved`) and saved with
+    changes (`file-modified`).  The tab keeps the short name, because a tab bar
+    full of paths cannot be read.
+    """
+    from prologd_gui import actions, assets
+
+    def picture(name: str):
+        found = assets.icon(name)
+        assert found is not None, f"{name}.png is not in assets"
+        return found.cacheKey()
+
+    def tab(window, index: int = 0) -> int:
+        return window.active_pane().tabIcon(index).cacheKey()
+
+    window = empty_window(executable)
+    try:
+        buffer = window.buffers()[0]
+        assert buffer.icon_name() == actions.FILE_ICON, "a buffer that was never saved"
+        assert tab(window) == picture(actions.FILE_ICON)
+        assert window.windowTitle() == f"{buffer.model.name} — PrologD", window.windowTitle()
+
+        window.editor().insertPlainText("факт(1).\n")
+        assert buffer.icon_name() == actions.MODIFIED_ICON
+        assert tab(window) == picture(actions.MODIFIED_ICON)
+
+        target = directory / "состояние.pld"
+        window.save_buffer(buffer, str(target))
+        assert buffer.icon_name() == actions.SAVED_ICON, "a saved file is not a modified one"
+        assert tab(window) == picture(actions.SAVED_ICON)
+        assert str(target) in window.windowTitle(), window.windowTitle()
+        assert window.windowTitle().startswith("*") is False, "saving clears the marker"
+
+        window.editor().insertPlainText("% ещё строка\n")
+        assert buffer.icon_name() == actions.MODIFIED_ICON
+        assert str(target) in window.windowTitle(), "the path stays in the title"
+        print("ok: the title shows the full path and every tab shows its own state")
+    finally:
+        discard_changes(window)
+
+
+def test_undo_and_redo_follow_the_tab_that_is_showing(executable: str) -> None:
+    """A greyed-out «Отменить» with something to undo is a defect of its own."""
+    window = empty_window(executable)
+    try:
+        assert window._actions["undo"].isEnabled() is False
+        assert window._actions["redo"].isEnabled() is False
+
+        window.editor().insertPlainText("факт(1).\n")
+        assert window._actions["undo"].isEnabled() is True, "typing did not arm undo"
+        assert window._actions["redo"].isEnabled() is False
+
+        window._actions["undo"].trigger()
+        assert window._actions["undo"].isEnabled() is False, "that was the only step"
+        assert window._actions["redo"].isEnabled() is True
+
+        # Another tab has a history of its own, and the state follows the one on
+        # screen — the documents do not share an undo stack.
+        window.new_buffer()
+        assert window._actions["undo"].isEnabled() is False, "an empty tab has nothing to undo"
+        assert window._actions["redo"].isEnabled() is False
+        window.editor().insertPlainText("правило(2).\n")
+        assert window._actions["undo"].isEnabled() is True, "this tab's edit was not noticed"
+
+        window.active_pane().set_current(window.buffers()[0])
+        assert window._actions["undo"].isEnabled() is False, "the first tab was already undone"
+        assert window._actions["redo"].isEnabled() is True, "the first tab can be redone"
+        print("ok: undo and redo follow the document of the tab that is showing")
+    finally:
+        discard_changes(window)
+
+
+def test_the_recent_menu_and_the_window_carry_the_pictures(
+    executable: str, directory: pathlib.Path
+) -> None:
+    """A recent program shows the file picture, and the window has its own icon."""
+    from prologd_gui import actions, assets
+
+    target = directory / "недавний.pld"
+    target.write_text("факт(1).\n", encoding="utf-8")
+    window = empty_window(executable)
+    try:
+        window.open_path(str(target))
+        window._fill_recent_menu()
+        entries = [
+            entry for entry in window._recent_menu.actions() if entry.text().endswith(".pld")
+        ]
+        assert entries, [entry.text() for entry in window._recent_menu.actions()]
+        assert entries[0].icon().isNull() is False, "the recent program has no picture"
+        found = assets.icon(actions.FILE_ICON)
+        assert found is not None and entries[0].icon().cacheKey() == found.cacheKey()
+
+        assert window.windowIcon().isNull() is False, "the window has no application icon"
+        text = window.about_text()
+        assert "PrologD" in text and str(window._settings.path) in text
+        print("ok: the recent menu and the window carry their pictures")
+    finally:
+        discard_changes(window)
 
 
 def test_the_menus_come_from_the_action_table(executable: str) -> None:
@@ -1023,6 +1129,9 @@ def main(argv: list[str]) -> int:
         test_the_toolbar_reuses_the_actions(executable)
         test_view_switches_are_stored(executable)
         test_the_recent_menu_lists_what_is_still_there(executable, files)
+        test_the_recent_menu_and_the_window_carry_the_pictures(executable, files)
+        test_the_title_and_the_tabs_show_the_file_state(executable, files)
+        test_undo_and_redo_follow_the_tab_that_is_showing(executable)
         test_the_context_menu_reuses_the_shared_actions(executable)
         test_the_font_control_and_the_wheel_are_one_setting(executable)
         test_saving_before_a_run_writes_the_file(executable, files)

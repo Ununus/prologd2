@@ -19,6 +19,14 @@ from dataclasses import dataclass
 #: and named here so the icon audit sees it.
 RECENT_ICON = "file-recent"
 
+#: Names that belong to no action: the tab picture of a buffer (never saved,
+#: saved, modified) and the application icon.  They live here because
+#: `ICON_NAMES` is the list `test_icons.py` holds the code to.
+FILE_ICON = "file"
+SAVED_ICON = "file-saved"
+MODIFIED_ICON = "file-modified"
+APPLICATION_ICON = "prologd2"
+
 #: A menu entry that is a separator or a submenu rather than an action.
 SEPARATOR = "-"
 RECENT = "recent"
@@ -185,7 +193,8 @@ BY_KEY: dict[str, Action] = {action.key: action for action in ACTIONS}
 #: Every icon name the code can ask for — what `test_icons.py` checks against the
 #: files in `assets/` and against the documented `MISSING` list.
 ICON_NAMES: frozenset[str] = frozenset(
-    [action.icon for action in ACTIONS if action.icon] + [RECENT_ICON]
+    [action.icon for action in ACTIONS if action.icon]
+    + [RECENT_ICON, FILE_ICON, SAVED_ICON, MODIFIED_ICON, APPLICATION_ICON]
 )
 
 #: The menu bar: (title, entries).  `-` is a separator, `recent` the submenu of

@@ -156,8 +156,7 @@ plain scripts.
    Open for the next session: the rest of task_27 (the output pane's own
    behaviour — colour by kind, truncation, auto-scroll, save to a file — the input
    console and the status-bar details), the graphics window (no task file yet),
-   and the output panel's own font size (task_29).  `setWindowIcon` is never
-   called either, so the window uses the default Qt icon.
+   and the output panel's own font size (task_29).
 
 ## Open questions for the user
 
@@ -398,3 +397,27 @@ Resolved on 2026-09-29 (GUI planning):
   with the «вывод усечён» marker, auto-scroll that stops when the user scrolls up,
   save to a file), the input console as an alternative to the modal dialogs, the
   status-bar details and `src/gui/tests/test_output.py`.
+* GUI hand-testing round, part 15: five requests from the user, and three real
+  defects behind them.  (1) A tab now shows its state as a picture — `file` for a
+  buffer that was never saved, `file-saved` once it has a file, `file-modified`
+  while there are unsaved changes — and the title bar carries the *whole* path
+  (the tab keeps the short name, or the tab bar becomes unreadable).  Chasing the
+  first of those found that `mark_saved` said nothing when the modified flag was
+  already clear, so a tab could keep the wrong picture: the picture is fetched when
+  `changed` arrives, and `setModified(False)` on an unmodified document emits
+  nothing — the signal is now sent unconditionally.  (2) The «Последние» submenu
+  gives programs the file picture, «О программе» shows `prologd2.png` (a box of our
+  own instead of `QMessageBox.about`, with the text in a Qt-free `about_text()` so
+  a test can read it), and the window itself now carries that icon — the gap the
+  README had recorded since task_26.  (3) Undo and redo follow the document of the
+  tab that is showing: every document reports `undoAvailable`/`redoAvailable` and
+  the slot reads the current one, because the buffers do not share an undo stack.
+  Chasing that found two more: a tab click used to leave the title *and* the undo
+  state stale (only an edit refreshed them — now `currentChanged` is connected),
+  and the handler that resulted raised `IndexError` while a paned editor was being
+  merged, because `_active_pane` was reset *after* the pane was dismantled; it is
+  reset first, and the handler ignores the signal while the window is between
+  states.  `Buffer.icon_name()` keeps the tab policy Qt-free, `actions.ICON_NAMES`
+  now carries the four names that belong to no action so the icon audit checks
+  them too (46 referenced, 31 drawn, 15 to go), and `test_window.py` grew three
+  tests for the pictures, the title and the undo state.

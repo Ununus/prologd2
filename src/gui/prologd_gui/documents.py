@@ -146,7 +146,14 @@ class Document:
         return ("*" if self.modified else "") + self.name
 
     def window_title(self) -> str:
-        return f"{self.title()} — PrologD"
+        """What the title bar says: the file's *full* path, plus `*` while there
+        are unsaved changes.
+
+        The tab keeps the short name — a tab bar full of paths is unreadable — and
+        the window carries where those tabs are, so two files with one name are
+        told apart without opening anything.
+        """
+        return f"{'*' if self.modified else ''}{self.path or self.name} — PrologD"
 
     def directory(self) -> str:
         """Where its file lives, for the open/save dialogs; the cwd otherwise."""

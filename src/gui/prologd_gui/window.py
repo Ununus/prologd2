@@ -174,6 +174,11 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self._panel_splitter)
         self._apply_output_position(remember=False)
         self._sidebar.setVisible(self._settings.output_visible)
+        # The application picture: the title bar and the taskbar, and the icon any
+        # Qt-made dialog asks for (the about box sets its own).
+        picture = assets.icon(actions.APPLICATION_ICON)
+        if picture is not None:
+            self.setWindowIcon(picture)
         # A dropped program opens in its own tab; see `dropEvent`.
         self.setAcceptDrops(True)
 
@@ -370,6 +375,31 @@ class MainWindow(QMainWindow):
                         view.addAction(self._actions[key])
                 view.setProperty("prologdContext", True)
 
+    def _sync_undo_actions(self) -> None:
+        """Undo and redo say whether there is anything to undo *in the tab that
+        is showing*.
+
+        The commands are in a menu and on the keyboard, so a greyed-out «Отменить»
+        with something to undo is a lie the user notices immediately — and an
+        enabled one that does nothing is just as bad.
+        """
+        buffer = self.current_buffer()
+        document = buffer.document if buffer is not None else None
+        self._actions["undo"].setEnabled(document is not None and document.isUndoAvailable())
+        self._actions["redo"].setEnabled(document is not None and document.isRedoAvailable())
+
+    def _on_tab_changed(self, _index: int) -> None:
+        """The tab that is showing decides the title and what can be undone.
+
+        A plain tab click used to leave both stale: only an edit refreshed them.
+        The handler is called while a pane is being dismantled as well — a tab
+        being removed raises it — and there the window is between states.
+        """
+        if not self._panes or self._active_pane >= len(self._panes):
+            return
+        self._refresh_titles()
+        self._sync_undo_actions()
+
     def _sync_pane_actions(self) -> None:
         """`split` and `merge` follow the number of panes.
 
@@ -394,6 +424,7 @@ class MainWindow(QMainWindow):
         self._actions["full_screen"].setChecked(self.isFullScreen())
         self._actions["output"].setChecked(self.output_visible())
         self._sync_pane_actions()
+        self._sync_undo_actions()
         self._show_font_size(self._settings.font_size)
 
     # -- editing commands of the current view ------------------------------
@@ -455,15 +486,26 @@ class MainWindow(QMainWindow):
         appearance.apply_theme(QApplication.instance(), name)
         self._status.setText(f"оформление: {name}")
 
-    def _about(self) -> None:
-        QMessageBox.about(
-            self,
-            "О программе",
+    def about_text(self) -> str:
+        """What «О программе» says.  Separate from the box so a test can read it
+        without a modal window it cannot close."""
+        return (
             "PrologD 2.0 — графическая оболочка (PySide6).\n\n"
             f"Интерпретатор: {self._version or 'ещё не ответил'}\n"
             f"Панелей редактора: {len(self._panes)}\n"
-            f"Настройки: {self._settings.path}",
+            f"Настройки: {self._settings.path}"
         )
+
+    def _about(self) -> None:
+        """A box of our own rather than `QMessageBox.about`: the reference
+        front-end's picture is what belongs in that corner."""
+        box = QMessageBox(self)
+        box.setWindowTitle("О программе")
+        picture = assets.icon(actions.APPLICATION_ICON)
+        if picture is not None:
+            box.setIconPixmap(picture.pixmap(64, 64))
+        box.setText(self.about_text())
+        box.exec()
 
     def _open_document(self, name: str) -> None:
         """Opens a built PDF, or says where it should be.
@@ -498,6 +540,12 @@ class MainWindow(QMainWindow):
         for path in paths:
             entry = menu.addAction(pathlib.Path(path).name)
             entry.setToolTip(path)
+            if pathlib.Path(path).suffix.lower() == ".pld":
+                # «Последние» lists programs, and a program gets the picture of a
+                # file; anything else in the list shows its name only.
+                picture = assets.icon(actions.FILE_ICON)
+                if picture is not None:
+                    entry.setIcon(picture)
             entry.triggered.connect(lambda _checked=False, path=path: self.open_path(path))
         menu.addSeparator()
         menu.addAction("Очистить список", self._clear_recent)
@@ -519,6 +567,8 @@ class MainWindow(QMainWindow):
         pane.newFileRequested.connect(lambda: self.new_buffer())
         pane.zoomChanged.connect(self._on_zoom_changed)
         pane.fileDropped.connect(self.open_path)
+        # Which tab is showing decides the window title and the undo state.
+        pane.currentChanged.connect(self._on_tab_changed)
         self._panes.append(pane)
         self._editor_splitter.addWidget(pane)
         pane.set_buffers(self._buffers)
@@ -553,13 +603,15 @@ class MainWindow(QMainWindow):
         if len(self._panes) < 2:
             return False
         pane = self._panes.pop()
+        # Before anything else: removing the tabs raises `currentChanged`, and the
+        # handler reads the active pane — which is this one until it is reset.
+        self._active_pane = 0
         current = pane.current_buffer()
         # The views belong to the pane; they are detached before it goes, or the
         # buffers would keep dangling editors (see `Pane.set_buffers`).
         pane.set_buffers([])
         self._editor_splitter.widget(1).setParent(None)
         pane.deleteLater()
-        self._active_pane = 0
         if current is not None:
             self._panes[0].set_current(current)  # the eyes stay on that program
         if remember:
@@ -973,6 +1025,10 @@ class MainWindow(QMainWindow):
         """Adds a document, shows it in every pane, makes it current."""
         buffer = Buffer(model, self._settings, self)
         buffer.changed.connect(self._refresh_titles)
+        # Undo and redo belong to the *document*, so every document reports its own
+        # changes and the slot reads the one that is showing.
+        buffer.document.undoAvailable.connect(self._sync_undo_actions)
+        buffer.document.redoAvailable.connect(self._sync_undo_actions)
         # The reserved names arrive with `ready`; a buffer opened after that gets
         # them here, and a buffer created before it is served by `_on_ready`.
         buffer.set_keywords(self._session.keywords)
