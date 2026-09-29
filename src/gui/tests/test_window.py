@@ -82,11 +82,16 @@ def printed_lines(window) -> list[str]:
 _SETTINGS_DIRECTORIES: list[tempfile.TemporaryDirectory] = []
 
 
-def make_window(executable: str):
+def make_window(executable: str, *, ready: bool = True):
     """A window whose preferences live in a throw-away file.
 
     Without this the window would read (and, on zoom, write) the settings of the
     person running the tests.
+
+    `ready=True` starts the interpreter the way the first run does, because most
+    checks are about what happens afterwards — the reserved names, the
+    highlighting, the output.  A window the user has only *opened* has nothing
+    running at all, and `ready=False` is that window.
     """
     from prologd_gui.settings import Settings
     from prologd_gui.window import MainWindow
@@ -94,7 +99,12 @@ def make_window(executable: str):
     directory = tempfile.TemporaryDirectory(prefix="prologd_gui_test_")
     _SETTINGS_DIRECTORIES.append(directory)
     settings = Settings(pathlib.Path(directory.name) / "gui.ini")
-    return MainWindow(executable, [], settings)
+    window = MainWindow(executable, [], settings)
+    if ready:
+        window.session.start()
+        assert pump(window, lambda: bool(window.session.keywords)), "the session never said ready"
+    return window
+
 
 def empty_window(executable: str):
     """A ready window with one empty buffer, so a file takes its place.
@@ -103,7 +113,6 @@ def empty_window(executable: str):
     would be off by one.
     """
     window = make_window(executable)
-    assert pump(window, lambda: bool(window.session.keywords)), "the session never said ready"
     window.editor().setPlainText("")
     window.buffers()[0].mark_saved()  # an empty buffer is not unsaved work
     return window
@@ -625,31 +634,47 @@ def test_the_recent_menu_and_the_window_carry_the_pictures(
 
 
 def test_the_run_state_drives_the_buttons(executable: str) -> None:
-    """A live interpreter is what «Остановить» is for, and a dead one what
-    «Запустить» is for.
+    """Two states, not one: the process can be *up and idle*, and a run can be
+    *in flight*.
 
-    Pressing either at the wrong moment used to do nothing at all, which the user
-    reads as a broken button rather than as a state.
+    `Запустить` needs the second (there is nothing to start while a computation is
+    running, and it is what restarts the whole file), `Остановить` the first — a
+    live interpreter holds a knowledge base, and unloading it is a stop of its own.
+    A window the user has only opened has nothing running at all, which is what the
+    startup state wrongly said it had.
     """
-    window = empty_window(executable)
+    window = make_window(executable, ready=False)
     try:
-        # `empty_window` waited for `ready`, so the session is up.
-        assert window.session.is_running() is True
-        assert window._actions["stop"].isEnabled() is True
-        assert window._actions["run"].isEnabled() is False, "a live session is not started twice"
+        assert window.session.is_running() is False, "a new window starts no interpreter"
+        assert window._actions["run"].isEnabled() is True
+        assert window._actions["stop"].isEnabled() is False
+        assert "остановлен" in window._details.text(), window._details.text()
 
+        # The first run starts the interpreter *and* the computation.
+        window.open_path(str(EXAMPLE))
+        window._actions["run"].trigger()
+        assert window._actions["run"].isEnabled() is False, "a run is in flight"
+        assert window._actions["stop"].isEnabled() is True
+        assert pump(window, lambda: "решение" in window.status_text()), window.status_text()
+
+        # The answer frees `Запустить`; the process is up and the base is loaded.
+        assert window._actions["run"].isEnabled() is True, "the answer frees the button"
+        assert window._actions["stop"].isEnabled() is True, "the process is still up"
+        assert "база знаний загружена" in window._details.text(), window._details.text()
+
+        # Stopping an *idle* interpreter unloads the knowledge base ...
         window._actions["stop"].trigger()
         assert window.session.is_running() is False
-        assert window._actions["run"].isEnabled() is True, "a stopped session can be started"
+        assert window._actions["run"].isEnabled() is True
         assert window._actions["stop"].isEnabled() is False
+        assert "--- база знаний выгружена ---" in window.output_text(), window.output_text()
 
+        # ... while stopping a computation in flight is just a stop.
         window._actions["run"].trigger()
-        # `run` goes grey at once; the *state* line follows when the interpreter
-        # says `ready`, which is what the status bar reports.
-        assert window._actions["run"].isEnabled() is False
-        assert pump(window, lambda: "работает" in window._details.text()), window._details.text()
         assert window._actions["stop"].isEnabled() is True
-        print("ok: run and stop follow the state of the interpreter")
+        window._actions["stop"].trigger()
+        assert "--- остановлено ---" in window.output_text(), window.output_text()
+        print("ok: run and stop follow the two states of the interpreter")
     finally:
         discard_changes(window)
 

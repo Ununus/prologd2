@@ -70,8 +70,21 @@ Done in this round (2026-09-29):
   comes back with the panel at the bottom.
 
 Still open: saving the pane to a text file, the input *console* mode as an
-alternative to the modal dialogs (the user asked to postpone that one), and the
-rest of the pane furniture the reference GUI had.
+alternative to the modal dialogs (the user asked to postpone that one), the rest of
+the pane furniture the reference GUI had, and a paragraph in `doc/gui.typ`, §6,
+about what the run state means (the README has it).
+
+Done in the third round (2026-09-29): the run state was split in two — the process
+being *up* and a computation being *in flight* — and the window no longer starts an
+interpreter just by opening: it comes up with the first run or with a query typed
+into the query line.  `Запустить` is enabled while nothing is computing (the answer
+frees it, and the next press restarts the whole file), `Остановить` while the
+process is alive, and the stop says which of the two it interrupted:
+`--- остановлено ---` for a computation, `--- база знаний выгружена ---` for an idle
+interpreter.  The load note became `--- загрузка базы знаний ---`, the status bar
+says `выполняется` / `база знаний загружена` / `интерпретатор остановлен`, and
+`test_window.py` checks the whole walk: nothing running → run → answer → stop (idle)
+→ run → stop (in flight).
 
 Done in the second round (2026-09-29):
 

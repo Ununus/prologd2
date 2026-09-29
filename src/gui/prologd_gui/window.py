@@ -91,6 +91,13 @@ class MainWindow(QMainWindow):
         #: True while a stop of our own is in flight, so the exit code it produces
         #: (a termination status, not an exit code) is not reported as one.
         self._stopping = False
+        #: Two states, not one: the interpreter is a process that can be *up* and
+        #: idle, and a computation can be *in flight* in it.  `Запустить` needs the
+        #: second (there is nothing to start while one is running) and `Остановить`
+        #: the first (an idle interpreter still holds a knowledge base).
+        self._busy = False
+        #: Whether a program was loaded into the running interpreter (`run_program`).
+        self._loaded = False
 
         self._build_ui()
         # The split editor comes back if it was left open, and before the first
@@ -102,7 +109,9 @@ class MainWindow(QMainWindow):
         welcome = documents.Document.untitled(documents.untitled_name([]))
         welcome.text = WELCOME
         self._add_buffer(welcome)
-        self._session.start()
+        # No interpreter yet: it is started by the first run (or by a query typed
+        # into the query line).  A window that has been opened but not used has
+        # nothing running, and saying otherwise made `Остановить` look live.
 
     # -- construction ------------------------------------------------------
     def _build_ui(self) -> None:
@@ -414,21 +423,27 @@ class MainWindow(QMainWindow):
         self._update_details()
 
     def _sync_run_actions(self) -> None:
-        """«Запустить» and «Остановить» follow the interpreter.
+        """Two states, two buttons.
 
-        A live session is the only thing that can be stopped, and a run in a fresh
-        session is the only thing that can be started — pressing either at the
-        wrong moment used to do nothing at all, which reads as a broken button.
+        `Запустить` is for a computation that is not in flight — it restarts the
+        whole file, whether the interpreter is idle with a base loaded or gone
+        altogether.  `Остановить` is for a live process: stopping an idle one is
+        how the knowledge base is unloaded, which is what its message says.
         """
-        running = self._session.is_running()
-        self._actions["run"].setEnabled(not running)
-        self._actions["stop"].setEnabled(running)
+        self._actions["run"].setEnabled(not self._busy)
+        self._actions["stop"].setEnabled(self._session.is_running())
 
     def _update_details(self) -> None:
         """The right-hand side of the status bar: state, caret, file shape."""
-        parts = [
-            "интерпретатор работает" if self._session.is_running() else "интерпретатор остановлен"
-        ]
+        if not self._session.is_running():
+            state = "интерпретатор остановлен"
+        elif self._busy:
+            state = "выполняется"
+        elif self._loaded:
+            state = "база знаний загружена"
+        else:
+            state = "интерпретатор запущен"
+        parts = [state]
         buffer = self.current_buffer()
         if buffer is not None:
             view = self.view_for(buffer)
@@ -794,11 +809,14 @@ class MainWindow(QMainWindow):
         # value — and a cancelled question applies to this run only.
         self._stopped_input = False
         self._queued_input = self._input_lines()
+        self._busy = True
+        self._loaded = True
         self._session.start()
         # At once, not when `ready` arrives: the user pressed the button, and it
         # must not be pressable again while the interpreter is coming up.
         self._sync_run_actions()
-        self._append_note("--- загрузка программы ---\n")
+        self._update_details()
+        self._append_note("--- загрузка базы знаний ---\n")
         if self._queued_input:
             self._append_note(f"--- ввод из поля, строк — {len(self._queued_input)} ---\n")
         if path is not None and not buffer.is_modified():
@@ -823,7 +841,14 @@ class MainWindow(QMainWindow):
         self._query_line.clear()
         if not text.startswith("?"):
             text = "?" + text
+        # A query needs an interpreter, and the window may not have one yet: the
+        # session is started by the first run *or* by a goal typed into this line.
+        if not self._session.is_running():
+            self._session.start()
+        self._busy = True
         self._session.run_query(text)
+        self._sync_run_actions()
+        self._update_details()
 
     # -- files -------------------------------------------------------------
     def new_buffer(self, name: str | None = None) -> Buffer:
@@ -1068,10 +1093,19 @@ class MainWindow(QMainWindow):
                 return
 
     def stop_program(self) -> None:
+        if not self._session.is_running():
+            self._status.setText("интерпретатор уже остановлен")
+            return
+        # What the stop *means* depends on what it interrupts: a computation that is
+        # in flight is stopped, an idle interpreter with a base loaded is unloaded.
+        unloading = self._loaded and not self._busy
         self._stopping = True
+        self._busy = False
+        self._loaded = False
         self._session.stop()
-        self._status.setText("остановлено")
-        self._append_note("--- остановлено ---\n")
+        message = "база знаний выгружена" if unloading else "остановлено"
+        self._status.setText(message)
+        self._append_note(f"--- {message} ---\n")
         # The process is gone, so the buttons change at once — waiting for `ended`
         # would leave «Остановить» enabled on a session that is already dead.
         self._sync_run_actions()
@@ -1333,11 +1367,20 @@ class MainWindow(QMainWindow):
         The interpreter prints `ДА`, `НЕТ` or the bindings itself, and `result`
         only says the query is over.  Appending another `НЕТ` here is what made a
         failing query print it twice — the program was never wrong.
+
+        The query being over is what frees `Запустить`: the run is finished, the
+        knowledge base is still loaded, and the next run restarts the file.
         """
+        self._busy = False
         self._status.setText("решение найдено" if found else "решения нет")
+        self._sync_run_actions()
+        self._update_details()
 
     def _on_failed(self, kind: str, message: str) -> None:
         self._output.feed(f"*** {kind}: {message}\n", panels.ERROR)
+        # A failure ends whatever was in flight; whether the process is still there
+        # is a separate question, and `_sync_run_actions` asks it.
+        self._busy = False
         self._sync_run_actions()
         self._update_details()
 
@@ -1348,11 +1391,12 @@ class MainWindow(QMainWindow):
         if self._stopping:
             self._stopping = False
             self._output.flush()
-            self._status.setText("остановлено")
             self._sync_run_actions()
             self._update_details()
             return
         self._exit_code = exit_code
+        self._busy = False
+        self._loaded = False
         # The last half-line: a program that stopped in the middle of `ВЫВОД` left
         # it in the pane's buffer, and nothing else will complete it.
         self._output.flush()

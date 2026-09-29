@@ -446,3 +446,21 @@ Resolved on 2026-09-29 (GUI planning):
   `dragEnterEvent` into the paragraph above it (caught by the next test run), and
   `test_output.py` first read the echo's colour from `layout().formats()`, which
   holds *block* formats — the colour is in the character format.
+* GUI hand-testing round, part 17: the run state was split in two, as the user asked.
+  It was one flag (`is_running`), which made a freshly opened window claim the
+  interpreter was up, and made `Запустить` dead right after an answer.  Now the
+  process being *up* and a computation being *in flight* are separate: `Запустить`
+  needs the second (nothing is started while something is computing, and the answer
+  frees it so the next press restarts the whole file) and `Остановить` the first
+  (an idle interpreter still holds a knowledge base).  The window also stopped
+  starting an interpreter just by being opened — the session comes up with the first
+  run or with a goal typed into the query line, and until then `Остановить` is dead,
+  which is what the user expected of a window that is merely open.  The stop now
+  names what it interrupted: `--- остановлено ---` for a computation in flight,
+  `--- база знаний выгружена ---` for an idle interpreter, and the load note became
+  `--- загрузка базы знаний ---`.  The status bar shows `выполняется`,
+  `база знаний загружена` or `интерпретатор остановлен`.  The test helper grew
+  `ready=False` for the window that has only been opened (the default still starts a
+  session, because most checks are about what happens after `ready`), and
+  `test_the_run_state_drives_the_buttons` walks the whole path: nothing running →
+  run → answer → stop (idle) → run → stop (in flight).

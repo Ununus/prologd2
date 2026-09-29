@@ -184,13 +184,19 @@ and the oldest lines are dropped in one edit with `*** вывод усечён �
 as the first line.  The view follows the end of the output until the user scrolls
 up to read something, and follows again as soon as they come back to the bottom.
 
-Undo, redo, «Запустить» and «Остановить» follow the *state*: the first two read
-the document of the tab that is showing, the last two the session — a live
-interpreter is the only thing that can be stopped, and a fresh one the only thing
-that can be started (`_sync_run_actions`, refreshed on `ready`, on a failure, when
-a run ends and right after a stop).  The right-hand side of the status bar shows
-that state together with the caret's line and column and the file's line ending
-and encoding.
+Undo, redo, «Запустить» and «Остановить» follow the *state*, and the state of the
+interpreter is **two** things, not one: the process can be up and idle, and a
+computation can be in flight in it.  «Запустить» needs the second — a run in
+flight is not started twice, and the answer frees the button so that the next
+press restarts the whole file — while «Остановить» needs the first, because a live
+interpreter holds a knowledge base and unloading it is a stop of its own (the note
+says `--- база знаний выгружена ---`; a computation that was interrupted gets
+`--- остановлено ---`).  A window the user has only opened starts **no**
+interpreter: the session comes up with the first run or with a goal typed into the
+query line, which is also what makes «Остановить» dead until then.  The right-hand
+side of the status bar says which of the three it is (`выполняется`, `база знаний
+загружена`, `интерпретатор остановлен`), together with the caret's line and column
+and the file's line ending and encoding.
 
 ## Tabs and files
 
