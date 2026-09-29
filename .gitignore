@@ -26,3 +26,6 @@ ai/_ref/
 # Scratch scripts written while debugging the front-end: useful while looking for
 # a defect, never part of the project (one was committed by accident once).
 src/gui/tests/_debug*.py
+
+# Written by examples/lessons/lesson_07.pld when the lesson runs.
+lesson_07_данные.txt
