@@ -100,6 +100,7 @@ session.
 | task_32_import_search_report | done | `ИМПОРТ` failure names the directories tried, with reasons |
 | task_33_gui_search_replace | done | `search.py` (plain-text, Qt-free) + the find bar: question from the selection or the word at the caret, `F3`/`Shift+F3` with the wrap reported, three switches, «Заменить всё» as one undo step, the matches lit in every view; `test_search.py` has 16 checks |
 | task_34_builtin_branches | done | every built-in branch-tested in Catch2 (186 cases); the sweep found and fixed five defects: two in the float built-ins (`nan` instead of a failure), the integer/real comparison, the cyclic term that ended the process, the ignored read prompt, the unchecked graphics arguments and the code points that were written as invalid UTF-8 |
+| task_35_lessons_rework | in progress | the course in `examples/lessons` is rewritten for the current dialect, one commit per lesson, from the plan in `ai/task_35_lessons_rework.md`; `test_lessons.cpp` runs every listed lesson and compares its output with the `%!` lines the lesson itself carries, so a lesson cannot drift again; lessons 1--7 are done and machine-checked (facts and queries, rules and backtracking, arithmetic, recursion and cut, lists, strings, input/output with `lesson_07.input.txt`); lessons 8--12 and the debug appendix remain, then the index and `doc/lessons.typ` |
 
 ## Test suite
 
@@ -659,3 +660,15 @@ Resolved on 2026-09-29 (GUI planning):
   remembering: this is the second time a *lesson's* behaviour has been the only
   evidence for a built-in's semantics — the lessons are the acceptance material, and
   a commented-out query is not a test.
+* Lessons session, part 1: the course was stale — lesson 1 still answered with
+  the old interpreter's values, lesson 7 never existed, and lessons 5 and 8 could
+  not be run whole.  It is being rebuilt from the plan in
+  `ai/task_35_lessons_rework.md`, one commit per lesson, and `test_lessons.cpp`
+  now runs every listed lesson and compares its output with the `%!` lines the
+  lesson carries.  Writing those expectations found real defects in the source
+  material: a `нод/3` that never terminates (it hands the same pair back), sorts
+  that came out descending, a `?длина(Х, 2)` that never stops, and a failed
+  number read that leaves the rest of its line — which behaves differently in the
+  CLI and in the test harness, so the lesson keeps that read last.  Lessons 1--7
+  are done, `ctest` stays green (183 Catch2 cases, 194 tests); 8--12, the debug
+  appendix, the index and `doc/lessons.typ` remain.
