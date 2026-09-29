@@ -1,6 +1,8 @@
 # task_33 — GUI: find and replace
 
-**Status:** not started
+**Status:** done — the bar, the keys, the highlight, «Заменить всё» as one undo
+step and `search.py` are in; `test_search.py` has sixteen checks, half of which
+open a window but start no interpreter
 **Depends on:** task_22 (the editor), task_26 (the action table, where the five
 menu entries already sit disabled)
 **Milestone:** M11
@@ -16,7 +18,7 @@ menus and shortcuts are already declared, and the tooltips say «ещё не
 
 ## Deliverables
 
-- [ ] A find bar that appears above the editor (not a modal dialog: a modal box
+- [x] A find bar that appears above the editor (not a modal dialog: a modal box
       cannot be driven from a headless test — see the note in `buffers.py` about
       the same trap with `_ask_save`), with:
   * a **Найти** field, prefilled with the selection when there is one, and the
@@ -40,23 +42,24 @@ menus and shortcuts are already declared, and the tooltips say «ещё не
       `beginEditBlock`/`endEditBlock` around the whole replacement.  Nothing is
       replaced inside the *found* text by accident: replacements never re-scan
       their own output.
-- [ ] The search is plain text, not a regular expression: the programs are in
+- [x] The search is plain text, not a regular expression: the programs are in
       Russian and often contain `#…#`, `?` and parentheses, where regex syntax
       would surprise more than help.  A `QRegularExpression` would be a later
       task with its own switch.
-- [ ] Case-insensitive search compares with `str.casefold()` (Cyrillic included),
+- [x] Case-insensitive search compares with `str.casefold()` (Cyrillic included),
       and a search for a word *does* cross the ends of the document — wrapping is
-      reported in the bar.
-- [ ] The bar follows the **active pane**: the split editor has two panes over one
+      reported in the bar.  Folded on a *slice*, not on a copy of the whole text:
+      a fold that changes a string's length must not shift the offsets after it.
+- [x] The bar follows the **active pane**: the split editor has two panes over one
       document set, so «Найти» acts on the pane that was used last, and the
       matches are highlighted in every view of that document (they share one
       text).
-- [ ] Tests: `src/gui/tests/test_search.py` — finding the first, the next and the
+- [x] Tests: `src/gui/tests/test_search.py` — finding the first, the next and the
       previous match, wrapping in both directions, a search that matches nothing,
       case sensitivity, whole word, «заменить всё» as one `Ctrl+Z`, the bar
       closing on `Esc` with focus back in the editor, and the five menu entries
       becoming enabled.
-- [ ] The `edit-find-replace` icon is drawn (or the existing `search-find.png`,
+- [x] The `edit-find-replace` icon is drawn (or the existing `search-find.png`,
       which is already in `assets/` and unused, is given the name the action
       asks for) and the name leaves `assets.MISSING`; `test_icons.py` keeps the
       two lists in step.
@@ -66,7 +69,8 @@ menus and shortcuts are already declared, and the tooltips say «ещё не
 * The `search-find*` icons of the reference project are already in
   `src/gui/assets` (`search-find`, `search-find-next`, `search-find-prev`,
   `search-find-selected-next`, `search-find-selected-prev`) and
-  `actions.py` already names them, so only `edit-find-replace` is missing.
+  `actions.py` already names them, so only `edit-find-replace` was missing — and
+  it arrived with the rest of the pictures.
 * A `QPlainTextEdit` gives the cursor and the document; a search over
   `document().toPlainText()` with `str.find` is enough — the file is small, and a
   hand-written scanner keeps the «найти выделенное» and the count honest.
@@ -84,3 +88,45 @@ menus and shortcuts are already declared, and the tooltips say «ещё не
 matches of the active pane and wraps at the end, `Ctrl+F3` searches for the word
 under the cursor, `Заменить всё` is undone by one `Ctrl+Z`, `Esc` closes the bar
 and the editor has the focus again, and none of it writes to the file.
+
+## What was built (2026-09-29)
+
+* `prologd_gui/search.py` — Qt-free engine: `Options(match_case, whole_word,
+  span)`, `matches`, `count`, `match_at`, `next_match`, `previous_match`,
+  `replace_all`.  Offsets always point into the original text.
+* `prologd_gui/findbar.py` — the strip: «Найти», next/previous, the count, the
+  three switches, «Замена» behind a disclosure with «Заменить» and «Заменить
+  всё».  It owns the question and the switches and knows nothing about editors, so
+  there is one place where a search is turned into offsets, and that place is
+  `search.py`.
+* `window.py` — the state machine: `show_find`, `close_find`, `find_selected`,
+  `find_step`, `replace_current`, `replace_all`, the highlight in every view of
+  the active document and the re-follow when the pane or the tab changes.
+* `editor.py` — `word_under_cursor()`, `search_ranges()`, and the extra selections
+  now compose the diagnostic line, the search's matches and the selected word's
+  occurrences in one list (Qt keeps one).
+
+Three decisions worth keeping:
+
+1. **A match the caret is *inside* is the one that is found** (`search.match_at`),
+   so `Ctrl+F` in the middle of `факт` lands on that `факт`; `F3` is unaffected
+   because it steps *after* the match it is on.  Without it `Ctrl+F` jumped to the
+   next occurrence, which reads as a bug.
+2. **The span of «Только в выделении» is taken once**, when the switch goes on: the
+   search itself moves the selection it would otherwise be read from.  Switched on
+   with nothing selected it refuses and says so, instead of quietly meaning
+   «everywhere».
+3. **Re-running the search never moves the caret.**  The first version recomputed
+   on every text change and moved the caret to the match it picked, so typing in
+   the program threw the cursor into the next `факт`.
+
+Two Qt traps hit on the way, both worth a line in `src/gui/README.md`:
+`QAction.triggered` hands the slot a `checked` boolean, so `"find":
+self.show_find` called `show_find(False)` and opened an empty field; and the
+occurrence highlight had to be suppressed while the search is showing its own
+matches, or the pale occurrence colour was painted over the warm one and the
+*current* match stopped standing out.
+
+The `search-find` icon was given a name in the table (`actions.FIND_ICON`) rather
+than renamed, so the audit covers it; `edit-del` (drawn at the same time) became
+the picture of «Удалить» in the «Правка» menu.

@@ -29,53 +29,68 @@ except ImportError:  # pragma: no cover - main() reports it
     QApplication = None  # type: ignore[assignment]
 
 
-def test_a_partial_line_waits_for_its_newline() -> None:
+def test_an_unfinished_line_is_written_at_once() -> None:
+    """The prompt of `ВЫВОД`/`ВВОДСИМВ` has no newline — and must still be seen.
+
+    Holding it back until the newline that arrives with the *answer* is exactly how
+    a program looked as if it asked before printing anything.
+    """
     buffer = panels.LineBuffer()
-    assert buffer.feed("да") == [], "half a line is not a line"
-    assert buffer.pending() == "да"
-    lines = buffer.feed("!\nвторое\n")
-    assert [line.text for line in lines] == ["да!", "второе"]
+    pieces = buffer.feed("Введите символ")
+    assert [(piece.text, piece.complete) for piece in pieces] == [("Введите символ", False)]
+    assert buffer.pending() == "Введите символ"
+
+    # The rest of the line continues it, and only the *new* text is handed over:
+    # the pane has written the first half already.
+    pieces = buffer.feed("!\n")
+    assert [(piece.text, piece.complete) for piece in pieces] == [("!", True)]
     assert buffer.pending() == ""
-    assert all(line.kind == panels.OUTPUT for line in lines)
-    print("ok: a line without a newline is held until the rest of it arrives")
+    print("ok: an unfinished line goes out at once, and the rest continues it")
 
 
-def test_several_lines_and_an_exact_newline() -> None:
+def test_chunks_are_split_and_joined() -> None:
     buffer = panels.LineBuffer()
-    lines = buffer.feed("один\nдва\nтри\n")
-    assert [line.text for line in lines] == ["один", "два", "три"]
+    pieces = buffer.feed("один\nдва\nтри\n")
+    assert [(piece.text, piece.complete) for piece in pieces] == [
+        ("один", True),
+        ("два", True),
+        ("три", True),
+    ]
     assert buffer.pending() == "", "a trailing newline leaves nothing behind"
 
-    # A chunk that ends *on* the newline is complete; the next chunk starts a line.
-    assert [line.text for line in buffer.feed("четыре\n")] == ["четыре"]
-    assert buffer.feed("пять") == []
-    assert [line.text for line in buffer.feed("шесть\n")] == ["пятьшесть"]
+    # A chunk that ends *on* the newline is complete; the next one opens a line.
+    assert [piece.text for piece in buffer.feed("четыре\n")] == ["четыре"]
+    assert [(piece.text, piece.complete) for piece in buffer.feed("пять")] == [("пять", False)]
+    assert [(piece.text, piece.complete) for piece in buffer.feed("шесть\n")] == [("шесть", True)]
     print("ok: chunks are joined until a newline ends the line")
 
 
-def test_a_change_of_kind_closes_the_held_line() -> None:
+def test_a_change_of_kind_closes_the_open_line() -> None:
     buffer = panels.LineBuffer()
-    assert buffer.feed("вывод без ПС") == []
-    lines = buffer.feed("--- заметка ---\n", panels.NOTE)
-    assert [line.text for line in lines] == ["вывод без ПС", "--- заметка ---"]
-    assert [line.kind for line in lines] == [panels.OUTPUT, panels.NOTE], (
-        "the half-line belongs to the program, not to the note"
-    )
+    assert [(piece.text, piece.complete) for piece in buffer.feed("вывод без ПС")] == [
+        ("вывод без ПС", False)
+    ]
+    pieces = buffer.feed("--- заметка ---\n", panels.NOTE)
+    assert [(piece.text, piece.kind, piece.complete) for piece in pieces] == [
+        ("", panels.OUTPUT, True),  # the bare newline that closes the half-line
+        ("--- заметка ---", panels.NOTE, True),
+    ], "the half-line belongs to the program, not to the note"
     print("ok: a note closes the program's half-line and keeps its own colour")
 
 
 def test_flush_and_reset() -> None:
     buffer = panels.LineBuffer()
     buffer.feed("хвост")
-    lines = buffer.flush()
-    assert [line.text for line in lines] == ["хвост"], "the run ended mid-line"
+    assert [(piece.text, piece.complete) for piece in buffer.flush()] == [("", True)], (
+        "flush only closes the line: its text is on screen already"
+    )
     assert buffer.pending() == ""
-    assert buffer.flush() == [], "nothing is written twice"
+    assert buffer.flush() == [], "nothing is closed twice"
 
     buffer.feed("что-то\n")
     buffer.reset()
     assert buffer.pending() == ""
-    print("ok: flush writes the last half-line once, and reset forgets everything")
+    print("ok: flush closes the open line once, and reset forgets everything")
 
 
 def test_the_pane_colours_lines_and_keeps_a_bounded_history() -> None:
@@ -86,7 +101,12 @@ def test_the_pane_colours_lines_and_keeps_a_bounded_history() -> None:
         pane.feed("> 42\n", panels.ECHO)
         pane.feed("--- загрузка ---\n", panels.NOTE)
         assert pane.toPlainText().splitlines() == ["программа", "> 42", "--- загрузка ---"]
-        assert pane.pending() == ""
+
+        # A prompt without a newline is on screen at once — the defect the user hit:
+        # it used to wait for the newline that comes with the answer.
+        pane.feed("Введите символ")
+        assert pane.toPlainText().endswith("Введите символ"), ascii(pane.toPlainText())
+        assert pane.pending() == "Введите символ", "the open line is remembered"
 
         # The echo is painted, the program's answer is left plain.  The colour sits
         # in the *character* format; `layout().formats()` holds block-level ones
@@ -127,9 +147,9 @@ def main() -> int:
     if QApplication is None:
         print("skipped: PySide6 is not installed")
         return 0
-    test_a_partial_line_waits_for_its_newline()
-    test_several_lines_and_an_exact_newline()
-    test_a_change_of_kind_closes_the_held_line()
+    test_an_unfinished_line_is_written_at_once()
+    test_chunks_are_split_and_joined()
+    test_a_change_of_kind_closes_the_open_line()
     test_flush_and_reset()
     test_the_pane_colours_lines_and_keeps_a_bounded_history()
     print("all output checks passed")

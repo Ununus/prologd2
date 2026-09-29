@@ -403,11 +403,44 @@ def test_the_input_field_feeds_the_program(executable: str) -> None:
         discard_changes(window)
 
 
-def test_the_dialog_is_asked_only_after_the_queue(executable: str) -> None:
+def test_the_console_answers_once_the_prepared_lines_run_out(executable: str) -> None:
+    """The queue first, then the console under the output — `Ctrl+Enter` sends.
+
+    The modal dialog is what is left when the whole panel is hidden, so a test that
+    would hang on one is a test that forgot to arm the console.
+    """
     window = empty_window(executable)
     try:
         window.editor().setPlainText(READS_TWO)
         window.input_pane().setPlainText("7\n")
+        asked: list[str] = []
+        window._ask_input = lambda kind: asked.append(kind) or "0"
+
+        window.run_program()
+        assert pump(window, lambda: window._input_console.waiting()), "nothing was asked"
+        assert window._input_console.kind() == "token", window._input_console.kind()
+        assert "ждёт ввода" in window.status_text(), window.status_text()
+
+        # What the field holds, and `send()` — the same call `Ctrl+Enter` makes.
+        window._input_console._line.setText("9")
+        window._input_console.send()
+        wait_for_result(window)
+
+        assert asked == [], "the dialog was used with the console right there"
+        assert echoed_lines(window) == ["> 7", "> 9"], echoed_lines(window)
+        assert printed_lines(window) == ["7", "9", "А=7", "Б=9"], printed_lines(window)
+        assert window._input_console.waiting() is False, "the console stayed armed"
+        print("ok: the console answers once the prepared lines run out")
+    finally:
+        discard_changes(window)
+
+
+def test_the_dialog_is_the_last_resort(executable: str) -> None:
+    """With the panel hidden there is nowhere to put a console, so a box asks."""
+    window = empty_window(executable)
+    try:
+        window._actions["output"].setChecked(False)  # hides the whole panel
+        window.editor().setPlainText(READS_TWO)
         asked: list[str] = []
 
         def answer(kind: str) -> str:
@@ -418,18 +451,67 @@ def test_the_dialog_is_asked_only_after_the_queue(executable: str) -> None:
         window.run_program()
         wait_for_result(window)
 
-        assert asked == ["token"], asked
-        assert echoed_lines(window) == ["> 7"], "the prepared line was not used first"
-        assert printed_lines(window) == ["7", "9", "А=7", "Б=9"], printed_lines(window)
-        print("ok: the dialog is asked once the prepared answers run out")
+        # The program reads two values, so the box is asked twice.
+        assert asked == ["token", "token"], asked
+        assert printed_lines(window) == ["9", "9", "А=9", "Б=9"], printed_lines(window)
+        print("ok: a hidden panel leaves the dialog as the only place to ask")
     finally:
         discard_changes(window)
+
+
+def test_the_console_appears_only_when_it_is_asked(executable: str) -> None:
+    """Hidden while nothing is asked; shown, framed yellow, then hidden again.
+
+    An idle strip of the window takes room from the output for nothing, and the
+    question *is* a state — the placeholder says what is wanted and which key sends
+    it, so no label row is needed.
+    """
+    window = empty_window(executable)
+    try:
+        assert window._input_console.isHidden() is True, "the console took room while idle"
+
+        window.editor().setPlainText("?ВВОДЦЕЛ(А),ВЫВОД(А),ПС.\n")
+        window._ask_input = lambda kind: "0"  # must not be used: the panel is right there
+        window.run_program()
+        assert pump(window, lambda: not window._input_console.isHidden()), "it never appeared"
+        assert window._input_console._line.placeholderText() == "Слово — Enter"
+        assert "e0b400" in window._input_console.styleSheet(), "no frame round the answer"
+        assert "ждёт ввода: Слово" in window.status_text(), window.status_text()
+
+        window._input_console._line.setText("5")
+        window._input_console.send()
+        assert pump(window, lambda: window._input_console.isHidden()), "it stayed on screen"
+        assert window._input_console.styleSheet() == "", "the frame stayed"
+    finally:
+        discard_changes(window)
+    print("ok: the console appears for a question and goes away with the answer")
+
+
+def test_the_queue_field_can_be_hidden(executable: str) -> None:
+    """Hidden, its lines are not used at all — the console answers instead."""
+    from prologd_gui.settings import Settings
+
+    window = empty_window(executable)
+    try:
+        window.editor().setPlainText(READS_TWO)
+        window.input_pane().setPlainText("7\n9\n")
+        assert window._input_lines() == ["7", "9"]
+
+        window._actions["input_queue"].setChecked(False)
+        assert window.input_pane().isHidden() is True
+        assert window._input_lines() == [], "a hidden field still decided the answers"
+    finally:
+        discard_changes(window)
+
+    assert Settings(window._settings.path).input_queue is False, "the switch was not stored"
+    print("ok: hiding the queue field takes its lines out of the run")
 
 
 def test_cancelling_input_stops_the_run(executable: str) -> None:
     """«Отмена» stops the program and the run asks nothing else."""
     window = empty_window(executable)
     try:
+        window._actions["output"].setChecked(False)  # the dialog needs a reason to be used
         window.editor().setPlainText(READS_TWO)
         asked: list[str] = []
         window._ask_input = lambda kind: asked.append(kind) or None
@@ -445,7 +527,7 @@ def test_cancelling_input_stops_the_run(executable: str) -> None:
         window._ask_input = lambda kind: "5"
         window.run_program()
         wait_for_result(window)
-        assert echoed_lines(window) == []
+        assert echoed_lines(window) == ["> 5", "> 5"], echoed_lines(window)
         assert "5" in window.output_text(), ascii(window.output_text())
         print("ok: cancelling input stops the run, and the next run asks again")
     finally:
@@ -515,7 +597,11 @@ def test_the_output_panel_moves_and_hides(executable: str) -> None:
     stored = Settings(path)
     assert stored.output_position == "bottom", "the side of the panel was not remembered"
     assert len(stored.panel_sizes) == 2 and all(size > 0 for size in stored.panel_sizes)
-    assert len(stored.output_sizes) == 2 and all(size > 0 for size in stored.output_sizes)
+    # Three parts now: the output, the console and the prepared-lines field.  The
+    # console is hidden while nothing is asked, and a hidden splitter child has no
+    # size of its own — so only the sum has to make sense.
+    assert len(stored.output_sizes) == 3, stored.output_sizes
+    assert sum(stored.output_sizes) > 0, stored.output_sizes
     assert stored.output_visible is True
 
     reopened = MainWindow(executable, [], stored)
@@ -708,6 +794,37 @@ def test_the_wrap_switch_reaches_every_editor(executable: str) -> None:
     print("ok: the wrap switch is stored and reaches every editor view")
 
 
+def test_the_output_can_be_saved(executable: str, directory: pathlib.Path) -> None:
+    """A run's output goes to a file as it stands — the text, without the colours."""
+    window = empty_window(executable)
+    target = directory / "вывод.txt"
+    try:
+        window.open_path(str(EXAMPLE))
+        window.run_program()
+        wait_for_result(window)
+
+        before = window.output_text()
+        window._ask_save_output_path = lambda: str(target)
+        window._actions["save_output"].trigger()
+
+        assert target.is_file(), window.status_text()
+        saved = target.read_text(encoding="utf-8")
+        # What goes to the file is the output as it stood.  The note saying where it
+        # went is written into the pane *after* that, so the pane is longer by now —
+        # comparing it with the file was a check that could never pass.
+        assert saved == before, (ascii(saved), ascii(before))
+        assert ANSWER in saved, ascii(saved)
+        assert "вывод сохранён" in window.status_text(), window.status_text()
+        assert window.output_text().startswith(before)
+
+        # Declining the question writes nothing — and does not pretend otherwise.
+        window._ask_save_output_path = lambda: None
+        window._actions["save_output"].trigger()
+        print("ok: the output pane is saved to a file, and declining writes nothing")
+    finally:
+        discard_changes(window)
+
+
 def test_the_menus_come_from_the_action_table(executable: str) -> None:
     """Every menu entry is an action of the table, in the order the table gives.
 
@@ -733,10 +850,13 @@ def test_the_menus_come_from_the_action_table(executable: str) -> None:
         assert set(window._actions) == set(actions.BY_KEY), "the window has stray actions"
 
         # What is not implemented yet says so instead of doing nothing quietly.
+        # «Поиск» left this list in task_33: those five are live now, and
+        # `test_search.py` is where they are checked.
         step = window._actions["step"]
         assert step.isEnabled() is False
         assert "task_28" in step.toolTip(), step.toolTip()
-        assert window._actions["find"].isEnabled() is False
+        assert window._actions["format"].isEnabled() is False
+        assert window._actions["find"].isEnabled() is True, "the search is implemented now"
         print("ok: the menu bar is built from the action table, disabled entries explain themselves")
     finally:
         discard_changes(window)
@@ -757,9 +877,14 @@ def test_the_toolbar_reuses_the_actions(executable: str) -> None:
         assert shown[-1] == actions.BY_KEY["clear_output"].title, shown
         assert window._font_size_box.parent() is not None, "the size control is on the toolbar"
 
-        # An icon that exists is set; one that does not leaves a text-only button.
+        # An icon that exists is set; one that is not drawn yet leaves a text-only
+        # button.  `file-reload` used to be the missing one; the `view-*` switches
+        # are the row still waiting (see `assets.MISSING`).
         assert window._actions["save"].icon().isNull() is False
-        assert window._actions["reload"].icon().isNull() is True, "file-reload.png is not drawn yet"
+        assert window._actions["reload"].icon().isNull() is False, "file-reload.png is drawn now"
+        assert window._actions["line_numbers"].icon().isNull() is True, (
+            "view-line-numbers.png is not drawn yet"
+        )
         print("ok: the toolbar shows the actions and their icons, text-only where none exists")
     finally:
         discard_changes(window)
@@ -1203,7 +1328,10 @@ def main(argv: list[str]) -> int:
         test_saving_clears_the_marker_and_keeps_the_file_shape(executable, files)
         test_cancelling_the_encoding_question_opens_nothing(executable, files)
         test_the_input_field_feeds_the_program(executable)
-        test_the_dialog_is_asked_only_after_the_queue(executable)
+        test_the_console_answers_once_the_prepared_lines_run_out(executable)
+        test_the_dialog_is_the_last_resort(executable)
+        test_the_console_appears_only_when_it_is_asked(executable)
+        test_the_queue_field_can_be_hidden(executable)
         test_cancelling_input_stops_the_run(executable)
         test_a_run_uses_the_tab_that_is_showing(executable)
         test_the_split_editor_shares_one_document(executable)
@@ -1221,6 +1349,7 @@ def main(argv: list[str]) -> int:
         test_undo_and_redo_follow_the_tab_that_is_showing(executable)
         test_the_run_state_drives_the_buttons(executable)
         test_the_wrap_switch_reaches_every_editor(executable)
+        test_the_output_can_be_saved(executable, files)
         test_the_context_menu_reuses_the_shared_actions(executable)
         test_the_font_control_and_the_wheel_are_one_setting(executable)
         test_saving_before_a_run_writes_the_file(executable, files)

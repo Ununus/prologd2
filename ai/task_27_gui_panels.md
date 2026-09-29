@@ -1,8 +1,9 @@
 # task_27 — GUI: output pane, input pane and window layout
 
-**Status:** in progress — the window layout (the movable output panel) and the
-output pane itself are done; the input console is **deliberately postponed** (the
-user wants to think it over), and saving the pane to a file is still open
+**Status:** done — the movable panel, the output pane and the input console are in;
+the input *mode* turned out to need no setting of its own (the console answers when
+the panel is visible, and a hidden panel leaves the dialog), and saving the pane to a
+file is done too
 **Depends on:** task_21
 **Milestone:** M11
 
@@ -25,14 +26,24 @@ instead of only a modal dialog.
     lines with a visible "вывод усечён" marker — a runaway `ВЫВОД` must not eat
     the machine;
   * "следить за выводом" auto-scroll that stops when the user scrolls up.
-- [ ] `InputPane` — the console the reference GUI had: a label showing what is
+- [x] `InputPane` — the console the reference GUI had: a label showing what is
       asked, a one-line editor for `token`/`codepoint` and a multi-line area for
       `line`, plus an "Отправить" button; it answers the pending
       `input_request` with `{"cmd":"input","text":…}`.
-- [ ] Input mode setting: **панель ввода** (default) or **диалоги** (the modal
+      * By the user's decision there is no label row: the question lives in the
+        placeholder (`Слово — Enter`, `Строка — Ctrl+Enter`, `Символ — Enter`), the
+        console is hidden while nothing is asked, and a yellow frame marks it while
+        it waits.  `Ctrl+Enter` sends from the text area, `Enter` from the one-line
+        field, and «Отправить» is there for the mouse.
+- [x] Input mode setting: **панель ввода** (default) or **диалоги** (the modal
       dialogs the skeleton has today).  Whichever is active, the *kind* of the
       request decides the widget, and an unanswered request must be visible in
       the status bar.
+      * Superseded by the user's decision: the mode follows the panel — visible it
+        answers, hidden (`F4`) the dialog does — and the status bar says
+        `ждёт ввода: Слово` while the question stands.  The prepared-lines field has
+        its own switch, «Вид → Поле очереди ввода», and a hidden field is not read
+        at all.
 - [x] Layout: a `QSplitter` with the editor(s) and an *output container*; the
       container is vertical (output over input) and can be moved to the right
       side of the window:

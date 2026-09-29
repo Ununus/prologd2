@@ -19,6 +19,11 @@ from dataclasses import dataclass
 #: and named here so the icon audit sees it.
 RECENT_ICON = "file-recent"
 
+#: The lens at the left of the find bar (task_33).  Not an action of its own:
+#: the bar is built by the window, and the five «Поиск» commands carry the other
+#: search pictures.
+FIND_ICON = "search-find"
+
 #: Names that belong to no action: the tab picture of a buffer (never saved,
 #: saved, modified) and the application icon.  They live here because
 #: `ICON_NAMES` is the list `test_icons.py` holds the code to.
@@ -65,6 +70,8 @@ ACTIONS: tuple[Action, ...] = (
     Action("save_as", "Сохранить как…", "file-save-as", ("Ctrl+Shift+S",)),
     Action("save_all", "Сохранить все", "file-save-all"),
     Action("reload", "Перечитать с диска", "file-reload", ("Ctrl+Shift+R",)),
+    # The output pane as a file: a log of the run, written as plain text.
+    Action("save_output", "Сохранить вывод…", "file-save-as"),
     Action("close", "Закрыть вкладку", "file-close", ("Ctrl+W",)),
     Action("close_all", "Закрыть все", "file-close-all"),
     Action("exit", "Выход", "file-exit", ("Ctrl+Q",)),
@@ -74,7 +81,7 @@ ACTIONS: tuple[Action, ...] = (
     Action("cut", "Вырезать", "edit-cut", ("Ctrl+X",)),
     Action("copy", "Копировать", "edit-copy", ("Ctrl+C",)),
     Action("paste", "Вставить", "edit-paste", ("Ctrl+V",)),
-    Action("delete", "Удалить", None, ("Del",)),
+    Action("delete", "Удалить", "edit-del", ("Del",)),
     Action("select_all", "Выделить всё", None, ("Ctrl+A",)),
     Action("comment", "Закомментировать", "edit-comment", ("Ctrl+K",)),
     Action("uncomment", "Раскомментировать", "edit-uncomment", ("Ctrl+U",)),
@@ -100,40 +107,30 @@ ACTIONS: tuple[Action, ...] = (
         "Поиск и замена…",
         "edit-find-replace",
         ("Ctrl+F",),
-        implemented=False,
-        waiting_for="task_33",
     ),
     Action(
         "find_next",
         "Далее",
         "search-find-next",
         ("F3",),
-        implemented=False,
-        waiting_for="task_33",
     ),
     Action(
         "find_prev",
         "Назад",
         "search-find-prev",
         ("Shift+F3",),
-        implemented=False,
-        waiting_for="task_33",
     ),
     Action(
         "find_selected",
         "Найти выделенное",
         "search-find-selected-next",
         ("Ctrl+F3",),
-        implemented=False,
-        waiting_for="task_33",
     ),
     Action(
         "find_selected_prev",
         "Найти выделенное назад",
         "search-find-selected-prev",
         ("Ctrl+Shift+F3",),
-        implemented=False,
-        waiting_for="task_33",
     ),
     # -- view
     Action("toolbar", "Панель инструментов", "view-toolbar", checkable=True),
@@ -141,6 +138,10 @@ ACTIONS: tuple[Action, ...] = (
     # right side and the bottom (`split_orientation` keeps the reference's name
     # for the command; the icon hints at the *other* position).
     Action("output", "Панель вывода", "view-output-right", ("F4",), checkable=True),
+    # The prepared answers under the output: a program reading a column of numbers
+    # is best answered by typing the column once, and hiding the field is how the
+    # console below takes over for good.
+    Action("input_queue", "Поле очереди ввода", None, checkable=True),
     Action("split", "Разделить редактор", "view-split-editor", ("Ctrl+\\",)),
     Action("merge", "Объединить редакторы", None, ("Ctrl+Shift+\\",)),
     Action("next_tab", "Следующая вкладка", None, ("Ctrl+Tab",)),
@@ -197,7 +198,7 @@ BY_KEY: dict[str, Action] = {action.key: action for action in ACTIONS}
 #: files in `assets/` and against the documented `MISSING` list.
 ICON_NAMES: frozenset[str] = frozenset(
     [action.icon for action in ACTIONS if action.icon]
-    + [RECENT_ICON, FILE_ICON, SAVED_ICON, MODIFIED_ICON, APPLICATION_ICON]
+    + [RECENT_ICON, FIND_ICON, FILE_ICON, SAVED_ICON, MODIFIED_ICON, APPLICATION_ICON]
 )
 
 #: The menu bar: (title, entries).  `-` is a separator, `recent` the submenu of
@@ -214,6 +215,7 @@ MENUS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "save_as",
             "save_all",
             "reload",
+            "save_output",
             SEPARATOR,
             "close",
             "close_all",
@@ -248,6 +250,7 @@ MENUS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "toolbar",
             SEPARATOR,
             "output",
+            "input_queue",
             SEPARATOR,
             "split",
             "merge",

@@ -35,6 +35,7 @@ RESTORE_SPLIT = "view/restore_split"
 TOOLBAR = "view/toolbar"
 OUTPUT_POSITION = "view/output_position"
 OUTPUT_VISIBLE = "view/output_visible"
+INPUT_QUEUE = "view/input_queue"
 OUTPUT_SIZES = "view/output_sizes"
 PANEL_SIZES = "view/panel_sizes"
 SAVE_BEFORE_RUN = "execution/save_before_run"
@@ -300,6 +301,20 @@ class Settings:
     @output_visible.setter
     def output_visible(self, value: bool) -> None:
         self._write(OUTPUT_VISIBLE, bool(value))
+
+    @property
+    def input_queue(self) -> bool:
+        """Whether the field of prepared answers is shown under the output.
+
+        Hidden, its lines are not used at all: the point of hiding it is to answer
+        from the console instead, and a field nobody can see must not decide what
+        the program is told.
+        """
+        return self._flag(INPUT_QUEUE, True)
+
+    @input_queue.setter
+    def input_queue(self, value: bool) -> None:
+        self._write(INPUT_QUEUE, bool(value))
 
     @property
     def output_sizes(self) -> list[int]:

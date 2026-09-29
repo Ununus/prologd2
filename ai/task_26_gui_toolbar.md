@@ -47,6 +47,14 @@ drawing a text-only button.
 
 ## Icons: what exists and what is missing
 
+**Superseded** by the drawings that arrived in task_27 and task_33: the current
+audit is 48 referenced names, 42 drawn, and 6 left — `view-toolbar`,
+`view-split-editor`, `view-output-right`, `view-output-bottom`,
+`view-line-numbers` and `view-theme` — plus `execution-step-over` and
+`execution-restart`, which are waiting for task_28.  `test_icons.py` and the
+«Icon audit» section of `src/gui/README.md` are the live lists; the table below is
+kept as the drawing plan of task_26.
+
 Present (64 px tall PNG, `prologd2.ico` for the window): `file-new`,
 `file-open`, `file-save`, `file-close`, `file-close-all`, `file-exit`,
 `edit-undo`, `edit-redo`, `edit-cut`, `edit-copy`, `edit-paste`, `edit-comment`,

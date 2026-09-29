@@ -90,14 +90,14 @@ session.
 | task_23_gui_keyword_source | done | `--list-keywords` + `keywords` in `ready` (protocol 2); one source for the built-in list |
 | task_24_gui_completion | done | popup over the reserved names *and* the document's own names, with arities; no completion in a comment, string or `#…#`; `Ctrl+Space` |
 | task_25_gui_files_tabs | done | tabs, files, save prompts, encodings, input queue, drop anywhere and the split editor (two panes, one text per document) |
-| task_26_gui_toolbar | done | one action table (48 commands, 12 disabled with a reason) feeding the menu bar, the toolbar and the context menu; icon audit in `src/gui/README.md` (41 names referenced, 27 drawn) |
-| task_27_gui_panels | in progress | the movable panel and the output pane (colour by kind, held half-lines, 50 000-line history with a marker, auto-scroll, status-bar details, run/stop state) are done; the input console is postponed by the user, and saving the pane to a file is open |
+| task_26_gui_toolbar | done | one action table (48 commands, 12 disabled with a reason) feeding the menu bar, the toolbar and the context menu; icon audit in `src/gui/README.md` (48 names referenced, 42 drawn, 6 left: the «Вид» switches) |
+| task_27_gui_panels | done | movable panel (`F4`, `Ctrl+F4`), output pane (colour by kind, visible half-lines, bounded history, auto-scroll, save to a file), input console with the queue switch, status-bar details and the two-state run/stop |
 | task_28_gui_run_step | not started | run, step (new engine seam + protocol v2), stop, error line |
 | task_29_gui_settings | not started | settings dialog and persistence |
 | task_30_gui_formatter | not started | soft/hard formatting in prlib + protocol |
 | task_31_gui_shortcuts | not started | layout-independent `Ctrl`+ key combinations |
 | task_32_import_search_report | done | `ИМПОРТ` failure names the directories tried, with reasons |
-| task_33_gui_search_replace | not started | find/replace bar for the five «Поиск» entries, which are already in the menus (disabled) |
+| task_33_gui_search_replace | done | `search.py` (plain-text, Qt-free) + the find bar: question from the selection or the word at the caret, `F3`/`Shift+F3` with the wrap reported, three switches, «Заменить всё» as one undo step, the matches lit in every view; `test_search.py` has 16 checks |
 
 ## Test suite
 
@@ -464,3 +464,70 @@ Resolved on 2026-09-29 (GUI planning):
   session, because most checks are about what happens after `ready`), and
   `test_the_run_state_drives_the_buttons` walks the whole path: nothing running →
   run → answer → stop (idle) → run → stop (in flight).
+* GUI hand-testing round, part 18: the input console, and the real defect it
+  uncovered.  The user asked whether it was a protocol limitation that
+  `ВЫВОД("Введите символ")` appeared only *after* the answer to `ВВОДСИМВ`; driving
+  the interpreter by hand over the bare protocol showed the order on the wire is
+  right (`output`, then `input_request`, with a deliberate `flush()` between them in
+  `protocol.cpp`), so the defect was in the window: the pane *held* an unfinished
+  line until its newline arrived, and a prompt is exactly such a line.  The pane now
+  writes an unfinished line at once and continues it in place (`Piece(text, kind,
+  complete)` from `LineBuffer`), a change of kind still closes the line first, and
+  the end of a run closes what is left; `test_output.py` carries the case the user
+  reported.  The console is as the user asked: hidden while nothing is asked (an
+  idle strip was taking room from the output and stretching its own label), shown
+  with the question, the kind in the placeholder (`Слово — Enter`,
+  `Строка — Ctrl+Enter`, `Символ — Enter`), a yellow frame (`#e0b400`) while it
+  waits, `Ctrl+Enter` sending from the text area and `Enter` from the one-line
+  field, and the answer echoed with `>`.  The prepared-lines field stays with a
+  switch of its own («Вид → Поле очереди ввода»), and a *hidden* field is not read at
+  all — hiding it is how the console takes over.  «Файл → Сохранить вывод…» writes
+  the pane as UTF-8 text: the text, not the colours, because a log should be
+  readable in any editor.  Two test mistakes of the round were mine: a new check
+  expected one dialog request where the program asks twice, and the run that would
+  have caught it was chained to the commit — so the commit did not happen and the
+  tree waited, which is the right way round.
+* GUI hand-testing round, part 19: **task_33, the find bar**, plus the icons the user
+  drew.  `prologd_gui/search.py` is the engine and is Qt-free on purpose: what goes
+  wrong in a search is arithmetic — an offset into a folded copy instead of into the
+  text, a match counted twice, a wrap that never comes, a «Заменить всё» that finds
+  its own output — and `test_search.py` hammers exactly that.  Case folding happens
+  on a *slice* of the original, never on a copy of the whole text, so a fold that
+  changes a string's length cannot shift the offsets after it.  `prologd_gui/findbar.py`
+  is the strip (question, next/previous, count, the three switches, «Замена» behind a
+  disclosure with «Заменить» and «Заменить всё»); it knows nothing about editors, so
+  there is one place where a question becomes offsets, and that place is `search.py`.
+  The bar is a widget of the window and not a dialog, for two reasons worth
+  remembering: a modal box covers the text being searched, and a modal box cannot be
+  driven from a headless test.  Three decisions of the round: a match the caret is
+  *inside* is the one found (`search.match_at`), so `Ctrl+F` in the middle of `факт`
+  stops on that `факт` while `F3` still moves on; the span of «Только в выделении» is
+  taken *once*, when the switch goes on, because the search itself moves the selection
+  it would otherwise be read from, and switched on with nothing selected it refuses
+  instead of quietly meaning «everywhere»; and re-running the search never moves the
+  caret — the first version moved it to the match it picked, so typing in the program
+  threw the cursor into the next `факт`.  Two Qt traps: `QAction.triggered` hands the
+  slot a `checked` boolean, so `"find": self.show_find` arrived as
+  `show_find(False)` and opened an *empty* field (the entry is a lambda now, and the
+  README says why), and the occurrence highlight of the selected word had to be
+  suppressed while the search shows its own matches, or the pale occurrence colour was
+  painted over the warm one and the *current* match stopped standing out.  The five
+  «Поиск» entries left the disabled list, `search-find` got a name in the table
+  (`actions.FIND_ICON`) instead of being renamed, and `edit-del` became the picture of
+  «Удалить».  With the user's new pictures the audit is 48 names, 42 drawn, 6 to go
+  (`assets.MISSING` is now only the «Вид» switches), which made two window checks
+  stale — one asserted that `find` is disabled, another that `file-reload` has no
+  picture — and one that could never pass: `test_the_output_can_be_saved` compared the
+  file against `output_text()` *after* the pane had been told where it went, so the
+  note about the save was already in the pane.  All thirteen GUI scripts are green.
+* GUI hand-testing round, part 20: the find bar's *shape*, from the user's first look
+  at it.  The three switches moved to a row of their own — beside the field they were
+  the first thing squeezed out of a narrow window — and the strip's vertical size
+  policy is now `Maximum`, so it is exactly as tall as its three rows.  With the
+  default policy the layout shared the window's spare height with the editor and the
+  search took half the program pane; a hidden row takes no room at all, so closing
+  «Замена» gives the height back.  The rows are real widgets (`field_row`,
+  `switch_row`, `replace_row`) rather than loose layouts, because then “which row did
+  this widget end up on?” is a question a test can ask: `test_search.py` checks the
+  parent of each switch and that the rows stack, and the same test fails if the size
+  policy ever goes back to the default.

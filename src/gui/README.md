@@ -65,6 +65,11 @@ version does not know are left alone (task_29 adds the dialog).
 | `Ctrl+Q` | exit (asks about every modified buffer) |
 | `Ctrl+L` | clear the output pane |
 | `Ctrl+K` / `Ctrl+U` | comment / uncomment the selection or the current line |
+| `Ctrl+F` | the find bar over the editor, with the selection or the word at the caret |
+| `F3` / `Shift+F3` | next, previous match — also with the find bar closed |
+| `Ctrl+F3` / `Ctrl+Shift+F3` | find the word under the caret, forwards and backwards |
+| `Esc` | close the find bar, the focus goes back to the editor |
+| `Enter` / `Shift+Enter` in the find field | the same as `F3` / `Shift+F3` |
 | `F4` | show or hide the output panel (the input queue goes with it) |
 | `Ctrl+F4` | move that panel between the right side and the bottom |
 | `Ctrl+Space` | completion popup — it also opens by itself after two letters |
@@ -89,7 +94,10 @@ Neither list is final: the rest of the combinations is task_31.  Zoom uses the
 One table describes every command (`prologd_gui/actions.py`), and the menu bar,
 the toolbar and the editor's context menu are all built from it — so a shortcut,
 a tooltip or an enabled/disabled state cannot exist in two versions and drift
-apart.  The window makes one `QAction` per entry and finds it by key.
+apart.  The window makes one `QAction` per entry and finds it by key.  A method with an
+optional last argument is wired through a lambda (`"find": lambda: self.show_find()
+`), because `QAction.triggered` hands the slot a `checked` boolean: that is how
+`Ctrl+F` once arrived as `show_find(False)` and opened an empty field.
 
 The menus are **Файл** (Новый, Открыть…, Последние, Сохранить, Сохранить как…,
 Сохранить все, Перечитать с диска, Закрыть вкладку, Закрыть все, Выход),
@@ -104,10 +112,10 @@ The menus are **Файл** (Новый, Открыть…, Последние, �
 
 An entry that does not exist yet stays in its menu but is **disabled**, and its
 tooltip names what it waits for: «Форматировать» — task_30, «Настройки…» —
-task_29, «Поиск и замена…» and the four search commands — task_33,
-«Запустить с трассировкой» and «Шаг» — task_28, «Графическое окно» — **no task
-file yet** (the roadmap below has the plan).  A menu that silently lacks half of
-the feature list is worse than one that says so.  The toolbar is grouped as
+task_29, «Запустить с трассировкой» and «Шаг» — task_28, «Графическое окно» —
+**no task file yet** (the roadmap below has the plan).  A menu that silently lacks
+half of the feature list is worse than one that says so.  «Поиск» left that list
+in task_33 and is live; the toolbar is grouped as
 the reference front-end had it: file | run/stop/step | editing (comment,
 uncomment, format) | font size | tools (graphics, settings, help), and at the far
 right **Очистить вывод**, which acts on the output rather than on the program;
@@ -126,38 +134,33 @@ split could not be undone without a restart.
 
 `test_icons.py` is the guard: it fails as soon as a name is misspelled, and it
 also checks that an icon which *does* have a file is not still listed as missing.
-The code references **46** names, **31** of which have a file in
+The code references **48** names, **42** of which have a file in
 `src/gui/assets` (64×64 PNG, transparent background).  A missing file is not an
 error: the action is built without a picture, and the name is reported once on
-stderr (`icons: no view-zoom-in.png — the action will have no picture`).
+stderr (`icons: no view-theme.png — the action will have no picture`).
 
-Present (31): `edit-comment`, `edit-copy`, `edit-cut`, `edit-format`,
-`edit-paste`, `edit-redo`, `edit-uncomment`, `edit-undo`, `execution-abort`,
-`execution-execute`, `execution-step-into`, `execution-tracing`, `file`,
-`file-close`, `file-close-all`, `file-exit`, `file-new`, `file-open`,
-`file-save`, `file-save-all`, `file-saved`, `file-modified`, `help`,
-`prologd2`, `search-find-next`, `search-find-prev`, `search-find-selected-next`,
-`search-find-selected-prev`, `tools-settings`, `view-full-screen`,
-`view-graphics`.
+Present (42): `edit-clear`, `edit-comment`, `edit-copy`, `edit-cut`, `edit-del`,
+`edit-find-replace`, `edit-format`, `edit-paste`, `edit-redo`, `edit-uncomment`,
+`edit-undo`, `execution-abort`, `execution-execute`, `execution-step-into`,
+`execution-tracing`, `file`, `file-close`, `file-close-all`, `file-exit`,
+`file-modified`, `file-new`, `file-open`, `file-recent`, `file-reload`,
+`file-save`, `file-save-all`, `file-save-as`, `file-saved`, `help`, `help-about`,
+`prologd2`, `search-find`, `search-find-next`, `search-find-prev`,
+`search-find-selected-next`, `search-find-selected-prev`, `tools-settings`,
+`view-full-screen`, `view-graphics`, `view-zoom-in`, `view-zoom-out`,
+`view-zoom-reset`.
 
-Still to draw (15 names, listed in `assets.MISSING`) — needed for:
-
-| Name | Needed for |
-|------|------------|
-| `file-save-as`, `file-reload` | Сохранить как…, Перечитать с диска |
-| `file-recent` | the «Последние» submenu (named in `actions.RECENT_ICON`) |
-| `edit-clear`, `edit-find-replace` | Очистить вывод; Поиск и замена… |
-| `view-toolbar`, `view-split-editor`, `view-output-right`, `view-line-numbers` | the view switches |
-| `view-zoom-in`, `view-zoom-out`, `view-zoom-reset`, `view-theme` | zoom (combo box, `Ctrl+0` and the keypad keys) and the theme switch |
-| `view-output-bottom`, `help-about` | Сменить ориентацию сплита; О программе |
+Still to draw (6 names, listed in `assets.MISSING`) — the «Вид» switches:
+`view-toolbar`, `view-split-editor`, `view-output-right`, `view-output-bottom`,
+`view-line-numbers` and `view-theme`.
 
 `MISSING` also names two icons nothing refers to yet — `execution-restart` and
 `execution-step-over` — which is allowed: they are the pictures for features that
-are not wired (task_27, task_28).  The directory holds 32 files, and only one is
-never asked for: `search-find.png`, which task_33 wants under its own name.  Four
-of the names are not buttons at all: `file`, `file-saved` and `file-modified` are
-the states of a tab, and `prologd2` is the window icon, shown in «О программе» and
-in the taskbar.
+are not wired (task_27, task_28).  Six of the names are not buttons at all:
+`file`, `file-saved` and `file-modified` are the states of a tab, `prologd2` is
+the window icon, `search-find` is the lens at the left of the find bar
+(`actions.FIND_ICON`), and `edit-del` is the picture of «Удалить» in the «Правка»
+menu.
 
 ## The output panel
 
@@ -197,6 +200,79 @@ query line, which is also what makes «Остановить» dead until then.  
 side of the status bar says which of the three it is (`выполняется`, `база знаний
 загружена`, `интерпретатор остановлен`), together with the caret's line and column
 and the file's line ending and encoding.
+
+### The input console
+
+Under the output sits the **console**: the field the program's question goes into.
+It is hidden while nothing is asked — an idle strip would take room from the output
+for nothing — and appears with the question, framed in yellow (`#e0b400`) and with
+the answer's own key in its placeholder (`Слово — Enter`, `Строка — Ctrl+Enter`,
+`Символ — Enter`; the one-line field sends on `Enter`, the text area for a `line`
+keeps `Enter` as a newline, because an answer to `ВВОДСТР` may be a sentence).
+`Отправить` is there for the mouse.  The answer is echoed into the output with `>`,
+like the prepared lines, and the strip disappears again.
+
+Answers are taken in this order: the **prepared lines** under it (one per request),
+then the console, and the **modal dialog** only when the whole panel is hidden by
+`F4` — there is nowhere to put a console then.  «Вид → Поле очереди ввода» hides the
+prepared lines; a hidden field contributes nothing at all, so the console answers
+instead.  A run that is waiting is abandoned with «Остановить».
+
+One thing the output pane learned from a user report: a line that has no newline yet
+is written **at once**.  `ВЫВОД` prints without ending the line (that is the language:
+`ВЫВОД` prints, `ПС` breaks the line), so a prompt like
+`ВЫВОД("Введите символ"),ВВОДСИМВ(Ч)` used to stay invisible until the answer's
+echo brought the newline — the program looked as if it asked before saying anything.
+The pane now writes the unfinished line and continues it in place; a change of kind
+(the window's own note arriving mid-line) still closes it first, and the end of a run
+closes what is left.  «Файл → Сохранить вывод…» writes the pane as UTF-8 text — the
+text, not the colours: a log should be readable in any editor.
+
+## The find bar
+
+`Ctrl+F` puts a strip above the editor: the question, the switches, the count and —
+behind the «Замена» disclosure — the replacement field with **Заменить** and
+**Заменить всё**.  It is a widget of the window and not a dialog, for two reasons: a
+modal box covers the text being searched, and a modal box cannot be driven from a
+headless test (the same trap `Buffers._ask_save` avoids).
+
+Three rows, and the switches have one of their own: beside the field they were the
+first thing squeezed out of a narrow window, and a switch that cannot be read is a
+switch the user cannot use.  The strip is also as tall as its rows ask and no more
+(`QSizePolicy.Maximum`) — with the default policy the layout shared the window's
+spare height with the editor, so three short lines took half of the program pane.
+A hidden row takes no room at all, so closing «Замена» gives the height back.
+
+The question starts as the **selection**, or as the word the caret is inside when
+nothing is selected — `факт` for a caret anywhere in `факт(1)`, not the whole
+clause.  `F3` and `Shift+F3` walk the matches and wrap at the ends, and the bar
+**says** it wrapped («1 из 3 — поиск с начала»).  A match the caret is *inside*
+counts as the one being looked for, so `Ctrl+F` in the middle of a word lands on
+that word, while `F3` still moves on.  Every match is highlighted while the bar is
+open — the current one darker than the rest — in **every view** of the document,
+because the split editor shows one text twice; `Esc` clears the highlight, closes
+the strip and gives the focus back to the editor.  Searching never writes to the
+file, and neither do `Ctrl+F3` and `Ctrl+Shift+F3`, which search for the word under
+the caret.
+
+The engine is `prologd_gui/search.py`, and it is **Qt-free** on purpose: what goes
+wrong in a search is arithmetic — an offset into a folded copy instead of into the
+text, a match counted twice, a wrap that never comes, a «Заменить всё» that finds
+its own output — and `test_search.py` hammers exactly that.  The search is by
+*text*, not by pattern: the programs are Russian and full of `#…#`, `?` and
+parentheses, where regular-expression syntax would surprise more than help.
+«С учётом регистра» switches case folding on (`факт` and `ФАКТ` are two predicates
+in PrologD), and «Слово целиком» refuses a match that touches a word character on
+either side, so `фактик` is not `факт`.
+
+«Только в выделении» keeps the span it was switched on over — kept, and not read
+again on every step, because the search itself moves the selection it would
+otherwise be read from.  Switched on with nothing selected it refuses, and the bar
+says «сначала выделите фрагмент» rather than quietly meaning «everywhere», which
+would make its own message a lie.  «Заменить всё» is **one undo step**
+(`beginEditBlock` around the whole replacement), so `Ctrl+Z` undoes the lot; the
+count is recomputed while the text is edited under the bar, and that never moves
+the caret — typing in the program must not throw the cursor into the next match.
 
 ## Tabs and files
 

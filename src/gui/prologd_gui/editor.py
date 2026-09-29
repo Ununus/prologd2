@@ -22,7 +22,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import QCompleter, QPlainTextEdit, QTextEdit, QWidget
 
-from . import completion, tokens
+from . import completion, search, tokens
 from .settings import DEFAULT_FONT_SIZE, MAXIMUM_FONT_SIZE, MINIMUM_FONT_SIZE
 
 #: The comment character of the language: `%` to the end of the line.
@@ -31,6 +31,15 @@ COMMENT_PREFIX = "%"
 #: Background of the line a diagnostic points at (task_28).
 ERROR_BACKGROUND = "#ffd9d9"
 ERROR_NUMBER = "#c00000"
+
+#: Backgrounds of the search bar's matches: all of them, and the one the caret is on.
+SEARCH_MATCH = "#ffe9a8"
+SEARCH_CURRENT = "#ffc14d"
+
+#: Background of the other places the selected word appears, and the size of a
+#: document worth scanning for them on every selection change.
+OCCURRENCE_BACKGROUND = "#e8ecf5"
+OCCURRENCE_LIMIT = 200_000
 
 _MARGIN_BACKGROUND = "#f0f0f0"
 _MARGIN_TEXT = "#8a8a8a"
@@ -226,6 +235,9 @@ class CodeEditor(ZoomablePlainTextEdit):
         self._indent_width = max(1, indent_width)
         self._line_numbers = line_numbers
         self._error_line: int | None = None
+        #: Where the search bar's matches are, and which one the caret sits on.
+        self._search_ranges: list[tuple[int, int]] = []
+        self._current_range: tuple[int, int] | None = None
         self._keywords: object | None = None
         self._auto_complete_after = max(1, int(auto_complete_after))
         self._completion: completion.CompletionModel | None = None
@@ -237,6 +249,10 @@ class CodeEditor(ZoomablePlainTextEdit):
         self.blockCountChanged.connect(self._update_margin_width)
         self.updateRequest.connect(self._update_margin)
         self.cursorPositionChanged.connect(self._margin.update)
+        # Selecting a word shows every other place it appears.  `QPlainTextEdit` has
+        # one list of extra selections, so all the pieces are composed in one place
+        # (`_refresh_extra_selections`) instead of overwriting each other.
+        self.selectionChanged.connect(self._refresh_extra_selections)
         self._update_margin_width()
         if completion:
             self.enable_completion(True)
@@ -312,25 +328,105 @@ class CodeEditor(ZoomablePlainTextEdit):
             bottom = top + round(self.blockBoundingRect(block).height())
             number += 1
 
-    # -- diagnostics --------------------------------------------------------
+    # -- diagnostics, search and occurrences --------------------------------
     def mark_error_line(self, line: int | None) -> None:
         """Paints the 1-based `line` red; `None` clears the mark (task_28)."""
         self._error_line = line
+        self._refresh_extra_selections()
+        self._margin.update()
+
+    def set_search_ranges(
+        self, ranges: list[tuple[int, int]], current: tuple[int, int] | None = None
+    ) -> None:
+        """The search bar's matches, and the one the caret is on."""
+        self._search_ranges = list(ranges)
+        self._current_range = current
+        self._refresh_extra_selections()
+
+    def search_ranges(self) -> list[tuple[int, int]]:
+        """What is highlighted right now — the window clears the pane it left."""
+        return list(self._search_ranges)
+
+    def word_under_cursor(self) -> str:
+        """The token the caret is inside, for `Ctrl+F` and `Ctrl+F3`.
+
+        Letters, digits and the underscore, as the whole-word switch counts them:
+        a caret in `факт(1)` sitting anywhere in the name gives `факт`, not the
+        clause.  An empty answer means there is no word there — whitespace, a
+        bracket, or the end of the line.
+        """
+        cursor = self.textCursor()
+        line = cursor.block().text()
+        position = cursor.positionInBlock()
+        start = position
+        while start > 0 and search.is_word_character(line[start - 1]):
+            start -= 1
+        end = position
+        while end < len(line) and search.is_word_character(line[end]):
+            end += 1
+        return line[start:end]
+    def selected_token(self) -> str | None:
+        """The selection, when it is worth highlighting everywhere.
+
+        One line and no spaces: dragging over a paragraph should not paint half the
+        file, while a name, `факт(1)` or `#X+1#` is exactly what a reader wants to
+        see the other occurrences of.  `\u2029` is Qt's line separator inside a
+        selection.
+        """
+        cursor = self.textCursor()
+        if not cursor.hasSelection():
+            return None
+        text = cursor.selectedText()
+        if not text or "\u2029" in text or any(character.isspace() for character in text):
+            return None
+        return text
+
+    def _refresh_extra_selections(self) -> None:
+        """The diagnostic line, the search's matches and the selected word's.
+
+        One list, because Qt keeps one: setting it from a single feature is how a red
+        diagnostic line disappeared the moment a word was selected.
+        """
         selections: list[QTextEdit.ExtraSelection] = []
-        if line is not None:
-            block = self.document().findBlockByNumber(line - 1)
+        if self._error_line is not None:
+            block = self.document().findBlockByNumber(self._error_line - 1)
             if block.isValid():
                 selection = QTextEdit.ExtraSelection()
                 selection.format.setBackground(QColor(ERROR_BACKGROUND))
-                selection.format.setProperty(
-                    QTextFormat.Property.FullWidthSelection, True
-                )
+                selection.format.setProperty(QTextFormat.Property.FullWidthSelection, True)
                 cursor = QTextCursor(block)
                 cursor.clearSelection()
                 selection.cursor = cursor
                 selections.append(selection)
+
+        for start, length in self._search_ranges:
+            background = SEARCH_CURRENT if (start, length) == self._current_range else SEARCH_MATCH
+            selections.append(self._highlight(start, length, background))
+
+        token = self.selected_token()
+        text = self.toPlainText()
+        # While the find bar is showing its own matches they *are* the occurrences
+        # of that word; a second, lighter set drawn over them would only dull the
+        # current one.  Case-sensitively otherwise: in PrologD `факт` and `Факт`
+        # are two predicates.
+        if (
+            token is not None
+            and not self._search_ranges
+            and len(text) <= OCCURRENCE_LIMIT
+        ):
+            for offset in search.matches(text, token, search.Options(match_case=True)):
+                selections.append(self._highlight(offset, len(token), OCCURRENCE_BACKGROUND))
         self.setExtraSelections(selections)
-        self._margin.update()
+
+    def _highlight(self, start: int, length: int, background: str) -> QTextEdit.ExtraSelection:
+        """One highlighted run of characters."""
+        selection = QTextEdit.ExtraSelection()
+        selection.format.setBackground(QColor(background))
+        cursor = QTextCursor(self.document())
+        cursor.setPosition(start)
+        cursor.setPosition(start + length, QTextCursor.MoveMode.KeepAnchor)
+        selection.cursor = cursor
+        return selection
 
     def error_line(self) -> int | None:
         return self._error_line

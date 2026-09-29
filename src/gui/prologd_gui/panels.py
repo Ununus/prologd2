@@ -15,10 +15,19 @@ read something.
 
 from __future__ import annotations
 
+import pathlib
 from dataclasses import dataclass
 
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QTextCharFormat, QTextCursor
-from PySide6.QtWidgets import QWidget
+from PySide6.QtWidgets import (
+    QHBoxLayout,
+    QLineEdit,
+    QPlainTextEdit,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from . import theme
 from .editor import ZoomablePlainTextEdit
@@ -49,52 +58,63 @@ TRUNCATED_MARK = "*** вывод усечён: показаны только п�
 
 
 @dataclass(frozen=True)
-class Line:
-    """One finished line, with the kind of text it came from."""
+class Piece:
+    """A run of text of one kind, which may end in the middle of a line.
+
+    `complete` says whether a newline ended it.  An incomplete piece is the line so
+    far, and the rest of it may still arrive — it is written out all the same,
+    because a program that prints a prompt with `ВЫВОД` and then waits for the
+    answer leaves exactly such a line, and a prompt the user cannot see is not a
+    prompt.
+    """
 
     text: str
     kind: str = OUTPUT
+    complete: bool = True
 
 
 class LineBuffer:
-    """Turns chunks of text into lines, holding the unfinished tail.
+    """Turns chunks of text into pieces, remembering the line that is still open.
 
-    Qt-free on purpose: this is the part with the classic defect in it — a partial
-    line that reaches the pane and is never completed — so it is the part that is
-    tested directly.
+    What it hands out is the *new* text of every chunk, never the line again: the
+    pane has already written what it was given, and repeating it would double the
+    prompt on screen.  A change of kind closes the open line — the bare newline of
+    that piece — so a note of our own never becomes the tail of the program's.
+
+    Qt-free on purpose: a line that goes missing in here is invisible on screen, so
+    this is the part that is tested directly.
     """
 
     def __init__(self) -> None:
         self._tail = ""
         self._kind = OUTPUT
 
-    def feed(self, text: str, kind: str = OUTPUT) -> list[Line]:
-        """The complete lines of `text`; what follows the last newline waits."""
-        lines: list[Line] = []
+    def feed(self, text: str, kind: str = OUTPUT) -> list[Piece]:
+        """The pieces of `text`, continuing the line the previous call left open."""
+        pieces: list[Piece] = []
         if self._tail and kind != self._kind:
-            # The kind changed in the middle of a line — a note arriving while the
-            # program left half a line behind.  That half is a line of its own, or
-            # it would be painted with the note's colour.
-            lines.append(Line(self._tail, self._kind))
+            # Close the half-line as it is: it belongs to the text it came from.
+            pieces.append(Piece("", self._kind, complete=True))
             self._tail = ""
-        rest = self._tail + text if self._tail else text
-        self._tail = ""
-        parts = rest.split("\n")
-        self._tail = parts.pop()
+        parts = text.split("\n")
+        tail = parts.pop()
+        for part in parts:
+            pieces.append(Piece(part, kind, complete=True))
+        if tail or not pieces:
+            pieces.append(Piece(tail, kind, complete=False))
+        self._tail = tail
         self._kind = kind
-        lines.extend(Line(part, kind) for part in parts)
-        return lines
+        return pieces
 
-    def flush(self) -> list[Line]:
-        """The held tail as a line — for the end of a run that stopped mid-line."""
+    def flush(self) -> list[Piece]:
+        """Ends the open line, if there is one; its text is on screen already."""
         if not self._tail:
             return []
-        line = Line(self._tail, self._kind)
         self._tail = ""
-        return [line]
+        return [Piece("", self._kind, complete=True)]
 
     def pending(self) -> str:
-        """What is waiting for a newline (the window's notes ask this)."""
+        """The text of the line that is still open (for tests and for notes)."""
         return self._tail
 
     def reset(self) -> None:
@@ -132,28 +152,36 @@ class OutputPane(ZoomablePlainTextEdit):
 
     # -- text --------------------------------------------------------------
     def feed(self, text: str, kind: str = OUTPUT) -> None:
-        """Adds whatever of `text` is a finished line, colouring it by `kind`."""
-        lines = self._buffer.feed(text, kind)
-        if lines:
-            self.append_lines(lines)
+        """Writes whatever of `text` is new, colouring it by `kind`.
+
+        An unfinished line is written at once: waiting for its newline is how the
+        prompt of `ВЫВОД`/`ВВОДСИМВ` used to appear only after the answer arrived.
+        """
+        pieces = self._buffer.feed(text, kind)
+        if pieces:
+            self.append_pieces(pieces)
 
     def flush(self) -> None:
-        """Writes a held partial line; the run is over and it will not be finished."""
-        lines = self._buffer.flush()
-        if lines:
-            self.append_lines(lines)
+        """Ends the open line; the run is over and nothing will finish it."""
+        pieces = self._buffer.flush()
+        if pieces:
+            self.append_pieces(pieces)
 
-    def append_lines(self, lines: list[Line]) -> None:
-        """Inserts finished lines in one pass.
+    def append_pieces(self, pieces: list[Piece]) -> None:
+        """Inserts pieces in one pass.
 
         A cursor of the *document* rather than the pane's own: the user's caret and
-        selection have nothing to do with the output, and moving them would take
-        the selection away while a program is running.
+        selection have nothing to do with the output, and moving them would take the
+        selection away while a program is running.
         """
         cursor = QTextCursor(self.document())
         cursor.movePosition(QTextCursor.MoveOperation.End)
-        for line in lines:
-            cursor.insertText(line.text + "\n", self._formats.get(line.kind, self._plain))
+        for piece in pieces:
+            fmt = self._formats.get(piece.kind, self._plain)
+            if piece.text:
+                cursor.insertText(piece.text, fmt)
+            if piece.complete:
+                cursor.insertText("\n", fmt)
         self._trim()
         if self._following:
             bar = self.verticalScrollBar()
@@ -165,6 +193,16 @@ class OutputPane(ZoomablePlainTextEdit):
         self._buffer.reset()
         self._truncated = False
         self._following = True
+
+    def save_to(self, path: str) -> int:
+        """Writes what the pane holds as UTF-8, and says how many characters went.
+
+        The *text* is saved, not the colours: the point is a log of the run, and a
+        log readable in any editor is worth more than one that keeps the markup.
+        """
+        text = self.toPlainText()
+        pathlib.Path(path).write_text(text, encoding="utf-8")
+        return len(text)
 
     # -- the history -------------------------------------------------------
     def line_limit(self) -> int:
@@ -215,3 +253,141 @@ class OutputPane(ZoomablePlainTextEdit):
         cursor = QTextCursor(document)
         cursor.setPosition(0)
         cursor.insertText(TRUNCATED_MARK + "\n", self._formats[ERROR])
+
+
+#: What a request is called in the console and in the status bar.
+INPUT_PROMPTS = {
+    "token": "Слово",
+    "line": "Строка",
+    "codepoint": "Символ",
+}
+
+#: A yellow frame round the answer while the program is waiting for it.  The
+#: console appears and disappears, so the colour is what actually catches the eye.
+ARMED_BORDER = "QLineEdit, QPlainTextEdit { border: 2px solid #e0b400; }"
+
+
+class AnswerEdit(QPlainTextEdit):
+    """The text area for a `line` request, where `Ctrl+Enter` sends.
+
+    Plain `Enter` is a newline here on purpose: an answer to `ВВОДСТР` may be a
+    sentence, and a control that sends on the first `Enter` cannot type one.
+    """
+
+    submitted = Signal()
+
+    def keyPressEvent(self, event) -> None:  # noqa: N802 - Qt spelling
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and (
+            event.modifiers() & Qt.KeyboardModifier.ControlModifier
+        ):
+            self.submitted.emit()
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+
+class InputPane(QWidget):
+    """The console under the output: what the program asks, and the answer.
+
+    Idle until an `input_request` arrives; then the label says what is wanted (the
+    kind decides which field appears — one line for a token or a code point, a text
+    area for a line) and `Ctrl+Enter`, `Enter` in the one-line field, or
+    «Отправить» sends the answer.  The window wraps it in `{"cmd":"input",…}`.
+
+    The *prepared* answers under it stay: a program that reads a column of numbers
+    is still best answered by typing the column once, and the console is what is
+    left when those lines run out.
+    """
+
+    #: One answer, ready to send.
+    submitted = Signal(str)
+
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        *,
+        font_family: str = "Cascadia Mono",
+        font_size: float = 11.0,
+    ) -> None:
+        super().__init__(parent)
+        self._family = font_family
+        self._size = font_size
+        self._kind = ""
+
+        self._line = QLineEdit()
+        self._line.returnPressed.connect(self.send)
+        self._text = AnswerEdit()
+        self._text.submitted.connect(self.send)
+        self._text.setVisible(False)
+        self._button = QPushButton("Отправить")
+        self._button.clicked.connect(self.send)
+
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.addWidget(self._line, 1)
+        row.addWidget(self._button)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(2, 2, 2, 2)
+        layout.setSpacing(2)
+        layout.addLayout(row)
+        layout.addWidget(self._text)
+        self.set_font_size(font_size)
+        self.idle()
+
+    # -- what the window drives --------------------------------------------
+    def ask(self, kind: str) -> None:
+        """Arms the console for the request that is pending — and shows it.
+
+        The strip is hidden while nothing is asked, because it would otherwise take
+        room from the output for nothing; and the question is a *state*, so what it
+        wants and which key sends it go into the placeholder.
+        """
+        self._kind = kind
+        word = INPUT_PROMPTS.get(kind, "Значение")
+        multiline = kind == "line"
+        self._text.setVisible(multiline)
+        self._line.setVisible(not multiline)
+        self._text.setPlaceholderText(f"{word} — Ctrl+Enter")
+        self._line.setPlaceholderText(f"{word} — Enter")
+        self._line.clear()
+        self._text.clear()
+        self.setEnabled(True)
+        self.setStyleSheet(ARMED_BORDER)
+        self.show()
+        (self._text if multiline else self._line).setFocus()
+
+    def idle(self) -> None:
+        """Nothing is being asked: no room taken, and nothing to answer."""
+        self._kind = ""
+        self._line.clear()
+        self._text.clear()
+        self.setEnabled(False)
+        self.setStyleSheet("")
+        self.hide()
+
+    def kind(self) -> str:
+        return self._kind
+
+    def waiting(self) -> bool:
+        return bool(self._kind)
+
+    def answer(self) -> str:
+        """What is typed now — a whole text area for a `line`, else one line."""
+        if self._kind == "line":
+            return self._text.toPlainText()
+        return self._line.text()
+
+    def send(self) -> None:
+        """Hands the answer over; `Ctrl+Enter`, `Enter` or the button."""
+        if not self._kind:
+            return
+        self.submitted.emit(self.answer())
+
+    def set_font_size(self, size: float) -> None:
+        """The console follows the editor's size, like the output above it."""
+        self._size = float(size)
+        font = self._line.font()
+        font.setPointSizeF(self._size)
+        self._line.setFont(font)
+        self._text.setFont(font)

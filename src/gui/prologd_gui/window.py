@@ -11,7 +11,7 @@ from __future__ import annotations
 import pathlib
 
 from PySide6.QtCore import QSize, Qt, QUrl
-from PySide6.QtGui import QAction, QDesktopServices, QIntValidator, QKeySequence
+from PySide6.QtGui import QAction, QDesktopServices, QIntValidator, QKeySequence, QTextCursor
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from . import actions, appearance, assets, documents, panels
+from . import actions, appearance, assets, documents, findbar, panels, search
 from .buffers import Buffer
 from .editor import CodeEditor, ZoomablePlainTextEdit
 from .panes import Pane
@@ -150,6 +150,15 @@ class MainWindow(QMainWindow):
         self._input_pane.zoomChanged.connect(self._on_zoom_changed)
         self._input_pane.fileDropped.connect(self.open_path)
 
+        # The console: what the program asks once the prepared lines under it run
+        # out (or when that field is hidden).  `Ctrl+Enter` sends; «Остановить» is
+        # how a run that waits for an answer is abandoned.
+        self._input_console = panels.InputPane(
+            font_family=self._settings.font_family,
+            font_size=self._settings.font_size,
+        )
+        self._input_console.submitted.connect(self._send_input)
+
         self._query_line = QLineEdit()
         # The same face as the panes, so a goal looks like the program it asks
         # about; `_on_zoom_changed` keeps it in step.
@@ -157,9 +166,34 @@ class MainWindow(QMainWindow):
         self._query_line.setPlaceholderText("?цель(X). — Enter, чтобы выполнить")
         self._query_line.returnPressed.connect(self._run_query)
 
+        # The find bar (task_33): a strip above the editor, hidden until `Ctrl+F`.
+        # Not a dialog — a modal box covers the text being searched and cannot be
+        # driven from a headless test.
+        self._find_bar = findbar.FindBar()
+        self._find_bar.changed.connect(self._on_find_changed)
+        self._find_bar.stepRequested.connect(self._find_step_from_bar)
+        self._find_bar.replaceRequested.connect(self.replace_current)
+        self._find_bar.replaceAllRequested.connect(self.replace_all)
+        self._find_bar.closeRequested.connect(self.close_find)
+        self._find_bar.spanToggled.connect(self._on_find_span_toggled)
+
+        #: What the last search found, and which of those the caret is on.  Where
+        #: the next step starts from is derived from that match, not stored: the
+        #: step continues *after* the match forwards and *before* it backwards.
+        self._find_matches: list[int] = []
+        self._find_current: int | None = None
+        #: The span «Только в выделении» was switched on over — taken once, because
+        #: the search moves the selection it would otherwise be read from.
+        self._find_span: tuple[int, int] | None = None
+        #: The buffer whose views carry the highlight, so the previous one is cleared.
+        self._find_highlighted: Buffer | None = None
+        #: The view whose text changes keep the matches fresh while the bar is open.
+        self._find_bound: CodeEditor | None = None
+
         editor_area = QWidget()
         editor_layout = QVBoxLayout(editor_area)
         editor_layout.setContentsMargins(0, 0, 0, 0)
+        editor_layout.addWidget(self._find_bar)
         editor_layout.addWidget(self._editor_splitter)
         editor_layout.addWidget(self._query_line)
 
@@ -170,9 +204,11 @@ class MainWindow(QMainWindow):
         self._editor_area = editor_area
         self._sidebar = QSplitter(Qt.Orientation.Vertical)
         self._sidebar.addWidget(self._output)
+        self._sidebar.addWidget(self._input_console)
         self._sidebar.addWidget(self._input_pane)
         stored = [size for size in self._settings.output_sizes if size > 0]
-        self._sidebar.setSizes(stored if len(stored) == 2 else [420, 110])
+        self._sidebar.setSizes(stored if len(stored) == 3 else [360, 140, 90])
+        self._input_pane.setVisible(self._settings.input_queue)
 
         # One splitter, two orientations: side by side when the panel is on the
         # right, stacked when it is at the bottom.  The order (editor first) is the
@@ -252,6 +288,7 @@ class MainWindow(QMainWindow):
             "save": lambda: self.save_buffer(),
             "save_as": self._save_as,
             "save_all": self._save_all,
+            "save_output": self._save_output,
             "reload": self.reload_buffer,
             "close": self._close_current,
             "close_all": self._close_all_tabs,
@@ -266,8 +303,14 @@ class MainWindow(QMainWindow):
             "comment": self._comment,
             "uncomment": self._uncomment,
             "clear_output": self.clear_output,
+            "find": lambda: self.show_find(),
+            "find_next": lambda: self.find_step(False),
+            "find_prev": lambda: self.find_step(True),
+            "find_selected": lambda: self.find_selected(False),
+            "find_selected_prev": lambda: self.find_selected(True),
             "toolbar": self._toggle_toolbar,
             "output": self._toggle_output,
+            "input_queue": self._toggle_input_queue,
             "split": self.split_editor,
             "merge": self.merge_editor,
             "next_tab": self._next_tab,
@@ -421,6 +464,8 @@ class MainWindow(QMainWindow):
         self._refresh_titles()
         self._sync_undo_actions()
         self._update_details()
+        # The find bar follows the tab that is showing: another tab is another text.
+        self._refollow_find()
 
     def _sync_run_actions(self) -> None:
         """Two states, two buttons.
@@ -482,6 +527,7 @@ class MainWindow(QMainWindow):
         self._actions["save_before_run"].setChecked(self._settings.save_before_run)
         self._actions["full_screen"].setChecked(self.isFullScreen())
         self._actions["output"].setChecked(self.output_visible())
+        self._actions["input_queue"].setChecked(self._settings.input_queue)
         self._sync_pane_actions()
         self._sync_undo_actions()
         self._sync_run_actions()
@@ -732,6 +778,12 @@ class MainWindow(QMainWindow):
         self._sidebar.setVisible(bool(visible))
         self._status.setText("панель вывода показана" if visible else "панель вывода скрыта")
 
+    def _toggle_input_queue(self, checked: bool) -> None:
+        """Hides the prepared answers, and stops taking anything from them."""
+        self._settings.input_queue = bool(checked)
+        self._input_pane.setVisible(bool(checked))
+        self._status.setText("поле очереди ввода: " + ("показано" if checked else "скрыто"))
+
     def _save_panel_state(self) -> None:
         """Remembers the side of the panel and the sizes inside both splitters."""
         self._settings.output_position = self.output_position()
@@ -766,6 +818,8 @@ class MainWindow(QMainWindow):
             return
         self._active_pane = self._panes.index(pane)
         self._refresh_titles()
+        # «Найти» acts on the pane that was used last, so the matches move with it.
+        self._refollow_find()
         buffer = self.current_buffer()
         where = f" — панель {self._active_pane + 1} из {len(self._panes)}" if len(self._panes) > 1 else ""
         if buffer is not None and buffer.model.path:
@@ -1104,6 +1158,7 @@ class MainWindow(QMainWindow):
         self._loaded = False
         self._session.stop()
         message = "база знаний выгружена" if unloading else "остановлено"
+        self._input_console.idle()
         self._status.setText(message)
         self._append_note(f"--- {message} ---\n")
         # The process is gone, so the buttons change at once — waiting for `ended`
@@ -1114,6 +1169,36 @@ class MainWindow(QMainWindow):
     def clear_output(self) -> None:
         """Empties the pane, including the half-line it was holding."""
         self._output.reset()
+
+    def _save_output(self) -> None:
+        """Writes the output pane to a file of the user's choosing."""
+        path = self._ask_save_output_path()
+        if not path:
+            return
+        try:
+            self._output.save_to(path)
+        except OSError as error:
+            self._append_note(f"*** не могу записать {path}: {error}\n")
+            self._status.setText("вывод не сохранён")
+            return
+        self._append_note(f"--- вывод сохранён в {path} ---\n")
+        self._status.setText(f"вывод сохранён: {pathlib.Path(path).name}")
+
+    def _ask_save_output_path(self) -> str | None:
+        """Where to put the output.
+
+        Replaceable for the same reason as `_ask_save`: a modal box cannot be driven
+        from a headless test, and a test that forgets to replace one does not fail —
+        it *hangs*.
+        """
+        start = pathlib.Path(self._settings.last_directory or pathlib.Path.home())
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Сохранить вывод",
+            str(start / "вывод.txt"),
+            "Текст (*.txt);;Все файлы (*)",
+        )
+        return path or None
 
     # -- buffers -----------------------------------------------------------
     def _add_buffer(self, model: documents.Document) -> Buffer:
@@ -1146,6 +1231,14 @@ class MainWindow(QMainWindow):
             self._buffers.remove(buffer)
         for pane in self._panes:
             pane.set_buffers(self._buffers)  # detaches the views as well
+        # Its views are about to go, so the find bar must not hold the buffer they
+        # belonged to — and must not keep a highlight it can no longer clear.
+        if self._find_highlighted is buffer:
+            self._find_highlighted = None
+            self._find_matches = []
+            self._find_current = None
+            if self._find_bound not in buffer.views():
+                self._find_bound = None
         buffer.deleteLater()
 
     def _is_placeholder(self, buffer: Buffer) -> bool:
@@ -1223,6 +1316,331 @@ class MainWindow(QMainWindow):
     def _reset_zoom(self) -> None:
         self.editor().reset_zoom()
 
+    # -- searching ---------------------------------------------------------
+    def find_bar(self) -> findbar.FindBar:
+        """The bar itself — its fields are what the user and the tests type into."""
+        return self._find_bar
+
+    def find_open(self) -> bool:
+        """Whether the bar is on screen.
+
+        `isHidden`, not `isVisible`: a window that was never shown reads as
+        invisible whatever the bar is doing, the same trap the toolbar switch has.
+        """
+        return not self._find_bar.isHidden()
+
+    def _find_view(self) -> CodeEditor | None:
+        """The view the search works on: the active pane's current tab."""
+        pane = self.active_pane() if self._panes else None
+        return pane.current_view() if pane is not None else None
+
+    def _find_options(self) -> search.Options:
+        return search.Options(
+            match_case=self._find_bar.match_case(),
+            whole_word=self._find_bar.whole_word(),
+            span=self._find_span,
+        )
+
+    @staticmethod
+    def _prefill(view: CodeEditor) -> str:
+        """What `Ctrl+F` starts with: the selection, else the word at the caret."""
+        return view.selected_token() or view.word_under_cursor()
+
+    @staticmethod
+    def _match_from(
+        text: str, needle: str, position: int, options: search.Options
+    ) -> tuple[int | None, bool]:
+        """The match at `position`, else the next one, and whether that wrapped.
+
+        A caret *inside* a match counts as being on it: `Ctrl+F` in the middle of
+        `факт` must land on that `факт`.  An `F3` step is unaffected, because it
+        continues after the match it has just found.
+        """
+        covered = search.match_at(text, needle, position, options)
+        if covered is not None:
+            return covered, False
+        offset = search.next_match(text, needle, position, options)
+        return offset, offset is not None and offset < position
+
+    def show_find(self, text: str | None = None) -> bool:
+        """`Ctrl+F`: the bar above the editor, prefilled and focused.
+
+        `text` overrides the prefill, which is how `Ctrl+F3` hands over the word
+        it found.  An empty prefill leaves the previous question in the field: a
+        reader who searched for `факт` a moment ago does not want the field wiped
+        because the caret happens to sit on a bracket.
+        """
+        view = self._find_view()
+        if view is None:
+            return False
+        if text is None:
+            text = self._prefill(view)
+        if text:
+            self._find_bar.set_needle(text)
+        self._find_bar.setVisible(True)
+        self._bind_find_view(view)
+        self._find_current = None
+        if self._find_bar.needle():
+            # From the caret: a match the caret is *inside* is the one to start on.
+            self.find_step(False)
+        else:
+            self._refresh_find()
+        self._find_bar.focus_find()
+        return True
+
+    def close_find(self) -> None:
+        """`Esc`: the bar and its highlight go, and the editor has the focus."""
+        self._find_bar.setVisible(False)
+        self._find_bar.set_only_in_selection(False)
+        self._find_span = None
+        self._find_matches = []
+        self._find_current = None
+        self._bind_find_view(None)
+        self._apply_find_highlight()
+        view = self._find_view()
+        if view is not None:
+            view.setFocus()
+
+    def find_selected(self, backwards: bool = False) -> bool:
+        """`Ctrl+F3` / `Ctrl+Shift+F3`: the word under the caret, then the next one.
+
+        The step starts *outside* the selection, or the first hit would be the
+        text that is already on screen and the command would look dead.
+        """
+        view = self._find_view()
+        if view is None:
+            return False
+        token = view.selected_token() or view.word_under_cursor()
+        if not token:
+            return False
+        self._find_bar.set_needle(token)
+        self._find_bar.setVisible(True)
+        self._bind_find_view(view)
+        cursor = view.textCursor()
+        # `-1` backwards is one before the first character, which wraps round the
+        # top of the document; `selectionEnd()` forwards is past the current word.
+        start = cursor.selectionStart() - 1 if backwards else cursor.selectionEnd()
+        self._find_current = None
+        found = self.find_step(backwards, start)
+        self._find_bar.focus_find()
+        return found
+
+    def find_step(self, backwards: bool = False, start: int | None = None) -> bool:
+        """`F3` / `Shift+F3`: the next match, wrapping at the ends.
+
+        Works with the bar closed — the question in its field is the one the last
+        search asked — but a bar that has never been used has no question and
+        `F3` then does what `Ctrl+F` does.
+
+        `start` overrides where the step begins, which is how «Найти выделенное»
+        skips the word that is already selected.
+        """
+        view = self._find_view()
+        if view is None:
+            return False
+        if not self._find_bar.needle():
+            return self.show_find()
+        needle = self._find_bar.needle()
+        options = self._find_options()
+        text = view.toPlainText()
+        found = search.matches(text, needle, options)
+        self._find_matches = found
+        if not found:
+            self._find_current = None
+            self._apply_find_highlight()
+            self._find_status()
+            return False
+        if start is None:
+            if self._find_current in found:
+                # Past the match the caret is on, in the direction of travel.
+                start = self._find_current - 1 if backwards else self._find_current + len(needle)
+            else:
+                start = view.textCursor().selectionStart()
+        if backwards:
+            offset = search.previous_match(text, needle, start, options)
+            # It wrapped when the match is *after* where the search started.
+            wrapped = offset > start
+        else:
+            offset, wrapped = self._match_from(text, needle, start, options)
+        self._find_current = offset
+        self._select_match(view, offset, len(needle))
+        self._apply_find_highlight()
+        self._find_status(wrapped=wrapped, backwards=backwards)
+        return True
+
+    def _find_step_from_bar(self, backwards: bool) -> None:
+        """`Enter`/`Shift+Enter` in the question field."""
+        self.find_step(backwards)
+
+    def replace_current(self) -> bool:
+        """«Заменить»: the match the caret is on, then look for the next one."""
+        view = self._find_view()
+        needle = self._find_bar.needle()
+        if view is None or not needle or self._find_current is None:
+            return False
+        replacement = self._find_bar.replacement()
+        offset = self._find_current
+        cursor = view.textCursor()
+        cursor.setPosition(offset)
+        cursor.setPosition(offset + len(needle), QTextCursor.MoveMode.KeepAnchor)
+        cursor.insertText(replacement)  # one `insertText` is one undo step itself
+        # The caret now sits after what was written, and that is where the next
+        # step goes from.
+        self._find_current = None
+        return self.find_step(False)
+
+    def replace_all(self) -> bool:
+        """«Заменить всё»: every match, in *one* undo step.
+
+        The whole replacement is one block of edits, the way comment/uncomment is:
+        a reader who disliked it presses `Ctrl+Z` once, not once per match.
+        """
+        view = self._find_view()
+        needle = self._find_bar.needle()
+        if view is None or not needle:
+            return False
+        replacement = self._find_bar.replacement()
+        text = view.toPlainText()
+        replaced, how_many = search.replace_all(text, needle, replacement, self._find_options())
+        if not how_many:
+            self._refresh_find()
+            self._find_bar.set_status("не найдено")
+            return False
+        cursor = view.textCursor()
+        cursor.beginEditBlock()
+        try:
+            cursor.setPosition(0)
+            cursor.setPosition(len(text), QTextCursor.MoveMode.KeepAnchor)
+            cursor.insertText(replaced)
+        finally:
+            cursor.endEditBlock()
+        self._find_current = None
+        self._refresh_find()
+        # After `_refresh_find`, which sets the status of the search that is left.
+        self._find_bar.set_status(f"заменено {how_many}")
+        return True
+
+    def _select_match(self, view: CodeEditor, offset: int, length: int) -> None:
+        cursor = view.textCursor()
+        cursor.setPosition(offset)
+        cursor.setPosition(offset + length, QTextCursor.MoveMode.KeepAnchor)
+        view.setTextCursor(cursor)
+        # Scrolled into view, but not centred: a match jumping to the middle of the
+        # window loses the paragraph the reader was following.
+        view.ensureCursorVisible()
+
+    def _refresh_find(self) -> None:
+        """Recomputes the matches after the text or the question changed.
+
+        The caret is deliberately not moved here: typing in the editor with the bar
+        open must not throw the caret into the next match.  Only a step does that.
+        """
+        view = self._find_view()
+        needle = self._find_bar.needle()
+        options = self._find_options()
+        text = view.toPlainText() if view is not None else ""
+        self._find_matches = search.matches(text, needle, options) if needle and view else []
+        if self._find_current not in self._find_matches:
+            self._find_current = None
+        if self._find_current is None and self._find_matches and view is not None:
+            # The match the caret is on (or inside), else the first one after it.
+            self._find_current, _wrapped = self._match_from(
+                text, needle, view.textCursor().selectionStart(), options
+            )
+        self._apply_find_highlight()
+        self._find_status()
+
+    def _on_find_changed(self) -> None:
+        """The question or a switch changed: search again from the caret."""
+        view = self._find_view()
+        if view is None:
+            return
+        self._find_current = None
+        if self._find_bar.needle():
+            self.find_step(False)
+        else:
+            self._refresh_find()
+
+    def _on_find_span_toggled(self, checked: bool) -> None:
+        """«Только в выделении» keeps the span it was switched on over.
+
+        Kept, and not read again on every step: the search itself moves the
+        selection, so a span read afresh would shrink to the match just found.
+        """
+        view = self._find_view()
+        cursor = view.textCursor() if view is not None else None
+        if checked and (cursor is None or not cursor.hasSelection()):
+            self._find_bar.uncheck_only_in_selection()
+            self._find_bar.set_status("сначала выделите фрагмент")
+            self._find_span = None
+            return
+        self._find_span = (
+            (cursor.selectionStart(), cursor.selectionEnd()) if checked and cursor else None
+        )
+        self._on_find_changed()
+
+    def _refollow_find(self) -> None:
+        """Points the bar at the pane and the tab that are showing now."""
+        if not self.find_open():
+            return
+        self._bind_find_view(self._find_view())
+        self._find_current = None
+        self._refresh_find()
+
+    def _bind_find_view(self, view: CodeEditor | None) -> None:
+        """Keeps the matches fresh while the text is edited under the bar."""
+        if self._find_bound is view:
+            return
+        if self._find_bound is not None:
+            try:
+                self._find_bound.textChanged.disconnect(self._refresh_find)
+            except (RuntimeError, TypeError):  # the view is already gone
+                pass
+        self._find_bound = view
+        if view is not None:
+            view.textChanged.connect(self._refresh_find)
+
+    def _apply_find_highlight(self) -> None:
+        """Paints the matches in every view of the active document, nowhere else.
+
+        Every view, because the split editor shows one text twice; and only the
+        active document, because a highlight left in a tab the user switched away
+        from is a lie about where the search is.
+        """
+        pane = self.active_pane() if self._panes else None
+        buffer = pane.current_buffer() if pane is not None else None
+        length = len(self._find_bar.needle())
+        current = None if self._find_current is None else (self._find_current, length)
+        ranges = (
+            [(offset, length) for offset in self._find_matches] if self.find_open() else []
+        )
+        if self._find_highlighted is not None and self._find_highlighted is not buffer:
+            for view in self._find_highlighted.views():
+                view.set_search_ranges([])
+            self._find_highlighted = None
+        if buffer is not None:
+            for view in buffer.views():
+                view.set_search_ranges(ranges, current)
+            self._find_highlighted = buffer if ranges else None
+
+    def _find_status(self, wrapped: bool = False, backwards: bool = False) -> None:
+        """«3 из 17», and where the search went round — reported, not silent."""
+        if not self._find_bar.needle():
+            self._find_bar.set_status("")
+            return
+        if not self._find_matches:
+            self._find_bar.set_status("не найдено")
+            return
+        index = (
+            self._find_matches.index(self._find_current) + 1
+            if self._find_current in self._find_matches
+            else 0
+        )
+        where = ""
+        if wrapped:
+            where = " — поиск с конца" if backwards else " — поиск с начала"
+        self._find_bar.set_status(f"{index} из {len(self._find_matches)}{where}")
+
     # -- input requests ----------------------------------------------------
     def _on_input_request(self, kind: str) -> None:
         """Feeds the program: the prepared lines first, the dialog only after them.
@@ -1242,22 +1660,41 @@ class MainWindow(QMainWindow):
             self._session.answer_input(line)
             self._status.setText(f"ввод из поля, осталось строк — {len(self._queued_input)}")
             return
+        if not self._sidebar.isHidden():
+            self._input_console.ask(kind)
+            self._status.setText(f"ждёт ввода: {panels.INPUT_PROMPTS.get(kind, 'значение')}")
+            return
         answer = self._ask_input(kind)
         if answer is None:
-            self._stopped_input = True
-            self._append_note("--- ввод отменён: программа остановлена ---\n")
-            self._session.stop()
-            self._status.setText("ввод отменён, выполнение остановлено")
+            self._cancel_input()
             return
+        self._send_input(answer)
+
+    def _send_input(self, answer: str) -> None:
+        """One answer — from the console or from the dialog — echoed and sent."""
+        self._input_console.idle()
+        self._append_output(f"> {answer}\n", panels.ECHO)
         self._session.answer_input(answer)
+        self._status.setText("ввод принят")
+
+    def _cancel_input(self) -> None:
+        """«Отмена» stops the whole run: nothing else is asked during it."""
+        self._stopped_input = True
+        self._input_console.idle()
+        self._append_note("--- ввод отменён: программа остановлена ---\n")
+        self._session.stop()
+        self._status.setText("ввод отменён, выполнение остановлено")
 
     def _input_lines(self) -> list[str]:
         """The input field, one answer per line, blank lines dropped.
 
         A line is taken as written — leading spaces can matter for a string — but
         a line that is empty or only spaces is an answer to nothing, and skipping
-        it is what keeps the field easy to read.
+        it is what keeps the field easy to read.  A *hidden* field contributes
+        nothing: hiding it is how the console below takes over for good.
         """
+        if self._input_pane.isHidden():
+            return []
         return [line for line in self._input_pane.toPlainText().split("\n") if line.strip()]
 
     def _ask_input(self, kind: str) -> str | None:
@@ -1357,6 +1794,7 @@ class MainWindow(QMainWindow):
             buffer.set_font_size(size)
         self._output.set_font_size(size)
         self._input_pane.set_font_size(size)
+        self._input_console.set_font_size(size)
         self._query_line.setFont(self._output.font())
         self._show_font_size(size)
         self._status.setText(f"шрифт {size:.0f} pt")
