@@ -90,13 +90,14 @@ session.
 | task_23_gui_keyword_source | done | `--list-keywords` + `keywords` in `ready` (protocol 2); one source for the built-in list |
 | task_24_gui_completion | done | popup over the reserved names *and* the document's own names, with arities; no completion in a comment, string or `#…#`; `Ctrl+Space` |
 | task_25_gui_files_tabs | done | tabs, files, save prompts, encodings, input queue, drop anywhere and the split editor (two panes, one text per document) |
-| task_26_gui_toolbar | done | one action table (48 commands, 12 disabled with a reason) feeding the menu bar, the toolbar and the context menu; icon audit in `src/gui/README.md` (41 names referenced, 25 drawn) |
+| task_26_gui_toolbar | done | one action table (48 commands, 12 disabled with a reason) feeding the menu bar, the toolbar and the context menu; icon audit in `src/gui/README.md` (41 names referenced, 27 drawn) |
 | task_27_gui_panels | not started | output and input panes, output bottom/right |
 | task_28_gui_run_step | not started | run, step (new engine seam + protocol v2), stop, error line |
 | task_29_gui_settings | not started | settings dialog and persistence |
 | task_30_gui_formatter | not started | soft/hard formatting in prlib + protocol |
 | task_31_gui_shortcuts | not started | layout-independent `Ctrl`+ key combinations |
 | task_32_import_search_report | done | `ИМПОРТ` failure names the directories tried, with reasons |
+| task_33_gui_search_replace | not started | find/replace bar for the five «Поиск» entries, which are already in the menus (disabled) |
 
 ## Test suite
 
@@ -355,3 +356,24 @@ Resolved on 2026-09-29 (GUI planning):
   in the repo memory.  `doc/gui.typ` gained section 9 (menus, toolbar, icons) and
   a rewritten "not done yet" list; the Typst trap of the day: bold is one star —
   `**bold**` is not Markdown, it warns and bolds nothing.
+* GUI hand-testing round, part 13: four requests from the user and one defect they
+  found.  **«Разделить» and «Объединить» were broken**: the pane-dependent enabled
+  state was computed once at start-up, so after `Ctrl+\` the «Объединить
+  редакторы» entry stayed greyed out — and a disabled `QAction` fires no shortcut,
+  so `Ctrl+Shift+\` did nothing and a split could not be undone without a restart
+  (`_sync_pane_actions`, now called from both commands, with a test that drives
+  them the way a key does).  Zoom gained the *keypad* keys `Ctrl+Num+` and
+  `Ctrl+Num-` (Qt spells them `Num++`/`Num+-`, and they are different combinations
+  from `Ctrl++`/`Ctrl+-`, which stay free for the task_31 skeleton insertions);
+  «Очистить вывод» moved to the far right of the toolbar, since it acts on the
+  output rather than on the program; and the user's two new icons
+  (`file-save-all.png`, `execution-step-into.png`) left `assets.MISSING` — 41
+  referenced names, 27 drawn, 14 to go.  Search and replace finally has a task
+  file of its own (`ai/task_33_gui_search_replace.md`), which the five disabled
+  «Поиск» entries name in their tooltips.  Two harness lessons from the same
+  round: an offscreen screenshot of a split showed the second pane *without text*
+  while both views really held it (the real Windows platform paints it — check on
+  the real platform before believing an offscreen grab), and a synthetic `QTest`
+  key is unreliable in a long headless run once several windows exist, so the
+  regression test drives the commands through `trigger()` — the same path, and
+  refused in exactly the cases where a dead shortcut would be.

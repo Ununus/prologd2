@@ -353,6 +353,18 @@ class MainWindow(QMainWindow):
                         view.addAction(self._actions[key])
                 view.setProperty("prologdContext", True)
 
+    def _sync_pane_actions(self) -> None:
+        """`split` and `merge` follow the number of panes.
+
+        Not cosmetic: both carry a key (`Ctrl+\\` and `Ctrl+Shift+\\`), and a
+        *disabled* `QAction` does not fire its shortcut — so without this call
+        right after a split or a merge the key that undoes it goes dead, and the
+        menu entry stays greyed out.  That is exactly how «Разделить и объединить»
+        broke: the state was only ever computed on start-up.
+        """
+        self._actions["split"].setEnabled(len(self._panes) < 2)
+        self._actions["merge"].setEnabled(len(self._panes) > 1)
+
     def _sync_actions(self) -> None:
         """Makes the checkable entries agree with the settings and the panes."""
         # `isHidden`, not `isVisible`: a toolbar of a window that was never shown
@@ -363,8 +375,7 @@ class MainWindow(QMainWindow):
         self._actions["theme"].setChecked(self._settings.theme == appearance.SYSTEM)
         self._actions["save_before_run"].setChecked(self._settings.save_before_run)
         self._actions["full_screen"].setChecked(self.isFullScreen())
-        self._actions["split"].setEnabled(len(self._panes) < 2)
-        self._actions["merge"].setEnabled(len(self._panes) > 1)
+        self._sync_pane_actions()
         self._show_font_size(self._settings.font_size)
 
     # -- editing commands of the current view ------------------------------
@@ -515,6 +526,7 @@ class MainWindow(QMainWindow):
         if remember:
             self._save_split_state()
         self._refresh_titles()
+        self._sync_pane_actions()
         self._status.setText("редактор разделён: две панели, одна программа")
         return True
 
@@ -535,6 +547,7 @@ class MainWindow(QMainWindow):
         if remember:
             self._save_split_state()
         self._refresh_titles()
+        self._sync_pane_actions()
         self._status.setText("редактор объединён: одна панель")
         return True
 

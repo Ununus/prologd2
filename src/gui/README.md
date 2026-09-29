@@ -67,14 +67,15 @@ version does not know are left alone (task_29 adds the dialog).
 | `Ctrl+K` / `Ctrl+U` | comment / uncomment the selection or the current line |
 | `Ctrl+Space` | completion popup — it also opens by itself after two letters |
 | `Enter` / `Tab` / `Esc` | take the highlighted completion / close the popup |
-| `Ctrl`+wheel, `Ctrl+0` | font size (6…72 pt) and its reset |
+| `Ctrl`+wheel, `Ctrl`+keypad `+`/`-`, `Ctrl+0` | font size (6…72 pt) and its reset |
 | `Tab` / `Shift+Tab` | indent / outdent the selected lines |
 | `Enter` | continues the indent after `,`, `:-` or `<-` |
 
-Neither list is final: the rest of the combinations is task_31.  Zoom
-deliberately has no key pair of its own —
-`Ctrl+=`, `Ctrl++` and `Ctrl+-` will insert a `РАВНО(…)`, `СЛОЖЕНИЕ(…)` or
-`ВЫЧИТАНИЕ(…)` skeleton there.
+Neither list is final: the rest of the combinations is task_31.  Zoom uses the
+*keypad* keys — `Ctrl+Num+` and `Ctrl+Num-`, which Qt spells `Num++` and `Num+-`
+(the keypad modifier is part of the sequence) — so that `Ctrl+=`, `Ctrl++` and
+`Ctrl+-` on the main row stay free for the `РАВНО(…)`, `СЛОЖЕНИЕ(…)` and
+`ВЫЧИТАНИЕ(…)` skeletons.
 
 ## Menus, toolbar and icons
 
@@ -96,48 +97,58 @@ The menus are **Файл** (Новый, Открыть…, Последние, �
 
 An entry that does not exist yet stays in its menu but is **disabled**, and its
 tooltip names what it waits for: «Форматировать» — task_30, «Настройки…» —
-task_29, «Поиск и замена…» and the four search commands — no task file yet,
+task_29, «Поиск и замена…» and the four search commands — task_33,
 «Панель вывода», «Сменить ориентацию сплита», «Графическое окно» — task_27,
 «Запустить с трассировкой» and «Шаг» — task_28.  A menu that silently lacks half
 of the feature list is worse than one that says so.  The toolbar is grouped as
 the reference front-end had it: file | run/stop/step | editing (comment,
-uncomment, format, clear output) | font size | tools (graphics, settings, help);
+uncomment, format) | font size | tools (graphics, settings, help), and at the far
+right **Очистить вывод**, which acts on the output rather than on the program;
 `QToolBar.setIconSize(QSize(24, 24))` is set explicitly so the layout does not
 depend on the style.
+
+The two commands of the split editor follow the number of panes: `split` is
+enabled while there is one, `merge` while there are two.  That is not cosmetic —
+both carry a key, and a *disabled* `QAction` fires no shortcut — so the state is
+recomputed right after a split or a merge (`_sync_pane_actions`).  It was
+computed on start-up only, which left «Объединить редакторы» greyed out for the
+rest of the session: the menu did nothing, `Ctrl+Shift+\` did nothing, and a
+split could not be undone without a restart.
 
 ### Icon audit
 
 `test_icons.py` is the guard: it fails as soon as a name is misspelled, and it
 also checks that an icon which *does* have a file is not still listed as missing.
-The code references **41** names, **25** of which have a file in
+The code references **41** names, **27** of which have a file in
 `src/gui/assets` (64×64 PNG, transparent background).  A missing file is not an
 error: the action is built without a picture, and the name is reported once on
 stderr (`icons: no view-zoom-in.png — the action will have no picture`).
 
-Present (25): `edit-comment`, `edit-copy`, `edit-cut`, `edit-format`,
+Present (27): `edit-comment`, `edit-copy`, `edit-cut`, `edit-format`,
 `edit-paste`, `edit-redo`, `edit-uncomment`, `edit-undo`, `execution-abort`,
-`execution-execute`, `execution-tracing`, `file-close`, `file-close-all`,
-`file-exit`, `file-new`, `file-open`, `file-save`, `help`, `search-find-next`,
-`search-find-prev`, `search-find-selected-next`, `search-find-selected-prev`,
-`tools-settings`, `view-full-screen`, `view-graphics`.
+`execution-execute`, `execution-step-into`, `execution-tracing`, `file-close`,
+`file-close-all`, `file-exit`, `file-new`, `file-open`, `file-save`,
+`file-save-all`, `help`, `search-find-next`, `search-find-prev`,
+`search-find-selected-next`, `search-find-selected-prev`, `tools-settings`,
+`view-full-screen`, `view-graphics`.
 
-Still to draw (16 names, listed in `assets.MISSING`) — needed for:
+Still to draw (14 names, listed in `assets.MISSING`) — needed for:
 
 | Name | Needed for |
 |------|------------|
-| `file-save-as`, `file-save-all`, `file-reload` | Сохранить как…, Сохранить все, Перечитать с диска |
+| `file-save-as`, `file-reload` | Сохранить как…, Перечитать с диска |
 | `file-recent` | the «Последние» submenu (named in `actions.RECENT_ICON`) |
 | `edit-clear`, `edit-find-replace` | Очистить вывод; Поиск и замена… |
 | `view-toolbar`, `view-split-editor`, `view-output-right`, `view-line-numbers` | the view switches |
-| `view-zoom-in`, `view-zoom-out`, `view-zoom-reset`, `view-theme` | zoom (now a combo box with `Ctrl+0`) and the theme switch |
-| `execution-step-into`, `help-about` | Шаг (task_28), О программе |
+| `view-zoom-in`, `view-zoom-out`, `view-zoom-reset`, `view-theme` | zoom (now a combo box with `Ctrl+0` and the keypad keys) and the theme switch |
+| `help-about` | О программе |
 
 `MISSING` also names three icons nothing refers to yet — `execution-restart`,
 `execution-step-over`, `view-output-bottom` — which is allowed: they are the
 pictures for features that are not wired (task_27, task_28).  The directory holds
-three files the code never asks for: `file.png`, `search-find.png` (would fit
-Поиск и замена…) and `prologd2.png`, which is meant to be the window icon —
-`setWindowIcon` is not called anywhere yet.
+30 files, of which three are never asked for: `file.png`, `search-find.png`
+(task_33 will want that picture) and `prologd2.png`, which is meant to be the
+window icon — `setWindowIcon` is not called anywhere yet.
 
 ## Tabs and files
 

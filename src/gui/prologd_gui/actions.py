@@ -93,7 +93,7 @@ ACTIONS: tuple[Action, ...] = (
         "edit-find-replace",
         ("Ctrl+F",),
         implemented=False,
-        waiting_for="задача ещё не заведена",
+        waiting_for="task_33",
     ),
     Action(
         "find_next",
@@ -101,7 +101,7 @@ ACTIONS: tuple[Action, ...] = (
         "search-find-next",
         ("F3",),
         implemented=False,
-        waiting_for="задача ещё не заведена",
+        waiting_for="task_33",
     ),
     Action(
         "find_prev",
@@ -109,7 +109,7 @@ ACTIONS: tuple[Action, ...] = (
         "search-find-prev",
         ("Shift+F3",),
         implemented=False,
-        waiting_for="задача ещё не заведена",
+        waiting_for="task_33",
     ),
     Action(
         "find_selected",
@@ -117,7 +117,7 @@ ACTIONS: tuple[Action, ...] = (
         "search-find-selected-next",
         ("Ctrl+F3",),
         implemented=False,
-        waiting_for="задача ещё не заведена",
+        waiting_for="task_33",
     ),
     Action(
         "find_selected_prev",
@@ -125,7 +125,7 @@ ACTIONS: tuple[Action, ...] = (
         "search-find-selected-prev",
         ("Ctrl+Shift+F3",),
         implemented=False,
-        waiting_for="задача ещё не заведена",
+        waiting_for="task_33",
     ),
     # -- view
     Action("toolbar", "Панель инструментов", "view-toolbar", checkable=True),
@@ -150,8 +150,12 @@ ACTIONS: tuple[Action, ...] = (
         waiting_for="task_27",
     ),
     Action("line_numbers", "Номера строк", "view-line-numbers", checkable=True),
-    Action("zoom_in", "Увеличить шрифт", "view-zoom-in"),
-    Action("zoom_out", "Уменьшить шрифт", "view-zoom-out"),
+    # The zoom keys are the *keypad* ones: `Ctrl+=` and `Ctrl+-` sit on the main
+    # row, where task_31 puts the `РАВНО`/`СЛОЖЕНИЕ`/`ВЫЧИТАНИЕ` skeletons.  Qt
+    # spells the keypad `+` as `Num++` (it is a different combination from `+`:
+    # the keypad modifier is part of the sequence).
+    Action("zoom_in", "Увеличить шрифт", "view-zoom-in", ("Ctrl+Num++",)),
+    Action("zoom_out", "Уменьшить шрифт", "view-zoom-out", ("Ctrl+Num+-",)),
     Action("zoom_reset", "Обычный размер шрифта", "view-zoom-reset", ("Ctrl+0",)),
     Action("theme", "Системная тема (иначе светлая)", "view-theme", checkable=True),
     Action("full_screen", "Полный экран", "view-full-screen", ("F11",), checkable=True),
@@ -268,7 +272,8 @@ MENUS: tuple[tuple[str, tuple[str, ...]], ...] = (
 )
 
 #: The toolbar, grouped as the reference front-end had it: files, run/stop/step,
-#: editing, then the size control, then the tools.
+#: editing, then the size control, then the tools — and, at the far right,
+#: «Очистить вывод», which acts on the output rather than on the program.
 TOOLBAR: tuple[str, ...] = (
     "new",
     "open",
@@ -282,7 +287,6 @@ TOOLBAR: tuple[str, ...] = (
     "comment",
     "uncomment",
     "format",
-    "clear_output",
     SEPARATOR,
     FONT_SIZE,
     SEPARATOR,
@@ -290,6 +294,8 @@ TOOLBAR: tuple[str, ...] = (
     SEPARATOR,
     "settings",
     "help_doc",
+    SEPARATOR,
+    "clear_output",
 )
 
 #: The editor's context menu, built from the same actions.

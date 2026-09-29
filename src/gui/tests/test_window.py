@@ -504,6 +504,9 @@ def test_the_toolbar_reuses_the_actions(executable: str) -> None:
         shown = [entry.text() for entry in toolbar.actions() if not entry.isSeparator()]
         for key in ("new", "open", "save", "run", "stop", "comment", "clear_output"):
             assert actions.BY_KEY[key].title in shown, (key, shown)
+        # «Очистить вывод» is the last button on the right: it acts on the output,
+        # not on the program, so it is kept away from the editing group.
+        assert shown[-1] == actions.BY_KEY["clear_output"].title, shown
         assert window._font_size_box.parent() is not None, "the size control is on the toolbar"
 
         # An icon that exists is set; one that does not leaves a text-only button.
@@ -870,16 +873,51 @@ def test_the_documented_shortcuts_are_bound(executable: str) -> None:
             bound = {sequence.toString() for sequence in window._actions[key].shortcuts()}
             assert bound == expected, f"{key} is bound to {sorted(bound)}, documented {sorted(expected)}"
 
-        # Zoom in and out have no key on purpose: `Ctrl+=`, `Ctrl++` and `Ctrl+-`
-        # belong to the `РАВНО`/`СЛОЖЕНИЕ`/`ВЫЧИТАНИЕ` skeletons of task_31.
-        for key in ("zoom_in", "zoom_out"):
-            assert window._actions[key].shortcuts() == [], key
+        # Zoom is on the *keypad* keys.  `Ctrl+=`, `Ctrl++` and `Ctrl+-` sit on the
+        # main row and belong to the `РАВНО`/`СЛОЖЕНИЕ`/`ВЫЧИТАНИЕ` skeletons of
+        # task_31; the keypad is a different combination to Qt, and it is spelled
+        # `Num++`/`Num+-` (the keypad modifier is part of the sequence).
+        for key, expected in (("zoom_in", {"Ctrl+Num++"}), ("zoom_out", {"Ctrl+Num+-"})):
+            bound = {sequence.toString() for sequence in window._actions[key].shortcuts()}
+            assert bound == expected, f"{key} is bound to {sorted(bound)}"
 
         # Triggering is the same path a shortcut takes.
         window.open_path(str(EXAMPLE))
         window._actions["run"].trigger()
         assert pump(window, lambda: ANSWER in window.output_text()), ascii(window.output_text())
         print("ok: the documented keys are bound to the actions, and the action runs the program")
+    finally:
+        discard_changes(window)
+
+
+def test_split_and_merge_follow_the_pane_count(executable: str) -> None:
+    """Both commands are enabled according to how many panes there are.
+
+    Not cosmetic: each carries a key (`Ctrl+\\`, `Ctrl+Shift+\\`), and a *disabled*
+    `QAction` fires neither its shortcut nor `trigger()` — so with the state
+    computed on start-up only, «Объединить редакторы» stayed greyed out for the
+    rest of the session and a split could not be undone without a restart.
+
+    The commands are driven through `trigger()` here: a synthetic key is
+    unreliable in a long headless run once several windows exist, while
+    `trigger()` takes the same path a shortcut does (`triggered` → the slot) and
+    is refused in exactly the same cases.
+    """
+    window = empty_window(executable)
+    try:
+        assert window._actions["split"].isEnabled() is True
+        assert window._actions["merge"].isEnabled() is False
+
+        window._actions["split"].trigger()
+        assert window.pane_count() == 2, "«Разделить редактор» did nothing"
+        assert window._actions["merge"].isEnabled() is True, "the merge entry stayed disabled"
+        assert window._actions["split"].isEnabled() is False, "a second pane is not a third"
+
+        window._actions["merge"].trigger()
+        assert window.pane_count() == 1, "«Объединить редакторы» did nothing"
+        assert window._actions["split"].isEnabled() is True, "the split entry stayed disabled"
+        assert window._actions["merge"].isEnabled() is False
+        print("ok: split and merge are enabled by the pane count, and are usable again")
     finally:
         discard_changes(window)
 
@@ -921,6 +959,7 @@ def main(argv: list[str]) -> int:
         test_each_pane_has_its_own_current_tab(executable, files)
         test_merging_the_editor_keeps_the_documents(executable, files)
         test_the_split_survives_a_restart(executable)
+        test_split_and_merge_follow_the_pane_count(executable)
         test_the_menus_come_from_the_action_table(executable)
         test_the_toolbar_reuses_the_actions(executable)
         test_view_switches_are_stored(executable)

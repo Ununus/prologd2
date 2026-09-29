@@ -22,17 +22,16 @@ from PySide6.QtGui import QIcon
 DEFAULT_DIRECTORY = pathlib.Path(__file__).resolve().parent.parent / "assets"
 
 #: Referenced by the code, not drawn yet.  Task_26 lists the set and the sizes
-#: they should be drawn in; until then those actions show their title only.
+#: they should be drawn in; until then those actions show their title only.  The
+#: last three are for features that are not wired at all (task_27, task_28).
 MISSING = frozenset(
     {
         "edit-clear",
         "edit-find-replace",
         "execution-restart",
-        "execution-step-into",
         "execution-step-over",
         "file-recent",
         "file-reload",
-        "file-save-all",
         "file-save-as",
         "help-about",
         "view-line-numbers",
