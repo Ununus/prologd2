@@ -63,6 +63,7 @@ std::string expectedOutput(const std::string& source) {
 const std::vector<std::string>& checkedLessons() {
   static const std::vector<std::string> names = {
       "lesson_01.pld",
+      "lesson_02.pld",
   };
   return names;
 }
@@ -87,7 +88,7 @@ std::string withoutQueries(const std::string& source) {
 
 TEST_CASE("ported example programs parse cleanly") {
   const std::vector<std::string> files = {
-      "lessons/lesson_2.pld", "lessons/lesson_3.pld",
+      "lessons/lesson_3.pld",
       "lessons/lesson_4.pld", "lessons/lesson_5.pld", "lessons/lesson_6.pld",
       "lessons/lesson_8.pld", "lessons/lesson_9.pld",
       "factorial.pld",        "file_io.pld",         "drawing.pld",
@@ -118,17 +119,6 @@ TEST_CASE("every lesson prints exactly what its comments promise") {
     REQUIRE_FALSE(result.runtimeError);
     REQUIRE(result.output == expectedOutput(source));
   }
-}
-
-TEST_CASE("lesson 2 primitives, digits and reversal") {
-  const std::string program = withoutQueries(readExample("lessons/lesson_2.pld")) +
-                              "?простое(7).\n"
-                              "?простое(8).\n"
-                              "?минциф(1785,Ц).\n"
-                              "?наоборот(1785,Ф).\n";
-  const auto result = runProgram(program);
-  REQUIRE(result.loaded);
-  REQUIRE(result.output == "ДА\nНЕТ\nЦ=1\nФ=5871\n");
 }
 
 TEST_CASE("lesson 3 string predicates") {
