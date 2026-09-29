@@ -633,3 +633,29 @@ Resolved on 2026-09-29 (GUI planning):
   functions, the exact number comparison and cyclic terms, the prompt, the code
   point range, the string range rules, the type-test truth table, the database
   clamps and the graphics argument rule.
+* Question-answering round, part 23: **«где расхождение» в `КОПИЯ`**, from the
+  user's own lesson program.  The old interpreter answered `?сколько(идиотизм,"и",Q)`
+  with `Q=3`; the port answers `Q=1`.  The difference is one branch: `КОПИЯ(с,П,Р,с4)`
+  with **both position and length free**.  The program takes the prefix *before* the
+  occurrence it found and counts there, which only adds up when the found occurrence
+  is the **last** one — and the reference searched from the end (its `str0.rfind`)
+  until commit `da51bbe` («Fix: КОПИЯ», 23.03.2023, by the original author) rewrote
+  that line to `str0.find` while doing something else entirely (allowing a negative
+  length and letting its sign choose the direction in the *other* search mode); the
+  port was written from the post-fix reference, so it inherited `find`, and the
+  lessons were never updated because their queries are commented out.  With
+  `Х=1` the lesson's second clause (`РАВНО(Х,1),!`) fires and answers `1` — there is
+  no bug in the new code, only a silent behaviour change in the old one.  Decision
+  (the user's): **keep the left-to-right search** — it is what the current reference
+  does — and bring lesson 3 in line with it instead of the other way round.  So
+  `сколько/3` now counts the rest *after* the first occurrence (`1` is the case where
+  the occurrence *is* the whole string), `замена/4` and `удаление/3` cut the first
+  occurrence out and recurse, and the results are the ones the lesson wanted:
+  `Н=3`, `Т=юбвюбвю` (all three `а` replaced), `Ю=бркдбр`, and `скобки` on the
+  lesson's own example finally diagnoses the real reason instead of comparing two
+  accidentally equal counts.  `doc/help.typ` §7.4 states the direction now (it was
+  undocumented), `test_lessons.cpp` pins the rewritten lesson, and
+  `ai/porting_notes.md` records the deviation from the original file.  Worth
+  remembering: this is the second time a *lesson's* behaviour has been the only
+  evidence for a built-in's semantics — the lessons are the acceptance material, and
+  a commented-out query is not a test.

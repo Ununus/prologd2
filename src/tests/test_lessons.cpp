@@ -89,12 +89,34 @@ TEST_CASE("lesson 2 primitives, digits and reversal") {
 }
 
 TEST_CASE("lesson 3 string predicates") {
+  // The lesson is written for the `КОПИЯ` that searches from the beginning of
+  // the string: the count walks the rest *after* the first occurrence, and
+  // `замена`/`удаление` cut the first one out and recurse.  The original lesson
+  // counted from the last one, which only worked while that search went from the
+  // end (see ai/porting_notes.md).
   const std::string program = withoutQueries(readExample("lessons/lesson_3.pld")) +
                               "?обращение(абвгдежз,С).\n"
-                              "?замена(\"а\",\"ю\",абвабва,Т).\n";
+                              "?сколько(идиотизм,\"и\",Н).\n"
+                              "?сколько(\"абаб\",\"аб\",Н2).\n"
+                              "?сколько(\"абв\",\"абв\",Н3).\n"
+                              "?сколько(\"абв\",\"з\",Н4).\n"
+                              "?замена(\"а\",\"ю\",абвабва,Т).\n"
+                              "?замена(\"а\",\"ю\",бвг,Т2).\n"
+                              "?удаление(\"а\",абракадабра,Ю).\n"
+                              "?скобки(\"()(()()()))(\").\n";
   const auto result = runProgram(program);
   REQUIRE(result.loaded);
-  REQUIRE(result.output == "С=зжедгвба\nТ=юбвабва\n");
+  REQUIRE(result.output ==
+          "С=зжедгвба\n"
+          "Н=3\n"
+          "Н2=2\n"
+          "Н3=1\n"
+          "Н4=0\n"
+          "Т=юбвюбвю\n"
+          "Т2=бвг\n"
+          "Ю=бркдбр\n"
+          "Неверный порядок скобок в строке: первая скобка - правая ()(()()()))(\n"
+          "ДА\n");
 }
 
 TEST_CASE("lesson 4 sorting") {
