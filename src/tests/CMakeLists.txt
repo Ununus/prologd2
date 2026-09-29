@@ -6,6 +6,8 @@ add_executable(prlib_tests
   test_parser.cpp
   test_unify.cpp
   test_engine.cpp
+  test_builtins_control.cpp
+  test_builtins_types.cpp
   test_builtins_arith.cpp
   test_builtins_string.cpp
   test_builtins_io.cpp
@@ -31,6 +33,12 @@ if(MSVC)
   target_compile_options(prlib_tests PRIVATE /utf-8)
 endif()
 
+# Keep test case names ASCII.  The discovery step below runs the test binary with
+# `--list-tests` and decodes what it writes with the code page of the build's
+# console (the OEM one when the build has none), so a Russian test name is stored
+# double encoded in `prlib_tests-*_tests.cmake`; `ctest` then reports "No test
+# cases matched" for it even though the binary runs the test fine.  The test
+# *goals* are Russian throughout — only the names have to stay ASCII.
 catch_discover_tests(prlib_tests)
 
 # ---------------------------------------------------------------------------

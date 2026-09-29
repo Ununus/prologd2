@@ -15,6 +15,27 @@ using detail::unifyFloat;
 using detail::unifyInteger;
 using detail::unifyText;
 
+namespace {
+
+/// The largest code point UTF-8 can carry.
+constexpr std::int64_t kMaxCodePoint = 0x10FFFF;
+
+/// The optional second argument of the reading predicates is a prompt: it is
+/// written before the read, the way the original waited at the console.  A
+/// prompt that is not text is an error, like any other wrong type.
+void writePrompt(Engine& engine, std::span<const Term> args, std::string_view predicate) {
+  if (args.size() < 2) {
+    return;
+  }
+  const auto prompt = asText(engine, args[1]);
+  if (!prompt) {
+    badArguments(predicate);
+  }
+  engine.io().write(*prompt);
+}
+
+}  // namespace
+
 BuiltinResult builtinWrite(Engine& engine, std::span<const Term> args) {
   for (const Term& argument : args) {
     engine.io().write(engine.format(argument));
@@ -26,7 +47,11 @@ BuiltinResult builtinWriteCode(Engine& engine, std::span<const Term> args) {
   const auto value = asNumeric(engine, args[0]);
   if (value && !value->is_float) {
     const long long code = value->integer.toInt64();
-    if (code < 0) {
+    // A code point has to be a Unicode scalar value.  A negative one, one past
+    // U+10FFFF, or a surrogate used to be encoded anyway, which wrote bytes that
+    // are not UTF-8 at all — and the JSON protocol cannot carry those back to a
+    // front-end.
+    if (code < 0 || code > kMaxCodePoint || (code >= 0xD800 && code <= 0xDFFF)) {
       badArguments("ВВКОД");
     }
     engine.io().write(utf8Encode(static_cast<CodePoint>(code)));
@@ -45,6 +70,7 @@ BuiltinResult builtinWriteCode(Engine& engine, std::span<const Term> args) {
 }
 
 BuiltinResult builtinReadInt(Engine& engine, std::span<const Term> args) {
+  writePrompt(engine, args, "ВВОДЦЕЛ");
   const std::optional<std::string> token = engine.io().readToken();
   if (!token) {
     return BuiltinResult::Fail;
@@ -65,6 +91,7 @@ BuiltinResult builtinReadInt(Engine& engine, std::span<const Term> args) {
 }
 
 BuiltinResult builtinReadFloat(Engine& engine, std::span<const Term> args) {
+  writePrompt(engine, args, "ВВОДВЕЩ");
   const std::optional<std::string> token = engine.io().readToken();
   if (!token) {
     return BuiltinResult::Fail;
@@ -91,6 +118,7 @@ BuiltinResult builtinReadFloat(Engine& engine, std::span<const Term> args) {
 }
 
 BuiltinResult builtinReadSymbol(Engine& engine, std::span<const Term> args) {
+  writePrompt(engine, args, "ВВОДСИМВ");
   const std::optional<std::string> token = engine.io().readToken();
   if (!token) {
     return BuiltinResult::Fail;
@@ -107,6 +135,7 @@ BuiltinResult builtinReadSymbol(Engine& engine, std::span<const Term> args) {
 }
 
 BuiltinResult builtinReadString(Engine& engine, std::span<const Term> args) {
+  writePrompt(engine, args, "ВВОДСТР");
   const std::optional<std::string> line = engine.io().readWholeLine();
   if (!line) {
     return BuiltinResult::Fail;

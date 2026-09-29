@@ -9,14 +9,14 @@ session.
   started (protocol + skeleton).
 * Build: the `windows-msvc` preset (Visual Studio 18 2026, MSVC 19.51) build is
   green locally; the Linux presets, including `-Werror`, build cleanly.
-* Tests: 126/126 pass in about a second: 115 Catch2 cases plus 11 command-line and
-  integration tests (seven option tests, two `--list-keywords` tests, the
+* Tests: 197/197 pass in about two seconds: 186 Catch2 cases plus 11 command-line
+  and integration tests (seven option tests, two `--list-keywords` tests, the
   import-search report and the JSON protocol session).
 * CLI: `build/windows-msvc/src/cli/Release/prologd` runs files (positional, `-s`
   or `--source`), stdin, the REPL and the `--protocol json` session for
   front-ends.
 * GUI: `src/gui` (PySide6) drives the executable through the JSON protocol; the
-  window, the protocol and the stepping are covered by thirteen offscreen scripts
+  window, the protocol and the stepping are covered by fifteen offscreen scripts
   (`src/gui/tests/`), which need no display.
 * Documentation: `doc/help.typ`, `doc/technical.typ`, `doc/prologd-diff.typ`
   written (Russian); `cmake --build build --target docs` compiles them when
@@ -99,18 +99,20 @@ session.
 | task_31_gui_shortcuts | not started | layout-independent `Ctrl`+ key combinations |
 | task_32_import_search_report | done | `ИМПОРТ` failure names the directories tried, with reasons |
 | task_33_gui_search_replace | done | `search.py` (plain-text, Qt-free) + the find bar: question from the selection or the word at the caret, `F3`/`Shift+F3` with the wrap reported, three switches, «Заменить всё» as one undo step, the matches lit in every view; `test_search.py` has 16 checks |
+| task_34_builtin_branches | done | every built-in branch-tested in Catch2 (186 cases); the sweep found and fixed five defects: two in the float built-ins (`nan` instead of a failure), the integer/real comparison, the cyclic term that ended the process, the ignored read prompt, the unchecked graphics arguments and the code points that were written as invalid UTF-8 |
 
 ## Test suite
 
-119 tests, about a second: 108 Catch2 cases plus 11 command-line and
+197 tests, about two seconds: 186 Catch2 cases plus 11 command-line and
 integration tests (seven option tests, two `--list-keywords` tests, the
 import-search report and the JSON protocol session). Groups:
-BigInt, lexer, keywords, parser, unification, engine, every built-in group, `НАЙТИВСЁ`,
-module loader (including the import search report), the I/O seams, typical tasks
-(factorial, Fibonacci, GCD, insertion sort, 4-queens, knapsack), ported
-lesson/example programs (golden output) and the CLI (`-s`, `--source`,
+BigInt, lexer, keywords, parser, unification, engine, every built-in group,
+`НАЙТИВСЁ`, module loader (including the import search report), the I/O seams,
+typical tasks (factorial, Fibonacci, GCD, insertion sort, 4-queens, knapsack),
+ported lesson/example programs (golden output) and the CLI (`-s`, `--source`,
 `--source=`, positional, `-I`, `--help`, `--version`, `--list-keywords`,
-`--protocol json`).
+`--protocol json`).  Every built-in is covered branch by branch — see
+`ai/task_34_builtin_branches.md`, which also lists what the sweep found.
 
 The front-end has its own headless checks, run by hand (they need PySide6 or a
 build, so CI does not run them yet): `src/gui/tests/protocol_smoke.py`,
@@ -141,9 +143,10 @@ plain scripts.
 2. `--dump-ast` and `--dump-clauses` (task_16) are dropped: the parser produces a
    `ParsedProgram`, not a tree worth printing, and no workflow asked for them.
 3. Catch2 test discovery decodes the test executable's stdout with the console
-   code page, so on a cp437/cp1252 machine non-ASCII test *names* would land in
-   `prlib_tests-*_tests.cmake` mangled and ctest would report "No test cases
-   matched".  The test names are ASCII now, which removes the failure mode; the
+   code page, so a non-ASCII test *name* lands in `prlib_tests-*_tests.cmake`
+   mangled and ctest reports "No test cases matched" for it.  Test names are
+   ASCII for that reason (the *goals* are Russian as always), which is written
+   down next to `catch_discover_tests` in `src/tests/CMakeLists.txt`; the
    underlying fix (a project-local discovery step writing `--list-tests
    --reporter json` to a *file*, which `execute_process(... OUTPUT_FILE ...)`
    leaves byte-exact) is still a possible improvement.
@@ -568,3 +571,65 @@ Resolved on 2026-09-29 (GUI planning):
   «Остановить» still terminates the child instead of interrupting politely, which
   is recorded in the task file as a deliberate deviation rather than quietly
   half-implemented.
+* Coverage round, part 22: **task_34 — every branch of every built-in**, the round
+  the user asked for after the stepping work ("проверим что все ветки предикатов
+  работают корректно").  The method was the point: drive the built `prologd.exe`
+  over each predicate's arguments — bound, free, wrong type, out of range, and the
+  empty list / empty string / end-of-input — write the expectations from what came
+  back, and only then decide whether a surprising answer is a defect or the port's
+  documented behaviour.  It found **six real defects**, five of them in code that
+  had tests already:
+
+  1. `SQRT(-4, X)` *succeeded* with `X=0` and `SQRT(-4.0, X)` with `X=nan`
+     (`BigInt::fromDouble(nan)` is 0), and `EXP(X, -1.0)` (that is `ln(-1)`) bound
+     `X=nan` — `SIN(X, 2.0)` and `COS(X, 2.0)` too.  A value the function does not
+     have is a *failure* now, and the float mode checks `std::isfinite` before
+     unifying.  This is a behaviour change, recorded in `doc/help.typ`.
+  2. `РАВНО(16777217, 16777216.0)` was true and `РАВНО(16777217, 16777217.0)`
+     false: the integer/real comparison narrowed the integer to `float` and then
+     compared it with the double, so the two sides were compared at different
+     precisions.  It now compares the numbers exactly (the real must be whole and
+     `BigInt::fromDouble` must equal the integer), which also stops `10^20 + 1`
+     from matching `10^20.0`.
+  3. `?РАВНО(X, f(X)).` **ended the process** with a stack overflow — there is no
+     occurs check, so one line at the prompt makes a cyclic term, and the printer
+     followed it until the C++ stack ran out (a cyclic *list* did not end at all,
+     because its cells are followed in a loop).  The printer now remembers the
+     compound nodes it is inside and writes `...` at the repeat, and the copy
+     behind `ДОБ`/`НАЙТИВСЁ` refuses a cyclic term with a diagnostic instead of
+     recursing.  The default print depth also came down from 100000 to 2000, which
+     is a stack-safety number, not a formatting choice.
+  4. The second argument of `ВВОДЦЕЛ`/`ВВОДВЕЩ`/`ВВОДСИМВ`/`ВВОДСТР` — the prompt —
+     was documented and silently dropped.  It is written before the read now, and
+     a prompt that is not text is a type error like any other argument.
+  5. Every graphics argument went through `*intArg(...)`: a real, an atom, a string
+     or a list as a coordinate dereferenced an empty `std::optional`, which is
+     undefined behaviour — the calls were *accepted* and drew with whatever was in
+     memory.  Each non-free argument is checked now; a real is still truncated, as
+     everywhere else.
+  6. `ВВКОД(1114112)` and `ВВКОД(55296)` wrote bytes that are not UTF-8 at all
+     (the JSON protocol cannot carry them back); a code point has to be a Unicode
+     scalar value now.
+
+  Everything else the sweep touched was the port behaving as `task_09`–`task_13`
+  documented it, and is now pinned by tests: the truncating integer arguments
+  (`СКОЛЬКО(прим, 1.5)`, `ПРЕДЛ(прим, 1.0, …)`, `ДОБ(…, 1.5)`, `ТОЧКА(1.5, …)`),
+  `УДАЛЕНИЕ`'s clamp (0 and -1 mean the first clause, past the end means the last),
+  numbering by name *across arities*, the snapshot a running enumeration keeps while
+  the database is edited, `ПЕР`/`ЦЕЛ`/`ВЕЩ`/`СИМВ`/`СПИСОК` as a truth table over
+  every term kind, `НЕ` undoing bindings but not `ДОБ`, `ИЛИ` committing to the
+  first solution of its first goal, `ТИХО` being a per-query flag, `НАЙТИВСЁ`
+  copying its template, and the token/line interplay of the reading predicates.
+  Two new files carry it (`test_builtins_control.cpp`, `test_builtins_types.cpp`, both
+  from `task_09`'s plan, which had never been written), and `test_builtins_io.cpp`,
+  `test_builtins_database.cpp`, `test_builtins_string.cpp`, `test_builtins_arith.cpp`,
+  `test_findall.cpp`, `test_graphics.cpp` and `test_unify.cpp` grew the rest:
+  132 cases before the round, 186 after, 2733 assertions.  One harness lesson came
+  out of it: test *names* have to be ASCII, because the discovery step reads the
+  test binary's `--list-tests` output through the console code page — a Russian
+  name reaches `ctest` double encoded and the test reports "No test cases matched"
+  while the binary runs it fine (the rule is written next to `catch_discover_tests`
+  now).  `doc/help.typ` gained the edges the tests pin — the domains of the float
+  functions, the exact number comparison and cyclic terms, the prompt, the code
+  point range, the string range rules, the type-test truth table, the database
+  clamps and the graphics argument rule.

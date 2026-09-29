@@ -17,7 +17,14 @@ struct PrintOptions {
   /// Called for `$expr` terms to obtain their numeric value.  May be empty, in
   /// which case expressions print as `#_?_#`.
   std::function<Term(const Term&)> evaluate;
-  std::size_t maxDepth = 100000;
+  /// How deep a nested term may be before the rest is written as `...`.
+  ///
+  /// The limit is also a safety net: writing a compound recurses in C++, so a
+  /// limit far beyond the C++ stack (this used to be 100000) turns a deeply
+  /// nested term into a crash instead of a shortened line.  A cyclic term —
+  /// which `РАВНО(X, f(X))` can build, since there is no occurs check — is
+  /// stopped by the writer's own cycle detection, not by this number.
+  std::size_t maxDepth = 2000;
 };
 
 /// Render a term in PrologD notation using `bindings` to resolve variables.

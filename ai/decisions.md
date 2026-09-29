@@ -378,3 +378,60 @@ deliberate fallback (grepping the trace text) is *not* used: the structured hook
 what the panel, the call stack and the highlighted line are built on.
 
 **Status.** Accepted.
+
+## ADR-016: What a built-in does when it cannot answer
+
+**Context.** `task_34` walked every branch of every built-in and found six defects,
+five of them where the code had to decide something the documentation never
+settled: what a float function returns for a value it does not have, how an
+integer and a real are compared, what happens to a term that contains itself, what
+the optional second argument of a reading predicate means, and what a code point
+beyond Unicode is.  Each one had a branch, and the branch was wrong — the class of
+bug a test suite that only tries the happy path never sees.
+
+**Decision.** The rules, written down now so the next predicate does not invent
+its own:
+
+1. **A value the function does not have is a failure, never a silent non-number.**
+   `SQRT` of a negative, `ln` of a non-positive, `asin`/`acos` outside `[-1, 1]`
+   and a forward value that is not finite all fail.  `nan` is a C++ accident:
+   `BigInt::fromDouble(nan)` is 0, so before this rule `SQRT(-4, X)` answered
+   `X=0` in integer mode and `X=nan` in float mode.  This is a behaviour change
+   (documented in `help.typ` §5.5–5.6).
+2. **An integer and a real are compared as numbers, exactly.**  Equal means the
+   real is whole and its value equals the integer: `6` matches `6.0`, and
+   `16777217` matches neither `16777216.0` (what narrowing the integer to `float`
+   used to produce) nor `16777217.0`.  In other words the comparison happens in
+   one precision, and rounding cannot make two different numbers equal — comparing
+   the integer's *nearest double* was rejected for the same reason
+   (`10^20 + 1` would match `10^20.0`).
+3. **A cyclic term is a fact of the language, and the walkers defend themselves.**
+   There is no occurs check (ADR/notes), so `РАВНО(X, f(X))` is legal and makes a
+   term that contains itself.  Printing stops at the repeat and writes `...`
+   (`f(...)`, `[1|...]`), the print depth is a stack-safety number (2000, not
+   100000), and a *copy* — what `ДОБ` and `НАЙТИВСЁ` need — is refused with
+   «Циклический терм нельзя скопировать» instead of recursing until the process
+   dies.  The alternative (enabling the occurs check) was rejected: it changes
+   unification for every program to protect one line at the prompt.
+4. **A documented argument is read, or it is an error.**  The second argument of
+   `ВВОДЦЕЛ`/`ВВОДВЕЩ`/`ВВОДСИМВ`/`ВВОДСТР` is the prompt the original typed at
+   the console; it is written before the read, and a prompt that is not text is a
+   type error.  Silently ignoring an argument was the defect.
+5. **An argument that is not a number is a type error, in the graphics predicates
+   too.**  Dereferencing an empty `std::optional` is not "lenient", it is
+   undefined behaviour; every non-free coordinate and colour goes through one
+   checking helper.  A real is truncated, as in every other integer argument.
+6. **Text written out has to be valid UTF-8.**  `ВВКОД` accepts a Unicode scalar
+   value only: negative, past `U+10FFFF` or a surrogate is an error, because the
+   JSON protocol cannot carry the bytes that used to be produced.
+
+**Consequences.** Five behaviour changes a program can notice (the float domains,
+the number comparison, the cyclic-term diagnostic, the prompt, the code point
+range), all of them recorded in `doc/help.typ` and pinned by tests; the truncation
+of real arguments, the clamp in `УДАЛЕНИЕ` and `#1/2#` = 0 were *kept* because they
+are the documented port, not defects.  The sweep also produced a harness rule: test
+case *names* must be ASCII, because Catch2 discovery reads the test binary's
+`--list-tests` output through the console code page and a Russian name reaches
+`ctest` double encoded.
+
+**Status.** Accepted.

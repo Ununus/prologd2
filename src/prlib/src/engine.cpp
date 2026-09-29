@@ -1,5 +1,7 @@
 #include "prlib/engine.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <iostream>
 #include <utility>
 
@@ -439,7 +441,8 @@ void Engine::instantiateClause(const Clause& clause, Term& head, std::vector<Ter
   }
 }
 
-Term Engine::copyTermResolvedImpl(const Term& term, std::unordered_map<VarId, VarId>& mapping) {
+Term Engine::copyTermResolvedImpl(const Term& term, std::unordered_map<VarId, VarId>& mapping,
+                                  std::vector<const CompoundTerm*>& path) {
   const Term resolved = bindings_.deref(term);
   switch (resolved.kind) {
     case TermKind::Var: {
@@ -455,11 +458,19 @@ Term Engine::copyTermResolvedImpl(const Term& term, std::unordered_map<VarId, Va
       if (resolved.compound == nullptr) {
         return resolved;
       }
+      // A cyclic term (`?РАВНО(X, f(X)).` builds one — there is no occurs check)
+      // has no finite copy: the copy would be cyclic too, and every later walk of
+      // it would run forever.  Say so instead of recursing until the stack ends.
+      if (std::find(path.begin(), path.end(), resolved.compound.get()) != path.end()) {
+        raise(ErrorCode::StackOverflow, "Циклический терм нельзя скопировать");
+      }
+      path.push_back(resolved.compound.get());
       std::vector<Term> args;
       args.reserve(resolved.compound->args.size());
       for (const Term& arg : resolved.compound->args) {
-        args.push_back(copyTermResolvedImpl(arg, mapping));
+        args.push_back(copyTermResolvedImpl(arg, mapping, path));
       }
+      path.pop_back();
       return makeCompound(resolved.compound->name, std::move(args));
     }
     default:
@@ -469,7 +480,8 @@ Term Engine::copyTermResolvedImpl(const Term& term, std::unordered_map<VarId, Va
 
 Term Engine::copyTermResolved(const Term& term) {
   std::unordered_map<VarId, VarId> mapping;
-  return copyTermResolvedImpl(term, mapping);
+  std::vector<const CompoundTerm*> path;
+  return copyTermResolvedImpl(term, mapping, path);
 }
 
 bool Engine::unify(const Term& first, const Term& second) {
@@ -513,22 +525,19 @@ bool Engine::unify(const Term& first, const Term& second) {
       continue;
     }
 
-    if (left.kind == TermKind::Int && right.kind == TermKind::Float) {
-      const double real = right.real;
-      if (!(real - 1 < left.integer.toDouble())) {
-        return false;
-      }
-      if (real != static_cast<double>(static_cast<float>(left.integer.toDouble()))) {
-        return false;
-      }
-      continue;
-    }
-    if (left.kind == TermKind::Float && right.kind == TermKind::Int) {
-      const double real = left.real;
-      if (!(real - 1 < right.integer.toDouble())) {
-        return false;
-      }
-      if (real != static_cast<double>(static_cast<float>(right.integer.toDouble()))) {
+    // An integer and a real unify when they are the *same number*: the original
+    // keeps the two apart as types but compares their values, so `6` matches
+    // `6.0` and not `6.5`.  The comparison has to be exact — the integer used to
+    // be narrowed to `float` first and compared with the double, which made
+    // different numbers unify (`16777217` with `16777216.0`) and made a large
+    // integer miss its own real (`16777217` with `16777217.0`); comparing the
+    // integer's nearest double would let `10^20 + 1` match `10^20.0`.
+    if ((left.kind == TermKind::Int && right.kind == TermKind::Float) ||
+        (left.kind == TermKind::Float && right.kind == TermKind::Int)) {
+      const Term& as_int = left.kind == TermKind::Int ? left : right;
+      const double real = (left.kind == TermKind::Int ? right : left).real;
+      if (!std::isfinite(real) || real != std::trunc(real) ||
+          BigInt::fromDouble(real) != as_int.integer) {
         return false;
       }
       continue;
@@ -629,11 +638,12 @@ bool Engine::callOnce(const Term& goal) {
 void Engine::copyClauseResolved(const Term& head, const std::vector<Term>& body,
                                 Term& out_head, std::vector<Term>& out_body) {
   std::unordered_map<VarId, VarId> mapping;
-  out_head = copyTermResolvedImpl(head, mapping);
+  std::vector<const CompoundTerm*> path;
+  out_head = copyTermResolvedImpl(head, mapping, path);
   out_body.clear();
   out_body.reserve(body.size());
   for (const Term& goal : body) {
-    out_body.push_back(copyTermResolvedImpl(goal, mapping));
+    out_body.push_back(copyTermResolvedImpl(goal, mapping, path));
   }
 }
 

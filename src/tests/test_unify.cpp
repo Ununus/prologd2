@@ -39,6 +39,16 @@ TEST_CASE("integers and floats unify by value") {
   Engine engine;
   REQUIRE(engine.unify(makeInt(6), makeFloat(6.0)));
   REQUIRE_FALSE(engine.unify(makeInt(6), makeFloat(6.5)));
+  REQUIRE(engine.unify(makeInt(-5), makeFloat(-5.0)));
+  REQUIRE_FALSE(engine.unify(makeInt(2), makeFloat(-2.0)));
+  // The comparison is exact, in both directions and at any size: narrowing the
+  // integer to `float` first made `16777217` equal `16777216.0`, and comparing
+  // the integer's nearest double made `10^20 + 1` equal `10^20.0`.
+  REQUIRE(engine.unify(makeInt(16777217), makeFloat(16777217.0)));
+  REQUIRE_FALSE(engine.unify(makeInt(16777217), makeFloat(16777216.0)));
+  REQUIRE(engine.unify(makeInt(BigInt("100000000000000000000")), makeFloat(1e20)));
+  REQUIRE_FALSE(engine.unify(makeInt(BigInt("100000000000000000001")), makeFloat(1e20)));
+  REQUIRE(engine.unify(makeFloat(1e20), makeInt(BigInt("100000000000000000000"))));
 }
 
 TEST_CASE("compound unification") {

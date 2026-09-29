@@ -1,7 +1,9 @@
 #include "prlib/term_print.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <unordered_map>
+#include <vector>
 
 #include "prlib/engine.hpp"
 
@@ -23,6 +25,27 @@ std::string formatFloat(double value) {
 
 namespace {
 
+/// The compound nodes on the way to the node being written, outermost first.
+///
+/// A node that appears twice is a cycle: `?РАВНО(X, f(X)).` unifies `X` with a
+/// term that contains `X`, and the original PrologD has no occurs check, so one
+/// line at the prompt asks for exactly that.  Writing such a term has to stop at
+/// the repeat — the alternative is following the term until the C++ stack runs
+/// out, which is how this used to fail (and a cyclic *list* never ended at all,
+/// because its cells are followed in a loop rather than by recursion).
+class PathGuard {
+ public:
+  explicit PathGuard(std::vector<const CompoundTerm*>& path)
+      : path_(path), mark_(path.size()) {}
+  ~PathGuard() { path_.resize(mark_); }
+
+  void push(const CompoundTerm* node) { path_.push_back(node); }
+
+ private:
+  std::vector<const CompoundTerm*>& path_;
+  std::size_t mark_;
+};
+
 class TermWriter {
  public:
   TermWriter(const Bindings& bindings, const PrintOptions& options)
@@ -35,6 +58,11 @@ class TermWriter {
   }
 
  private:
+  /// True when `node` is one of the compounds currently being written.
+  [[nodiscard]] bool onPath(const CompoundTerm* node) const {
+    return std::find(path_.begin(), path_.end(), node) != path_.end();
+  }
+
   void append(std::string& out, const Term& term, std::size_t depth) {
     if (depth > options_.maxDepth) {
       out += "...";
@@ -76,6 +104,14 @@ class TermWriter {
       out += "<null>";
       return;
     }
+    // A node that is already being written is a cycle; write `...` for it and
+    // leave it at that.
+    if (onPath(term.compound.get())) {
+      out += "...";
+      return;
+    }
+    PathGuard guard(path_);
+    guard.push(term.compound.get());
     // Arithmetic expression: evaluate when possible.
     if (term.compound->name == "$expr" && term.compound->args.size() == 1 &&
         options_.evaluate) {
@@ -104,6 +140,13 @@ class TermWriter {
         first = false;
         const Term tail = bindings_.deref(current.compound->args[1]);
         if (isListCell(tail)) {
+          // The cells are followed in a loop, so the depth limit does not bound
+          // this: `?РАВНО(X, [1|X]).` is a list that contains itself.
+          if (onPath(tail.compound.get())) {
+            out += "|...";
+            break;
+          }
+          guard.push(tail.compound.get());
           current = tail;
           continue;
         }
@@ -131,6 +174,7 @@ class TermWriter {
   const PrintOptions& options_;
   std::unordered_map<VarId, std::string> variable_names_;
   std::size_t next_variable_ = 0;
+  std::vector<const CompoundTerm*> path_;
 };
 
 }  // namespace

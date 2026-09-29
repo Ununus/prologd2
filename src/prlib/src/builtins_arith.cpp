@@ -331,6 +331,12 @@ BuiltinResult builtinSqrt(Engine& engine, std::span<const Term> args) {
   const auto y = asNumeric(engine, args[1]);
   if (x && !y && isUnbound(engine, args[1])) {
     const double root = std::sqrt(x->asDouble());
+    // A negative argument has no real root.  `BigInt::fromDouble(nan)` is zero,
+    // so without this check `SQRT(-4, X)` *succeeded* and said the root of -4 is
+    // 0, and the float mode unified `nan` — a value that is not a number at all.
+    if (!std::isfinite(root)) {
+      return BuiltinResult::Fail;
+    }
     if (x->is_float) {
       return unifyFloat(engine, args[1], root) ? BuiltinResult::Continue : BuiltinResult::Fail;
     }
@@ -359,12 +365,24 @@ BuiltinResult unaryFloat(Engine& engine, std::span<const Term> args, double (*fo
   const auto x = asNumeric(engine, args[0]);
   const auto y = asNumeric(engine, args[1]);
   if (x && !y && isUnbound(engine, args[1])) {
-    return unifyFloat(engine, args[1], forward(x->asDouble())) ? BuiltinResult::Continue
-                                                               : BuiltinResult::Fail;
+    const double value = forward(x->asDouble());
+    // Out of the domain of the inverse function — `ln` of a negative number,
+    // `asin` of 2 — the result is not a number, and unifying `nan` with the
+    // argument would be a lie about what the interpreter computed.  (The forward
+    // direction can also overflow to infinity: `EXP(1000.0, X)`.)
+    if (!std::isfinite(value)) {
+      return BuiltinResult::Fail;
+    }
+    return unifyFloat(engine, args[1], value) ? BuiltinResult::Continue
+                                              : BuiltinResult::Fail;
   }
   if (!x && isUnbound(engine, args[0]) && y) {
-    return unifyFloat(engine, args[0], inverse(y->asDouble())) ? BuiltinResult::Continue
-                                                               : BuiltinResult::Fail;
+    const double value = inverse(y->asDouble());
+    if (!std::isfinite(value)) {
+      return BuiltinResult::Fail;
+    }
+    return unifyFloat(engine, args[0], value) ? BuiltinResult::Continue
+                                              : BuiltinResult::Fail;
   }
   if (x && y) {
     return forward(x->asDouble()) == y->asDouble() ? BuiltinResult::Continue

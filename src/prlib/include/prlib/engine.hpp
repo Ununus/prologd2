@@ -236,7 +236,10 @@ class Engine {
   std::size_t nested_depth_ = 0;
 
   Term instantiateImpl(const Term& templ, std::unordered_map<VarId, VarId>& mapping);
-  Term copyTermResolvedImpl(const Term& term, std::unordered_map<VarId, VarId>& mapping);
+  /// `path` collects the compound nodes on the way to the term being copied;
+  /// a node that appears twice is a cycle and is reported rather than followed.
+  Term copyTermResolvedImpl(const Term& term, std::unordered_map<VarId, VarId>& mapping,
+                            std::vector<const CompoundTerm*>& path);
 };
 
 }  // namespace prologd
