@@ -65,6 +65,7 @@ const std::vector<std::string>& checkedLessons() {
       "lesson_01.pld",
       "lesson_02.pld",
       "lesson_03.pld",
+      "lesson_04.pld",
   };
   return names;
 }
