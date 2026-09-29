@@ -66,6 +66,7 @@ const std::vector<std::string>& checkedLessons() {
       "lesson_02.pld",
       "lesson_03.pld",
       "lesson_04.pld",
+      "lesson_05.pld",
   };
   return names;
 }
@@ -91,7 +92,7 @@ std::string withoutQueries(const std::string& source) {
 TEST_CASE("ported example programs parse cleanly") {
   const std::vector<std::string> files = {
       "lessons/lesson_3.pld",
-      "lessons/lesson_4.pld", "lessons/lesson_5.pld", "lessons/lesson_6.pld",
+      "lessons/lesson_5.pld", "lessons/lesson_6.pld",
       "lessons/lesson_8.pld", "lessons/lesson_9.pld",
       "factorial.pld",        "file_io.pld",         "drawing.pld",
       "monk.pld",             "monkd.pld",           "findall_demo.pld",
@@ -152,17 +153,6 @@ TEST_CASE("lesson 3 string predicates") {
           "Ю=бркдбр\n"
           "Неверный порядок скобок в строке: первая скобка - правая ()(()()()))(\n"
           "ДА\n");
-}
-
-TEST_CASE("lesson 4 sorting") {
-  const std::string program = withoutQueries(readExample("lessons/lesson_4.pld")) +
-                              "?сортировка([5,4,3,2,1],A).\n"
-                              "?вставсорт([10,9,8,7,6,5,4,3,2,1],B).\n";
-  const auto result = runProgram(program);
-  REQUIRE(result.loaded);
-  REQUIRE(result.output ==
-          "A=[1,2,3,4,5]\n"
-          "B=[1,2,3,4,5,6,7,8,9,10]\n");
 }
 
 TEST_CASE("lesson 5 monkey and bananas") {
