@@ -58,6 +58,20 @@ class IoContext {
     return static_cast<bool>(input_handler_);
   }
 
+  /// Route trace text (`ТРАССА`) through `sink` instead of the output stream,
+  /// one line per call, newline included.  A front-end uses it to colour the
+  /// trace apart from the program's own output (the JSON protocol emits
+  /// `trace` events) or to give it a pane of its own; the console leaves it
+  /// unset and reads the trace in the output stream as it always has.  A set
+  /// sink wins over `ЗАПИСЬ_В`, because the trace is for the reader, not for
+  /// the program's output file.
+  void setTraceSink(std::function<void(std::string_view)> sink);
+  [[nodiscard]] bool hasTraceSink() const noexcept {
+    return static_cast<bool>(trace_sink_);
+  }
+  /// One line of trace text, wherever it goes.
+  void writeTrace(std::string_view text);
+
   // ---- redirection ----
   /// Switch input to `path`; empty or `con:` restores the base stream.
   bool openInput(const std::string& path);
@@ -73,6 +87,7 @@ class IoContext {
   [[nodiscard]] static bool isSpace(char ch);
 
   InputRequestHandler input_handler_;
+  std::function<void(std::string_view)> trace_sink_;
 
   std::istream* base_input_;
   std::ostream* base_output_;

@@ -9,14 +9,15 @@ session.
   started (protocol + skeleton).
 * Build: the `windows-msvc` preset (Visual Studio 18 2026, MSVC 19.51) build is
   green locally; the Linux presets, including `-Werror`, build cleanly.
-* Tests: 108/108 pass in about a second, including 8 command-line/integration
-  tests and the JSON protocol session.
+* Tests: 126/126 pass in about a second: 115 Catch2 cases plus 11 command-line and
+  integration tests (seven option tests, two `--list-keywords` tests, the
+  import-search report and the JSON protocol session).
 * CLI: `build/windows-msvc/src/cli/Release/prologd` runs files (positional, `-s`
   or `--source`), stdin, the REPL and the `--protocol json` session for
   front-ends.
 * GUI: `src/gui` (PySide6) drives the executable through the JSON protocol; the
-  protocol client is verified headlessly, the window itself still needs a
-  machine with PySide6.
+  window, the protocol and the stepping are covered by thirteen offscreen scripts
+  (`src/gui/tests/`), which need no display.
 * Documentation: `doc/help.typ`, `doc/technical.typ`, `doc/prologd-diff.typ`
   written (Russian); `cmake --build build --target docs` compiles them when
   `typst` is installed.
@@ -92,7 +93,7 @@ session.
 | task_25_gui_files_tabs | done | tabs, files, save prompts, encodings, input queue, drop anywhere and the split editor (two panes, one text per document) |
 | task_26_gui_toolbar | done | one action table (48 commands, 12 disabled with a reason) feeding the menu bar, the toolbar and the context menu; icon audit in `src/gui/README.md` (48 names referenced, 42 drawn, 6 left: the «Вид» switches) |
 | task_27_gui_panels | done | movable panel (`F4`, `Ctrl+F4`), output pane (colour by kind, visible half-lines, bounded history, auto-scroll, save to a file), input console with the queue switch, status-bar details and the two-state run/stop |
-| task_28_gui_run_step | not started | run, step (new engine seam + protocol v2), stop, error line |
+| task_28_gui_run_step | done | `EngineOptions::stepHook` + `StepInfo`, protocol 3 (`step`/`trace` events, `step` request, positions on `error`), the step strip with the call stack, the trace line in the editor, `F10`/`Shift+F10`/`F5`, error and trace lines from structured positions |
 | task_29_gui_settings | not started | settings dialog and persistence |
 | task_30_gui_formatter | not started | soft/hard formatting in prlib + protocol |
 | task_31_gui_shortcuts | not started | layout-independent `Ctrl`+ key combinations |
@@ -531,3 +532,39 @@ Resolved on 2026-09-29 (GUI planning):
   this widget end up on?” is a question a test can ask: `test_search.py` checks the
   parent of each switch and that the rows stack, and the same test fails if the size
   policy ever goes back to the default.
+
+* GUI hand-testing round, part 21: **task_28 — stepping, the trace and the line an
+  error is on**, the first round in a while that is mostly C++.  The engine got one
+  seam, `EngineOptions::stepHook`, called at the four points the textual trace
+  already had, with `StepInfo{action, goal, depth, location}` — and **no `Pause`**:
+  a hook that wants the user to look at the point it was given simply *waits*,
+  reading the next request, and the protocol reuses the re-entrant read loop
+  `input_request` already had.  The solver has no continuation to suspend, and the
+  loop a front-end already owns is exactly the pause (ADR-015).  The environment
+  frames now carry their depth and the location of the clause they are solving,
+  which is what a step point reports — and what let `Engine::raise` fill in a
+  position, so a **runtime** error names its line as a parse error always did: the
+  task asked to check for that and the check found the gap.  `IoContext` grew a
+  trace sink, so `ТРАССА` goes to the front-end as `trace` events (and to the
+  output stream as before when nothing asks), which is how the pane colours it
+  apart from the program's own output.  Protocol 3 carries all of it: `step` events
+  and the `step` request, `trace` events, `file`/`line`/`column` on `error`, and
+  `step`/`trace` flags on `load` and `query`.  In the window: the step strip (action,
+  goal, depth, position, and the call stack *the window rebuilds* from `call`/`exit`
+  pairs), the trace line marked in a neutral colour, `F10`, `Shift+F10`, `F5` as
+  «продолжить» — and the three commands enabled, because a paused step is a *usable*
+  state and a disabled `QAction` fires no shortcut, the trap that already cost this
+  project a round.  Diagnostics now come with their position: the window marks the
+  line, puts the caret on it, and opens an `ИМПОРТ`ed file in a tab of its own
+  rather than marking a line in whatever tab happens to be showing.  Coverage: six
+  Catch2 cases, seven Qt-free checks in `test_stepping.py` against the built
+  interpreter, five more in `test_window.py`, and the protocol session in cmake.
+  Three findings worth their lines: the *same* test can pass in a UTF-8 console and
+  fail under the VS Code task runner because `execute_process` decodes the child's
+  stdout with the console code page, so the cmake expectations are ASCII-only now
+  (the Cyrillic side lives in Catch2, which compares inside one process); a parser
+  can report a line past the end of the file (`непарные скобки`), so a marked line
+  is clamped to a line that exists — and the caret follows the clamped one; and
+  «Остановить» still terminates the child instead of interrupting politely, which
+  is recorded in the task file as a deliberate deviation rather than quietly
+  half-implemented.

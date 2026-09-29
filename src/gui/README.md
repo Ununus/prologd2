@@ -54,8 +54,10 @@ version does not know are left alone (task_29 adds the dialog).
 
 | Key | Command |
 | --- | --- |
-| `F5`, `Ctrl+R` | **Запустить** — a run in a fresh interpreter |
+| `F5`, `Ctrl+R` | **Запустить** — a run in a fresh interpreter; while a step is paused it means «продолжить» |
 | `Shift+F5` | **Остановить** |
+| `F10` | **Шаг** — one step point further in (starts a stepped run) |
+| `Shift+F10` | **Шаг с обходом** — to the end of the current goal |
 | `Ctrl+N` | **Новый** — an empty untitled buffer |
 | `Ctrl+O` | **Открыть…** — a new tab; it does not run |
 | `Ctrl+S`, `Ctrl+Shift+S` | **Сохранить**, **Сохранить как…** |
@@ -111,11 +113,12 @@ The menus are **Файл** (Новый, Открыть…, Последние, �
 **Справка** (Руководство пользователя, Справка по окну, О программе).
 
 An entry that does not exist yet stays in its menu but is **disabled**, and its
-tooltip names what it waits for: «Форматировать» — task_30, «Настройки…» —
-task_29, «Запустить с трассировкой» and «Шаг» — task_28, «Графическое окно» —
-**no task file yet** (the roadmap below has the plan).  A menu that silently lacks
-half of the feature list is worse than one that says so.  «Поиск» left that list
-in task_33 and is live; the toolbar is grouped as
+tooltip names what it waits for: «Форматировать» — task_30 and «Настройки…» —
+task_29; «Графическое окно» has **no task file yet** (the roadmap below has the
+plan).  A menu that silently lacks half of the feature list is worse than one that
+says so.  «Поиск» left that list in task_33 and the «Выполнение» group in task_28 —
+«Запустить с трассировкой», «Шаг» and «Шаг с обходом» are live.  The toolbar is
+grouped as
 the reference front-end had it: file | run/stop/step | editing (comment,
 uncomment, format) | font size | tools (graphics, settings, help), and at the far
 right **Очистить вывод**, which acts on the output rather than on the program;
@@ -134,7 +137,7 @@ split could not be undone without a restart.
 
 `test_icons.py` is the guard: it fails as soon as a name is misspelled, and it
 also checks that an icon which *does* have a file is not still listed as missing.
-The code references **48** names, **42** of which have a file in
+The code references **49** names, **42** of which have a file in
 `src/gui/assets` (64×64 PNG, transparent background).  A missing file is not an
 error: the action is built without a picture, and the name is reported once on
 stderr (`icons: no view-theme.png — the action will have no picture`).
@@ -150,17 +153,70 @@ Present (42): `edit-clear`, `edit-comment`, `edit-copy`, `edit-cut`, `edit-del`,
 `view-full-screen`, `view-graphics`, `view-zoom-in`, `view-zoom-out`,
 `view-zoom-reset`.
 
-Still to draw (6 names, listed in `assets.MISSING`) — the «Вид» switches:
+Still to draw (7 names, listed in `assets.MISSING`) — the «Вид» switches
 `view-toolbar`, `view-split-editor`, `view-output-right`, `view-output-bottom`,
-`view-line-numbers` and `view-theme`.
+`view-line-numbers` and `view-theme`, plus `execution-step-over`, the picture of
+«Шаг с обходом» (the action is live since task_28 and shows its caption until the
+file appears) and `execution-restart`, which nothing refers to yet.
 
-`MISSING` also names two icons nothing refers to yet — `execution-restart` and
-`execution-step-over` — which is allowed: they are the pictures for features that
-are not wired (task_27, task_28).  Six of the names are not buttons at all:
+Six of the names are not buttons at all:
 `file`, `file-saved` and `file-modified` are the states of a tab, `prologd2` is
 the window icon, `search-find` is the lens at the left of the find bar
 (`actions.FIND_ICON`), and `edit-del` is the picture of «Удалить» in the «Правка»
 menu.
+
+## Stepping through a program
+
+`F10` walks the program one step point at a time.  Four points exist, and they are
+the four the textual trace already had: a **вызов** (a user predicate is entered),
+an **успех** (its body is satisfied), a **переделка** (the solver is back in it,
+looking for another solution) and a **неудача** (nothing matches, so it fails).  The
+interpreter reports them as `step` events — structured, not the text of `ТРАССА`:
+the text format is for humans and changes with the version, while a front-end needs
+the action, the goal, the depth and the position.
+
+The strip under the editor shows the point that was reached: the action, the goal
+and how deep it is, where it stands in the source, and the call stack.  The stack
+is rebuilt *here*, from the events: a `call` pushes the goal it names and the
+`exit`/`fail` that answers it pops — an `exit` carries no goal of its own, because
+the goal that succeeded is the one the `call` already reported.  The line of the
+clause is highlighted in the editor in a neutral colour (the error line's
+machinery, a different paint) and the caret follows it while that tab is showing.
+`Shift+F10` steps out of the current goal: the interpreter stops sending the points
+*inside* it, so a long recursion is walked over in one key rather than hundreds.
+`F5` (**Продолжить**) runs on to the end, and `Shift+F5` ends the query, as it does
+for a runaway run.
+
+A paused step is a *usable* state, not a busy one: «Шаг», «Шаг с обходом» and
+«Запустить» (= продолжить) are enabled while the panel is up, because a disabled
+`QAction` fires no shortcut and those keys are exactly the ones the user needs
+there.  The panel goes when the run is over; the mark stays until the next run or
+the first edit.
+
+«Запустить с трассировкой» is the same run with `ТРАССА` on.  The trace text is the
+interpreter's own and arrives as `trace` events, so the pane colours it apart from
+the program's output: a trace shown like the answer is a trace mistaken for one.
+(The console front-end reads the same text in the output stream, where it always
+was; the sink is what the protocol installs.)
+
+### Where an error happened
+
+`error` events carry `file`, `line` and `column` next to the human message
+(protocol 3), so nothing is parsed out of the text.  A parse error has a position
+from the parser and a **runtime error has one too**: the solver keeps the clause it
+is solving in step with its environment, and `raise` fills in that clause's
+location, so `деление на ноль` in the third clause of `модуль.pld` marks line 3
+there.  `raiseAt` still overrides it where a caller knows better.
+
+The window marks that line red, puts the caret on it, and names the file in the
+status bar and in the pane (`path:line:column: message`).  A diagnostic from an
+`ИМПОРТ`ed file names *that* file: the window looks for the tab, then next to the
+file that imported it, then on disk — where it is opened in a tab of its own,
+because marking a line in whatever tab happens to be showing would be worse than
+marking none.  A name in angle brackets (`<buffer>`, `<library>`) is the text the
+window itself sent, so that one is marked where it came from.  A line past the end
+of the file (where `непарные скобки` is reported) is clamped to the last line that
+exists, and the first edit clears the mark.
 
 ## The output panel
 
@@ -318,13 +374,16 @@ Headless check of the protocol, without PySide6 installed:
 python src/gui/tests/protocol_smoke.py
 ```
 
-## Protocol contract (version 2)
+## Protocol contract (version 3)
 
 One JSON object per line in both directions; the interpreter writes nothing else
 to stdout.  The C++ side lives in `src/cli/protocol.cpp`, the Python side in
-`prologd_gui/protocol.py`.  Version 2 added the reserved names to `ready`;
-version 1 sessions are still understood by the Python client (the table is then
-empty and completion falls back to the document's own predicates).
+`prologd_gui/protocol.py`.  Version 2 added the reserved names to `ready`; version
+3 added stepping (`step` events and the `step` request), the `trace` events, the
+`step`/`trace` flags of `load` and `query`, and the `file`/`line`/`column` fields
+of `error`.  Version 1 sessions are still understood by the Python client (the
+table is then empty and completion falls back to the document's own
+predicates).
 
 ### Requests
 
@@ -334,18 +393,25 @@ empty and completion falls back to the document's own predicates).
 | `{"cmd":"load","text":"…","name":"buffer"}` | load program text (the editor buffer) |
 | `{"cmd":"query","text":"?цель(X)."}` | run one statement |
 | `{"cmd":"input","text":"…"}` | answer the pending `input_request` |
+| `{"cmd":"step","action":"into"}` | answer the pending `step` event; `action` is `into`, `over`, `continue` or `stop` |
 | `{"cmd":"interrupt"}` | ask for a stop (see the note below) |
 | `{"cmd":"quit"}` | end the session |
+
+`load` and `query` take two optional flags: `"trace":true` turns `ТРАССА` on for
+that run, and `"step":true` arms the step hook, so the run stops at its first
+step point and waits for a `step` request.  A false flag is left off the wire.
 
 ### Events
 
 | Event | Meaning |
 |-------|---------|
-| `{"event":"ready","protocol":2,"version":"2.0.0","keywords":[…]}` | the session is up |
-| `{"event":"output","text":"…"}` | program output (`ВЫВОД`, query results, traces) |
+| `{"event":"ready","protocol":3,"version":"2.0.0","keywords":[…]}` | the session is up |
+| `{"event":"output","text":"…"}` | program output (`ВЫВОД`, query results) |
 | `{"event":"result","found":true}` | one query finished; `found` is false when nothing matched |
 | `{"event":"input_request","kind":"line"}` | `ВВОДСТР`/`ВВОДСИМВ`/`ВВКОД` waits for an answer; `kind` is `token`, `line` or `codepoint` |
-| `{"event":"error","kind":"parse","message":"…"}` | diagnostic; `kind` is `parse`, `runtime` or `protocol` |
+| `{"event":"step","action":"call","goal":"…","depth":2,"file":"…","line":9,"column":1}` | a step point; `action` is `call`, `exit`, `redo` or `fail`.  `goal` is absent for `exit` (the goal is the one its `call` named), and the position is absent when there is none |
+| `{"event":"trace","text":"…"}` | one line of the `ТРАССА` trace |
+| `{"event":"error","kind":"parse","message":"…","file":"…","line":3,"column":5}` | diagnostic; `kind` is `parse`, `runtime` or `protocol`, and the position is absent when there is none to report |
 | `{"event":"bye"}` | the session is over |
 
 Exit codes: `0` clean, `1` usage error, `2` load/parse failure, `3` runtime
@@ -372,6 +438,14 @@ failure (for example an interrupted query).
   typed into the field under the output pane, one per request, and falls back to
   a single-line dialog when that list is empty; cancelling the dialog stops the
   session instead of answering an empty string.
+* **A step point is a question too.**  The `step` event is written when the solver
+  reaches a point with the hook armed, and the interpreter then *waits* inside the
+  query for the `step` request that answers it — the same re-entrant read loop
+  `input_request` uses, so no new threading model is involved.  This is the whole
+  reason the hook blocks instead of returning a "paused" state: the solver has no
+  continuation to suspend, and the read loop a front-end already has is exactly
+  the pause.  A `step` request with nothing waiting is a protocol error, as an
+  `input` with nothing waiting is.
 * `ready` carries `keywords`: every reserved name the lexer knows, with its kind
   (`predicate`, `operator`, `directive`) and its arities — `[]` for operators,
   directives and the variadic `ВЫВОД`, which is marked with `"variadic":true`.

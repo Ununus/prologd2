@@ -850,13 +850,15 @@ def test_the_menus_come_from_the_action_table(executable: str) -> None:
         assert set(window._actions) == set(actions.BY_KEY), "the window has stray actions"
 
         # What is not implemented yet says so instead of doing nothing quietly.
-        # «Поиск» left this list in task_33: those five are live now, and
-        # `test_search.py` is where they are checked.
-        step = window._actions["step"]
-        assert step.isEnabled() is False
-        assert "task_28" in step.toolTip(), step.toolTip()
+        # The execution group left this list in task_28 — `Запустить с
+        # трассировкой`, `Шаг` and `Шаг с обходом` are live now — and `test_search.py`
+        # is where the search entries are checked.
+        settings = window._actions["settings"]
+        assert settings.isEnabled() is False
+        assert "task_29" in settings.toolTip(), settings.toolTip()
         assert window._actions["format"].isEnabled() is False
-        assert window._actions["find"].isEnabled() is True, "the search is implemented now"
+        assert window._actions["step"].isEnabled() is True, "stepping is implemented now"
+        assert window._actions["run_trace"].isEnabled() is True
         print("ok: the menu bar is built from the action table, disabled entries explain themselves")
     finally:
         discard_changes(window)
@@ -1298,6 +1300,156 @@ def test_split_and_merge_follow_the_pane_count(executable: str) -> None:
         discard_changes(window)
 
 
+def colour_of(pane, block: int) -> str:
+    """The colour of the first character of a block of a text pane."""
+    from PySide6.QtGui import QTextCursor
+
+    cursor = QTextCursor(pane.document())
+    cursor.setPosition(pane.document().findBlockByNumber(block).position())
+    cursor.movePosition(QTextCursor.MoveOperation.NextCharacter, cursor.MoveMode.KeepAnchor)
+    return cursor.charFormat().foreground().color().name()
+
+
+def test_a_runtime_error_marks_its_line(executable: str) -> None:
+    """A diagnostic comes with its position, and the editor marks that line.
+
+    The message used to carry `file:line:column:` as text, which a front-end can
+    only use by parsing it; protocol 3 sends the fields, so the window marks the
+    line and puts the caret on it instead of guessing.
+    """
+    window = empty_window(executable)
+    try:
+        typed = "дели(Х) :- БОЛЬШЕ(1, #1/0#).\n?дели(1).\n"
+        window.editor().setPlainText(typed)
+        window.run_program()
+        assert pump(window, lambda: "деление на ноль" in window.output_text()), ascii(
+            window.output_text()
+        )
+        view = window.editor()
+        assert view.error_line() == 1, view.error_line()
+        assert view.textCursor().blockNumber() == 0, "the caret is not on the line"
+        assert "ошибка: <buffer>:1:1" in window.status_text(), window.status_text()
+        assert "<buffer>:1:1: деление на ноль" in window.output_text(), ascii(
+            window.output_text()
+        )
+
+        # An edit clears the mark: a red line over text it no longer describes is
+        # a lie about where the program broke.
+        window.editor().insertPlainText("\n")
+        assert window.editor().error_line() is None
+    finally:
+        discard_changes(window)
+    print("ok: a runtime error marks its line, names it, and the mark goes on edit")
+
+
+def test_a_parse_error_marks_the_line_the_parser_stopped_at(executable: str) -> None:
+    window = empty_window(executable)
+    try:
+        window.editor().setPlainText("факт(1.\n")
+        window.run_program()
+        assert pump(window, lambda: "непарные скобки" in window.output_text()), ascii(
+            window.output_text()
+        )
+        view = window.editor()
+        line = view.error_line()
+        assert line is not None, "the parse error marked nothing"
+        assert line <= view.document().blockCount(), line
+        assert view.textCursor().blockNumber() + 1 == line
+    finally:
+        discard_changes(window)
+    print("ok: a parse error marks its line as well")
+
+
+def test_a_diagnostic_from_an_imported_file_opens_it(executable: str, directory) -> None:
+    """A failure in an `ИМПОРТ`ed file marks the line in *that* file.
+
+    Marking a line in the tab that happens to be showing would be worse than
+    marking none, so the file is opened in a tab of its own first.
+    """
+    module = directory / "модуль.pld"
+    module.write_text("ок(1).\nсломано(1.\n", encoding="utf-8")
+    main = directory / "главная.pld"
+    main.write_text(':- ИМПОРТ("модуль.pld").\n?ок(1).\n', encoding="utf-8")
+
+    window = empty_window(executable)
+    try:
+        assert window.open_path(str(main)), "the main file did not open"
+        window.run_program()
+        assert pump(window, lambda: "непарные скобки" in window.output_text()), ascii(
+            window.output_text()
+        )
+        buffer = window._buffer_for_path(str(module))
+        assert buffer is not None, [item.model.path for item in window.buffers()]
+        assert any(view.error_line() is not None for view in buffer.views()), "no line marked"
+        # The diagnostic names the file it came from, and the line in it.  The
+        # interpreter writes its paths with forward slashes, so the file's name is
+        # what is looked for here rather than the platform's own spelling.
+        assert "модуль.pld:4:1" in window.output_text(), ascii(window.output_text())
+    finally:
+        discard_changes(window)
+    print("ok: a diagnostic from an imported file opens that file and marks its line")
+
+
+def test_stepping_shows_the_goal_the_stack_and_the_line(executable: str) -> None:
+    """`F10` starts a stepped run; the panel, the stack and the editor follow it."""
+    window = empty_window(executable)
+    try:
+        assert window.stepping() is False, "the step panel stood there before F10"
+        window.editor().setPlainText("факт(1).\nсчёт(X) :- факт(X).\n?счёт(X).\n")
+        window._actions["step"].trigger()
+        assert pump(window, lambda: window.stepping()), "the step panel never appeared"
+        pane = window.step_pane()
+        assert pane.action_text() == "вызов", pane.action_text()
+        assert pane.goal_text() == "счёт(_1)", ascii(pane.goal_text())
+        assert pane.depth_text() == "глубина 0", pane.depth_text()
+        assert pane.where_text().endswith(":3:1"), ascii(pane.where_text())
+        assert pane.stack_text() == "стек: счёт(_1)", ascii(pane.stack_text())
+        assert window.editor().trace_line() == 3, window.editor().trace_line()
+        assert window.status_text().startswith("шаг:"), window.status_text()
+        # A paused step is a usable state: the keys that go on from it must be
+        # live, or they are dead exactly when the user needs them.
+        assert window._actions["step"].isEnabled() is True
+        assert window._actions["step_over"].isEnabled() is True
+        assert window._actions["run"].isEnabled() is True
+
+        window._actions["step"].trigger()  # one point in
+        assert pump(window, lambda: pane.goal_text().startswith("факт")), ascii(pane.goal_text())
+        assert pane.depth_text() == "глубина 1", pane.depth_text()
+        assert pane.stack_text() == "стек: счёт(_1) → факт(_1)", ascii(pane.stack_text())
+        assert window.editor().trace_line() == 2, window.editor().trace_line()
+
+        window._actions["run"].trigger()  # F5 while paused means «продолжить»
+        assert pump(window, lambda: not window.stepping()), "the panel stayed up"
+        assert pump(window, lambda: "решени" in window.status_text()), window.status_text()
+        assert "X=1" in window.output_text(), ascii(window.output_text())
+    finally:
+        discard_changes(window)
+    print("ok: stepping shows the goal, the depth, the stack and the line it is on")
+
+
+def test_the_trace_is_coloured_apart_from_the_output(executable: str) -> None:
+    """«Запустить с трассировкой»: the trace text arrives as `trace` events.
+
+    It is the interpreter's own text and the program's own output; colouring them
+    alike would make a trace look like the answer.
+    """
+    from prologd_gui import panels
+
+    window = empty_window(executable)
+    try:
+        window.editor().setPlainText("факт(1).\n?факт(1).\n")
+        window._actions["run_trace"].trigger()
+        assert pump(window, lambda: "Согласуется с" in window.output_text()), ascii(
+            window.output_text()
+        )
+        lines = window.output_text().splitlines()
+        block = next(number for number, line in enumerate(lines) if "Согласуется с" in line)
+        assert colour_of(window._output, block) == panels.KIND_COLORS[panels.TRACE]
+    finally:
+        discard_changes(window)
+    print("ok: the trace is coloured apart from the program's own output")
+
+
 def main(argv: list[str]) -> int:
     if QApplication is None:
         print("skipped: PySide6 is not installed")
@@ -1349,6 +1501,11 @@ def main(argv: list[str]) -> int:
         test_undo_and_redo_follow_the_tab_that_is_showing(executable)
         test_the_run_state_drives_the_buttons(executable)
         test_the_wrap_switch_reaches_every_editor(executable)
+        test_a_runtime_error_marks_its_line(executable)
+        test_a_parse_error_marks_the_line_the_parser_stopped_at(executable)
+        test_a_diagnostic_from_an_imported_file_opens_it(executable, files)
+        test_stepping_shows_the_goal_the_stack_and_the_line(executable)
+        test_the_trace_is_coloured_apart_from_the_output(executable)
         test_the_output_can_be_saved(executable, files)
         test_the_context_menu_reuses_the_shared_actions(executable)
         test_the_font_control_and_the_wheel_are_one_setting(executable)

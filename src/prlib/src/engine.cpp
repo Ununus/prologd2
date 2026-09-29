@@ -39,21 +39,38 @@ namespace {
 /// Persistent environment frame.  Pushing or advancing an environment creates
 /// a new node that shares its parent chain, so a choice point can capture the
 /// whole continuation in O(1) and restore it in O(1).
+///
+/// The frame also carries what a *step* needs: how deep it is, the clause it is
+/// solving (a runtime error points there), and whether it is the body of a
+/// clause — only those frames are entered and left as a goal, the frames of a
+/// conjunction or of `ВЫП` are not.
 struct EnvNode {
   std::shared_ptr<const EnvNode> parent;  // null for the root environment
   std::shared_ptr<std::vector<Term>> goals;
   std::size_t index = 0;
   std::size_t cp_barrier = 0;
+  std::size_t depth = 0;
+  SourceLocation location;
+  bool goalFrame = false;
 };
 
 using EnvRef = std::shared_ptr<const EnvNode>;
 
-EnvRef makeEnv(EnvRef parent, std::shared_ptr<std::vector<Term>> goals,
-               std::size_t barrier) {
+/// A frame of goals.  `location` is set for a clause body and inherited
+/// otherwise; the depth counts the chain and no term is copied.
+EnvRef makeEnv(EnvRef parent, std::shared_ptr<std::vector<Term>> goals, std::size_t barrier,
+               const SourceLocation* location = nullptr, bool goal_frame = false) {
   auto node = std::make_shared<EnvNode>();
   node->parent = std::move(parent);
   node->goals = std::move(goals);
   node->cp_barrier = barrier;
+  node->depth = node->parent ? node->parent->depth + 1 : 0;
+  node->goalFrame = goal_frame;
+  if (location != nullptr) {
+    node->location = *location;
+  } else if (node->parent) {
+    node->location = node->parent->location;
+  }
   return node;
 }
 
@@ -86,7 +103,10 @@ class Solver {
  public:
   explicit Solver(Engine& engine) : engine_(engine) {}
 
-  void run(std::span<const Term> goals, const std::function<bool()>& on_solution);
+  /// Solve `goals`; `location` is where they stand in the source, which is what
+  /// a step point of the query's own goals reports.
+  void run(std::span<const Term> goals, const std::function<bool()>& on_solution,
+           const SourceLocation& location = {});
 
  private:
   bool resolveGoal(const Term& goal);
@@ -96,6 +116,15 @@ class Solver {
   void pushMeta(const Term& goal, std::size_t barrier);
   void traceGoal(const Term& goal);
   void traceText(std::string_view text);
+  /// The environment moves with the location it stands for: a runtime error and
+  /// a step must name the clause that is being solved, not the query.
+  void setEnv(EnvRef env);
+  /// One step point, if a front-end asked for them.  `goal` may be null where
+  /// the goal is the one the matching `Call` already reported, and `depth` is
+  /// the nesting the point belongs to — for an `Exit` that is the depth of the
+  /// goal that is leaving, not of the frame it leaves.
+  void step(StepAction action, const Term* goal, const SourceLocation& location,
+            std::size_t depth);
 
   Engine& engine_;
   EnvRef env_;
@@ -103,17 +132,52 @@ class Solver {
   std::size_t steps_ = 0;
 };
 
+/// Puts the engine's current location back when a query ends, however it ends.
+/// A nested query (`НАЙТИВСЁ`, `НЕ`, `ИЛИ`) runs its own solver over its own
+/// environment chain, and the outer one has to keep its own idea of where it is.
+class LocationGuard {
+ public:
+  explicit LocationGuard(Engine& engine)
+      : engine_(engine), saved_(engine.currentLocation()) {}
+  ~LocationGuard() { engine_.setCurrentLocation(saved_); }
+  LocationGuard(const LocationGuard&) = delete;
+  LocationGuard& operator=(const LocationGuard&) = delete;
+
+ private:
+  Engine& engine_;
+  SourceLocation saved_;
+};
+
+void Solver::setEnv(EnvRef env) {
+  env_ = std::move(env);
+  engine_.setCurrentLocation(env_->location);
+}
+
+void Solver::step(StepAction action, const Term* goal, const SourceLocation& location,
+                  std::size_t depth) {
+  const EngineOptions& options = engine_.options();
+  if (!options.stepHook) {
+    return;  // not stepping: this is the whole cost of the hook
+  }
+  StepInfo info;
+  info.action = action;
+  info.goal = goal;
+  info.depth = depth;
+  info.location = location;
+  if (options.stepHook(info) == StepDecision::Stop) {
+    engine_.raise(ErrorCode::Interrupted);
+  }
+}
+
 void Solver::traceText(std::string_view text) {
   if (engine_.traceEnabled()) {
-    engine_.io().write(text);
-    engine_.io().newline();
+    engine_.io().writeTrace(text);
   }
 }
 
 void Solver::traceGoal(const Term& goal) {
   if (engine_.traceEnabled()) {
-    engine_.io().write("Цель " + engine_.format(goal));
-    engine_.io().newline();
+    engine_.io().writeTrace("Цель " + engine_.format(goal));
   }
 }
 
@@ -126,7 +190,7 @@ void Solver::applyCut() {
 void Solver::pushMeta(const Term& goal, std::size_t barrier) {
   auto goals = std::make_shared<std::vector<Term>>();
   goals->push_back(goal);
-  env_ = makeEnv(env_, std::move(goals), barrier);
+  setEnv(makeEnv(env_, std::move(goals), barrier));
 }
 
 bool Solver::selectClause(ChoicePoint& cp) {
@@ -143,8 +207,11 @@ bool Solver::selectClause(ChoicePoint& cp) {
       if (engine_.traceEnabled()) {
         traceText("Успех");
       }
-      env_ = advanceEnv(cp.env);
-      env_ = makeEnv(env_, std::make_shared<std::vector<Term>>(std::move(body)), cp.barrier);
+      setEnv(advanceEnv(cp.env));
+      // The body of *this* clause: its position is what a runtime error and a
+      // step point inside it must report.
+      setEnv(makeEnv(env_, std::make_shared<std::vector<Term>>(std::move(body)), cp.barrier,
+                     &clause.location, /*goal_frame=*/true));
       return true;
     }
     if (engine_.traceEnabled()) {
@@ -160,10 +227,11 @@ bool Solver::backtrack() {
     ChoicePoint cp = std::move(cps_.back());
     cps_.pop_back();
     engine_.bindings().unwind(cp.trail_mark);
-    env_ = cp.env;
+    setEnv(cp.env);
     if (engine_.traceEnabled()) {
       traceText("Переделка. Цель " + engine_.format(cp.goal));
     }
+    step(StepAction::Redo, &cp.goal, env_->location, env_->depth);
     if (selectClause(cp)) {
       if (cp.next < cp.clauses->size()) {
         cps_.push_back(std::move(cp));
@@ -189,7 +257,7 @@ bool Solver::resolveGoal(const Term& goal) {
 
   if (name == "!" && arity == 0) {
     applyCut();
-    env_ = advanceEnv(env_);
+    setEnv(advanceEnv(env_));
     return true;
   }
   if (name == "," && arity == 2) {
@@ -204,7 +272,7 @@ bool Solver::resolveGoal(const Term& goal) {
   if (name == "ВЫП" && arity == 1) {
     // Meta-call: solve the argument in the caller's cut scope.
     const std::size_t barrier = env_->cp_barrier;
-    env_ = advanceEnv(env_);
+    setEnv(advanceEnv(env_));
     pushMeta(goal.compound->args[0], barrier);
     return true;
   }
@@ -217,7 +285,7 @@ bool Solver::resolveGoal(const Term& goal) {
     const BuiltinResult result = builtin(engine_, args);
     switch (result) {
       case BuiltinResult::Continue:
-        env_ = advanceEnv(env_);
+        setEnv(advanceEnv(env_));
         return true;
       case BuiltinResult::Fail:
         return false;
@@ -228,9 +296,14 @@ bool Solver::resolveGoal(const Term& goal) {
   }
 
   traceGoal(goal);
+  // A user predicate: the goal is entered (`Exit` or `Fail` will follow), and
+  // the position is the clause this goal is being called *from*.
+  const SourceLocation caller = env_->location;
+  step(StepAction::Call, &goal, caller, env_->depth);
 
   Database::ClauseListPtr clauses = engine_.database().clausesFor(name, arity);
   if (!clauses || clauses->empty()) {
+    step(StepAction::Fail, &goal, caller, env_->depth);
     return false;  // unknown predicate fails, like the original
   }
   ChoicePoint cp;
@@ -242,6 +315,7 @@ bool Solver::resolveGoal(const Term& goal) {
   cp.goal = goal;
   cp.env = env_;
   if (!selectClause(cp)) {
+    step(StepAction::Fail, &goal, caller, env_->depth);
     return false;
   }
   if (cp.next < cp.clauses->size()) {
@@ -250,11 +324,16 @@ bool Solver::resolveGoal(const Term& goal) {
   return true;
 }
 
-void Solver::run(std::span<const Term> goals, const std::function<bool()>& on_solution) {
+void Solver::run(std::span<const Term> goals, const std::function<bool()>& on_solution,
+                 const SourceLocation& location) {
+  LocationGuard location_guard(engine_);
   cps_.clear();
   steps_ = 0;
-  env_ = makeEnv(nullptr,
-                 std::make_shared<std::vector<Term>>(goals.begin(), goals.end()), 0);
+  const std::shared_ptr<std::vector<Term>> root =
+      std::make_shared<std::vector<Term>>(goals.begin(), goals.end());
+  // The goals of the query itself stand where the query was written — a `?`
+  // statement in a file has a line, one typed at the prompt has none.
+  setEnv(makeEnv(nullptr, root, 0, &location));
 
   for (;;) {
     if (engine_.shouldStop()) {
@@ -273,7 +352,16 @@ void Solver::run(std::span<const Term> goals, const std::function<bool()>& on_so
           return;
         }
       } else {
-        env_ = env_->parent;
+        // Leaving a clause body: the goal that was entered has succeeded.  The
+        // frames of a conjunction and of ВЫП are not goals, so they are not
+        // announced — a front-end rebuilds the call stack from Call/Exit pairs.
+        if (env_->goalFrame) {
+          // The depth of the goal that is leaving, not of the frame it leaves:
+          // then an `exit` and the `call` it answers report the same depth, and
+          // a front-end can pair them without guessing.
+          step(StepAction::Exit, nullptr, env_->location, env_->depth - 1);
+        }
+        setEnv(env_->parent);
       }
       continue;
     }
@@ -580,6 +668,9 @@ std::vector<Term> Engine::collectAll(const Term& goal, const Term& templ,
 void Engine::raise(ErrorCode code, std::string message) {
   PrologError error;
   error.code = code;
+  // The clause being solved is where a runtime error happened, and the solver
+  // keeps that in step with its environment; `raiseAt` overrides it.
+  error.location = current_location_;
   error.message = message.empty() ? std::string(errorCodeText(code)) : std::move(message);
   throw PrologRuntimeError(std::move(error));
 }
@@ -603,12 +694,21 @@ ParsedProgram Engine::parseSource(std::string_view source, const std::string& fi
     if (diagnostic.code == ErrorCode::NoErrors) {
       continue;
     }
-    io_->errorStream() << DiagnosticSink::format(diagnostic) << '\n';
+    report(diagnostic);
   }
   if (sink.hasErrors()) {
     program.ok = false;
   }
   return program;
+}
+
+void Engine::report(const PrologError& diagnostic) {
+  if (diagnostic_hook_) {
+    // The front-end takes it from here, with the location in structured form.
+    diagnostic_hook_(diagnostic);
+    return;
+  }
+  io_->errorStream() << DiagnosticSink::format(diagnostic) << '\n';
 }
 
 void Engine::loadProgram(const ParsedProgram& program) {
@@ -634,7 +734,7 @@ bool Engine::runQuery(const Query& query, const std::function<bool()>& onSolutio
     solver.run(query.goals, [&found]() {
       found = true;
       return false;
-    });
+    }, query.location);
     return found;
   }
   const bool has_variables = !query.variables.empty();
@@ -665,7 +765,7 @@ bool Engine::runQuery(const Query& query, const std::function<bool()>& onSolutio
       io_->newline();
     }
     return true;
-  });
+  }, query.location);
 
   if (!quiet_ && !found) {
     if (!io_->atLineStart()) {

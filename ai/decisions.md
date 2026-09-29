@@ -335,3 +335,46 @@ type hints, no dependency besides PySide6, and `protocol.py` stays Qt-free so it
 can be tested headlessly.
 
 **Status.** Accepted.
+
+---
+
+## ADR-015: Stepping blocks inside the engine, and positions come from the clause
+
+**Context.** task_28 asked for step-by-step execution in the window.  The naive
+shapes both fail: parsing the textual trace is fragile (the text is for humans and
+changes with the version), and a hook that "pauses" has nowhere to pause — the
+solver is a plain C++ loop over a persistent environment chain, with no coroutine
+or continuation to suspend and resume.
+
+**Decision.** Three things, all of them small:
+
+1. `EngineOptions::stepHook` — a `std::function<StepDecision(const StepInfo&)>`
+   called at the four points the textual trace already has (call, exit, redo,
+   fail), with `StepInfo{action, goal, depth, location}`.  It has exactly **two**
+   outcomes, `Continue` and `Stop`; there is no `Pause`, because a hook that wants
+   the user to look at the point it was given simply *waits* — reading the next
+   request from the front-end — and then answers.  That wait is the same re-entrant
+   request loop `input_request` already uses, so the protocol needs no new
+   threading model, and the solver needs no suspension.  Null by default, so a run
+   that is not stepped through pays one branch per point.
+2. The positions a front-end needs are carried by the *environment*: an `EnvNode`
+   knows its depth and the `SourceLocation` of the clause it is solving, which is
+   what a step point reports, and `Engine::raise` fills the same location in, so a
+   **runtime** error — not only a parse error — names its line.  A nested query
+   saves and restores the engine's current location.
+3. `error` events carry `file`/`line`/`column` as fields, and a front-end is
+   expected to *not* parse them out of the message.  A diagnostic sink that
+   replaces the error-stream text is how the interpreter hands them over.
+
+The trace of `ТРАССА` is untouched on the console path but goes through
+`IoContext::setTraceSink` when a front-end asks, so the GUI can colour it apart
+from the program's own output.
+
+**Consequences.** Stepping costs one indirect call per traced point even when the
+hook is installed and running on; a front-end that never installs it pays a null
+check.  The hook runs on the solver's own thread and may block — it must not
+throw, and it is not a signal handler.  The alternative the task named as a
+deliberate fallback (grepping the trace text) is *not* used: the structured hook is
+what the panel, the call stack and the highlighted line are built on.
+
+**Status.** Accepted.

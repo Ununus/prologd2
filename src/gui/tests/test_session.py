@@ -73,13 +73,27 @@ class Recorder:
     def __init__(self, session) -> None:
         self.output = ""
         self.ready = ""
+        self.trace = ""
+        self.steps: list[str] = []
         self.failures: list[str] = []
         session.output.connect(self.on_output)
         session.ready.connect(self.on_ready)
-        session.failed.connect(lambda kind, message: self.failures.append(f"{kind}: {message}"))
+        session.trace.connect(self.on_trace)
+        session.stepped.connect(self.on_stepped)
+        # A failure carries where it happened as well (protocol 3); the position is
+        # a `protocol.Position` or None, and the message is what a test looks at.
+        session.failed.connect(
+            lambda kind, message, _position: self.failures.append(f"{kind}: {message}")
+        )
 
     def on_output(self, text: str) -> None:
         self.output += text
+
+    def on_trace(self, text: str) -> None:
+        self.trace += text
+
+    def on_stepped(self, point) -> None:
+        self.steps.append(point.action)
 
     def on_ready(self, version: str) -> None:
         self.ready = version

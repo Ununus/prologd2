@@ -18,12 +18,18 @@ namespace prologd::cli {
 /// | `{"cmd":"load","text":"...","name":"buffer"}` | load program text |
 /// | `{"cmd":"query","text":"?goal."}` | run one statement |
 /// | `{"cmd":"input","text":"..."}` | answer the pending `input_request` |
+/// | `{"cmd":"step","action":"into"}` | answer the pending `step` event |
 /// | `{"cmd":"interrupt"}` | stop the current query |
 /// | `{"cmd":"quit"}` | end the session |
 ///
+/// `load` and `query` take `"trace":true` (the trace of `ТРАССА` goes out as
+/// `trace` events) and `"step":true` (the run stops at the first step point and
+/// waits for a `step` request; `action` is `into`, `over`, `continue` or `stop`).
+///
 /// Events are written to `out`, one JSON object per line: `ready`, `output`,
-/// `result`, `input_request`, `error`, `bye`.  The contract is written down in
-/// `src/gui/README.md`.
+/// `result`, `input_request`, `step`, `trace`, `error`, `bye`.  `error` carries
+/// `file`/`line`/`column` when the diagnostic has a position.  The contract is
+/// written down in `src/gui/README.md`.
 ///
 /// The session replaces the engine streams and the loader's query runner, so it
 /// is an alternative to the console front-end, not an addition to it.

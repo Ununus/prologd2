@@ -164,10 +164,20 @@ def test_the_error_line_is_marked_and_cleared() -> None:
     assert editor.error_line() is None
     assert editor.extraSelections() == []
 
-    # A line past the end must not raise: the diagnostic may be stale.
+    # A line past the end is marked on the last line that exists: `непарные скобки`
+    # is reported where the input ran out, which for a file that ends without its
+    # closing bracket is one line past the end — and a mark that points at nothing
+    # is not a mark at all.
     editor.mark_error_line(99)
+    assert editor.error_line() == editor.document().blockCount(), editor.error_line()
+    assert len(editor.extraSelections()) == 1
+
+    # An edit clears the marks: a red line over text it no longer describes would
+    # be a lie about where the program broke.
+    editor.setPlainText("а\n")
+    assert editor.error_line() is None
     assert editor.extraSelections() == []
-    print("ok: the error line is marked, cleared, and a stale line is ignored")
+    print("ok: the error line is marked, clamped to a line that exists, and cleared by an edit")
 
 
 def test_a_document_made_outside_takes_the_pane_font() -> None:

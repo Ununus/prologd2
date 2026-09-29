@@ -1,6 +1,8 @@
 # task_28 — GUI: run, step, stop, error line, input
 
-**Status:** not started
+**Status:** done — running, stepping (`F10`/`Shift+F10`/`F5`), the trace, the error
+line with its position, and input were already partly in from task_27 and are now
+complete; the engine seam, the protocol additions and the tests are in.
 **Depends on:** task_22, task_25, task_27
 **Milestone:** M11
 
@@ -131,3 +133,51 @@ A runaway program stops on **Остановить** and the window stays usable;
 error and a runtime error both mark the offending line in red; a small program
 can be walked goal by goal and the editor follows the current line; `ВВОДСТР`
 is answered from the input pane.
+
+## What was built (2026-09-29)
+
+* `prlib`: `EngineOptions::stepHook` — `std::function<StepDecision(const StepInfo&)>`
+  called at the four points the textual trace already had (call, exit, redo, fail),
+  with `StepInfo{action, goal, depth, location}`.  The environment frames carry the
+  depth and the clause's `SourceLocation`, so a step point and a runtime error both
+  know where they are; the frames of a conjunction and of `ВЫП` are not goals and
+  are not announced, which is what makes the `call`/`exit` pairs balance.
+* `prlib`: `Engine::raise` fills in the location of the clause being solved, so
+  **runtime errors carry a position** — the gap the task asked to check for.  A
+  nested query (`НАЙТИВСЁ`, `НЕ`, `ИЛИ`) saves and restores it.
+* `prlib`: `IoContext::setTraceSink` — the trace text goes to the front-end when one
+  asks for it, and to the output stream as before when none does.  That is how the
+  GUI colours the trace apart from the program's own output.
+* Protocol 3: `step` events, the `step` request (`into`/`over`/`continue`/`stop`),
+  `trace` events, `file`/`line`/`column` on `error`, and the `step`/`trace` flags of
+  `load` and `query`.
+* GUI: the step strip (`panels.StepPane`) with the action, goal, depth, position and
+  the call stack the window rebuilds from `call`/`exit`; the trace line marked in the
+  editor in a neutral colour; `F10`, `Shift+F10`, `F5` as «продолжить», and the three
+  commands enabled (a *paused* step is a usable state — a disabled `QAction` fires no
+  shortcut); the error line from the structured position, with the caret on it and
+  the file opened in a tab when the diagnostic comes from an `ИМПОРТ`ed file.
+* Tests: `src/tests/test_stepping.cpp` (6 cases), `src/gui/tests/test_stepping.py`
+  (7 checks, Qt-free, against the built interpreter), five more checks in
+  `test_window.py`, and the protocol session in `src/tests/protocol_session.cmake`.
+
+Two decisions worth keeping (both in `ai/decisions.md`):
+
+1. **There is no `Pause` outcome.**  The hook *blocks* — reading the next request,
+   the same re-entrant loop `input_request` uses — and then answers `Continue` or
+   `Stop`.  The solver has no continuation to suspend, and the request loop a
+   front-end already has is exactly the pause; a third value would have been a
+   promise the engine cannot keep.
+2. **Stepping is not implemented by reading the trace text.**  The text format is
+   for humans and changes with the version; the structured hook is what the panel,
+   the stack and the highlighted line are built on.
+
+One thing the task asked for and this round did **not** do: «Остановить» still
+terminates the child rather than sending `interrupt` first and waiting out a grace
+period.  A query that is listening — waiting for input, or paused at a step — would
+end on the request alone and leave the session alive, but then «Остановить» would
+sometimes end the run and sometimes unload the knowledge base, and the run/stop
+buttons would have to be right in both cases.  The window was taught one meaning
+(`--- остановлено ---`, the process goes) in an earlier round and the tests pin it;
+a polite-first stop is a change of its own, worth its own task, and the acceptance
+criteria here are met without it.

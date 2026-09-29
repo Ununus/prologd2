@@ -32,6 +32,19 @@ void IoContext::setInputRequestHandler(InputRequestHandler handler) {
   input_handler_ = std::move(handler);
 }
 
+void IoContext::setTraceSink(std::function<void(std::string_view)> sink) {
+  trace_sink_ = std::move(sink);
+}
+
+void IoContext::writeTrace(std::string_view text) {
+  if (trace_sink_) {
+    trace_sink_(text);
+    return;
+  }
+  write(text);
+  newline();
+}
+
 bool IoContext::fetchLine(std::string& line, InputRequestKind kind) {
   if (!preloaded_.empty()) {
     line = std::move(preloaded_.front());

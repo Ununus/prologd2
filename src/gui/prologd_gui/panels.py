@@ -19,12 +19,14 @@ import pathlib
 from dataclasses import dataclass
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QColor, QTextCharFormat, QTextCursor
+from PySide6.QtGui import QColor, QFont, QTextCharFormat, QTextCursor
 from PySide6.QtWidgets import (
     QHBoxLayout,
+    QLabel,
     QLineEdit,
     QPlainTextEdit,
     QPushButton,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -391,3 +393,138 @@ class InputPane(QWidget):
         font.setPointSizeF(self._size)
         self._line.setFont(font)
         self._text.setFont(font)
+
+
+#: What a step point is called in the panel.  The words are the ones the
+#: interpreter's own trace uses (`Согласуется с …`, `Успех`, `Переделка`,
+#: `Неудача`), so the panel and the trace do not teach two vocabularies for one
+#: thing.
+STEP_TITLES = {
+    "call": "вызов",
+    "exit": "успех",
+    "redo": "переделка",
+    "fail": "неудача",
+}
+
+#: How many frames of the call stack the strip shows.  A deep recursion would
+#: otherwise stretch the label — and the window — to the width of the screen.
+STACK_FRAMES = 6
+
+
+class StepPane(QWidget):
+    """The strip that shows where a stepped run stands.
+
+    What the solver just did, the goal it did it with and how deep it is, where
+    that stands in the source, and the call stack.  The stack is *ours*: the
+    interpreter reports one point at a time and an `exit` names no goal, so the
+    window pushes what a `call` announced and pops it again on `exit`/`fail` —
+    which is exactly what those two events mean.
+
+    Hidden while nothing is being stepped through: like the console, an idle strip
+    would take room from the program for nothing.
+    """
+
+    #: «Продолжить»: run on to the end without stopping at the next point.
+    resumed = Signal()
+    #: «Стоп»: end the query, like «Остановить» does.
+    stopped = Signal()
+
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        *,
+        font_family: str = "Cascadia Mono",
+        font_size: float = 11.0,
+    ) -> None:
+        super().__init__(parent)
+        self._family = font_family
+        self._action = QLabel("")
+        self._action.setStyleSheet("font-weight: bold;")
+        self._goal = QLabel("")
+        # A goal is data: `#X+1#` must not be read as markup.
+        self._goal.setTextFormat(Qt.TextFormat.PlainText)
+        self._depth = QLabel("")
+        self._where = QLabel("")
+        self._where.setToolTip("Где эта цель стоит в файле")
+        self._stack = QLabel("")
+        self._stack.setTextFormat(Qt.TextFormat.PlainText)
+        self._resume = QPushButton("Продолжить")
+        self._resume.clicked.connect(self.resumed)
+        self._stop_button = QPushButton("Стоп")
+        self._stop_button.clicked.connect(self.stopped)
+
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.addWidget(self._action)
+        row.addWidget(self._goal, 1)
+        row.addWidget(self._depth)
+        row.addWidget(self._where)
+        row.addWidget(self._resume)
+        row.addWidget(self._stop_button)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(4, 3, 4, 3)
+        layout.setSpacing(2)
+        layout.addLayout(row)
+        layout.addWidget(self._stack)
+        # The strip is as tall as its two lines: the same ceiling the find bar has.
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
+        self.set_font_size(font_size)
+        self.setVisible(False)
+
+    # -- what the window drives --------------------------------------------
+    def show_point(self, point, stack: list[str]) -> None:
+        """Shows one step point of `protocol.StepPoint` shape, and the stack."""
+        self._action.setText(STEP_TITLES.get(point.action, point.action))
+        self._goal.setText(point.goal)
+        self._depth.setText(f"глубина {point.depth}")
+        self._where.setText(point.position.where() if point.position else "")
+        self._stack.setText(self._stack_text(stack))
+        self._stack.setToolTip(self._stack.text())
+        self.setVisible(True)
+
+    def idle(self) -> None:
+        """Nothing is being stepped through: no room taken, nothing to show."""
+        self._action.clear()
+        self._goal.clear()
+        self._depth.clear()
+        self._where.clear()
+        self._stack.clear()
+        self.setVisible(False)
+
+    @staticmethod
+    def _stack_text(stack: list[str]) -> str:
+        """The call stack, innermost last, with the head left out when it is long."""
+        if not stack:
+            return ""
+        shown = stack[-STACK_FRAMES:]
+        head = "… → " if len(stack) > len(shown) else ""
+        return "стек: " + head + " → ".join(shown)
+
+    def action_text(self) -> str:
+        return self._action.text()
+
+    def goal_text(self) -> str:
+        return self._goal.text()
+
+    def depth_text(self) -> str:
+        return self._depth.text()
+
+    def where_text(self) -> str:
+        return self._where.text()
+
+    def stack_text(self) -> str:
+        return self._stack.text()
+
+    def resume_button(self) -> QPushButton:
+        return self._resume
+
+    def stop_button(self) -> QPushButton:
+        return self._stop_button
+
+    def set_font_size(self, size: float) -> None:
+        """The goal and the stack are code: the editor's own font."""
+        font = QFont(self._family)
+        font.setPointSizeF(float(size))
+        self._goal.setFont(font)
+        self._stack.setFont(font)

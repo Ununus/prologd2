@@ -21,7 +21,35 @@ using Json = nlohmann::json;
 
 /// Wire format version; bump it whenever a command or an event changes shape.
 /// 2: the `ready` event carries `keywords`.
-constexpr int kProtocolVersion = 2;
+/// 3: `step` events and the `step` command, `trace` events, and `file`/`line`/
+///    `column` on `error` events (a front-end no longer parses them out of the
+///    message), plus `step`/`trace` flags on `load` and `query`.
+constexpr int kProtocolVersion = 3;
+
+[[nodiscard]] std::string stepActionName(StepAction action) {
+  switch (action) {
+    case StepAction::Call:
+      return "call";
+    case StepAction::Exit:
+      return "exit";
+    case StepAction::Redo:
+      return "redo";
+    case StepAction::Fail:
+      return "fail";
+  }
+  return "call";
+}
+
+/// Adds the position of a diagnostic, when it has one.  A goal that came from a
+/// query typed at the prompt does not, and then the fields are left out.
+void addLocation(Json& event, const SourceLocation& location) {
+  if (location.file.empty()) {
+    return;
+  }
+  event["file"] = location.file;
+  event["line"] = location.line;
+  event["column"] = location.column;
+}
 
 [[nodiscard]] std::string inputKindName(InputRequestKind kind) {
   switch (kind) {
@@ -77,6 +105,17 @@ class Session {
     // interactive read now goes through the protocol instead of a stream.
     engine_.io().setInputRequestHandler(
         [this](InputRequestKind kind) { return answerInputRequest(kind); });
+    // The trace text of `ТРАССА` goes out as `trace` events, so a front-end can
+    // colour it apart from the program's own output (the console keeps reading
+    // it in the output stream, where it always was).
+    engine_.io().setTraceSink([this](std::string_view text) {
+      emit(Json{{"event", "trace"}, {"text", std::string(text) + "\n"}});
+    });
+    // Diagnostics come with their position: a front-end must not have to parse
+    // `file:line:column:` out of the message.
+    engine_.setDiagnosticHook([this](const PrologError& diagnostic) {
+      reportDiagnostic(diagnostic, "parse");
+    });
     loader_.setQueryRunner([this](const Query& query) { runQuery(query); });
 
     emit(Json{{"event", "ready"},
@@ -123,6 +162,12 @@ class Session {
       fail("protocol", "нет ожидающего запроса ввода");
       return;
     }
+    if (command == "step") {
+      // A `step` is the answer to a paused step point, and the pause is the wait
+      // inside `onStep`; reaching this line means nothing is paused.
+      fail("protocol", "нет шага, который ждёт ответа");
+      return;
+    }
     if (command == "interrupt") {
       // Effective between commands and while the interpreter waits for input;
       // a runaway query has to be stopped by ending the process.
@@ -140,6 +185,15 @@ class Session {
       fail("protocol", command + ": нужен ровно один из параметров path или text");
       return;
     }
+    // A run can be asked for with the trace on, and one that is stepped through:
+    // the program's own `?`-statements and directives run during the load, so the
+    // step hook has to be armed around it, not only around `query`.
+    engine_.setTrace(request.value("trace", false));
+    const bool stepping = request.value("step", false);
+    if (stepping) {
+      armStepping();
+    }
+    reported_diagnostics_ = false;
     bool ok = false;
     if (has_path) {
       ok = loader_.loadFile(fromUtf8Path(request.at("path").get<std::string>()), &error);
@@ -147,10 +201,13 @@ class Session {
       const std::string name = request.value("name", std::string("<buffer>"));
       ok = loader_.loadSource(request.at("text").get<std::string>(), name, &error);
     }
+    if (stepping) {
+      disarmStepping();
+    }
     if (!ok) {
-      // The parse diagnostics already carry `file:line:column`; the loader's
-      // message is only a summary, so it is used when nothing was reported.
-      if (!flushDiagnostics("parse")) {
+      // The diagnostics of the parse went out one by one, with their positions;
+      // the loader's message is only a summary, used when nothing was reported.
+      if (!reported_diagnostics_ && !flushDiagnostics("parse")) {
         fail("parse", error);
       }
       exit_code_ = 2;
@@ -162,9 +219,106 @@ class Session {
       const bool found = engine_.runQuery(query);
       emit(Json{{"event", "result"}, {"found", found}});
     } catch (const PrologRuntimeError& runtime_error) {
-      fail("runtime", runtime_error.what());
+      reportDiagnostic(runtime_error.error(), "runtime");
       exit_code_ = 3;
     }
+  }
+
+  /// One diagnostic as an `error` event: the message as the human wrote it, and
+  /// the position in fields of its own.
+  void reportDiagnostic(const PrologError& diagnostic, const std::string& kind) {
+    Json event{{"event", "error"}, {"kind", kind}, {"message", diagnostic.message}};
+    addLocation(event, diagnostic.location);
+    reported_diagnostics_ = true;
+    emit(event);
+  }
+
+  // ---- stepping ---------------------------------------------------------
+
+  /// Asks the solver for step points.  Called before a run that is to be
+  /// stepped through, and removed by `disarmStepping` when it is over.
+  void armStepping() {
+    pause_at_step_ = true;
+    over_depth_.reset();
+    engine_.options().stepHook = [this](const StepInfo& info) { return onStep(info); };
+  }
+
+  /// Removes the hook *after* the run: clearing it from inside would destroy the
+  /// function object that is being called.
+  void disarmStepping() {
+    engine_.options().stepHook = nullptr;
+    pause_at_step_ = false;
+    over_depth_.reset();
+  }
+
+  /// Runs inside the solver, at a step point.
+  StepDecision onStep(const StepInfo& info) {
+    if (!pause_at_step_) {
+      return StepDecision::Continue;  // running on, but still counting frames
+    }
+    if (over_depth_.has_value() && info.depth > *over_depth_) {
+      // «Шаг с обходом»: the points inside the goal being stepped over are not
+      // stops, and they are not announced either.
+      return StepDecision::Continue;
+    }
+    flush();  // the output so far, then the point itself
+    Json event{{"event", "step"},
+               {"action", stepActionName(info.action)},
+               {"depth", info.depth}};
+    if (info.goal != nullptr) {
+      event["goal"] = engine_.format(*info.goal);
+    }
+    addLocation(event, info.location);
+    over_depth_.reset();
+    emit(event);
+
+    // The pause: read requests until the front-end answers, the same re-entrant
+    // loop `answerInputRequest` uses — the engine is inside a query, so nothing
+    // else can be reading this stream.
+    std::string line;
+    while (std::getline(in_, line)) {
+      if (line.empty()) {
+        continue;
+      }
+      Json request;
+      try {
+        request = Json::parse(line);
+      } catch (const Json::exception& parse_error) {
+        fail("protocol", std::string("некорректный JSON: ") + parse_error.what());
+        continue;
+      }
+      if (!request.is_object()) {
+        fail("protocol", "запрос должен быть объектом JSON");
+        continue;
+      }
+      const std::string command = request.value("cmd", std::string());
+      if (command == "step") {
+        const std::string action = request.value("action", std::string("into"));
+        if (action == "into") {
+          return StepDecision::Continue;  // stop again at the next point
+        }
+        if (action == "over") {
+          over_depth_ = info.depth;
+          return StepDecision::Continue;
+        }
+        if (action == "continue") {
+          pause_at_step_ = false;
+          return StepDecision::Continue;
+        }
+        if (action == "stop") {
+          pause_at_step_ = false;
+          return StepDecision::Stop;
+        }
+        fail("protocol", "неизвестное действие шага: " + action);
+        continue;
+      }
+      if (command == "interrupt" || command == "quit") {
+        pause_at_step_ = false;
+        return StepDecision::Stop;
+      }
+      fail("protocol", "ожидался ответ step, получено: " + command);
+    }
+    return StepDecision::Stop;  // the stream is over: nothing more will arrive
   }
 
   std::optional<std::string> answerInputRequest(InputRequestKind kind) {
@@ -242,6 +396,14 @@ class Session {
   std::ostringstream output_;
   std::ostringstream error_;
   int exit_code_ = 0;
+
+  /// True once a diagnostic was emitted for the current request, so the loader's
+  /// summary is not printed on top of the diagnostics themselves.
+  bool reported_diagnostics_ = false;
+  /// The state of stepping: stop at the next point, and whether the points
+  /// *inside* the goal being stepped over are stops.
+  bool pause_at_step_ = false;
+  std::optional<std::size_t> over_depth_;
 };
 
 }  // namespace

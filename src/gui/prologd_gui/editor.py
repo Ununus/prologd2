@@ -36,6 +36,11 @@ ERROR_NUMBER = "#c00000"
 SEARCH_MATCH = "#ffe9a8"
 SEARCH_CURRENT = "#ffc14d"
 
+#: The line a *step* is on: the same idea as the error line, in a neutral colour,
+#: because where a run stands is information and not a problem.
+TRACE_BACKGROUND = "#d8e6f7"
+TRACE_NUMBER = "#1b4f86"
+
 #: Background of the other places the selected word appears, and the size of a
 #: document worth scanning for them on every selection change.
 OCCURRENCE_BACKGROUND = "#e8ecf5"
@@ -235,6 +240,8 @@ class CodeEditor(ZoomablePlainTextEdit):
         self._indent_width = max(1, indent_width)
         self._line_numbers = line_numbers
         self._error_line: int | None = None
+        #: The line of the clause a stepped run is standing on (task_28).
+        self._trace_line: int | None = None
         #: Where the search bar's matches are, and which one the caret sits on.
         self._search_ranges: list[tuple[int, int]] = []
         self._current_range: tuple[int, int] | None = None
@@ -253,6 +260,9 @@ class CodeEditor(ZoomablePlainTextEdit):
         # one list of extra selections, so all the pieces are composed in one place
         # (`_refresh_extra_selections`) instead of overwriting each other.
         self.selectionChanged.connect(self._refresh_extra_selections)
+        # A mark that outlives the text it pointed at is a lie: an edit clears
+        # both the error line and the step line.
+        self.textChanged.connect(self.clear_marks)
         self._update_margin_width()
         if completion:
             self.enable_completion(True)
@@ -311,6 +321,8 @@ class CodeEditor(ZoomablePlainTextEdit):
             if block.isVisible() and bottom >= event.rect().top():
                 if self._error_line == number + 1:
                     painter.setPen(QColor(ERROR_NUMBER))
+                elif self._trace_line == number + 1:
+                    painter.setPen(QColor(TRACE_NUMBER))
                 elif number == current:
                     painter.setPen(QColor(_MARGIN_CURRENT))
                 else:
@@ -329,11 +341,53 @@ class CodeEditor(ZoomablePlainTextEdit):
             number += 1
 
     # -- diagnostics, search and occurrences --------------------------------
+    def _existing_line(self, line: int | None) -> int | None:
+        """A line that exists: the parser can point past the last one.
+
+        `непарные скобки` is reported where the input ran out, which for a file
+        that ends without its closing bracket is one line past the end — marking
+        the last line there is the honest place, and a mark that points at nothing
+        is not a mark at all.
+        """
+        if line is None:
+            return None
+        return max(1, min(int(line), max(1, self.document().blockCount())))
+
     def mark_error_line(self, line: int | None) -> None:
         """Paints the 1-based `line` red; `None` clears the mark (task_28)."""
-        self._error_line = line
+        self._error_line = self._existing_line(line)
         self._refresh_extra_selections()
         self._margin.update()
+
+    def mark_trace_line(self, line: int | None) -> None:
+        """Paints the line a step is standing on, in a neutral colour.
+
+        The same machinery as the error line, and for the same reason: a run that
+        is walked goal by goal has to show *where* it is, and the editor is where
+        the program is written.
+        """
+        self._trace_line = self._existing_line(line)
+        self._refresh_extra_selections()
+        self._margin.update()
+
+    def clear_marks(self) -> None:
+        """Drops both marks (the first edit, a new run, a closed panel)."""
+        if self._error_line is None and self._trace_line is None:
+            return
+        self._error_line = None
+        self._trace_line = None
+        self._refresh_extra_selections()
+        self._margin.update()
+
+    def show_line(self, line: int) -> None:
+        """Puts the caret at the start of `line` (1-based) and scrolls to it."""
+        block = self.document().findBlockByNumber(max(0, line - 1))
+        if not block.isValid():
+            return
+        cursor = QTextCursor(block)
+        cursor.clearSelection()
+        self.setTextCursor(cursor)
+        self.ensureCursorVisible()
 
     def set_search_ranges(
         self, ranges: list[tuple[int, int]], current: tuple[int, int] | None = None
@@ -399,6 +453,17 @@ class CodeEditor(ZoomablePlainTextEdit):
                 selection.cursor = cursor
                 selections.append(selection)
 
+        if self._trace_line is not None and self._trace_line != self._error_line:
+            block = self.document().findBlockByNumber(self._trace_line - 1)
+            if block.isValid():
+                selection = QTextEdit.ExtraSelection()
+                selection.format.setBackground(QColor(TRACE_BACKGROUND))
+                selection.format.setProperty(QTextFormat.Property.FullWidthSelection, True)
+                cursor = QTextCursor(block)
+                cursor.clearSelection()
+                selection.cursor = cursor
+                selections.append(selection)
+
         for start, length in self._search_ranges:
             background = SEARCH_CURRENT if (start, length) == self._current_range else SEARCH_MATCH
             selections.append(self._highlight(start, length, background))
@@ -430,6 +495,9 @@ class CodeEditor(ZoomablePlainTextEdit):
 
     def error_line(self) -> int | None:
         return self._error_line
+
+    def trace_line(self) -> int | None:
+        return self._trace_line
 
     # -- indentation --------------------------------------------------------
     def _indent_text(self) -> str:

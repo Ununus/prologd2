@@ -14,6 +14,7 @@ add_executable(prlib_tests
   test_graphics.cpp
   test_module_loader.cpp
   test_io_context.cpp
+  test_stepping.cpp
   test_typical_tasks.cpp
   test_lessons.cpp)
 

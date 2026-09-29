@@ -162,21 +162,9 @@ ACTIONS: tuple[Action, ...] = (
     Action("full_screen", "Полный экран", "view-full-screen", ("F11",), checkable=True),
     # -- execution
     Action("run", "Запустить", "execution-execute", ("F5", "Ctrl+R")),
-    Action(
-        "run_trace",
-        "Запустить с трассировкой",
-        "execution-tracing",
-        implemented=False,
-        waiting_for="task_28",
-    ),
-    Action(
-        "step",
-        "Шаг",
-        "execution-step-into",
-        ("F10",),
-        implemented=False,
-        waiting_for="task_28",
-    ),
+    Action("run_trace", "Запустить с трассировкой", "execution-tracing"),
+    Action("step", "Шаг", "execution-step-into", ("F10",)),
+    Action("step_over", "Шаг с обходом", "execution-step-over", ("Shift+F10",)),
     Action("stop", "Остановить", "execution-abort", ("Shift+F5",)),
     Action("save_before_run", "Сохранять перед запуском", None, checkable=True),
     Action(
@@ -271,7 +259,17 @@ MENUS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ),
     (
         "Выполнение",
-        ("run", "run_trace", "step", "stop", SEPARATOR, "save_before_run", SEPARATOR, "graphics"),
+        (
+            "run",
+            "run_trace",
+            "step",
+            "step_over",
+            "stop",
+            SEPARATOR,
+            "save_before_run",
+            SEPARATOR,
+            "graphics",
+        ),
     ),
     ("Справка", ("help_doc", "help_gui", "about")),
 )

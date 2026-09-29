@@ -25,8 +25,14 @@ class PrologSession(QObject):
     result = Signal(bool)
     #: The interpreter waits for input; carries "token", "line" or "codepoint".
     input_request = Signal(str)
-    #: A diagnostic; carries a kind ("parse", "runtime", "protocol") and a text.
-    failed = Signal(str, str)
+    #: A diagnostic; a kind ("parse", "runtime", "protocol"), a text, and where
+    #: it happened — a `protocol.Position`, or None when there is nothing to point
+    #: at (a goal typed at the prompt, an error with no clause).
+    failed = Signal(str, str, object)
+    #: The trace of `ТРАССА`, one line at a time (protocol 3).
+    trace = Signal(str)
+    #: A stepped run stopped at a point: a `protocol.StepPoint`.
+    stepped = Signal(object)
     #: The session ended; carries the process exit code.
     ended = Signal(int)
 
@@ -41,6 +47,7 @@ class PrologSession(QObject):
         self._includes = list(includes or [])
         self._decoder = protocol.Decoder()
         self._awaiting_input = False
+        self._paused = False
         # Requests issued before the interpreter announced itself are held back:
         # writing into a process that is still starting loses them.
         self._ready = False
@@ -70,6 +77,7 @@ class PrologSession(QObject):
             arguments += ["-I", directory]
         self._decoder = protocol.Decoder()
         self._awaiting_input = False
+        self._paused = False
         self._ready = False
         self._pending.clear()
         self._process.setProgram(self._executable)
@@ -95,20 +103,37 @@ class PrologSession(QObject):
             self._process.kill()
             self._process.waitForFinished(2000)
         self._ready = False
+        self._awaiting_input = False
+        self._paused = False
 
     # -- requests ----------------------------------------------------------
-    def load_text(self, text: str, name: str = "<buffer>") -> None:
-        self._send(protocol.load_text(text, name))
+    def load_text(self, text: str, name: str = "<buffer>", *, step: bool = False,
+                  trace: bool = False) -> None:
+        self._send(protocol.load_text(text, name, step=step, trace=trace))
 
-    def load_file(self, path: str) -> None:
-        self._send(protocol.load_file(path))
+    def load_file(self, path: str, *, step: bool = False, trace: bool = False) -> None:
+        self._send(protocol.load_file(path, step=step, trace=trace))
 
-    def run_query(self, text: str) -> None:
-        self._send(protocol.query(text))
+    def run_query(self, text: str, *, step: bool = False, trace: bool = False) -> None:
+        self._send(protocol.query(text, step=step, trace=trace))
 
     def answer_input(self, text: str) -> None:
         self._awaiting_input = False
         self._send(protocol.input_answer(text))
+
+    def answer_step(self, action: str) -> None:
+        """Continues, steps over or stops a paused step point.
+
+        Only meaningful while the interpreter is waiting inside a step point; a
+        `step` request with nothing waiting is a protocol error, and the window
+        asks for one only when the panel says a step is paused.
+        """
+        self._paused = False
+        self._send(protocol.step_answer(action))
+
+    def paused(self) -> bool:
+        """True while the interpreter waits at a step point."""
+        return self._paused
 
     def interrupt(self) -> None:
         self._send(protocol.interrupt())
@@ -119,7 +144,7 @@ class PrologSession(QObject):
     # -- internals ---------------------------------------------------------
     def _send(self, payload: bytes) -> None:
         if not self.is_running():
-            self.failed.emit("session", "интерпретатор не запущен")
+            self.failed.emit("session", "интерпретатор не запущен", None)
             return
         if not self._ready:
             self._pending.append(payload)
@@ -151,12 +176,29 @@ class PrologSession(QObject):
         elif name == "input_request":
             self._awaiting_input = True
             self.input_request.emit(str(event.get("kind", "line")))
+        elif name == "step":
+            # The interpreter is inside this point and waits for `answer_step`.
+            self._paused = True
+            self.stepped.emit(
+                protocol.StepPoint(
+                    action=str(event.get("action", "call")),
+                    goal=str(event.get("goal", "")),
+                    depth=int(event.get("depth", 0)),
+                    position=protocol.Position.from_event(event),
+                )
+            )
+        elif name == "trace":
+            self.trace.emit(str(event.get("text", "")))
         elif name == "error":
-            self.failed.emit(str(event.get("kind", "")), str(event.get("message", "")))
+            self.failed.emit(
+                str(event.get("kind", "")),
+                str(event.get("message", "")),
+                protocol.Position.from_event(event),
+            )
         elif name == "bye":
             pass  # the process exit reports the end of the session
         else:
-            self.failed.emit("protocol", f"неизвестное событие: {name}")
+            self.failed.emit("protocol", f"неизвестное событие: {name}", None)
 
     def _on_finished(self, exit_code: int, _status) -> None:
         for event in self._decoder.feed(b"\n"):

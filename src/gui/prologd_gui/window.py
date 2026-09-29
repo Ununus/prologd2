@@ -68,6 +68,8 @@ class MainWindow(QMainWindow):
         self._session.result.connect(self._on_result)
         self._session.input_request.connect(self._on_input_request)
         self._session.failed.connect(self._on_failed)
+        self._session.trace.connect(self._on_trace)
+        self._session.stepped.connect(self._on_stepped)
         self._session.ended.connect(self._on_ended)
 
         #: The open documents, in the order every pane shows them.  A pane has its
@@ -166,6 +168,17 @@ class MainWindow(QMainWindow):
         self._query_line.setPlaceholderText("?цель(X). — Enter, чтобы выполнить")
         self._query_line.returnPressed.connect(self._run_query)
 
+        # The step pane (task_28): what a stepped run is doing, where it stands and
+        # the call stack the window rebuilds from the points the interpreter
+        # reports.  Hidden while nothing is stepped through, like the console.
+        self._step_stack: list[str] = []
+        self._step_pane = panels.StepPane(
+            font_family=self._settings.font_family,
+            font_size=self._settings.font_size,
+        )
+        self._step_pane.resumed.connect(self.step_continue)
+        self._step_pane.stopped.connect(self.stop_program)
+
         # The find bar (task_33): a strip above the editor, hidden until `Ctrl+F`.
         # Not a dialog — a modal box covers the text being searched and cannot be
         # driven from a headless test.
@@ -195,6 +208,7 @@ class MainWindow(QMainWindow):
         editor_layout.setContentsMargins(0, 0, 0, 0)
         editor_layout.addWidget(self._find_bar)
         editor_layout.addWidget(self._editor_splitter)
+        editor_layout.addWidget(self._step_pane)
         editor_layout.addWidget(self._query_line)
 
         # The output on top, the input queue under it.  The two travel together:
@@ -323,7 +337,10 @@ class MainWindow(QMainWindow):
             "zoom_reset": self._reset_zoom,
             "theme": self._toggle_theme,
             "full_screen": self._toggle_full_screen,
-            "run": self.run_program,
+            "run": lambda: self.run_program(),
+            "run_trace": lambda: self.run_program(trace=True),
+            "step": self.step_into,
+            "step_over": self.step_over,
             "stop": self.stop_program,
             "save_before_run": self._toggle_save_before_run,
             "help_doc": lambda: self._open_document("help"),
@@ -477,11 +494,21 @@ class MainWindow(QMainWindow):
         """
         self._actions["run"].setEnabled(not self._busy)
         self._actions["stop"].setEnabled(self._session.is_running())
+        # A *paused* step is a usable state, not a busy one: «Шаг», «Шаг с обходом»
+        # and «Запустить» (which then means «продолжить») have to be live, or their
+        # keys are dead exactly when the user needs them — a disabled `QAction`
+        # fires no shortcut.  A run actually in flight is the blocked state.
+        free = not self._busy or self._session.paused()
+        self._actions["run_trace"].setEnabled(free)
+        self._actions["step"].setEnabled(free)
+        self._actions["step_over"].setEnabled(free)
 
     def _update_details(self) -> None:
         """The right-hand side of the status bar: state, caret, file shape."""
         if not self._session.is_running():
             state = "интерпретатор остановлен"
+        elif self._session.paused():
+            state = "остановлен на шаге"
         elif self._busy:
             state = "выполняется"
         elif self._loaded:
@@ -836,7 +863,7 @@ class MainWindow(QMainWindow):
             pane.set_buffers(self._buffers)
 
     # -- actions -----------------------------------------------------------
-    def run_program(self) -> None:
+    def run_program(self, *, trace: bool = False, step: bool = False) -> None:
         """Runs the current buffer in a fresh interpreter.
 
         A run starts from a clean slate: a fresh interpreter (no clauses, RNG
@@ -845,7 +872,18 @@ class MainWindow(QMainWindow):
         with a duplicated `факториал/2` the factorial example returns 64
         solutions instead of one, which looks like a loop — so `start()` stops
         a live process first.
+
+        `trace` turns `ТРАССА` on for this run: the trace arrives as `trace`
+        events and is coloured apart from the program's own output.  `step` arms
+        the step hook, so the run stops at its first step point and waits for
+        `Шаг`/`Продолжить` — and, like `trace`, it goes on the *load*, because a
+        program's own `?`-statements and directives run there.
         """
+        if self._session.paused() and not (trace or step):
+            # `F5` while a step is paused means «продолжить»: starting the file over
+            # would throw away the run the user is walking through.
+            self.step_continue()
+            return
         buffer = self.current_buffer()
         if buffer is None:
             return
@@ -858,6 +896,11 @@ class MainWindow(QMainWindow):
                 self._status.setText("запуск отменён: сохранить не удалось")
                 return
         self._output.clear()
+        # A new run starts clean: the red line of the last failure and the line a
+        # step was standing on are both about a run that is over.
+        self._clear_marks()
+        self._step_stack.clear()
+        self._step_pane.idle()
         # Every run starts with the prepared answers from the field: that is what
         # makes a program that reads several values runnable without a dialog per
         # value — and a cancelled question applies to this run only.
@@ -876,7 +919,7 @@ class MainWindow(QMainWindow):
         if path is not None and not buffer.is_modified():
             # A saved, unmodified buffer is loaded by path: `ИМПОРТ` resolves
             # against the file's own directory and diagnostics name the file.
-            self._session.load_file(path)
+            self._session.load_file(path, step=step, trace=trace)
             self._status.setText(f"выполняется {pathlib.Path(path).name}")
         else:
             # Otherwise the text comes from the editor, and the path, when there
@@ -884,7 +927,7 @@ class MainWindow(QMainWindow):
             # status line says which case is running, so a failing `ИМПОРТ` is
             # not a mystery: without a path it searches only the working
             # directory and the `-I` directories.
-            self._session.load_text(buffer.text(), path or "<buffer>")
+            self._session.load_text(buffer.text(), path or "<buffer>", step=step, trace=trace)
             name = pathlib.Path(path).name if path else "буфер без имени"
             self._status.setText(f"выполняется {name} (есть несохранённые правки)")
 
@@ -1159,6 +1202,8 @@ class MainWindow(QMainWindow):
         self._session.stop()
         message = "база знаний выгружена" if unloading else "остановлено"
         self._input_console.idle()
+        self._step_pane.idle()
+        self._step_stack.clear()
         self._status.setText(message)
         self._append_note(f"--- {message} ---\n")
         # The process is gone, so the buttons change at once — waiting for `ended`
@@ -1795,6 +1840,7 @@ class MainWindow(QMainWindow):
         self._output.set_font_size(size)
         self._input_pane.set_font_size(size)
         self._input_console.set_font_size(size)
+        self._step_pane.set_font_size(size)
         self._query_line.setFont(self._output.font())
         self._show_font_size(size)
         self._status.setText(f"шрифт {size:.0f} pt")
@@ -1811,16 +1857,165 @@ class MainWindow(QMainWindow):
         """
         self._busy = False
         self._status.setText("решение найдено" if found else "решения нет")
+        if not self._session.paused():
+            # Whatever was being stepped through is over; the line it stopped on
+            # stays marked until the next run or the first edit.
+            self._step_pane.idle()
+            self._step_stack.clear()
         self._sync_run_actions()
         self._update_details()
 
-    def _on_failed(self, kind: str, message: str) -> None:
-        self._output.feed(f"*** {kind}: {message}\n", panels.ERROR)
+    def _on_failed(self, kind: str, message: str, position=None) -> None:
+        """A diagnostic: the pane shows it with its file, the editor marks the line.
+
+        The position arrives in fields of its own (protocol 3), so nothing is
+        parsed out of the message — the message is what the interpreter wrote, and
+        the file and the line are put in front of it here.
+        """
+        where = position.where() if position is not None else ""
+        self._output.feed(f"*** {kind}: {where + ': ' if where else ''}{message}\n", panels.ERROR)
+        self._busy = False
+        self._step_pane.idle()
+        self._step_stack.clear()
+        if position is not None and position.line:
+            self._mark_error_line(position)
         # A failure ends whatever was in flight; whether the process is still there
         # is a separate question, and `_sync_run_actions` asks it.
-        self._busy = False
         self._sync_run_actions()
         self._update_details()
+
+    def _on_trace(self, text: str) -> None:
+        """The `ТРАССА` text of a traced run: the pane colours it apart."""
+        self._append_output(text, panels.TRACE)
+
+    # -- stepping ----------------------------------------------------------
+    def step_pane(self) -> panels.StepPane:
+        """The strip that shows where a stepped run stands."""
+        return self._step_pane
+
+    def stepping(self) -> bool:
+        """True while the step panel is up: a stepped run is in flight."""
+        return not self._step_pane.isHidden()
+
+    def step_into(self) -> None:
+        """`F10`: one point further in — or start a run that stops at the first."""
+        if self._session.paused():
+            self._session.answer_step("into")
+            return
+        self.run_program(step=True)
+
+    def step_over(self) -> None:
+        """`Shift+F10`: on to the next point of *this* goal, or to its end.
+
+        The skipping happens in the interpreter: the points inside the goal are
+        not stops there.  Doing it here would mean receiving them all and
+        discarding them, which is the same traffic for no gain.
+        """
+        if self._session.paused():
+            self._session.answer_step("over")
+            return
+        self.run_program(step=True)
+
+    def step_continue(self) -> None:
+        """`F5` while paused: run on to the end without stopping again."""
+        if not self._session.paused():
+            return
+        self._session.answer_step("continue")
+        self._step_stack.clear()
+        self._step_pane.idle()
+        self._status.setText("продолжение без остановок")
+        self._update_details()
+
+    def _on_stepped(self, point) -> None:
+        """One step point: the panel, the stack and the line in the editor.
+
+        The stack is rebuilt here, from the events themselves: a `call` pushes the
+        goal it names, and the `exit`/`fail` that answers it pops — an `exit`
+        carries no goal of its own, because the goal that succeeded is the one the
+        `call` already reported.
+        """
+        if point.action == "call":
+            if point.goal:
+                self._step_stack.append(point.goal)
+        elif self._step_stack:
+            self._step_stack.pop()
+        self._step_pane.show_point(point, self._step_stack)
+        self._mark_trace_line(point.position)
+        self._status.setText(f"шаг: {self._step_pane.action_text()} {point.goal}".rstrip())
+        self._sync_run_actions()
+        self._update_details()
+
+    # -- where a diagnostic and a step point stand -------------------------
+    def _clear_marks(self) -> None:
+        """Both marks, in every view: a new run starts clean."""
+        for buffer in self._buffers:
+            for view in buffer.views():
+                view.clear_marks()
+
+    def _diagnostic_buffer(self, position) -> Buffer | None:
+        """The tab a diagnostic points at, opening it when it is a file of ours.
+
+        A diagnostic from an `ИМПОРТ`ed file names *that* file, and marking a line
+        in the wrong tab would be worse than marking none: the file is looked for
+        among the open tabs, then next to the file that imported it, then on disk
+        (where it is opened).  A name in angle brackets (`<buffer>`, `<library>`)
+        is not a file at all — it is the text the window itself sent.
+        """
+        name = position.file if position is not None else ""
+        if not name or name.startswith("<"):
+            return self.current_buffer()
+        wanted = pathlib.Path(name)
+        candidates = [wanted]
+        current = self.current_buffer()
+        if not wanted.is_absolute() and current is not None and current.model.path:
+            # A relative name is relative to the file the import was written in.
+            candidates.append(pathlib.Path(current.model.path).parent / wanted)
+        for candidate in candidates:
+            found = self._buffer_for_path(str(candidate))
+            if found is not None:
+                return found
+        for candidate in candidates:
+            if candidate.is_file() and self.open_path(str(candidate)):
+                return self._buffer_for_path(str(pathlib.Path(candidate)))
+        return None
+
+    def _mark_error_line(self, position) -> None:
+        """Marks the line a diagnostic names and puts the caret on it."""
+        buffer = self._diagnostic_buffer(position)
+        if buffer is None:
+            # The file is not there and could not be opened: say where the line is
+            # rather than marking a line in a tab that has nothing to do with it.
+            self._status.setText(f"ошибка в {position.where()} — файл не открыт")
+            return
+        line = position.line
+        for other in self._buffers:
+            for view in other.views():
+                view.mark_error_line(line if other is buffer else None)
+        for view in buffer.views():
+            # The mark is clamped to a line that exists (`непарные скобки` is
+            # reported where the input ran out), and the caret follows that one.
+            view.show_line(view.error_line() or line)
+        self._status.setText(f"ошибка: {position.where()}")
+
+    def _mark_trace_line(self, position) -> None:
+        """Marks the line a step stands on — in the tab that line belongs to.
+
+        The caret follows only when that tab is the one showing: a stepped run
+        through an imported file must not pull the user out of the program they
+        are watching, and the mark is there when they switch to it.
+        """
+        buffer = self._diagnostic_buffer(position) if position is not None else None
+        for other in self._buffers:
+            for view in other.views():
+                if other is not buffer:
+                    view.mark_trace_line(None)
+        if buffer is None:
+            return
+        for view in buffer.views():
+            view.mark_trace_line(position.line)
+        if buffer is self.current_buffer():
+            for view in buffer.views():
+                view.show_line(view.trace_line() or position.line)
 
     def _on_ended(self, exit_code: int) -> None:
         # A process *we* killed has no meaningful code: Windows reports the
@@ -1835,6 +2030,8 @@ class MainWindow(QMainWindow):
         self._exit_code = exit_code
         self._busy = False
         self._loaded = False
+        self._step_pane.idle()
+        self._step_stack.clear()
         # The last half-line: a program that stopped in the middle of `ВЫВОД` left
         # it in the pane's buffer, and nothing else will complete it.
         self._output.flush()
