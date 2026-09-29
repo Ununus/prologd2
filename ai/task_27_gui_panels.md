@@ -1,6 +1,7 @@
 # task_27 — GUI: output pane, input pane and window layout
 
-**Status:** not started
+**Status:** in progress — the window layout (the movable output panel) is done;
+the output pane's own behaviour and the input console remain
 **Depends on:** task_21
 **Milestone:** M11
 
@@ -31,21 +32,47 @@ instead of only a modal dialog.
       dialogs the skeleton has today).  Whichever is active, the *kind* of the
       request decides the widget, and an unanswered request must be visible in
       the status bar.
-- [ ] Layout: a `QSplitter` with the editor(s) and an *output container*; the
+- [x] Layout: a `QSplitter` with the editor(s) and an *output container*; the
       container is vertical (output over input) and can be moved to the right
       side of the window:
   * **Панель вывода** `F4` shows/hides it;
   * **Сменить ориентацию сплита** `Ctrl+F4` moves it between bottom and right —
     the same pair of commands the reference GUI had
-    (`changeSplitOrientation`), but implemented as "editor splitter horizontal,
-    container on the right" instead of flipping two nested splitters;
-  * splitter positions and the chosen side are persisted (task_29) and restored
-    on start, with sane minimum sizes so a pane cannot be collapsed to nothing.
+    (`changeSplitOrientation`), but implemented as one splitter whose
+    *orientation* changes (editor first either way): side by side on the right,
+    stacked at the bottom;
+  * the chosen side and the sizes of both splitters are persisted
+    (`view/output_position`, `view/output_visible`, `view/panel_sizes`,
+    `view/output_sizes`) and restored on start — the settings store of task_22
+    was already there, so this needed no task_29;
+  * `childrenCollapsible` is off and both halves have a minimum size, so a pane
+    cannot be collapsed to nothing (a panel squeezed to zero pixels looks like a
+    lost window).
 - [ ] Status bar: interpreter state (запущен/остановлен/выполняется), line and
       column of the caret, current file's encoding/eol, last exit code.
 - [ ] Tests: the pane logic that is text-based (colour classification of an
       output chunk, truncation) lives in a Qt-free helper and is covered by
       `src/gui/tests/test_output.py`; the layout goes into the manual checklist.
+
+## Progress
+
+Done in this round (2026-09-29):
+
+* the layout half of the task, as ticked above.  The output and the input queue
+  travel together as one `_sidebar` splitter inside `_panel_splitter`; `F4`
+  (checkable, `_toggle_output`) and `Ctrl+F4` (`flip_output_position`) are wired,
+  the four settings keys above carry the state, and `_save_panel_state` runs on
+  close (next to `_save_split_state`).
+* `test_window.py`: `test_the_output_panel_moves_and_hides` — the position turns,
+  the input queue goes with the panel, `F4` hides rather than loses it, a pane
+  cannot be dragged to zero, and a *new* window built on the same settings file
+  comes back with the panel at the bottom.
+
+Still open: `panels.py` (colour by kind, truncation with the «вывод усечён»
+marker, auto-scroll that stops when the user scrolls up, save-to-file), the input
+*console* mode as an alternative to the modal dialogs, the status-bar details
+(interpreter state, caret line and column, encoding/eol, exit code) and
+`src/gui/tests/test_output.py` for the Qt-free part of the pane logic.
 
 ## Design notes
 

@@ -129,26 +129,15 @@ ACTIONS: tuple[Action, ...] = (
     ),
     # -- view
     Action("toolbar", "Панель инструментов", "view-toolbar", checkable=True),
-    Action(
-        "output",
-        "Панель вывода",
-        "view-output-right",
-        ("F4",),
-        implemented=False,
-        waiting_for="task_27",
-    ),
+    # The output panel: `F4` shows and hides it, `Ctrl+F4` moves it between the
+    # right side and the bottom (`split_orientation` keeps the reference's name
+    # for the command; the icon hints at the *other* position).
+    Action("output", "Панель вывода", "view-output-right", ("F4",), checkable=True),
     Action("split", "Разделить редактор", "view-split-editor", ("Ctrl+\\",)),
     Action("merge", "Объединить редакторы", None, ("Ctrl+Shift+\\",)),
     Action("next_tab", "Следующая вкладка", None, ("Ctrl+Tab",)),
     Action("previous_tab", "Предыдущая вкладка", None, ("Ctrl+Shift+Tab",)),
-    Action(
-        "split_orientation",
-        "Сменить ориентацию сплита",
-        None,
-        ("Ctrl+F4",),
-        implemented=False,
-        waiting_for="task_27",
-    ),
+    Action("split_orientation", "Сменить ориентацию сплита", "view-output-bottom", ("Ctrl+F4",)),
     Action("line_numbers", "Номера строк", "view-line-numbers", checkable=True),
     # The zoom keys are the *keypad* ones: `Ctrl+=` and `Ctrl+-` sit on the main
     # row, where task_31 puts the `РАВНО`/`СЛОЖЕНИЕ`/`ВЫЧИТАНИЕ` skeletons.  Qt
@@ -183,7 +172,7 @@ ACTIONS: tuple[Action, ...] = (
         "Графическое окно",
         "view-graphics",
         implemented=False,
-        waiting_for="task_27",
+        waiting_for="нет задачи (см. Roadmap в src/gui/README.md)",
     ),
     # -- help
     Action("help_doc", "Руководство пользователя", "help", ("F1",)),

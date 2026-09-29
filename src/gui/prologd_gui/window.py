@@ -148,17 +148,32 @@ class MainWindow(QMainWindow):
         editor_layout.addWidget(self._editor_splitter)
         editor_layout.addWidget(self._query_line)
 
-        # The output on top, the input queue under it.
-        right = QSplitter(Qt.Orientation.Vertical)
-        right.addWidget(self._output)
-        right.addWidget(self._input_pane)
-        right.setSizes([420, 110])
+        # The output on top, the input queue under it.  The two travel together:
+        # the panel is one widget that `F4` hides and `Ctrl+F4` moves — the pair of
+        # commands the reference front-end had, but arranged as "one splitter with
+        # two orientations" rather than two nested splitters being flipped.
+        self._editor_area = editor_area
+        self._sidebar = QSplitter(Qt.Orientation.Vertical)
+        self._sidebar.addWidget(self._output)
+        self._sidebar.addWidget(self._input_pane)
+        stored = [size for size in self._settings.output_sizes if size > 0]
+        self._sidebar.setSizes(stored if len(stored) == 2 else [420, 110])
 
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.addWidget(editor_area)
-        splitter.addWidget(right)
-        splitter.setSizes([600, 400])
-        self.setCentralWidget(splitter)
+        # One splitter, two orientations: side by side when the panel is on the
+        # right, stacked when it is at the bottom.  The order (editor first) is the
+        # same either way, so the turn is only an orientation change.
+        self._panel_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self._panel_splitter.addWidget(self._editor_area)
+        self._panel_splitter.addWidget(self._sidebar)
+        # A pane may not be dragged away to nothing: an output panel squeezed to
+        # zero pixels looks like a lost window rather than a hidden one.
+        self._panel_splitter.setChildrenCollapsible(False)
+        self._editor_area.setMinimumWidth(240)
+        self._sidebar.setMinimumWidth(200)
+        self._sidebar.setMinimumHeight(120)
+        self.setCentralWidget(self._panel_splitter)
+        self._apply_output_position(remember=False)
+        self._sidebar.setVisible(self._settings.output_visible)
         # A dropped program opens in its own tab; see `dropEvent`.
         self.setAcceptDrops(True)
 
@@ -227,10 +242,12 @@ class MainWindow(QMainWindow):
             "uncomment": self._uncomment,
             "clear_output": self.clear_output,
             "toolbar": self._toggle_toolbar,
+            "output": self._toggle_output,
             "split": self.split_editor,
             "merge": self.merge_editor,
             "next_tab": self._next_tab,
             "previous_tab": self._previous_tab,
+            "split_orientation": self.flip_output_position,
             "line_numbers": self._toggle_line_numbers,
             "zoom_in": self._zoom_in,
             "zoom_out": self._zoom_out,
@@ -375,6 +392,7 @@ class MainWindow(QMainWindow):
         self._actions["theme"].setChecked(self._settings.theme == appearance.SYSTEM)
         self._actions["save_before_run"].setChecked(self._settings.save_before_run)
         self._actions["full_screen"].setChecked(self.isFullScreen())
+        self._actions["output"].setChecked(self.output_visible())
         self._sync_pane_actions()
         self._show_font_size(self._settings.font_size)
 
@@ -550,6 +568,56 @@ class MainWindow(QMainWindow):
         self._sync_pane_actions()
         self._status.setText("редактор объединён: одна панель")
         return True
+
+    # -- the output panel --------------------------------------------------
+    def output_position(self) -> str:
+        """`right` or `bottom` — where the output (and the input queue) sits."""
+        if self._panel_splitter.orientation() == Qt.Orientation.Vertical:
+            return "bottom"
+        return "right"
+
+    def output_visible(self) -> bool:
+        """Whether the panel is shown (`isHidden`, so a window that was never
+        shown reads as visible — the same trap the toolbar switch has)."""
+        return not self._sidebar.isHidden()
+
+    def _apply_output_position(self, remember: bool = True) -> None:
+        """Puts the panel on the side the settings name, with its sizes."""
+        bottom = self._settings.output_position == "bottom"
+        self._panel_splitter.setOrientation(
+            Qt.Orientation.Vertical if bottom else Qt.Orientation.Horizontal
+        )
+        # The sizes mean different things after a turn (widths become heights), and
+        # a hand-edited `0` would collapse both halves — so only a pair of positive
+        # numbers is taken from the file.
+        stored = [size for size in self._settings.panel_sizes if size > 0]
+        self._panel_splitter.setSizes(stored if len(stored) == 2 else [600, 400])
+        if remember:
+            self._save_panel_state()
+
+    def flip_output_position(self) -> None:
+        """`Ctrl+F4`: the panel moves between the right side and the bottom."""
+        self._settings.output_position = (
+            "bottom" if self.output_position() == "right" else "right"
+        )
+        self._apply_output_position()
+        self._status.setText(
+            "панель вывода внизу"
+            if self.output_position() == "bottom"
+            else "панель вывода справа"
+        )
+
+    def _toggle_output(self, visible: bool) -> None:
+        """`F4`: show or hide the output panel."""
+        self._settings.output_visible = bool(visible)
+        self._sidebar.setVisible(bool(visible))
+        self._status.setText("панель вывода показана" if visible else "панель вывода скрыта")
+
+    def _save_panel_state(self) -> None:
+        """Remembers the side of the panel and the sizes inside both splitters."""
+        self._settings.output_position = self.output_position()
+        self._settings.panel_sizes = list(self._panel_splitter.sizes())
+        self._settings.output_sizes = list(self._sidebar.sizes())
 
     def active_pane(self) -> Pane:
         return self._panes[self._active_pane]
@@ -983,6 +1051,7 @@ class MainWindow(QMainWindow):
         try:
             if self.close_all():
                 self._save_split_state()
+                self._save_panel_state()
                 # The interpreter is this window's child: an unasked-for close
                 # must not leave it running behind the user (and a headless test
                 # suite otherwise collects one live process per test).

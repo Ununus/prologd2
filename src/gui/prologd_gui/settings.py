@@ -32,11 +32,20 @@ SPLIT_EDITOR = "view/split"
 SPLIT_SIZES = "view/split_sizes"
 RESTORE_SPLIT = "view/restore_split"
 TOOLBAR = "view/toolbar"
+OUTPUT_POSITION = "view/output_position"
+OUTPUT_VISIBLE = "view/output_visible"
+OUTPUT_SIZES = "view/output_sizes"
+PANEL_SIZES = "view/panel_sizes"
 SAVE_BEFORE_RUN = "execution/save_before_run"
 
 DEFAULT_FONT_FAMILY = "Cascadia Mono"
 DEFAULT_FONT_SIZE = 11.0
 DEFAULT_THEME = "light"
+
+#: Where the output (with the input queue under it) sits: to the right of the
+#: editor or under it.  `Ctrl+F4` moves it, `F4` hides it.
+DEFAULT_OUTPUT_POSITION = "right"
+OUTPUT_POSITIONS = ("right", "bottom")
 
 MINIMUM_FONT_SIZE = 6.0
 MAXIMUM_FONT_SIZE = 72.0
@@ -259,6 +268,63 @@ class Settings:
     @toolbar_visible.setter
     def toolbar_visible(self, value: bool) -> None:
         self._write(TOOLBAR, bool(value))
+
+    # -- the output panel ---------------------------------------------------
+    @property
+    def output_position(self) -> str:
+        """`right` or `bottom`; anything else in the file reads as the default."""
+        value = self._text(OUTPUT_POSITION, DEFAULT_OUTPUT_POSITION).strip().lower()
+        return value if value in OUTPUT_POSITIONS else DEFAULT_OUTPUT_POSITION
+
+    @output_position.setter
+    def output_position(self, value: str) -> None:
+        text = str(value).strip().lower()
+        self._write(OUTPUT_POSITION, text if text in OUTPUT_POSITIONS else DEFAULT_OUTPUT_POSITION)
+
+    @property
+    def output_visible(self) -> bool:
+        """Whether the output panel is shown at all (`F4` switches this)."""
+        return self._flag(OUTPUT_VISIBLE, True)
+
+    @output_visible.setter
+    def output_visible(self, value: bool) -> None:
+        self._write(OUTPUT_VISIBLE, bool(value))
+
+    @property
+    def output_sizes(self) -> list[int]:
+        """The heights of the output and of the input queue inside the panel."""
+        return self._sizes(OUTPUT_SIZES)
+
+    @output_sizes.setter
+    def output_sizes(self, sizes) -> None:
+        self._write(OUTPUT_SIZES, [int(size) for size in sizes])
+
+    @property
+    def panel_sizes(self) -> list[int]:
+        """The editor and the output panel as last seen — widths or heights,
+        depending on which side the panel is on."""
+        return self._sizes(PANEL_SIZES)
+
+    @panel_sizes.setter
+    def panel_sizes(self, sizes) -> None:
+        self._write(PANEL_SIZES, [int(size) for size in sizes])
+
+    def _sizes(self, key: str) -> list[int]:
+        """A stored list of sizes, tolerating a hand-edited file.
+
+        A single value comes back as a string rather than a list, and a value that
+        is not a number is dropped instead of stopping the window from starting.
+        """
+        value = self._store.value(key, [])
+        if isinstance(value, (int, str)):
+            value = [value] if value != "" else []
+        sizes: list[int] = []
+        for item in value or []:
+            try:
+                sizes.append(int(item))
+            except (TypeError, ValueError):
+                continue
+        return sizes
 
     # -- execution ----------------------------------------------------------
     @property

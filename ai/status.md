@@ -91,7 +91,7 @@ session.
 | task_24_gui_completion | done | popup over the reserved names *and* the document's own names, with arities; no completion in a comment, string or `#…#`; `Ctrl+Space` |
 | task_25_gui_files_tabs | done | tabs, files, save prompts, encodings, input queue, drop anywhere and the split editor (two panes, one text per document) |
 | task_26_gui_toolbar | done | one action table (48 commands, 12 disabled with a reason) feeding the menu bar, the toolbar and the context menu; icon audit in `src/gui/README.md` (41 names referenced, 27 drawn) |
-| task_27_gui_panels | not started | output and input panes, output bottom/right |
+| task_27_gui_panels | in progress | the movable output panel is done (`F4`, `Ctrl+F4`, side and sizes persisted, no pane collapsible to nothing); colour by kind, truncation, auto-scroll, the input console and the status-bar details remain |
 | task_28_gui_run_step | not started | run, step (new engine seam + protocol v2), stop, error line |
 | task_29_gui_settings | not started | settings dialog and persistence |
 | task_30_gui_formatter | not started | soft/hard formatting in prlib + protocol |
@@ -153,10 +153,11 @@ plain scripts.
    task_23 the keyword source.  The rest is task_24–task_31, see the board above.
    The settings file is written to `%LOCALAPPDATA%\PrologD\gui\gui.ini`; the
    dialog that edits it is task_29, and `--settings FILE` overrides the path.
-   Open for the next session: search and replace has **no task file** although
-   the feature list asks for it (the menu entries are there, disabled), the
-   output panel still has one position and one font size (task_27), and
-   `setWindowIcon` is never called, so the window uses the default Qt icon.
+   Open for the next session: the rest of task_27 (the output pane's own
+   behaviour — colour by kind, truncation, auto-scroll, save to a file — the input
+   console and the status-bar details), the graphics window (no task file yet),
+   and the output panel's own font size (task_29).  `setWindowIcon` is never
+   called either, so the window uses the default Qt icon.
 
 ## Open questions for the user
 
@@ -377,3 +378,23 @@ Resolved on 2026-09-29 (GUI planning):
   key is unreliable in a long headless run once several windows exist, so the
   regression test drives the commands through `trigger()` — the same path, and
   refused in exactly the cases where a dead shortcut would be.
+* GUI implementation session, part 14: **task_27, first half — the window
+  layout**.  The output and the input queue are now one *panel* inside a single
+  `QSplitter` whose orientation is the only thing that changes: side by side with
+  the editor when the panel is on the right, stacked under it at the bottom, the
+  editor first in both cases.  `Ctrl+F4` turns it and `F4` shows or hides it (a
+  checkable action, and `isHidden` again rather than `isVisible`, so a window that
+  was never shown is not read as "the user hid the panel").  The side and the sizes
+  of both splitters are remembered in four new settings keys
+  (`view/output_position`, `view/output_visible`, `view/panel_sizes`,
+  `view/output_sizes`) and restored on the next start; `childrenCollapsible` is off
+  and each half has a minimum size, because a panel squeezed to zero pixels looks
+  like a lost window rather than a hidden one.  Two entries left the disabled list
+  (`output`, `split_orientation`), and «Графическое окно» now says there is no task
+  for it instead of naming task_27, which never covered a drawing window.  The
+  test drives the panel through `trigger()` (see part 13) and checks the turn, the
+  travel of the input queue, hiding, the minimum sizes and a restart on the same
+  settings file.  Still open in task_27: `panels.py` (colour by kind, truncation
+  with the «вывод усечён» marker, auto-scroll that stops when the user scrolls up,
+  save to a file), the input console as an alternative to the modal dialogs, the
+  status-bar details and `src/gui/tests/test_output.py`.

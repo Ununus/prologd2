@@ -460,6 +460,64 @@ def test_a_run_uses_the_tab_that_is_showing(executable: str) -> None:
         discard_changes(window)
 
 
+def test_the_output_panel_moves_and_hides(executable: str) -> None:
+    """`Ctrl+F4` moves the output panel, `F4` hides it, and both are remembered.
+
+    The panel is *one* widget — the output with the input queue under it — inside a
+    single splitter whose **orientation** is what changes: side by side when it is
+    on the right, stacked when it is at the bottom.  The turn must not hide it and
+    must not leave a pane dragged away to nothing.
+    """
+    from PySide6.QtCore import Qt
+
+    from prologd_gui.settings import Settings
+    from prologd_gui.window import MainWindow
+
+    window = empty_window(executable)
+    path = window._settings.path
+    try:
+        assert window.output_position() == "right"
+        assert window._panel_splitter.orientation() == Qt.Orientation.Horizontal
+        assert window.output_visible() is True
+        assert window._actions["output"].isChecked() is True
+
+        window._actions["split_orientation"].trigger()
+        assert window.output_position() == "bottom"
+        assert window._panel_splitter.orientation() == Qt.Orientation.Vertical
+        assert window._panel_splitter.widget(1) is window._sidebar, "the editor moved"
+        assert window._input_pane.parent() is window._sidebar, "the input queue did not travel"
+        assert window._sidebar.isHidden() is False, "the turn hid the panel"
+
+        # `F4`: checked means shown, and a hidden panel is *hidden*, not vanished.
+        window._actions["output"].setChecked(False)
+        assert window.output_visible() is False
+        assert window._sidebar.isHidden() is True
+        window._actions["output"].setChecked(True)
+        assert window.output_visible() is True
+
+        # A pane can be dragged small, but never to nothing.
+        assert window._panel_splitter.childrenCollapsible() is False
+        window._panel_splitter.setSizes([0, 0])
+        assert all(size > 0 for size in window._panel_splitter.sizes()), window._panel_splitter.sizes()
+    finally:
+        discard_changes(window)
+
+    stored = Settings(path)
+    assert stored.output_position == "bottom", "the side of the panel was not remembered"
+    assert len(stored.panel_sizes) == 2 and all(size > 0 for size in stored.panel_sizes)
+    assert len(stored.output_sizes) == 2 and all(size > 0 for size in stored.output_sizes)
+    assert stored.output_visible is True
+
+    reopened = MainWindow(executable, [], stored)
+    try:
+        assert reopened.output_position() == "bottom", "the panel did not come back"
+        assert reopened._panel_splitter.orientation() == Qt.Orientation.Vertical
+        assert reopened._actions["output"].isChecked() is True
+        print("ok: the panel moves with Ctrl+F4, hides with F4, and comes back")
+    finally:
+        discard_changes(reopened)
+
+
 def test_the_menus_come_from_the_action_table(executable: str) -> None:
     """Every menu entry is an action of the table, in the order the table gives.
 
@@ -960,6 +1018,7 @@ def main(argv: list[str]) -> int:
         test_merging_the_editor_keeps_the_documents(executable, files)
         test_the_split_survives_a_restart(executable)
         test_split_and_merge_follow_the_pane_count(executable)
+        test_the_output_panel_moves_and_hides(executable)
         test_the_menus_come_from_the_action_table(executable)
         test_the_toolbar_reuses_the_actions(executable)
         test_view_switches_are_stored(executable)

@@ -65,6 +65,8 @@ version does not know are left alone (task_29 adds the dialog).
 | `Ctrl+Q` | exit (asks about every modified buffer) |
 | `Ctrl+L` | clear the output pane |
 | `Ctrl+K` / `Ctrl+U` | comment / uncomment the selection or the current line |
+| `F4` | show or hide the output panel (the input queue goes with it) |
+| `Ctrl+F4` | move that panel between the right side and the bottom |
 | `Ctrl+Space` | completion popup — it also opens by itself after two letters |
 | `Enter` / `Tab` / `Esc` | take the highlighted completion / close the popup |
 | `Ctrl`+wheel, `Ctrl`+keypad `+`/`-`, `Ctrl+0` | font size (6…72 pt) and its reset |
@@ -98,9 +100,9 @@ The menus are **Файл** (Новый, Открыть…, Последние, �
 An entry that does not exist yet stays in its menu but is **disabled**, and its
 tooltip names what it waits for: «Форматировать» — task_30, «Настройки…» —
 task_29, «Поиск и замена…» and the four search commands — task_33,
-«Панель вывода», «Сменить ориентацию сплита», «Графическое окно» — task_27,
-«Запустить с трассировкой» and «Шаг» — task_28.  A menu that silently lacks half
-of the feature list is worse than one that says so.  The toolbar is grouped as
+«Запустить с трассировкой» and «Шаг» — task_28, «Графическое окно» — **no task
+file yet** (the roadmap below has the plan).  A menu that silently lacks half of
+the feature list is worse than one that says so.  The toolbar is grouped as
 the reference front-end had it: file | run/stop/step | editing (comment,
 uncomment, format) | font size | tools (graphics, settings, help), and at the far
 right **Очистить вывод**, which acts on the output rather than on the program;
@@ -149,6 +151,18 @@ pictures for features that are not wired (task_27, task_28).  The directory hold
 30 files, of which three are never asked for: `file.png`, `search-find.png`
 (task_33 will want that picture) and `prologd2.png`, which is meant to be the
 window icon — `setWindowIcon` is not called anywhere yet.
+
+## The output panel
+
+The output — with the input queue under it — is *one* panel inside a single
+`QSplitter` whose orientation is the only thing that changes: side by side with
+the editor when the panel is on the right, stacked under it when the panel is at
+the bottom.  `Ctrl+F4` turns it, `F4` shows and hides it, and the side together
+with the sizes of both splitters is remembered (`view/output_position`,
+`view/output_visible`, `view/panel_sizes`, `view/output_sizes`) and comes back on
+the next start.  A pane cannot be dragged away to nothing — `childrenCollapsible`
+is off and each half has a minimum size — because a panel squeezed to zero pixels
+looks like a lost window rather than a hidden one.
 
 ## Tabs and files
 
