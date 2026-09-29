@@ -63,6 +63,7 @@ class Buffer(QObject):
         )
         editor.setDocument(self.document)
         editor.set_completion_keywords(self.highlighter.keywords)
+        editor.set_wrap(self._settings.wrap)
         self._views.append(editor)
         return editor
 
@@ -125,6 +126,10 @@ class Buffer(QObject):
     def set_line_numbers(self, enabled: bool) -> None:
         for view in self._views:
             view.set_line_numbers(enabled)
+
+    def set_wrap(self, enabled: bool) -> None:
+        for view in self._views:
+            view.set_wrap(enabled)
 
     def title(self) -> str:
         return self.model.title()

@@ -29,6 +29,8 @@ class Pane(QTabWidget):
 
     #: This pane was clicked or its tab changed: the commands act on it now.
     activated = Signal()
+    #: The caret moved in one of the views; the status bar shows its position.
+    cursorMoved = Signal()
     #: A view zoomed (Ctrl+wheel); the window stores one size for every pane.
     zoomChanged = Signal(float)
     #: A program file was dropped on a view; the window opens it in a tab.
@@ -113,6 +115,10 @@ class Pane(QTabWidget):
         view.zoomChanged.connect(self.zoomChanged)
         view.fileDropped.connect(self.fileDropped)
         view.activated.connect(self.activated)
+        # The status bar wants the caret's position, and the views come and go with
+        # the tabs, so the pane forwards the signal instead of the window chasing
+        # the current view.
+        view.cursorPositionChanged.connect(self.cursorMoved)
         self._views[buffer] = view
         self._buffers.append(buffer)
         self.addTab(view, buffer.title())

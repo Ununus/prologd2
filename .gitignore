@@ -22,3 +22,7 @@ __pycache__/
 .venv/
 ai/_venv/
 ai/_ref/
+
+# Scratch scripts written while debugging the front-end: useful while looking for
+# a defect, never part of the project (one was committed by accident once).
+src/gui/tests/_debug*.py

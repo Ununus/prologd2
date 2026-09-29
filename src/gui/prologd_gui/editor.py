@@ -184,6 +184,18 @@ class ZoomablePlainTextEdit(QPlainTextEdit):
     def reset_zoom(self) -> None:
         self.set_font_size(DEFAULT_FONT_SIZE)
 
+    def set_wrap(self, enabled: bool) -> None:
+        """Wraps long lines at the widget's width; `NoWrap` otherwise.
+
+        The editor wants this for a long clause; the output never does, because a
+        log line cut in the middle cannot be read as data.
+        """
+        self.setLineWrapMode(
+            QPlainTextEdit.LineWrapMode.WidgetWidth
+            if enabled
+            else QPlainTextEdit.LineWrapMode.NoWrap
+        )
+
     def wheelEvent(self, event: QWheelEvent) -> None:  # noqa: N802 - Qt spelling
         if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
             delta = event.angleDelta().y()

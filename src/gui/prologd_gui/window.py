@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from . import actions, appearance, assets, documents
+from . import actions, appearance, assets, documents, panels
 from .buffers import Buffer
 from .editor import CodeEditor, ZoomablePlainTextEdit
 from .panes import Pane
@@ -86,6 +86,11 @@ class MainWindow(QMainWindow):
         self._recent = documents.RecentFiles(self._settings.recent_files)
         #: What the interpreter announced in `ready`, for «О программе».
         self._version = ""
+        #: The exit code of the last run, shown in the status bar until the next one.
+        self._exit_code: int | None = None
+        #: True while a stop of our own is in flight, so the exit code it produces
+        #: (a termination status, not an exit code) is not reported as one.
+        self._stopping = False
 
         self._build_ui()
         # The split editor comes back if it was left open, and before the first
@@ -110,12 +115,13 @@ class MainWindow(QMainWindow):
 
         # The output is read-only, but it is monospace and it zooms with the
         # editor: one stored size covers both, so what the user set is still
-        # there next time in every pane.  (task_29 can split them.)
-        self._output = ZoomablePlainTextEdit(
+        # there next time in every pane.  (task_29 can split them.)  The pane
+        # itself — colours per kind, the bounded history, the tail it holds between
+        # chunks — lives in `panels.py`.
+        self._output = panels.OutputPane(
             font_family=self._settings.font_family,
             font_size=self._settings.font_size,
         )
-        self._output.setReadOnly(True)
         self._output.setPlaceholderText("вывод интерпретатора")
         self._output.zoomChanged.connect(self._on_zoom_changed)
         # A dropped program opens in a tab wherever it lands (see `dropEvent`).
@@ -188,10 +194,15 @@ class MainWindow(QMainWindow):
 
         self._status = QLabel("запуск…")
         self.statusBar().addWidget(self._status)
+        # The right-hand side of the status bar: what the interpreter is doing, where
+        # the caret is, and how the current file is written.
+        self._details = QLabel("")
+        self.statusBar().addPermanentWidget(self._details)
 
         # The first pane, always: the window never has no place to edit in.
         self._add_pane()
         self._sync_actions()
+        self._update_details()
 
     # -- commands ----------------------------------------------------------
     def _build_actions(self) -> None:
@@ -254,6 +265,7 @@ class MainWindow(QMainWindow):
             "previous_tab": self._previous_tab,
             "split_orientation": self.flip_output_position,
             "line_numbers": self._toggle_line_numbers,
+            "wrap": self._toggle_wrap,
             "zoom_in": self._zoom_in,
             "zoom_out": self._zoom_out,
             "zoom_reset": self._reset_zoom,
@@ -399,6 +411,37 @@ class MainWindow(QMainWindow):
             return
         self._refresh_titles()
         self._sync_undo_actions()
+        self._update_details()
+
+    def _sync_run_actions(self) -> None:
+        """«Запустить» and «Остановить» follow the interpreter.
+
+        A live session is the only thing that can be stopped, and a run in a fresh
+        session is the only thing that can be started — pressing either at the
+        wrong moment used to do nothing at all, which reads as a broken button.
+        """
+        running = self._session.is_running()
+        self._actions["run"].setEnabled(not running)
+        self._actions["stop"].setEnabled(running)
+
+    def _update_details(self) -> None:
+        """The right-hand side of the status bar: state, caret, file shape."""
+        parts = [
+            "интерпретатор работает" if self._session.is_running() else "интерпретатор остановлен"
+        ]
+        buffer = self.current_buffer()
+        if buffer is not None:
+            view = self.view_for(buffer)
+            if view is not None:
+                cursor = view.textCursor()
+                parts.append(
+                    f"строка {cursor.blockNumber() + 1}, столбец {cursor.positionInBlock() + 1}"
+                )
+            parts.append("CRLF" if buffer.model.eol == documents.EOL_CRLF else "LF")
+            parts.append(buffer.model.encoding)
+        if self._exit_code is not None:
+            parts.append(f"код {self._exit_code}")
+        self._details.setText(" · ".join(parts))
 
     def _sync_pane_actions(self) -> None:
         """`split` and `merge` follow the number of panes.
@@ -419,12 +462,14 @@ class MainWindow(QMainWindow):
         # the wrong preference on the first start.
         self._actions["toolbar"].setChecked(not self._toolbar.isHidden())
         self._actions["line_numbers"].setChecked(self._settings.line_numbers)
+        self._actions["wrap"].setChecked(self._settings.wrap)
         self._actions["theme"].setChecked(self._settings.theme == appearance.SYSTEM)
         self._actions["save_before_run"].setChecked(self._settings.save_before_run)
         self._actions["full_screen"].setChecked(self.isFullScreen())
         self._actions["output"].setChecked(self.output_visible())
         self._sync_pane_actions()
         self._sync_undo_actions()
+        self._sync_run_actions()
         self._show_font_size(self._settings.font_size)
 
     # -- editing commands of the current view ------------------------------
@@ -464,6 +509,12 @@ class MainWindow(QMainWindow):
         self._settings.line_numbers = checked
         for buffer in self._buffers:
             buffer.set_line_numbers(checked)
+
+    def _toggle_wrap(self, checked: bool) -> None:
+        """Wraps long lines in the editor; the output pane never wraps."""
+        self._settings.wrap = checked
+        for buffer in self._buffers:
+            buffer.set_wrap(checked)
 
     def _toggle_save_before_run(self, checked: bool) -> None:
         self._settings.save_before_run = checked
@@ -569,6 +620,7 @@ class MainWindow(QMainWindow):
         pane.fileDropped.connect(self.open_path)
         # Which tab is showing decides the window title and the undo state.
         pane.currentChanged.connect(self._on_tab_changed)
+        pane.cursorMoved.connect(self._update_details)
         self._panes.append(pane)
         self._editor_splitter.addWidget(pane)
         pane.set_buffers(self._buffers)
@@ -743,6 +795,9 @@ class MainWindow(QMainWindow):
         self._stopped_input = False
         self._queued_input = self._input_lines()
         self._session.start()
+        # At once, not when `ready` arrives: the user pressed the button, and it
+        # must not be pressable again while the interpreter is coming up.
+        self._sync_run_actions()
         self._append_note("--- загрузка программы ---\n")
         if self._queued_input:
             self._append_note(f"--- ввод из поля, строк — {len(self._queued_input)} ---\n")
@@ -1013,12 +1068,18 @@ class MainWindow(QMainWindow):
                 return
 
     def stop_program(self) -> None:
+        self._stopping = True
         self._session.stop()
         self._status.setText("остановлено")
         self._append_note("--- остановлено ---\n")
+        # The process is gone, so the buttons change at once — waiting for `ended`
+        # would leave «Остановить» enabled on a session that is already dead.
+        self._sync_run_actions()
+        self._update_details()
 
     def clear_output(self) -> None:
-        self._output.clear()
+        """Empties the pane, including the half-line it was holding."""
+        self._output.reset()
 
     # -- buffers -----------------------------------------------------------
     def _add_buffer(self, model: documents.Document) -> Buffer:
@@ -1143,7 +1204,7 @@ class MainWindow(QMainWindow):
             return
         if self._queued_input:
             line = self._queued_input.pop(0)
-            self._append_note(f"> {line}\n")
+            self._append_output(f"> {line}\n", panels.ECHO)
             self._session.answer_input(line)
             self._status.setText(f"ввод из поля, осталось строк — {len(self._queued_input)}")
             return
@@ -1242,10 +1303,13 @@ class MainWindow(QMainWindow):
         # before the interpreter announced itself; those created later are served
         # by `_add_buffer`.
         self._version = version
+        self._exit_code = None
         for buffer in self._buffers:
             buffer.set_keywords(self._session.keywords)
         self._status.setText(f"PrologD {version} готов")
         self._refresh_titles()
+        self._sync_run_actions()
+        self._update_details()
 
     def _on_zoom_changed(self, size: float) -> None:
         """One size for every editor, the output and the query line, stored at once.
@@ -1273,31 +1337,47 @@ class MainWindow(QMainWindow):
         self._status.setText("решение найдено" if found else "решения нет")
 
     def _on_failed(self, kind: str, message: str) -> None:
-        self._append_note(f"*** {kind}: {message}\n")
+        self._output.feed(f"*** {kind}: {message}\n", panels.ERROR)
+        self._sync_run_actions()
+        self._update_details()
 
     def _on_ended(self, exit_code: int) -> None:
+        # A process *we* killed has no meaningful code: Windows reports the
+        # termination status as a number nobody can read (62097), so the message
+        # stays «остановлено» and the status bar keeps the last real code.
+        if self._stopping:
+            self._stopping = False
+            self._output.flush()
+            self._status.setText("остановлено")
+            self._sync_run_actions()
+            self._update_details()
+            return
+        self._exit_code = exit_code
+        # The last half-line: a program that stopped in the middle of `ВЫВОД` left
+        # it in the pane's buffer, and nothing else will complete it.
+        self._output.flush()
         self._status.setText(f"интерпретатор завершился, код {exit_code}")
+        self._sync_run_actions()
+        self._update_details()
 
-    def _append_output(self, text: str) -> None:
-        cursor = self._output.textCursor()
-        cursor.movePosition(cursor.MoveOperation.End)
-        cursor.insertText(text)
-        self._output.setTextCursor(cursor)
-        self._output.ensureCursorVisible()
+    def _append_output(self, text: str, kind: str = panels.OUTPUT) -> None:
+        """Hands text to the output pane, which colours it by kind.
+
+        The pane holds whatever follows the last newline, so a program that prints
+        with `ВЫВОД` and no `ПС` keeps its half-line until the rest arrives — or
+        until the run ends and `flush()` writes it.
+        """
+        self._output.feed(text, kind)
 
     def _append_note(self, text: str) -> None:
-        """Appends a note of our own, starting on a line of its own.
+        """Appends a note of our own, coloured apart from the program's output.
 
         The interpreter prints without a trailing newline when a program uses
         `ВЫВОД` and no `ПС` (that is the documented behaviour: `ВЫВОД` prints,
-        `ПС` starts a new line), so a note would otherwise be glued to the last
-        line of the program's output.
+        `ПС` starts a new line).  The pane closes the half-line first, because the
+        kind changed — otherwise the note would be glued to the program's text.
         """
-        current = self._output.toPlainText()
-        if current and not current.endswith("\n"):
-            self._append_output("\n")
-        self._append_output(text)
-
+        self._output.feed(text, panels.NOTE)
     # -- drag and drop -----------------------------------------------------
     def dragEnterEvent(self, event) -> None:  # noqa: N802 - Qt spelling
         if any(url.isLocalFile() for url in event.mimeData().urls()):

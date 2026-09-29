@@ -21,6 +21,7 @@ APPLICATION = "gui"
 FONT_FAMILY = "editor/font_family"
 FONT_SIZE = "editor/font_size"
 LINE_NUMBERS = "editor/line_numbers"
+WRAP = "editor/wrap"
 INDENT_CHARACTER = "editor/indent_character"
 INDENT_WIDTH = "editor/indent_width"
 COMPLETION = "editor/completion"
@@ -144,6 +145,16 @@ class Settings:
     @line_numbers.setter
     def line_numbers(self, value: bool) -> None:
         self._write(LINE_NUMBERS, bool(value))
+
+    @property
+    def wrap(self) -> bool:
+        """Wrap long lines in the editor.  Off by default: a program line is read
+        as a whole, and a wrapped one hides where the line really ends."""
+        return self._flag(WRAP, False)
+
+    @wrap.setter
+    def wrap(self, value: bool) -> None:
+        self._write(WRAP, bool(value))
 
     @property
     def indent_character(self) -> str:

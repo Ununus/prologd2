@@ -147,6 +147,9 @@ ACTIONS: tuple[Action, ...] = (
     Action("previous_tab", "Предыдущая вкладка", None, ("Ctrl+Shift+Tab",)),
     Action("split_orientation", "Сменить ориентацию сплита", "view-output-bottom", ("Ctrl+F4",)),
     Action("line_numbers", "Номера строк", "view-line-numbers", checkable=True),
+    # Long clauses are easier to read wrapped, but a log line cut in the middle is
+    # not — so this switch is the *editor's*, and the output stays as it is.
+    Action("wrap", "Переносить длинные строки", None, checkable=True),
     # The zoom keys are the *keypad* ones: `Ctrl+=` and `Ctrl+-` sit on the main
     # row, where task_31 puts the `РАВНО`/`СЛОЖЕНИЕ`/`ВЫЧИТАНИЕ` skeletons.  Qt
     # spells the keypad `+` as `Num++` (it is a different combination from `+`:
@@ -173,7 +176,7 @@ ACTIONS: tuple[Action, ...] = (
         implemented=False,
         waiting_for="task_28",
     ),
-    Action("stop", "Остановить", "execution-abort", ("Shift+F5", "Ctrl+.")),
+    Action("stop", "Остановить", "execution-abort", ("Shift+F5",)),
     Action("save_before_run", "Сохранять перед запуском", None, checkable=True),
     Action(
         "graphics",
@@ -254,6 +257,7 @@ MENUS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "previous_tab",
             SEPARATOR,
             "line_numbers",
+            "wrap",
             "zoom_in",
             "zoom_out",
             "zoom_reset",

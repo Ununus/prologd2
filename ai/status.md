@@ -91,7 +91,7 @@ session.
 | task_24_gui_completion | done | popup over the reserved names *and* the document's own names, with arities; no completion in a comment, string or `#…#`; `Ctrl+Space` |
 | task_25_gui_files_tabs | done | tabs, files, save prompts, encodings, input queue, drop anywhere and the split editor (two panes, one text per document) |
 | task_26_gui_toolbar | done | one action table (48 commands, 12 disabled with a reason) feeding the menu bar, the toolbar and the context menu; icon audit in `src/gui/README.md` (41 names referenced, 27 drawn) |
-| task_27_gui_panels | in progress | the movable output panel is done (`F4`, `Ctrl+F4`, side and sizes persisted, no pane collapsible to nothing); colour by kind, truncation, auto-scroll, the input console and the status-bar details remain |
+| task_27_gui_panels | in progress | the movable panel and the output pane (colour by kind, held half-lines, 50 000-line history with a marker, auto-scroll, status-bar details, run/stop state) are done; the input console is postponed by the user, and saving the pane to a file is open |
 | task_28_gui_run_step | not started | run, step (new engine seam + protocol v2), stop, error line |
 | task_29_gui_settings | not started | settings dialog and persistence |
 | task_30_gui_formatter | not started | soft/hard formatting in prlib + protocol |
@@ -421,3 +421,28 @@ Resolved on 2026-09-29 (GUI planning):
   now carries the four names that belong to no action so the icon audit checks
   them too (46 referenced, 31 drawn, 15 to go), and `test_window.py` grew three
   tests for the pictures, the title and the undo state.
+* GUI hand-testing round, part 16: the rest of task_27 that does not need the input
+  console, plus four smaller requests.  `panels.py` is new: `LineBuffer` splits
+  chunks into lines and *holds* what has no newline yet — the classic defect of a
+  pane fed by arbitrary chunks — and `OutputPane` colours by kind (program output
+  plain, our echo in the query blue, our notes grey, diagnostics crimson; the kind
+  is told by the window, never guessed from the text), keeps a bounded history
+  (50 000 lines, dropped in one edit, with `*** вывод усечён ***` pinned first),
+  and follows the end until the user scrolls up.  It is read-only, never wrapped,
+  and writes through a document cursor, so the user's caret and selection are not
+  taken away while a program prints.  The status bar grew a right-hand side:
+  interpreter state, caret line and column (the pane forwards
+  `cursorPositionChanged`), the file's line ending and encoding, and the exit code
+  of the last run.  «Запустить» and «Остановить» now follow the session — a live
+  interpreter is the only thing that can be stopped — which also means the run
+  action is disabled right after `ready`; the test that triggered it stops the
+  session first.  «Переносить длинные строки» is a new checkable entry in «Вид»:
+  the *editor's* switch (stored as `editor/wrap`), because a log line cut in the
+  middle cannot be read as data, and «Остановить» keeps only `Shift+F5` — the
+  second combination was noise on a keyboard where it belongs to «Разделить».
+  Scratch scripts now match a `.gitignore` rule (`src/gui/tests/_debug*.py`), one
+  having been committed by accident earlier.  Two self-inflicted defects of the
+  round: an edit swallowed the newline after a comment in `editor.py` and merged
+  `dragEnterEvent` into the paragraph above it (caught by the next test run), and
+  `test_output.py` first read the echo's colour from `layout().formats()`, which
+  holds *block* formats — the colour is in the character format.

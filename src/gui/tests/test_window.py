@@ -624,6 +624,65 @@ def test_the_recent_menu_and_the_window_carry_the_pictures(
         discard_changes(window)
 
 
+def test_the_run_state_drives_the_buttons(executable: str) -> None:
+    """A live interpreter is what «Остановить» is for, and a dead one what
+    «Запустить» is for.
+
+    Pressing either at the wrong moment used to do nothing at all, which the user
+    reads as a broken button rather than as a state.
+    """
+    window = empty_window(executable)
+    try:
+        # `empty_window` waited for `ready`, so the session is up.
+        assert window.session.is_running() is True
+        assert window._actions["stop"].isEnabled() is True
+        assert window._actions["run"].isEnabled() is False, "a live session is not started twice"
+
+        window._actions["stop"].trigger()
+        assert window.session.is_running() is False
+        assert window._actions["run"].isEnabled() is True, "a stopped session can be started"
+        assert window._actions["stop"].isEnabled() is False
+
+        window._actions["run"].trigger()
+        # `run` goes grey at once; the *state* line follows when the interpreter
+        # says `ready`, which is what the status bar reports.
+        assert window._actions["run"].isEnabled() is False
+        assert pump(window, lambda: "работает" in window._details.text()), window._details.text()
+        assert window._actions["stop"].isEnabled() is True
+        print("ok: run and stop follow the state of the interpreter")
+    finally:
+        discard_changes(window)
+
+
+def test_the_wrap_switch_reaches_every_editor(executable: str) -> None:
+    """`Вид → Переносить длинные строки` is the editor's switch, not the output's."""
+    from PySide6.QtWidgets import QPlainTextEdit
+
+    from prologd_gui.settings import Settings
+
+    window = empty_window(executable)
+    try:
+        assert window._actions["wrap"].isChecked() is False
+        assert window.editor().lineWrapMode() == QPlainTextEdit.LineWrapMode.NoWrap
+
+        window._actions["wrap"].setChecked(True)
+        assert window.editor().lineWrapMode() == QPlainTextEdit.LineWrapMode.WidgetWidth
+        assert window.output().lineWrapMode() == QPlainTextEdit.LineWrapMode.NoWrap, (
+            "a log line cut in the middle cannot be read as data"
+        )
+
+        # A tab opened after the switch is wrapped as well.
+        second = window.new_buffer()
+        view = window.view_for(second)
+        assert view is not None
+        assert view.lineWrapMode() == QPlainTextEdit.LineWrapMode.WidgetWidth
+    finally:
+        discard_changes(window)
+
+    assert Settings(window._settings.path).wrap is True, "the switch was not stored"
+    print("ok: the wrap switch is stored and reaches every editor view")
+
+
 def test_the_menus_come_from_the_action_table(executable: str) -> None:
     """Every menu entry is an action of the table, in the order the table gives.
 
@@ -1023,7 +1082,7 @@ def test_the_documented_shortcuts_are_bound(executable: str) -> None:
     try:
         for key, expected in (
             ("run", {"F5", "Ctrl+R"}),
-            ("stop", {"Shift+F5", "Ctrl+."}),
+            ("stop", {"Shift+F5"}),
             ("open", {"Ctrl+O"}),
             ("save", {"Ctrl+S"}),
             ("close", {"Ctrl+W"}),
@@ -1047,6 +1106,9 @@ def test_the_documented_shortcuts_are_bound(executable: str) -> None:
 
         # Triggering is the same path a shortcut takes.
         window.open_path(str(EXAMPLE))
+        # «Запустить» is enabled only while there is nothing running, and
+        # `empty_window` waited for `ready` — the session is already up.
+        window.stop_program()
         window._actions["run"].trigger()
         assert pump(window, lambda: ANSWER in window.output_text()), ascii(window.output_text())
         print("ok: the documented keys are bound to the actions, and the action runs the program")
@@ -1132,6 +1194,8 @@ def main(argv: list[str]) -> int:
         test_the_recent_menu_and_the_window_carry_the_pictures(executable, files)
         test_the_title_and_the_tabs_show_the_file_state(executable, files)
         test_undo_and_redo_follow_the_tab_that_is_showing(executable)
+        test_the_run_state_drives_the_buttons(executable)
+        test_the_wrap_switch_reaches_every_editor(executable)
         test_the_context_menu_reuses_the_shared_actions(executable)
         test_the_font_control_and_the_wheel_are_one_setting(executable)
         test_saving_before_a_run_writes_the_file(executable, files)

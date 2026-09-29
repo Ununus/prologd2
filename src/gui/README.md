@@ -55,7 +55,7 @@ version does not know are left alone (task_29 adds the dialog).
 | Key | Command |
 | --- | --- |
 | `F5`, `Ctrl+R` | **Запустить** — a run in a fresh interpreter |
-| `Shift+F5`, `Ctrl+.` | **Остановить** |
+| `Shift+F5` | **Остановить** |
 | `Ctrl+N` | **Новый** — an empty untitled buffer |
 | `Ctrl+O` | **Открыть…** — a new tab; it does not run |
 | `Ctrl+S`, `Ctrl+Shift+S` | **Сохранить**, **Сохранить как…** |
@@ -72,6 +72,11 @@ version does not know are left alone (task_29 adds the dialog).
 | `Ctrl`+wheel, `Ctrl`+keypad `+`/`-`, `Ctrl+0` | font size (6…72 pt) and its reset |
 | `Tab` / `Shift+Tab` | indent / outdent the selected lines |
 | `Enter` | continues the indent after `,`, `:-` or `<-` |
+
+Long lines are wrapped only when **Вид → Переносить длинные строки** is on (no
+key, stored as `editor/wrap`): a program line is read as a whole, and a wrapped one
+hides where the line really ends.  The output pane never wraps, whatever the
+switch says.
 
 Neither list is final: the rest of the combinations is task_31.  Zoom uses the
 *keypad* keys — `Ctrl+Num+` and `Ctrl+Num-`, which Qt spells `Num++` and `Num+-`
@@ -165,6 +170,27 @@ with the sizes of both splitters is remembered (`view/output_position`,
 the next start.  A pane cannot be dragged away to nothing — `childrenCollapsible`
 is off and each half has a minimum size — because a panel squeezed to zero pixels
 looks like a lost window rather than a hidden one.
+
+The text inside is `panels.OutputPane`: read-only, the editor's font and zoom,
+and never wrapped (a log line cut in the middle cannot be read as data).  It
+**colours by kind** — program output plain, our echo of an answer in the query
+blue, our own markers grey, diagnostics crimson — and the kind comes from the
+window, which knows whether it is feeding the program's text, a note or an
+error; nothing is guessed from the text itself.  Chunks arrive mid-line, so a
+line is held until its newline (or until the run ends, which flushes it): that is
+the defect this code exists to avoid, and `LineBuffer` keeps it Qt-free so
+`test_output.py` hammers it.  The history is bounded — 50 000 lines by default —
+and the oldest lines are dropped in one edit with `*** вывод усечён … ***` kept
+as the first line.  The view follows the end of the output until the user scrolls
+up to read something, and follows again as soon as they come back to the bottom.
+
+Undo, redo, «Запустить» and «Остановить» follow the *state*: the first two read
+the document of the tab that is showing, the last two the session — a live
+interpreter is the only thing that can be stopped, and a fresh one the only thing
+that can be started (`_sync_run_actions`, refreshed on `ready`, on a failure, when
+a run ends and right after a stop).  The right-hand side of the status bar shows
+that state together with the caret's line and column and the file's line ending
+and encoding.
 
 ## Tabs and files
 

@@ -1,7 +1,8 @@
 # task_27 — GUI: output pane, input pane and window layout
 
-**Status:** in progress — the window layout (the movable output panel) is done;
-the output pane's own behaviour and the input console remain
+**Status:** in progress — the window layout (the movable output panel) and the
+output pane itself are done; the input console is **deliberately postponed** (the
+user wants to think it over), and saving the pane to a file is still open
 **Depends on:** task_21
 **Milestone:** M11
 
@@ -13,7 +14,7 @@ instead of only a modal dialog.
 
 ## Deliverables
 
-- [ ] `prologd_gui/panels.py` — `OutputPane(QPlainTextEdit)`:
+- [x] `prologd_gui/panels.py` — `OutputPane(QPlainTextEdit)`:
   * read-only, monospace, `NoWrap`, selectable and copyable;
   * colours by kind: program output plain, query echo `#0A22D6`, diagnostics
     crimson, trace grey — the reference GUI did the same with `appendHtml`;
@@ -48,9 +49,9 @@ instead of only a modal dialog.
   * `childrenCollapsible` is off and both halves have a minimum size, so a pane
     cannot be collapsed to nothing (a panel squeezed to zero pixels looks like a
     lost window).
-- [ ] Status bar: interpreter state (запущен/остановлен/выполняется), line and
+- [x] Status bar: interpreter state (запущен/остановлен/выполняется), line and
       column of the caret, current file's encoding/eol, last exit code.
-- [ ] Tests: the pane logic that is text-based (colour classification of an
+- [x] Tests: the pane logic that is text-based (colour classification of an
       output chunk, truncation) lives in a Qt-free helper and is covered by
       `src/gui/tests/test_output.py`; the layout goes into the manual checklist.
 
@@ -68,12 +69,30 @@ Done in this round (2026-09-29):
   cannot be dragged to zero, and a *new* window built on the same settings file
   comes back with the panel at the bottom.
 
-Still open: `panels.py` (colour by kind, truncation with the «вывод усечён»
-marker, auto-scroll that stops when the user scrolls up, save-to-file), the input
-*console* mode as an alternative to the modal dialogs, the status-bar details
-(interpreter state, caret line and column, encoding/eol, exit code) and
-`src/gui/tests/test_output.py` for the Qt-free part of the pane logic.
+Still open: saving the pane to a text file, the input *console* mode as an
+alternative to the modal dialogs (the user asked to postpone that one), and the
+rest of the pane furniture the reference GUI had.
 
+Done in the second round (2026-09-29):
+
+* `panels.py` — `LineBuffer` (Qt-free: chunks split into lines, the unfinished
+  tail held, and a change of kind closing the held line) and `OutputPane` (colours
+  by kind from `KIND_COLORS`, a plain-text cursor so the user's own selection is
+  left alone, a 50 000-line limit dropped in one edit with `TRUNCATED_MARK` kept
+  as the first line, and auto-scroll that follows the end until the user scrolls
+  up — and again as soon as they come back down).
+* The window feeds the pane by kind: the program's output plain, its own notes
+  grey, the echo of an answer in the query blue, and diagnostics crimson;
+  `clear_output` resets the pane (tail included), and the end of a run flushes the
+  half-line a program left behind.
+* The status bar carries the interpreter's state, the caret's line and column (the
+  pane forwards `cursorPositionChanged`), the file's line ending and encoding, and
+  the last exit code.
+* `run` and `stop` follow the session (`_sync_run_actions`), and «Переносить
+  длинные строки» is the *editor's* switch — the output never wraps.
+* Tests: `test_output.py` (five checks, among them the truncation marker and the
+  follow behaviour) and three more in `test_window.py` (run state, wrap switch,
+  undo per tab).
 ## Design notes
 
 * The output pane already exists (read-only `ZoomablePlainTextEdit`), the query
