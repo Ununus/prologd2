@@ -239,6 +239,14 @@ for a runaway run.  The strip carries three of the toolbar's pictures — про
 in the editor's monospace font: a monospace goal between proportional labels reads
 as a defect, and zooming used to move only half of the strip.
 
+The «где» label carries a *place*, not the whole path: the last two components
+(`…\examples\monk.pld:2:1`), with the whole path in its tooltip — a full path in
+that one row ran up against the buttons beside it.  A window too narrow even for
+that drops the head of the label and keeps its tail, in front of «…»: the file's
+own name, the line and the column are what is being read.  (Qt's own middle
+elision was measured first: it turns that place into `…\e…2:1` at a third of the
+width.)
+
 A paused step is a *usable* state, not a busy one: «Шаг», «Шаг с обходом» and
 «Запустить» (= продолжить) are enabled while the panel is up, because a disabled
 `QAction` fires no shortcut and those keys are exactly the ones the user needs

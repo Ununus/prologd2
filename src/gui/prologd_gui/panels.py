@@ -19,7 +19,7 @@ import pathlib
 from dataclasses import dataclass
 
 from PySide6.QtCore import QSize, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QTextCharFormat, QTextCursor
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QTextCharFormat, QTextCursor
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -31,7 +31,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from . import assets, theme
+from . import assets, documents, theme
 from .editor import ZoomablePlainTextEdit
 
 #: What a line is, which is what decides its colour.  The window knows the kind —
@@ -412,6 +412,10 @@ STEP_TITLES = {
 #: otherwise stretch the label — and the window — to the width of the screen.
 STACK_FRAMES = 6
 
+#: What the strip's «где» means; the whole `file:line:column` is put under it
+#: while a point is shown, since the label itself carries only the place.
+WHERE_TOOLTIP = "Где эта цель стоит в файле"
+
 
 def _tool_button(icon_name: str, tooltip: str, signal) -> QPushButton:
     """A picture button for the step strip, with its words in the tooltip.
@@ -433,6 +437,61 @@ def _tool_button(icon_name: str, tooltip: str, signal) -> QPushButton:
     button.setAutoDefault(False)
     button.clicked.connect(signal)
     return button
+
+
+class ElidedLabel(QLabel):
+    """A one-line label that says so when it is too narrow for its text.
+
+    The step strip's «где» carries a place in a file.  At full length the path ran
+    up against the buttons beside it, and a narrower window cut it mid-word with
+    nothing to show that it had been cut.  Painting is what shortens: `text()` —
+    and so the tooltip and the accessors — stays whole, and what is painted keeps
+    the *end* of the text, because the end of a place in a file (the file's own
+    name, then the line and the column) is the part being read.  Qt's own
+    `elidedText(…, ElideMiddle, …)` was measured first and reads badly on a path:
+    at a third of the width it turns `…\\examples\\monk.pld:2:1` into `…\\e…2:1`.
+    """
+
+    def display_text(self) -> str:
+        """What is painted: the text, or as much of its end as fits, after «…»."""
+        text = self.text()
+        width = self.contentsRect().width()
+        if width <= 0:
+            return text
+        metrics = QFontMetrics(self.font())
+        if metrics.horizontalAdvance(text) <= width:
+            return text
+        if metrics.horizontalAdvance("…") > width:
+            return ""
+        for cut in range(len(text)):
+            candidate = "…" + text[cut:]
+            if metrics.horizontalAdvance(candidate) <= width:
+                return candidate
+        return "…"
+
+    def paintEvent(self, event) -> None:  # noqa: N802 - Qt's own spelling
+        shown = self.display_text()
+        if shown == self.text():
+            super().paintEvent(event)
+            return
+        painter = QPainter(self)
+        painter.setFont(self.font())
+        painter.setPen(self.palette().color(self.foregroundRole()))
+        painter.drawText(self.contentsRect(), self.alignment().value, shown)
+
+
+def step_where_text(position) -> str:
+    """`file:line:column` for the strip: the file cut to its last two parts.
+
+    A stepped run on an *opened* file reports the whole path, and the whole path
+    in the strip's single row ran straight up against its buttons; the last two
+    parts (…\\examples\\monk.pld:2:1) say the same thing in a fifth of the room,
+    and the full text stays in the tooltip.
+    """
+    if position is None or not position.file:
+        return ""
+    file = documents.short_path(position.file)
+    return f"{file}:{position.line}:{position.column}"
 
 
 class StepPane(QWidget):
@@ -470,8 +529,10 @@ class StepPane(QWidget):
         # A goal is data: `#X+1#` must not be read as markup.
         self._goal.setTextFormat(Qt.TextFormat.PlainText)
         self._depth = QLabel("")
-        self._where = QLabel("")
-        self._where.setToolTip("Где эта цель стоит в файле")
+        self._where = ElidedLabel()
+        # A place in a file is data: a path with `<` in it is not markup.
+        self._where.setTextFormat(Qt.TextFormat.PlainText)
+        self._where.setToolTip(WHERE_TOOLTIP)
         self._stack = QLabel("")
         self._stack.setTextFormat(Qt.TextFormat.PlainText)
         self._resume = _tool_button(
@@ -510,7 +571,9 @@ class StepPane(QWidget):
         self._action.setText(STEP_TITLES.get(point.action, point.action))
         self._goal.setText(point.goal)
         self._depth.setText(f"глубина {point.depth}")
-        self._where.setText(point.position.where() if point.position else "")
+        full = point.position.where() if point.position else ""
+        self._where.setText(step_where_text(point.position))
+        self._where.setToolTip(f"{WHERE_TOOLTIP}\n{full}" if full else WHERE_TOOLTIP)
         self._stack.setText(self._stack_text(stack))
         self._stack.setToolTip(self._stack.text())
         self.setVisible(True)
@@ -521,6 +584,7 @@ class StepPane(QWidget):
         self._goal.clear()
         self._depth.clear()
         self._where.clear()
+        self._where.setToolTip(WHERE_TOOLTIP)
         self._stack.clear()
         self.setVisible(False)
 
@@ -544,6 +608,10 @@ class StepPane(QWidget):
 
     def where_text(self) -> str:
         return self._where.text()
+
+    def where_display_text(self) -> str:
+        """What the strip actually paints: the text, or its middle shortened."""
+        return self._where.display_text()
 
     def stack_text(self) -> str:
         return self._stack.text()

@@ -1701,7 +1701,9 @@ def test_the_step_strip_is_one_font_and_three_pictures(executable: str) -> None:
 
     Reported from a run: «Продолжить» and «Стоп» were words in the interface font
     between monospace labels — a paragraph of prose in the middle of a program —
-    and there was no way to step from the strip itself.
+    and there was no way to step from the strip itself.  The second look at the
+    same strip added the «где» case: the whole path of an opened file ran up
+    against those buttons.
     """
     from PySide6.QtWidgets import QLabel
 
@@ -1729,6 +1731,37 @@ def test_the_step_strip_is_one_font_and_three_pictures(executable: str) -> None:
         assert pump(window, lambda: pane.goal_text().startswith("факт")), ascii(
             pane.goal_text()
         )
+
+        # The «где» line shows a *place*, not the whole of `C:\Users\…`: on an
+        # opened file the path ran up against the buttons, and a narrower window
+        # cut it mid-word with nothing to say it had been cut.  The whole path
+        # stays in the tooltip, and what does not fit is elided in the middle —
+        # the file's own name is the part being looked for.
+        from prologd_gui.protocol import Position, StepPoint
+
+        pane.show_point(
+            StepPoint(
+                action="call",
+                goal="цель(_1)",
+                depth=2,
+                position=Position(
+                    "C:/Users/vasla/source/projects/examples/monk.pld", 2, 1
+                ),
+            ),
+            ["monk(6)"],
+        )
+        assert pane.where_text().endswith("monk.pld:2:1"), ascii(pane.where_text())
+        assert "C:/Users" not in pane.where_text(), ascii(pane.where_text())
+        assert "C:/Users" in pane._where.toolTip(), ascii(pane._where.toolTip())
+        # A window too narrow for the place drops its head and keeps the tail: the
+        # file's own name, then the line and the column, are what is being read.
+        pane._where.resize(240, pane._where.height())
+        shown = pane.where_display_text()
+        assert shown.startswith("…"), ascii(shown)
+        assert shown.endswith(":2:1"), ascii(shown)
+        assert shown != pane.where_text(), ascii(shown)
+        assert len(shown) < len(pane.where_text()), ascii(shown)
+        pane._where.grab()  # and painting it does not fall over
     finally:
         discard_changes(window)
     print("ok: the step strip is one font, and its buttons are the toolbar's pictures")

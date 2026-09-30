@@ -1006,4 +1006,10 @@ Resolved on 2026-09-29 (GUI planning):
   (`_on_zoom_changed` did not reach it) — fixed with the rest.  Sixteen
   `test_*.py` scripts (and the protocol smoke) green, 231/231 ctest, the `docs`
   target compiles the six PDFs; `doc/gui.typ` §2 and §6.2 and
-  `src/gui/README.md` say all of it.
+  `src/gui/README.md` say all of it.  The first stepped run on an *opened* file
+  found one more of the same family: the strip's «где» carried the whole path and
+  ran up against its own buttons.  The label now shows the last two components
+  (`…\examples\monk.pld:2:1`) with the whole path in its tooltip, and an
+  `ElidedLabel` paints the tail with «…» in front when even that does not fit —
+  Qt's own middle elision reads badly on a path (`…\e…2:1`), the cut is shown,
+  and `text()` stays whole, which is what the tooltip and the tests read.
