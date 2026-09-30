@@ -222,6 +222,10 @@ class Engine {
   // ---- parsing and loading ----
   ParsedProgram parseSource(std::string_view source, const std::string& file_name);
   void loadProgram(const ParsedProgram& program);
+  /// Run the post-load call-site checks over a unit (`prlib/checks.hpp`): an
+  /// undefined predicate or an arity a predicate does not have is reported as
+  /// a warning through the usual diagnostic path (hook or error stream).
+  void checkCallSites(const ParsedProgram& program);
   void initialize();
 
   /// Run a query; `onSolution` is called for every solution and may return

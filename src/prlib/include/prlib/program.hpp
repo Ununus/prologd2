@@ -19,6 +19,9 @@ namespace prologd {
 struct Clause {
   Term head;
   std::vector<Term> body;
+  /// Where each goal of `body` starts in the source, one entry per goal;
+  /// empty for a fact and for a clause built at run time by `ДОБ`.
+  std::vector<SourceLocation> bodyLocations;
   SourceLocation location;
   std::uint64_t id = 0;
 };

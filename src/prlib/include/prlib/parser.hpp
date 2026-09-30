@@ -27,6 +27,8 @@ struct ImportDirective {
 /// order of first occurrence.
 struct Query {
   std::vector<Term> goals;
+  /// Where each goal starts in the source, one entry per goal.
+  std::vector<SourceLocation> goalLocations;
   std::vector<std::pair<std::string, VarId>> variables;
   SourceLocation location;
   /// True for `:- Goal.` directives (executed quietly, no solution report).
@@ -76,13 +78,20 @@ class Parser {
   bool atEnd() const;
 
   void report(ErrorCode code, const SourceLocation& location, std::string message = {});
+  /// Report a bracket that was opened and never closed: the position is the
+  /// opening bracket, and the message names the line it is on.
+  void reportUnclosedBracket(char open, const SourceLocation& location);
+  /// Report a statement that ran into end-of-file without its final dot.
+  void reportMissingDot();
   void recoverToStatementEnd();
 
   // Statements.
   bool parseStatement(ParsedProgram& out);
   bool parseQueryOrDirective(ParsedProgram& out);
   bool parseClause(ParsedProgram& out);
-  std::vector<Term> parseGoalList();
+  /// Parse a comma-separated goal list.  When `locations` is given, the start
+  /// of every goal is appended to it.
+  std::vector<Term> parseGoalList(std::vector<SourceLocation>* locations = nullptr);
   Term parseGoal();
 
   // Terms.

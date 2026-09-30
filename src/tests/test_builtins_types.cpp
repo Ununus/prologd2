@@ -29,12 +29,15 @@ TEST_CASE("the variable test is true exactly for an unbound variable") {
                            "X=_1\nY=_1\n");
 }
 
-TEST_CASE("a type test with an unregistered arity is an unknown predicate") {
-  const auto result =
-      runProgram("?ПЕР(X, X).\n?ЦЕЛ(1, 1).\n?ВЕЩ(1.0, 1.0).\n?СИМВ(a, a).\n?СПИСОК([], []).\n");
-  REQUIRE(result.loaded);
-  REQUIRE_FALSE(result.runtimeError);
-  REQUIRE(result.output == "НЕТ\nНЕТ\nНЕТ\nНЕТ\nНЕТ\n");
+TEST_CASE("a type test with an unregistered arity is an error") {
+  // Each of these names has exactly one arity, so a two-argument call can never
+  // succeed; the load stops with the message instead of a silent `НЕТ`.
+  for (const std::string& goal :
+       {"ПЕР(X, X)", "ЦЕЛ(1, 1)", "ВЕЩ(1.0, 1.0)", "СИМВ(a, a)", "СПИСОК([], [])"}) {
+    const auto result = runProgram("?" + goal + ".\n");
+    REQUIRE_FALSE(result.loaded);
+    REQUIRE(result.error.find("не имеет арности 2 (есть 1)") != std::string::npos);
+  }
 }
 
 TEST_CASE("the integer test is true for an integer or an expression that gives one") {

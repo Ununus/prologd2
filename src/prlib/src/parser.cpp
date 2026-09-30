@@ -69,6 +69,21 @@ void Parser::report(ErrorCode code, const SourceLocation& location, std::string 
   sink_->report(std::move(error));
 }
 
+void Parser::reportUnclosedBracket(char open, const SourceLocation& location) {
+  std::string message = "непарные скобки: '";
+  message += open;
+  message += "' открыта в строке ";
+  message += std::to_string(location.line);
+  report(ErrorCode::UnpairedBracket, location, std::move(message));
+}
+
+void Parser::reportMissingDot() {
+  // The dot belongs right after the last token of the statement, and that is
+  // where a reader has to look.
+  report(ErrorCode::InvalidSentence, previous().location,
+         "предложение заканчивается точкой");
+}
+
 void Parser::recoverToStatementEnd() {
   while (!atEnd()) {
     const TokenKind kind = peek().kind;
@@ -144,14 +159,14 @@ Term Parser::parsePrimary() {
     case TokenKind::LBracket:
       return parseList();
     case TokenKind::LParen: {
-      advance();
+      const Token open = advance();
       std::vector<Term> parts;
       parts.push_back(parseTerm());
       while (!failed_ && match(TokenKind::Comma)) {
         parts.push_back(parseTerm());
       }
       if (!match(TokenKind::RParen)) {
-        report(ErrorCode::UnpairedBracket, peek().location);
+        reportUnclosedBracket('(', open.location);
       }
       // `(A, B)` is a conjunction; represent it as the compound `,`/2 so that
       // it can be passed to meta-predicates such as НАЙТИВСЁ.
@@ -203,9 +218,12 @@ Term Parser::parsePrimary() {
 
 Term Parser::parseCompoundOrAtom() {
   const Token name = advance();
-  if (!match(TokenKind::LParen)) {
+  if (!check(TokenKind::LParen)) {
     return makeAtom(name.text);
   }
+  // Keep the opening bracket: when the closing one is missing, that is where
+  // a reader has to look.
+  const Token open = advance();
   std::vector<Term> arguments;
   if (check(TokenKind::RParen)) {
     report(ErrorCode::InvalidFunction, peek().location,
@@ -229,7 +247,7 @@ Term Parser::parseCompoundOrAtom() {
     break;
   }
   if (!match(TokenKind::RParen)) {
-    report(ErrorCode::UnpairedBracket, peek().location);
+    reportUnclosedBracket('(', open.location);
   }
   return makeCompound(name.text, std::move(arguments));
 }
@@ -257,7 +275,7 @@ Term Parser::parseList() {
     break;
   }
   if (!match(TokenKind::RBracket)) {
-    report(ErrorCode::UnpairedBracket, open.location);
+    reportUnclosedBracket('[', open.location);
     return makeNil();
   }
   (void)has_tail;
@@ -361,15 +379,21 @@ Term Parser::parseGoal() {
   return goal;
 }
 
-std::vector<Term> Parser::parseGoalList() {
+std::vector<Term> Parser::parseGoalList(std::vector<SourceLocation>* locations) {
   std::vector<Term> goals;
   if (check(TokenKind::Dot) || check(TokenKind::Semicolon) || atEnd()) {
     report(ErrorCode::InvalidSentence, peek().location,
            "Пустое тело предложения");
     return goals;
   }
+  if (locations != nullptr) {
+    locations->push_back(peek().location);
+  }
   goals.push_back(parseGoal());
   while (!failed_ && match(TokenKind::Comma)) {
+    if (locations != nullptr) {
+      locations->push_back(peek().location);
+    }
     goals.push_back(parseGoal());
   }
   return goals;
@@ -399,12 +423,15 @@ bool Parser::parseClause(ParsedProgram& out) {
     return false;
   }
   std::vector<Term> body;
+  std::vector<SourceLocation> body_locations;
   if (match(TokenKind::ColonDash) || match(TokenKind::Arrow)) {
-    body = parseGoalList();
+    body = parseGoalList(&body_locations);
   }
   if (!check(TokenKind::Dot) && !check(TokenKind::Semicolon)) {
     const TokenKind kind = peek().kind;
-    if (kind == TokenKind::Bang) {
+    if (kind == TokenKind::EndOfFile && !failed_) {
+      reportMissingDot();
+    } else if (kind == TokenKind::Bang) {
       report(ErrorCode::MisplacedCut, peek().location);
     } else if (kind == TokenKind::RBracket) {
       report(ErrorCode::UnpairedBracket, peek().location);
@@ -421,6 +448,7 @@ bool Parser::parseClause(ParsedProgram& out) {
   Clause clause;
   clause.head = std::move(head);
   clause.body = std::move(body);
+  clause.bodyLocations = std::move(body_locations);
   clause.location = location;
   out.order.push_back(StatementRef{StatementRef::Kind::Clause, out.clauses.size()});
   out.clauses.push_back(std::move(clause));
@@ -437,9 +465,14 @@ bool Parser::parseQueryOrDirective(ParsedProgram& out) {
     match(TokenKind::ColonDash);
   }
   beginScope();
-  std::vector<Term> goals = parseGoalList();
+  std::vector<SourceLocation> goal_locations;
+  std::vector<Term> goals = parseGoalList(&goal_locations);
   if (!check(TokenKind::Dot) && !check(TokenKind::Semicolon)) {
-    report(ErrorCode::InvalidSentence, peek().location);
+    if (check(TokenKind::EndOfFile) && !failed_) {
+      reportMissingDot();
+    } else {
+      report(ErrorCode::InvalidSentence, peek().location);
+    }
     recoverToStatementEnd();
     out.ok = false;
     return false;
@@ -468,6 +501,7 @@ bool Parser::parseQueryOrDirective(ParsedProgram& out) {
 
   Query query;
   query.goals = std::move(goals);
+  query.goalLocations = std::move(goal_locations);
   query.variables = query_variables_;
   query.location = location;
   query.isDirective = !is_query;

@@ -5,6 +5,7 @@
 #include <iostream>
 #include <utility>
 
+#include "prlib/checks.hpp"
 #include "prlib/term_print.hpp"
 
 namespace prologd {
@@ -759,6 +760,9 @@ ParsedProgram Engine::parseSource(std::string_view source, const std::string& fi
   auto allocator = [this](std::string_view name) { return allocateVar(name); };
   Parser parser(std::move(tokens), allocator, &sink);
   ParsedProgram program = parser.parseProgram();
+  // A call to a reserved name with an arity the interpreter does not have can
+  // never succeed; the parser cannot see the tables, so the check lives here.
+  checkReservedCalls(program, database_, sink);
   for (const PrologError& diagnostic : sink.diagnostics()) {
     if (diagnostic.code == ErrorCode::NoErrors) {
       continue;
@@ -784,6 +788,11 @@ void Engine::loadProgram(const ParsedProgram& program) {
   for (const Clause& clause : program.clauses) {
     database_.addClause(clause);
   }
+}
+
+void Engine::checkCallSites(const ParsedProgram& program) {
+  prologd::checkCallSites(program, database_,
+                          [this](const PrologError& diagnostic) { report(diagnostic); });
 }
 
 std::string Engine::format(const Term& term) const {

@@ -242,6 +242,9 @@ bool ModuleLoader::process(const ParsedProgram& program, const std::filesystem::
       }
     }
   }
+  // Everything this unit and its imports define is loaded: a goal that names
+  // nothing can now be told apart from one that simply has no solutions.
+  engine_.checkCallSites(program);
   return true;
 }
 

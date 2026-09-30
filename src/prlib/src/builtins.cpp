@@ -91,8 +91,9 @@ bool unifyText(Engine& engine, const Term& argument, const std::string& value) {
 }
 
 [[noreturn]] void badArguments(std::string_view predicate) {
-  throw PrologRuntimeError(PrologError{
-      ErrorCode::TypeMismatch, std::string(predicate) + ": Недопустимый тип аргументов", {}, false});
+  throw PrologRuntimeError(
+      PrologError{.code = ErrorCode::TypeMismatch,
+                  .message = std::string(predicate) + ": Недопустимый тип аргументов"});
 }
 
 }  // namespace detail

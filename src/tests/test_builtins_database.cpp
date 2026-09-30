@@ -61,12 +61,12 @@ TEST_CASE("the clause counter: a bad name or count is an error") {
   for (const std::string& goal : {"СКОЛЬКО(5, N)", "СКОЛЬКО(X, N)", "СКОЛЬКО(прим, \"1\")"}) {
     checkBadArguments(goal, "СКОЛЬКО");
   }
-  // Арность, для которой ничего не зарегистрировано, — это неизвестный
-  // предикат: цель просто терпит неудачу.
-  const auto wrongArity = runProgram("прим(1).\n?СКОЛЬКО(прим).\n?СКОЛЬКО(прим, N, 1).\n");
-  REQUIRE(wrongArity.loaded);
-  REQUIRE_FALSE(wrongArity.runtimeError);
-  REQUIRE(wrongArity.output == "НЕТ\nНЕТ\n");
+  // Арность, для которой ничего не зарегистрировано, не может сработать: об
+  // этом сообщается при загрузке, а не молчаливым НЕТ (task_40).
+  const auto wrongArity = runProgram("прим(1).\n?СКОЛЬКО(прим).\n");
+  REQUIRE_FALSE(wrongArity.loaded);
+  REQUIRE(wrongArity.error.find("СКОЛЬКО не имеет арности 1 (есть 2)") !=
+          std::string::npos);
 }
 
 TEST_CASE("inspects clauses") {

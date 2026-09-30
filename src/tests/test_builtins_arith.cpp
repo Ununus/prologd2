@@ -272,12 +272,12 @@ TEST_CASE("the arithmetic built-ins report a wrong type as an error") {
     REQUIRE(result.error.find("ошибка преобразования типа") != std::string::npos);
   }
 
-  // An arity nothing is registered for is not a built-in at all: the goal simply
-  // fails, as an unknown predicate does.
+  // An arity nothing is registered for cannot work at all, and the load says so
+  // instead of leaving a silent failure (task_40).
   const auto unknown = runProgram("?УМНОЖЕНИЕ(1, 2, 3, 4, 5).\n");
-  REQUIRE(unknown.loaded);
-  REQUIRE_FALSE(unknown.runtimeError);
-  REQUIRE(unknown.output == "НЕТ\n");
+  REQUIRE_FALSE(unknown.loaded);
+  REQUIRE(unknown.error.find("УМНОЖЕНИЕ не имеет арности 5 (есть 3 и 4)") !=
+          std::string::npos);
 }
 
 TEST_CASE("arithmetic expressions evaluate with precedence") {

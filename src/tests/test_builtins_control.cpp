@@ -47,11 +47,11 @@ TEST_CASE("negation answers a goal that is not a predicate with an error") {
   REQUIRE_FALSE(atom.runtimeError);
   REQUIRE(atom.output == "ДА\n");
 
-  // A wrong arity, on the other hand, is not this predicate at all.
-  const auto arity = runProgram("?НЕ(ЛОЖЬ, ЛОЖЬ).\n?НЕ.\n");
-  REQUIRE(arity.loaded);
-  REQUIRE_FALSE(arity.runtimeError);
-  REQUIRE(arity.output == "НЕТ\nНЕТ\n");
+  // A wrong arity, on the other hand, is not this predicate at all: it cannot
+  // ever work, and the load says so (task_40).
+  const auto arity = runProgram("?НЕ(ЛОЖЬ, ЛОЖЬ).\n");
+  REQUIRE_FALSE(arity.loaded);
+  REQUIRE(arity.error.find("НЕ не имеет арности 2 (есть 1)") != std::string::npos);
 }
 
 TEST_CASE("a disjunction is true when either side is") {
@@ -91,10 +91,9 @@ TEST_CASE("a disjunction answers a goal that is not a predicate with an error") 
   REQUIRE_FALSE(atom.runtimeError);
   REQUIRE(atom.output == "ДА\n");
 
-  const auto arity = runProgram("?ИЛИ(ЛОЖЬ).\n?ИЛИ(ЛОЖЬ, ЛОЖЬ, ЛОЖЬ).\n");
-  REQUIRE(arity.loaded);
-  REQUIRE_FALSE(arity.runtimeError);
-  REQUIRE(arity.output == "НЕТ\nНЕТ\n");
+  const auto arity = runProgram("?ИЛИ(ЛОЖЬ, ЛОЖЬ, ЛОЖЬ).\n");
+  REQUIRE_FALSE(arity.loaded);
+  REQUIRE(arity.error.find("ИЛИ не имеет арности 3 (есть 2)") != std::string::npos);
 }
 
 TEST_CASE("quiet silences the query it appears in") {

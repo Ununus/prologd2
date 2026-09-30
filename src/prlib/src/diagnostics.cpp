@@ -86,11 +86,27 @@ PrologRuntimeError::PrologRuntimeError(PrologError error)
       what_(error_.message.empty() ? std::string(errorCodeText(error_.code))
                                    : error_.message) {}
 
+std::string_view severityText(Severity severity) noexcept {
+  switch (severity) {
+    case Severity::Error:
+      return "error";
+    case Severity::Warning:
+      return "warning";
+    case Severity::Note:
+      return "note";
+  }
+  return "error";
+}
+
 void DiagnosticSink::report(PrologError error) {
-  if (error.code != ErrorCode::NoErrors) {
+  if (error.code != ErrorCode::NoErrors || error.severity != Severity::Error) {
     if (error.message.empty()) {
       error.message = std::string(errorCodeText(error.code));
     }
+  }
+  if (error.severity == Severity::Warning) {
+    ++warnings_;
+  } else if (error.code != ErrorCode::NoErrors) {
     ++errors_;
   }
   diagnostics_.push_back(std::move(error));
@@ -99,6 +115,7 @@ void DiagnosticSink::report(PrologError error) {
 void DiagnosticSink::clear() {
   diagnostics_.clear();
   errors_ = 0;
+  warnings_ = 0;
 }
 
 std::string DiagnosticSink::format(const PrologError& error) {
@@ -111,7 +128,8 @@ std::string DiagnosticSink::format(const PrologError& error) {
     result += std::to_string(error.location.column);
     result += ": ";
   }
-  result += "error: ";
+  result += severityText(error.severity);
+  result += ": ";
   result += error.message.empty() ? std::string(errorCodeText(error.code)) : error.message;
   return result;
 }
