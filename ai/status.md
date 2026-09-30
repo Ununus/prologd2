@@ -103,7 +103,7 @@ session.
 | task_34_builtin_branches | done | every built-in branch-tested in Catch2 (186 cases); the sweep found and fixed five defects: two in the float built-ins (`nan` instead of a failure), the integer/real comparison, the cyclic term that ended the process, the ignored read prompt, the unchecked graphics arguments and the code points that were written as invalid UTF-8 |
 | task_35_lessons_rework | done | the course in `examples/lessons` is rewritten for the current dialect, one commit per lesson, from the plan in `ai/task_35_lessons_rework.md`; `test_lessons.cpp` runs every lesson (12 + the debug appendix) and compares its whole output with the `%!` lines the lesson itself carries, so a lesson cannot drift again; the old files are in `lessons/_old/`; the index is `examples/lessons/README.md` and the fifth Typst document `doc/lessons.typ` (the `docs` target builds it); writing the expectations found and fixed mistakes in the source material (a non-terminating `нод/3`, descending sorts, a hanging `?длина(Х, 2)`, a failed read that leaves the rest of its line) and taught the check two tricks: input files for lesson 7 and include paths for lesson 11 |
 | task_36_gui_query_markers | done | a blue triangle in the margin runs the question it stands at — `?Goal.` and `% ?Goal.` alike: the commented query of a lesson (its own lines still run whole), the `%?` line coloured as a question, and a `questions: false` load so the clicked query answers *alone*; the rule is not a parser and refuses a line it cannot read (commits e9c3beb/c38acc6/a99c906/cebd2c0); the first hands-on run added two fixes — a failed query marks no line of the program (`<query>`), and `Ctrl+C` copies from the focused pane |
-| task_37_gui_builtin_reference | not started | `doc/builtins.json` as the one machine-readable source for the built-in reference, a checker keeping it in step with `--list-keywords` and the sections of `help.typ`, a summary line under the completion popup and `Shift+F1` on the word under the caret (the English-alias work of task_39 would land in the same file) |
+| task_37_gui_builtin_reference | done | `doc/builtins.json` — one record per predicate (name, English aliases, kind, arities, group, `help.typ` section, one-line summary, argument modes), 59 records over all 108 names; `help.typ` builds its appendix table from the file, `test_reference.py` keeps the file in step with the interpreter and the manual, `reference.py` loads it for the window (a missing file is an empty reference); the completion popup shows the summary of the highlighted row, `F1` opens a dock with the whole record — and `Up`/`Down` now really walk the popup list (they moved the caret, contradicting the README) |
 | task_38_engine_limits | done | recursion depth and long runs: the crash is gone (the chain and deep terms are released iteratively — the trigger was a *surviving* deep reference, a choice point whose base clause does not cut, or the solver's final environment), `maxDepth` turns runaway recursion into a diagnostic, the variable growth is documented instead of "fixed", and `tools/bench_engine.py` made the numbers reproducible |
 | task_39_english_aliases | done | every built-in has an English spelling in lower case (one `kEnglishNames` table in `builtins.cpp`, 47 pairs, is the only place a pair is written; `test_aliases.cpp` walks it and fails on a Russian name without a row); the manual gained appendix 17 with the whole table, `prologd-diff.typ` §15 and `conventions.md` the rule; doing it showed that `int`/`float` were *checks*, not conversions (`integer`/`float` are the ISO type tests, `is_whole`/`is_number` the old ones, and the planned `to_int`/`to_float` were dropped) and `ДЛИНА` became `strlen`; 108 reserved names, one list for CLI, protocol and GUI; renamed on review: `number` → `is_number`, `num_to_float` → `int_to_float` |
 | task_40_diagnostics | done | severity (an error stops a load or a query and keeps exit codes 2/3; a warning never changes either, and `--no-warnings` drops them) with `severity` on the wire (protocol 4) and amber warnings counted in the GUI; positions name what to fix (the opening bracket and its line, the end of a clause without its dot, the goal); a reserved name with an arity that exists nowhere is an error, an undefined predicate or a missing arity is a warning with a suggestion; singleton variables with separate advice for facts, rules and bodies |
@@ -937,3 +937,26 @@ Resolved on 2026-09-29 (GUI planning):
   (`#b45309`, contrast 5.02 — the tightest colour in the palette, still above
   the 4.5 threshold).  No lesson file was edited; 231/231 ctest, the 16 headless
   GUI scripts, all six Typst documents.
+* GUI round, part 29: **task_37 — справка по предикату в окне**.  The built-in
+  reference now has one source of data: `doc/builtins.json`, 59 records covering
+  all 108 reserved names (the Russian name, its English spellings, kind, arities,
+  the variadic flag, group, the `help.typ` section, a one-line summary and the
+  argument modes).  The appendix of `help.typ` builds its table of English names
+  from that file with `json()`, so a pair of names is written down once — the
+  previous hand-written table was the only place where the same knowledge lived
+  twice.  `src/gui/tests/test_reference.py` is the keeper: every name of
+  `--list-keywords` has a record and no record is unknown, arities and kinds are
+  the interpreter's (`ready`), an alias is listed once, every `section` is a
+  heading of the manual, a variant starts with the predicate's own name, a
+  summary is one non-empty line without a trailing period.  The window shows the
+  record in two places: a label under the completion popup with the summary of
+  the highlighted row, and the dock that `F1` opens with the summary, the English
+  name, the section and *all* argument modes of the word under the caret.  `F1`
+  was taken by the PDF manual, and the user decided: the in-window answer gets
+  `F1`, the manual moves to `Shift+F1`.  Writing the label test found that
+  `Up`/`Down` did not walk the popup list at all (they moved the caret, while
+  the README's keyboard table promised the list) — now they do, and the label
+  follows the row.  A checkout without `doc/builtins.json` still works: the
+  popup has no descriptions and `F1` says the reference is unavailable.  New
+  rule in `ai/conventions.md`: a built-in is added to `builtins.cpp`, to the
+  lexer's reserved set *and* to `doc/builtins.json`.

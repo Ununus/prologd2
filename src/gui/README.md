@@ -74,6 +74,8 @@ version does not know are left alone (task_29 adds the dialog).
 | `Enter` / `Shift+Enter` in the find field | the same as `F3` / `Shift+F3` |
 | `F4` | show or hide the output panel (the input queue goes with it) |
 | `Ctrl+F4` | move that panel between the right side and the bottom |
+| `F1` | **Справка по предикату** — the record of the word under the caret, in a dock |
+| `Shift+F1` | **Руководство пользователя** — the built PDF (`doc/help.pdf`) |
 | `Ctrl+Space` | completion popup — it also opens by itself after two letters |
 | `Enter` / `Tab` / `Esc` | take the highlighted completion / close the popup |
 | `Ctrl`+wheel, `Ctrl`+keypad `+`/`-`, `Ctrl+0` | font size (6…72 pt) and its reset |
@@ -117,6 +119,26 @@ A click during a run stops it first (`Остановить`) and then runs the c
 question in a fresh interpreter: the marker is the way out of a runaway query as
 much as a way to ask one.  The click leaves the caret, the selection and the
 document untouched — a run is not an edit.
+
+## The built-in reference
+
+The window answers «what does `КОПИЯ` do?» where the question is asked.  The data
+is `doc/builtins.json` — one record per predicate (name, English aliases, kind,
+arities, group, the `help.typ` section, a one-line summary, the argument modes);
+`doc/help.typ` builds its appendix table of English names from the same file, so
+there is one place where a predicate is *described*, not two.  The records are
+kept in step with the interpreter and the manual by `test_reference.py` (name
+sets, arities, kinds, section headings, the shape of a summary and of a variant);
+`reference.py` is the Qt-free loader the window reads — a missing or broken file
+is an empty reference, never a failed start-up.
+
+Two places show it: a frameless `QLabel` under the completion popup showing the
+summary of the highlighted row (a row without a record shows no label — silence is
+better than «no description» for every second name), and the dock that `F1` opens:
+summary, English alias, the help section and *every* argument mode, filled for the
+word under the caret.  The dock is not modal — the manual is read *next to* the
+code, and a modal window cannot be driven from a headless test.  `F1` belongs to
+the in-window answer; the PDF manual keeps `Shift+F1`.
 
 ## Menus, toolbar and icons
 

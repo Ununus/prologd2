@@ -1625,6 +1625,39 @@ def test_copy_takes_the_selection_where_the_focus_is(executable: str) -> None:
     print("ok: Ctrl+C copies from the focused pane — the output included")
 
 
+def test_f1_shows_the_record_of_the_word_under_the_caret(executable: str) -> None:
+    """task_37: `F1` on `КОПИЯ` lists the five modes of 7.4 and the section.
+
+    The dock is filled from `doc/builtins.json`; the manual («Руководство
+    пользователя») keeps `Shift+F1`, because `F1` is the key pressed *while
+    reading a program*.
+    """
+    window = empty_window(executable)
+    try:
+        window.editor().setPlainText('тест :- КОПИЯ("абв", 1, 2, Х).\n')
+        view = window.editor()
+        cursor = view.textCursor()
+        cursor.setPosition(view.toPlainText().index("КОПИЯ") + 2)
+        view.setTextCursor(cursor)
+        window._actions["reference"].trigger()
+
+        text = window.reference_text()
+        assert text.startswith("КОПИЯ — Подстрока и поиск"), ascii(text)
+        assert "раздел руководства: 7.4" in text, ascii(text)
+        for mode in ("ц1, ц2, П", "ц1, ц2, с4", "П, ц2, с4", "П, Р, с4", "ц1, П, с4"):
+            assert mode in text, (mode, ascii(text))
+        assert not window._reference_dock.isHidden()
+
+        # An unknown word says so instead of showing the previous record.
+        cursor.setPosition(view.toPlainText().index("тест") + 1)
+        view.setTextCursor(cursor)
+        window._actions["reference"].trigger()
+        assert "нет справки" in window.reference_text(), ascii(window.reference_text())
+    finally:
+        discard_changes(window)
+    print("ok: F1 shows the record of the word under the caret, and says «нет справки»")
+
+
 def main(argv: list[str]) -> int:
     if QApplication is None:
         print("skipped: PySide6 is not installed")
@@ -1687,6 +1720,7 @@ def main(argv: list[str]) -> int:
         test_a_marker_while_a_step_is_paused_starts_a_fresh_quiet_run(executable)
         test_a_failed_query_marks_no_line_and_moves_no_caret(executable)
         test_copy_takes_the_selection_where_the_focus_is(executable)
+        test_f1_shows_the_record_of_the_word_under_the_caret(executable)
         test_the_output_can_be_saved(executable, files)
         test_the_context_menu_reuses_the_shared_actions(executable)
         test_the_font_control_and_the_wheel_are_one_setting(executable)

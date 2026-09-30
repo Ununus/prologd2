@@ -9,19 +9,20 @@ undo that takes two presses, an indent that eats a selection.
 
 from __future__ import annotations
 
-from PySide6.QtCore import QPoint, QRect, QSize, QStringListModel, Qt, Signal
+from PySide6.QtCore import QEvent, QPoint, QRect, QSize, QStringListModel, Qt, Signal
 from PySide6.QtGui import (
     QColor,
     QFont,
     QKeyEvent,
     QPainter,
+    QPalette,
     QPolygon,
     QTextCursor,
     QTextDocument,
     QTextFormat,
     QWheelEvent,
 )
-from PySide6.QtWidgets import QCompleter, QPlainTextEdit, QTextEdit, QWidget
+from PySide6.QtWidgets import QCompleter, QLabel, QPlainTextEdit, QTextEdit, QWidget
 
 from . import completion, queries, search, tokens
 from .settings import DEFAULT_FONT_SIZE, MAXIMUM_FONT_SIZE, MINIMUM_FONT_SIZE
@@ -279,6 +280,10 @@ class CodeEditor(ZoomablePlainTextEdit):
         self._offers: list[completion.Candidate] = []
         self._completer: QCompleter | None = None
         self._offer_list: QStringListModel | None = None
+        #: The built-in descriptions (`doc/builtins.json`), for the label under
+        #: the popup; may be absent (task_37).
+        self._reference: object | None = None
+        self._detail: QLabel | None = None
         #: The runnable questions of the text by line, for the margin's markers
         #: (task_36); the rule that fills this lives in `queries.py`.
         self._statements: dict[int, str] = {}
@@ -684,6 +689,10 @@ class CodeEditor(ZoomablePlainTextEdit):
             return
         if not enabled:
             self._hide_completion()
+            if self._detail is not None:
+                self._detail.hide()
+                self._detail.deleteLater()
+                self._detail = None
             self._completer = None
             self._offer_list = None
             self._completion = None
@@ -700,6 +709,23 @@ class CodeEditor(ZoomablePlainTextEdit):
         # handled in `keyPressEvent`, and `activated` is deliberately left
         # unconnected: Qt emits it for a key press too, which would insert twice.
         completer.popup().clicked.connect(self._accept_index)
+        # The description of the highlighted row: Qt's completer has no second
+        # row of its own, so this is a label of its own under the popup —
+        # frameless and `Qt.ToolTip`, so it takes no focus and the popup's own
+        # geometry never changes (the trap of task_24).  It listens to the
+        # popup's *current row*, not to `QCompleter.highlighted`, which is not
+        # emitted for every way a row becomes current.
+        completer.highlighted.connect(self._update_detail)
+        selection = completer.popup().selectionModel()
+        if selection is not None:
+            selection.currentChanged.connect(lambda *_: self._update_detail())
+        completer.popup().installEventFilter(self)
+        detail = QLabel(None, Qt.WindowType.ToolTip)
+        detail.setForegroundRole(QPalette.ColorRole.ToolTipText)
+        detail.setBackgroundRole(QPalette.ColorRole.ToolTipBase)
+        detail.setAutoFillBackground(True)
+        detail.setMargin(4)
+        self._detail = detail
         self._completer = completer
 
     def completion_enabled(self) -> bool:
@@ -723,6 +749,16 @@ class CodeEditor(ZoomablePlainTextEdit):
         # не завершится.» is prose only because nothing knows the word `не`.
         self._refresh_statements()
 
+    def set_reference(self, reference) -> None:
+        """The built-in descriptions (`doc/builtins.json`); may be absent."""
+        self._reference = reference
+
+    def completion_detail(self) -> str:
+        """What the label under the popup is showing; empty when it is hidden."""
+        if self._detail is None or not self._detail.isVisible():
+            return ""
+        return self._detail.text()
+
     def set_auto_complete_after(self, letters: int) -> None:
         self._auto_complete_after = max(1, int(letters))
 
@@ -731,8 +767,53 @@ class CodeEditor(ZoomablePlainTextEdit):
         self._maybe_complete(force=True)
 
     def _hide_completion(self) -> None:
+        if self._detail is not None:
+            self._detail.hide()
         if self._completer is not None:
             self._completer.popup().hide()
+
+    def eventFilter(self, watched, event) -> bool:  # noqa: N802 - Qt spelling
+        """The description follows the popup's own show and hide.
+
+        `_completer` is read through `getattr`: `QAbstractScrollArea` makes the
+        editor a filter of its *own viewport* from its constructor, so this runs
+        while `__init__` is still building the object and the field may not
+        exist yet.
+        """
+        completer = getattr(self, "_completer", None)
+        if (
+            completer is not None
+            and watched is completer.popup()
+            and event.type() in (QEvent.Type.Show, QEvent.Type.Hide)
+        ):
+            self._update_detail()
+        return super().eventFilter(watched, event)
+
+    def _update_detail(self, label: str = "") -> None:
+        """The one-line description of the highlighted candidate (task_37).
+
+        `label` is what `QCompleter.highlighted` carries — the text of the row;
+        without it (the popup was just shown, or hidden) the highlighted index
+        answers.  No record for the name means no label: saying nothing is better
+        than a label that says «нет описания» for every name of the document.
+        """
+        if self._completer is None or self._detail is None or self._reference is None:
+            return
+        popup = self._completer.popup()
+        if not popup.isVisible():
+            self._detail.hide()
+            return
+        offer = next((item for item in self._offers if item.label == label), None)
+        if offer is None:
+            offer = self._offer_at(popup.currentIndex().row())
+        summary = self._reference.summary(offer.name) if offer is not None else ""
+        if not summary:
+            self._detail.hide()
+            return
+        self._detail.setText(f"{offer.name} — {summary}")
+        self._detail.adjustSize()
+        self._detail.move(popup.mapToGlobal(QPoint(0, popup.height() + 2)))
+        self._detail.show()
 
     def _maybe_complete(self, force: bool = False) -> None:
         if self._completer is None or self._completion is None:
@@ -766,6 +847,9 @@ class CodeEditor(ZoomablePlainTextEdit):
         # list arrives already ranked and filtered, so nothing is highlighted —
         # and `Enter` on an unhighlighted popup does nothing at all.
         popup.setCurrentIndex(self._offer_list.index(0, 0))
+        # The description follows the row that is highlighted now, whether Qt
+        # announced the change or not: the index was set here.
+        self._update_detail()
 
     def _offer_at(self, row: int) -> completion.Candidate | None:
         if 0 <= row < len(self._offers):
@@ -823,6 +907,18 @@ class CodeEditor(ZoomablePlainTextEdit):
                         return
                 elif key == Qt.Key.Key_Escape:
                     self._hide_completion()
+                    event.accept()
+                    return
+                elif key in (Qt.Key.Key_Up, Qt.Key.Key_Down):
+                    # `Up`/`Down` walk the popup's list, not the caret: the list
+                    # is a menu while it is open (the keyboard table of the
+                    # README says so), and the description follows the row.
+                    popup = self._completer.popup()
+                    row = popup.currentIndex().row()
+                    row += 1 if key == Qt.Key.Key_Down else -1
+                    row = max(0, min(row, len(self._offers) - 1))
+                    popup.setCurrentIndex(self._offer_list.index(row, 0))
+                    self._update_detail()
                     event.accept()
                     return
                 elif key in _POPUP_CLOSE_KEYS:

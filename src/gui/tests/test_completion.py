@@ -21,6 +21,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from prologd_gui import completion  # noqa: E402
 from prologd_gui.keywords import Keywords  # noqa: E402
+from prologd_gui.reference import Reference  # noqa: E402
 
 DOCUMENT = """\
 % член(Элемент, Список) — истина, если Элемент входит в Список
@@ -39,6 +40,23 @@ RESERVED = Keywords.from_event(
             {"name": "mod", "kind": "operator", "arities": []},
         ]
     }
+)
+
+
+#: A reference with one record, for the label under the popup (task_37).
+REFERENCE = Reference(
+    [
+        {
+            "name": "abc",
+            "aliases": ["abc_en"],
+            "kind": "predicate",
+            "arities": [1],
+            "group": "test",
+            "section": "1.1",
+            "summary": "тестовый предикат",
+            "variants": ["abc(X) — тест"],
+        }
+    ]
 )
 
 
@@ -276,6 +294,54 @@ def test_no_popup_inside_a_comment_or_a_string() -> None:
     print("ok: typing inside a comment or a string offers nothing")
 
 
+def test_the_popup_shows_the_description_of_the_highlighted_row() -> None:
+    """The label under the popup (task_37): the summary of the highlighted name.
+
+    It is a window of its own (`Qt.ToolTip`), so it must appear with the popup,
+    follow the highlight and leave with the popup — and a name that has no record
+    must leave it hidden rather than show a frame about the previous row.
+    """
+    from PySide6.QtCore import Qt
+    from PySide6.QtGui import QTextCursor
+    from PySide6.QtTest import QTest
+
+    from prologd_gui.editor import CodeEditor
+
+    editor = CodeEditor(auto_complete_after=1)
+    editor.set_completion_keywords(RESERVED)
+    editor.set_reference(REFERENCE)
+    editor.setPlainText("abc(1).\nabc2(2).\n")
+    editor.moveCursor(QTextCursor.MoveOperation.End)
+
+    type_text(editor, "a")
+    assert editor.completion_visible()
+    # `a` itself is offered last: the line being typed is part of the document.
+    assert editor.completion_labels() == ["abc/1", "abc2/1", "a"], editor.completion_labels()
+    assert editor.completion_detail() == "abc — тестовый предикат", editor.completion_detail()
+
+    # Down moves the highlight to a name the reference does not know: the label
+    # goes away, it does not keep describing `abc`.
+    QTest.keyClick(editor, Qt.Key.Key_Down)
+    assert editor.completion_detail() == "", editor.completion_detail()
+    QTest.keyClick(editor, Qt.Key.Key_Up)
+    assert editor.completion_detail() == "abc — тестовый предикат", editor.completion_detail()
+
+    QTest.keyClick(editor, Qt.Key.Key_Escape)
+    assert not editor.completion_visible()
+    assert editor.completion_detail() == ""
+
+    # No reference at all (a checkout without `doc/`): the popup works, and no
+    # label appears — the description half simply does not exist.
+    plain = CodeEditor(auto_complete_after=1)
+    plain.set_completion_keywords(RESERVED)
+    plain.setPlainText("abc(1).\n")
+    plain.moveCursor(QTextCursor.MoveOperation.End)
+    type_text(plain, "a")
+    assert plain.completion_visible(), "completion works without a reference"
+    assert plain.completion_detail() == ""
+    print("ok: the popup's description follows the highlight and leaves with it")
+
+
 def main() -> int:
     test_the_document_is_scanned_for_names()
     test_lists_do_not_inflate_the_arity()
@@ -297,6 +363,7 @@ def main() -> int:
     test_escape_closes_and_arrows_keep_working()
     test_ctrl_space_opens_on_demand()
     test_no_popup_inside_a_comment_or_a_string()
+    test_the_popup_shows_the_description_of_the_highlighted_row()
     del application
     print("all completion checks passed")
     return 0

@@ -1,6 +1,6 @@
 # task_37 — GUI: a built-in reference without leaving the editor
 
-**Status:** not started
+**Status:** done (2026-10-01, commits a4eaf6a + the GUI half)
 **Depends on:** task_23 (the reserved names from `ready`, one source for the
 list), task_24 (the completion popup), task_26 (the action table, where the new
 command is declared)
@@ -35,7 +35,7 @@ So the work is not writing documentation: it is giving that documentation a
 
 ## Deliverables
 
-- [ ] **One source of data: `doc/builtins.json`.**  One record per reserved name
+- [x] **One source of data: `doc/builtins.json`.**  One record per reserved name
       — the full list is every name `prologd --list-keywords` prints (60
       registrations in `src/prlib/src/builtins.cpp:248-321`, ~57 names, plus
       `mod`, `div`, `ИМПОРТ`, `ВЫП`).  Fields:
@@ -62,13 +62,13 @@ So the work is not writing documentation: it is giving that documentation a
       }
       ```
 
-- [ ] **`doc/help.typ` builds its compact list from the same file** (`json()` is
+- [x] **`doc/help.typ` builds its compact list from the same file** (`json()` is
       part of Typst): the per-predicate prose stays hand-written, but the summary
       table and the «варианты» lines come from the JSON, so a predicate cannot be
       described in two places with two different meanings.  If that turns out
       awkward in Typst, the fallback is to keep `help.typ` as it is and let the
       checker below be the only guarantee that the two agree.
-- [ ] **A checker that keeps the two in step** — `src/gui/tests/test_reference.py`,
+- [x] **A checker that keeps the two in step** — `src/gui/tests/test_reference.py`,
       Qt-free, and the reason this task is worth doing at all:
   * every name from `prologd --list-keywords` has a record and no record is
     unknown (the exe is found the way the other CLI checks find it);
@@ -77,36 +77,36 @@ So the work is not writing documentation: it is giving that documentation a
   * `summary` is non-empty and does not end in a period (matching the style of
     the diagnostics);
   * the arities in the JSON equal the arities the interpreter reports.
-- [ ] `src/gui/prologd_gui/reference.py`, Qt-free: loads the JSON from
+- [x] `src/gui/prologd_gui/reference.py`, Qt-free: loads the JSON from
       `doc/builtins.json` (found the way `window.py` already finds `doc/*.pdf`,
       `parents[3] / "doc"`), indexes it by name, and answers
       `record(name)`, `summary(name)`, `variants(name)`.  A missing or broken
       file must degrade to "no descriptions", never to a failed start-up — the
       GUI has to work in a checkout where `doc/` was not copied.
-- [ ] **In the popup:** a detail label under the completion list, updated from
+- [x] **In the popup:** a detail label under the completion list, updated from
       `QCompleter.highlighted`, showing `НАЙТИВСЕ/3 — собирает все решения цели в
       список` and, if there is room, the first variant line.  Qt's completer has
       no second row, so this is a frameless `QLabel` positioned under
       `completer.popup()` and hidden when the popup closes; it must not take
       focus and must not move the caret (the popup's own trap from task_24).
-- [ ] **On demand:** a new action «Справка по предикату» in `actions.py`
+- [x] **On demand:** a new action «Справка по предикату» in `actions.py`
       (`Shift+F1`; `F1` is free today but is the conventional help key, so both
       may open it — decide with the user) that shows the record of the word under
       the caret: summary, every variant, and the `help.typ` section number.
       A small non-modal panel is preferable to a modal box — a modal window
       cannot be driven from a headless test (the lesson repeated in
       `buffers.py` about `_ask_save`).
-- [ ] Tests: `test_reference.py` as above, plus additions to
+- [x] Tests: `test_reference.py` as above, plus additions to
       `test_completion.py` (the label follows the highlighted row, disappears when
       the popup closes, and says nothing for a word with no record),
       `test_window.py` (`Shift+F1` on `КОПИЯ` shows the five `variants` lines of
       §7.4 and the section number; on an unknown word it shows nothing or says so)
       and, if the label is a new widget, `test_appearance.py` for its colours.
-- [ ] Docs: `doc/gui.typ` (section: «справка по предикату» — the popup label and
+- [x] Docs: `doc/gui.typ` (section: «справка по предикату» — the popup label and
       `Shift+F1`), `doc/README.md` (that `builtins.json` is data for the GUI and
       for `help.typ`, not a document, so the `docs` target does not build it),
       `src/gui/README.md` (the module and where the file is expected).
-- [ ] `ai/conventions.md` gains one line: a new built-in is added to
+- [x] `ai/conventions.md` gains one line: a new built-in is added to
       `builtins.cpp`, to the lexer's reserved set, **and** to `doc/builtins.json`
       — the checker will fail otherwise, which is the point.
 
@@ -139,3 +139,33 @@ So the work is not writing documentation: it is giving that documentation a
 * Out of scope: an embedded copy of the whole user manual, F1 opening `help.pdf`
   at the right page (PDF has no anchors in the general case), and translating the
   summaries into English (the GUI is Russian, like `doc/*.typ`).
+
+## Result (2026-10-01)
+
+The data half landed in `a4eaf6a` (the JSON, the generated appendix table in
+`help.typ`, the checker, the loader, the conventions line), the window half with
+the popup label and `F1` after it.
+
+Deviations from this plan, each for a reason:
+
+* the records carry an `aliases` list (the note at the top of this file): the
+  task_39 work is done, and one record per predicate is what keeps the English
+  spelling from becoming a second copy — `test_aliases.cpp` and the checker now
+  hold the two ends of that pair;
+* the file is an object with a `records` list, not a bare array: the purpose of
+  the file is written down in the file itself;
+* `help.typ` renders the *appendix table of English names* from the JSON (the
+  deliverable's own fallback allowed keeping the manual as it was; the table was
+  the one place where a pair was written twice, so it was the one worth
+  generating) — the per-predicate prose stays hand-written;
+* the checker takes the names from `--list-keywords` **and** the kinds from a
+  `ready` event (`test_keywords.py` proves the two listings identical);
+* `Shift+F1` turned out to be un-free: `F1` was already the manual.  The user's
+  decision: `F1` opens the *reference* (the answer needed while reading a
+  program), the PDF manual keeps `Shift+F1`;
+* while writing the label test it turned out `Up`/`Down` did not walk the popup
+  list at all — they moved the caret, although the README's keyboard table
+  promised the list.  Implemented here (`keyPressEvent`), because the description
+  label hangs off exactly that row;
+* the dock is a `QDockWidget`, not a modal box, as the task asked; it zooms with
+  the editor and says «справочник недоступен» when `doc/builtins.json` is absent.

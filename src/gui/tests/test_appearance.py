@@ -96,12 +96,29 @@ def test_an_unknown_theme_is_refused(app: QApplication) -> None:
     raise AssertionError("an unknown theme was accepted")
 
 
+def test_tooltip_pair_stays_readable(app: QApplication) -> None:
+    """The popup's description label is a tooltip window: check its own pair.
+
+    It takes its colours from the palette's `ToolTip` roles rather than from
+    `theme.py`, so this is the check that covers it — the same WCAG threshold as
+    the syntax colours.
+    """
+    appearance.apply_theme(app, appearance.LIGHT)
+    palette = app.palette()
+    text = palette.color(QPalette.ColorRole.ToolTipText).name()
+    base = palette.color(QPalette.ColorRole.ToolTipBase).name()
+    ratio = contrast_ratio(text, base)
+    assert ratio >= MINIMUM_CONTRAST, f"tooltip text {text} on {base} is {ratio:.2f}"
+    print(f"ok: the tooltip pair stays readable ({ratio:.2f})")
+
+
 def main() -> int:
     app = QApplication(sys.argv[:1])
     test_light_gives_a_light_background_and_dark_text(app)
     test_every_syntax_colour_contrasts_with_the_background(app)
     test_system_leaves_the_platform_palette_alone(app)
     test_an_unknown_theme_is_refused(app)
+    test_tooltip_pair_stays_readable(app)
     print("all appearance checks passed")
     del app
     return 0

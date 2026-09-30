@@ -175,7 +175,13 @@ ACTIONS: tuple[Action, ...] = (
         waiting_for="нет задачи (см. Roadmap в src/gui/README.md)",
     ),
     # -- help
-    Action("help_doc", "Руководство пользователя", "help", ("F1",)),
+    # The reference of a predicate (task_37): the same help picture, because it
+    # is the same «справка» — only the answer comes from `doc/builtins.json`
+    # instead of the PDF, and it is shown in the window, next to the code.  `F1`
+    # is the conventional help key, so it belongs to the answer needed *while
+    # reading a program*; the manual keeps `Shift+F1`.
+    Action("reference", "Справка по предикату", "help", ("F1",)),
+    Action("help_doc", "Руководство пользователя", "help", ("Shift+F1",)),
     Action("help_gui", "Справка по окну", None),
     Action("about", "О программе", "help-about"),
 )
@@ -271,7 +277,7 @@ MENUS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "graphics",
         ),
     ),
-    ("Справка", ("help_doc", "help_gui", "about")),
+    ("Справка", ("reference", SEPARATOR, "help_doc", "help_gui", "about")),
 )
 
 #: The toolbar, grouped as the reference front-end had it: files, run/stop/step,

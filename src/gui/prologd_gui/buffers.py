@@ -34,6 +34,8 @@ class Buffer(QObject):
         self.model = model
         self._settings = settings
         self._views: list[CodeEditor] = []
+        #: The built-in descriptions, shared by every view's popup (task_37).
+        self._reference = None
 
         # The layout is not optional.  A `QPlainTextEdit` refuses a document that
         # does not use `QPlainTextDocumentLayout` — Qt prints one warning and the
@@ -63,6 +65,7 @@ class Buffer(QObject):
         )
         editor.setDocument(self.document)
         editor.set_completion_keywords(self.highlighter.keywords)
+        editor.set_reference(self._reference)
         editor.set_wrap(self._settings.wrap)
         self._views.append(editor)
         return editor
@@ -118,6 +121,12 @@ class Buffer(QObject):
         self.highlighter.set_keywords(keywords)
         for view in self._views:
             view.set_completion_keywords(keywords)
+
+    def set_reference(self, reference) -> None:
+        """The built-in descriptions (`doc/builtins.json`), for the popup label."""
+        self._reference = reference
+        for view in self._views:
+            view.set_reference(reference)
 
     def set_font_size(self, size: float) -> None:
         for view in self._views:

@@ -15,6 +15,7 @@ from PySide6.QtGui import QAction, QDesktopServices, QIntValidator, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
+    QDockWidget,
     QFileDialog,
     QInputDialog,
     QLabel,
@@ -27,7 +28,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from . import actions, appearance, assets, documents, findbar, panels, search
+from . import actions, appearance, assets, documents, findbar, panels, reference, search
 from .buffers import Buffer
 from .editor import CodeEditor, ZoomablePlainTextEdit
 from .panes import Pane
@@ -61,6 +62,10 @@ class MainWindow(QMainWindow):
         #: Preferences; tests pass a file of their own so a run cannot touch the
         #: user's real settings.
         self._settings = settings if settings is not None else Settings()
+        #: The built-in reference (`doc/builtins.json`), read once for the whole
+        #: window: the popup's detail label and `F1` read the same object, and a
+        #: checkout without the file is an empty reference, not a failure.
+        self._reference = reference.Reference.load()
 
         self._session = PrologSession(executable, includes, self)
         self._session.ready.connect(self._on_ready)
@@ -182,6 +187,22 @@ class MainWindow(QMainWindow):
         )
         self._step_pane.resumed.connect(self.step_continue)
         self._step_pane.stopped.connect(self.stop_program)
+
+        # The reference of a predicate (task_37, `F1`): a dock, not a modal box —
+        # the manual is read *next to* the code, and a modal cannot be driven
+        # from a headless test.  It zooms with everything else and starts hidden.
+        self._reference_pane = ZoomablePlainTextEdit(
+            font_family=self._settings.font_family,
+            font_size=self._settings.font_size,
+        )
+        self._reference_pane.setReadOnly(True)
+        self._reference_pane.setPlaceholderText("Справка по предикату: F1 на имени")
+        self._reference_pane.zoomChanged.connect(self._on_zoom_changed)
+        self._reference_dock = QDockWidget("Справка по предикату", self)
+        self._reference_dock.setObjectName("referenceDock")
+        self._reference_dock.setWidget(self._reference_pane)
+        self._reference_dock.setVisible(False)
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self._reference_dock)
 
         # The find bar (task_33): a strip above the editor, hidden until `Ctrl+F`.
         # Not a dialog — a modal box covers the text being searched and cannot be
@@ -320,6 +341,7 @@ class MainWindow(QMainWindow):
             "select_all": self._select_all,
             "comment": self._comment,
             "uncomment": self._uncomment,
+            "reference": self.show_reference,
             "clear_output": self.clear_output,
             "find": lambda: self.show_find(),
             "find_next": lambda: self.find_step(False),
@@ -1308,6 +1330,7 @@ class MainWindow(QMainWindow):
         # The reserved names arrive with `ready`; a buffer opened after that gets
         # them here, and a buffer created before it is served by `_on_ready`.
         buffer.set_keywords(self._session.keywords)
+        buffer.set_reference(self._reference)
         self._buffers.append(buffer)
         for pane in self._panes:
             pane.set_buffers(self._buffers)
@@ -1864,6 +1887,50 @@ class MainWindow(QMainWindow):
         """What the recent-files menu of task_26 will show, newest first."""
         return self._recent.paths()
 
+    # -- the reference of a predicate --------------------------------------
+    def show_reference(self) -> None:
+        """`F1`: the record of the word under the caret — summary, modes, section.
+
+        An unknown word is said in so many words: silence would look like a dead
+        key.  A checkout without `doc/builtins.json` is not a failure either —
+        the dock says the reference is unavailable.
+        """
+        if len(self._reference) == 0:
+            text = "справочник недоступен: не найден doc/builtins.json"
+        else:
+            view = self.editor()
+            word = view.selected_token() or view.word_under_cursor()
+            record = self._reference.record(word) if word else None
+            if record is None:
+                text = (
+                    f"нет справки для «{word}»"
+                    if word
+                    else "поставьте курсор на имя предиката"
+                )
+            else:
+                text = self._reference_text(record)
+        self._reference_pane.setPlainText(text)
+        self._reference_dock.setVisible(True)
+        self._reference_dock.raise_()
+
+    @staticmethod
+    def _reference_text(record: dict) -> str:
+        """A record as the dock shows it: one line, the aliases, the modes."""
+        aliases = record.get("aliases") or []
+        lines = [f"{record['name']} — {record['summary']}"]
+        if aliases:
+            lines.append("английское имя: " + ", ".join(aliases))
+        lines.append(f"раздел руководства: {record['section']}")
+        variants = record.get("variants") or []
+        if variants:
+            lines.append("")
+            lines.extend(variants)
+        return "\n".join(lines)
+
+    def reference_text(self) -> str:
+        """What the reference dock is showing ("" while it was never filled)."""
+        return self._reference_pane.toPlainText()
+
     # -- session events ----------------------------------------------------
     def _on_ready(self, version: str) -> None:
         # The reserved names reach every open buffer, including the ones opened
@@ -1874,6 +1941,7 @@ class MainWindow(QMainWindow):
         self._warning_count = 0
         for buffer in self._buffers:
             buffer.set_keywords(self._session.keywords)
+            buffer.set_reference(self._reference)
         self._status.setText(f"PrologD {version} готов")
         self._refresh_titles()
         self._sync_run_actions()
