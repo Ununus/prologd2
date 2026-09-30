@@ -17,7 +17,7 @@ show where the messages stop helping:
 | `мама(Лена, Таня).` + `?мама(Лена, Таня).` | `Лена=_1`, `Таня=_1` — nonsense, no hint | warning: `Лена` — переменная, а не константа; константа — в одинарных кавычках |
 | `дв(1, 2).` + `?дв(1).` | `НЕТ`, silent | warning: `дв` определён с арностью 2, а вызван с 1 |
 | `?УМНОЖЕНИЕ(2, 3).` | `НЕТ`, silent — a *reserved* name with a wrong arity | error: `УМНОЖЕНИЕ` не имеет арности 2 (есть 3 и 4) |
-| `факт(1)` (no final dot) | `pld:2:1: error: ошибка при разборе предложения` — a line past the end, message says nothing | `предложение заканчивается точкой` at the end of the last clause |
+| `факт(1)` (no final dot) | `pld:2:1: error: ошибка при разборе предложения` — a line past the end, message says nothing | `предложение не заканчивается точкой` at the end of the last clause (the first wording, «предложение заканчивается точкой», read as a statement of fact — the user caught it) |
 | `факт(1.` | `pld:3:1: error: непарные скобки` — points at the current token | `непарные скобки: '(' открыта в строке 1`, at the bracket |
 
 The parser already recovers (`MessageSink` collects several diagnostics,

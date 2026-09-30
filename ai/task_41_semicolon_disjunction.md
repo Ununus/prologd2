@@ -35,7 +35,7 @@ second *sentence terminator* (`.`, `;`), inherited from the original PrologD.
   `A, B ; C, D` is `(A, B) ; (C, D)` — the same precedence as ISO.
 * The sentence terminator becomes `.` alone.  A `;` at the end of a statement is
   then a *syntax* error, and the task_40 machinery turns it into a message that
-  says what changed («`;` — дизъюнкция; предложение заканчивается точкой»).
+  says what changed («`;` — дизъюнкция; предложение не заканчивается точкой»).
   Keeping the old meaning *only* at the end of a line was considered and
   rejected: it is line-sensitive, and it would silently keep two contradictory
   meanings alive.

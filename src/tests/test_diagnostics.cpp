@@ -80,7 +80,7 @@ TEST_CASE("a missing final dot is reported at the end of the clause") {
   REQUIRE(error.severity == Severity::Error);
   REQUIRE(error.location.line == 1);
   REQUIRE(error.location.column == 11);  // the `)` the dot belongs after
-  REQUIRE(error.message == "предложение заканчивается точкой");
+  REQUIRE(error.message == "предложение не заканчивается точкой");
 }
 
 TEST_CASE("an unclosed string points at its opening quote") {

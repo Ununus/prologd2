@@ -79,9 +79,10 @@ void Parser::reportUnclosedBracket(char open, const SourceLocation& location) {
 
 void Parser::reportMissingDot() {
   // The dot belongs right after the last token of the statement, and that is
-  // where a reader has to look.
+  // where a reader has to look.  The message says what is *wrong* with the
+  // statement: "предложение заканчивается точкой" reads as a statement of fact.
   report(ErrorCode::InvalidSentence, previous().location,
-         "предложение заканчивается точкой");
+         "предложение не заканчивается точкой");
 }
 
 void Parser::warn(ErrorCode code, const SourceLocation& location, std::string message) {
