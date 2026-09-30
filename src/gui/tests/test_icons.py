@@ -39,10 +39,10 @@ def test_every_referenced_icon_is_present_or_documented() -> None:
 def test_nothing_recorded_as_missing_is_actually_drawn() -> None:
     """`MISSING` is the drawing list — it may name icons no entry uses *yet*.
 
-    `execution-step-over`, `execution-restart` and `view-output-bottom` are there
-    for features that are still to come, and drawing them early is fine.  What is
-    not fine is a name left in the list after its file appeared: then the audit
-    would let a real misspelling through later.
+    `execution-restart` and `view-output-bottom` are there for features that are
+    still to come, and drawing them early is fine.  What is not fine is a name
+    left in the list after its file appeared: then the audit would let a real
+    misspelling through later.
     """
     present = set(assets.icons())
     drawn = sorted(set(assets.MISSING) & present)

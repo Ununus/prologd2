@@ -69,6 +69,12 @@ CURRENT_LINE = "editor/current_line"
 #: Minutes between two automatic saves of *named* buffers; 0 is off.
 AUTOSAVE_MINUTES = "files/autosave_minutes"
 RECENT_LIMIT = "files/recent_limit"
+#: Reopen the tabs of the previous run (task_29): the switch the user sets…
+RESTORE_TABS = "files/restore_tabs"
+#: …and the session itself, which the window writes on the way out: the tabs in
+#: bar order (`documents.encode_tabs`) and which one was showing.
+SESSION_TABS = "session/tabs"
+SESSION_CURRENT = "session/current"
 #: The one folder the user keeps shared sources in (task_29): passed as `-I`
 #: on every session, so `ИМПОРТ("library.pld")` works from any program.
 WORKING_DIRECTORY = "execution/working_directory"
@@ -219,6 +225,8 @@ SETTINGS: tuple[Setting, ...] = (
     Setting(IMPORT_PATHS, "Дополнительные каталоги ИМПОРТ", "Выполнение", "dirs", (),
             hint="Передаются интерпретатору как -I, в этом порядке"),
     # -- files
+    Setting(RESTORE_TABS, "Восстанавливать вкладки при старте", "Файлы", "bool", True,
+            hint="Файлы читаются заново с диска; «Без имени» возвращаются как были"),
     Setting(AUTOSAVE_MINUTES, "Автосохранение, мин", "Файлы", "int",
             DEFAULT_AUTOSAVE_MINUTES, 0, MAXIMUM_AUTOSAVE_MINUTES,
             hint="0 — выключено.  Сохраняются только файлы с именем"),
@@ -241,6 +249,8 @@ MACHINE_KEYS = (
     OUTPUT_SIZES,
     PANEL_SIZES,
     SHORTCUTS_TABLE,
+    SESSION_TABS,
+    SESSION_CURRENT,
 )
 
 
@@ -599,6 +609,33 @@ class Settings:
     @autosave_minutes.setter
     def autosave_minutes(self, value: int) -> None:
         self._write(AUTOSAVE_MINUTES, min(MAXIMUM_AUTOSAVE_MINUTES, max(0, int(value))))
+
+    @property
+    def restore_tabs(self) -> bool:
+        """Whether the tabs of the previous run reopen on the next start."""
+        return self._flag(RESTORE_TABS, True)
+
+    @restore_tabs.setter
+    def restore_tabs(self, value: bool) -> None:
+        self._write(RESTORE_TABS, bool(value))
+
+    @property
+    def session_tabs(self) -> list[str]:
+        """The remembered tabs, in bar order; "" when there is no session."""
+        return self._paths(SESSION_TABS)
+
+    @session_tabs.setter
+    def session_tabs(self, lines) -> None:
+        self._write(SESSION_TABS, [str(line) for line in lines])
+
+    @property
+    def session_current(self) -> str:
+        """Which tab was showing: its path, or the name of an untitled one."""
+        return self._text(SESSION_CURRENT, "")
+
+    @session_current.setter
+    def session_current(self, value: str) -> None:
+        self._write(SESSION_CURRENT, str(value))
 
     # -- the split editor ---------------------------------------------------
     @property

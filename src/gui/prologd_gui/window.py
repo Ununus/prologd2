@@ -190,11 +190,16 @@ class MainWindow(QMainWindow):
         # document, so the welcome program is shown in both panes on that start.
         if self._settings.restore_split and self._settings.split_editor:
             self.split_editor(remember=False, sizes=self._settings.split_sizes)
-        # The welcome program goes into the first tab and is *not* unsaved work —
-        # the flag is left clear, so closing it asks nothing.
-        welcome = documents.Document.untitled(documents.untitled_name([]))
-        welcome.text = WELCOME
-        self._add_buffer(welcome)
+        # The tabs of the previous run (task_29) come back before anything else;
+        # the welcome program is for a window with no session to show.
+        if self._settings.restore_tabs:
+            self._restore_session()
+        if not self._buffers:
+            # The welcome program goes into the first tab and is *not* unsaved work
+            # — the flag is left clear, so closing it asks nothing.
+            welcome = documents.Document.untitled(documents.untitled_name([]))
+            welcome.text = WELCOME
+            self._add_buffer(welcome)
         # No interpreter yet: it is started by the first run (or by a query typed
         # into the query line).  A window that has been opened but not used has
         # nothing running, and saying otherwise made `Остановить` look live.
@@ -1725,10 +1730,89 @@ class MainWindow(QMainWindow):
         if self.close_all():
             self.new_buffer()
 
+    def _restore_session(self) -> int:
+        """Opens the tabs of the previous run; returns how many did open.
+
+        A *file* tab is read from disk, so the window opens on the file as it is
+        now, not on what the editor held when the last window closed; a file that
+        has gone is skipped and named in the status line, because a half session
+        that says nothing is worse than one that says what is missing.  An
+        untitled tab comes back with its text and stays **modified**: it is
+        unsaved work, and the next close has to ask about it.
+        """
+        records = documents.decode_tabs(self._settings.session_tabs)
+        missing: list[str] = []
+        opened = 0
+        for record in records:
+            if record.path:
+                if pathlib.Path(record.path).is_file():
+                    before = len(self._buffers)
+                    if self.open_path(record.path) and len(self._buffers) > before:
+                        opened += 1
+                else:
+                    missing.append(record.name or record.path)
+                continue
+            used = [buffer.model.name for buffer in self._buffers]
+            model = documents.Document.untitled(
+                record.name or documents.untitled_name(used)
+            )
+            model.text = record.text
+            buffer = self._add_buffer(model)
+            # Restored but not saved: closing the window must ask about it.
+            buffer.document.setModified(True)
+            buffer.sync_modified()
+            opened += 1
+
+        current = self._settings.session_current
+        if current:
+            for buffer in self._buffers:
+                if (buffer.model.path or buffer.model.name) == current:
+                    self.active_pane().set_current(buffer)
+                    break
+        if opened or missing:
+            said = f"восстановлено вкладок: {opened}"
+            if missing:
+                said += "; не найдено: " + ", ".join(
+                    documents.short_path(name) for name in missing
+                )
+            self._status.setText(said)
+        self._refresh_titles()
+        return opened
+
+    def _store_session(self) -> int:
+        """Remembers the open tabs for the next start; returns what was left out.
+
+        Called when the window really closes — the one moment the tab list is
+        final — and *before* the questions about unsaved buffers, because a
+        cancelled close has to leave the session as it was.  A file tab is stored
+        by its path (see `documents.TabRecord`) and an untitled one by its text,
+        up to the budget; `session_records` says how many did not fit.
+        """
+        tabs = [
+            (buffer.model.path or "", buffer.model.name, buffer.text())
+            for buffer in self._buffers
+        ]
+        records, dropped = documents.session_records(tabs)
+        self._settings.session_tabs = documents.encode_tabs(records)
+        current = self.current_buffer()
+        self._settings.session_current = (
+            (current.model.path or current.model.name) if current is not None else ""
+        )
+        return dropped
+
+    def session_tabs(self) -> list[documents.TabRecord]:
+        """The remembered session as it stands (what a test and `О программе` read)."""
+        return documents.decode_tabs(self._settings.session_tabs)
+
     def closeEvent(self, event) -> None:  # noqa: N802 - Qt spelling
         """Closing the window asks about every modified buffer first."""
         self._closing = True
         try:
+            # The session is remembered here, while the tabs are still there:
+            # answering «Отмена» to a save question leaves the window open, and a
+            # session stored on the way out would then describe a window that
+            # never closed.
+            self._store_session()
             if self.close_all():
                 self._save_split_state()
                 self._save_panel_state()

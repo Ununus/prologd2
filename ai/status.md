@@ -1175,3 +1175,17 @@ Added on 2026-10-02 while implementing task_31:
   (PySide6's `QFormLayout` has no column width to set) and the values fill their
   column.  251/251 ctest, 20 GUI scripts, five PDFs; both are pinned by
   `button_order()` and `label_column_width()` in `test_settingsdialog.py`.
+* GUI round, part 37: **the tabs of the previous run come back** — the last item
+  the user picked from what was still open in task_29.  A file tab is remembered
+  by its **path** (the next start reads the file, so a change refused at the save
+  prompt is not resurrected) and an untitled one by its **text**, up to a 256 KiB
+  budget; a buffer that does not fit is dropped whole and counted, an empty «Без
+  имени» is not stored at all, a stored path whose file has gone is skipped and
+  named in the status line, and a restored untitled tab counts as unsaved work so
+  the next close asks about it.  The store is written in `closeEvent` *before*
+  the save questions, because «Отмена» leaves the window open.  The two new keys
+  (`session/tabs`, `session/current`) are machine rows, so the dialog grew by
+  exactly one *preference*: «Файлы → Восстанавливать вкладки при старте», on by
+  default.  Qt-free record helpers in `documents.py` (round trip, budget, junk
+  lines) and a window check that closes one window over three tabs and opens the
+  next one over the same settings file; 251/251 ctest, 20 GUI scripts, five PDFs.

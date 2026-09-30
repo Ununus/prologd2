@@ -174,6 +174,64 @@ def test_short_path_keeps_the_place_and_drops_the_prefix() -> None:
     print("ok: a long path in the status bar keeps its last two parts")
 
 
+def test_the_session_records_round_trip() -> None:
+    """task_29: what a tab keeps between runs, and what it refuses to keep."""
+    records = [
+        documents.TabRecord(path="C:/пример.pld", name="пример.pld"),
+        documents.TabRecord(name="Без имени 2", text="факт(1).\n?факт(1).\n"),
+    ]
+    lines = documents.encode_tabs(records)
+    assert len(lines) == 2, "one entry per tab: the file has to stay readable"
+    assert documents.decode_tabs(lines) == records
+
+    # A text with the separators inside it survives: the *first* two tab
+    # characters are the fields, the rest is text.
+    text = "а\tб\nв\\г\n"
+    one = [documents.TabRecord(name="Без имени", text=text)]
+    assert documents.decode_tabs(documents.encode_tabs(one))[0].text == text
+
+    # A file is remembered by its path and no text at all: the next run reads the
+    # file, so a change the user refused to save is not resurrected.
+    kept, dropped = documents.session_records(
+        [("C:/a.pld", "a.pld", "x" * 1000), ("", "Без имени", "я" * 10)]
+    )
+    assert dropped == 0
+    assert kept[0] == documents.TabRecord(path="C:/a.pld", name="a.pld")
+    assert kept[0].text == "" and kept[0].untitled is False
+    assert kept[1].untitled is True and kept[1].text == "я" * 10
+    print("ok: a session record round-trips, and a file is not stored as text")
+
+
+def test_the_session_budget_drops_whole_tabs_and_reports_them() -> None:
+    """A buffer that does not fit goes entirely: half a text is worse than none."""
+    tabs = [
+        ("C:/a.pld", "a.pld", "x" * 100),
+        ("", "первый", "я" * 80),
+        ("", "второй", "я" * 80),
+        ("", "пустой", "   \n"),
+    ]
+    kept, dropped = documents.session_records(tabs, budget=100)
+    assert [record.name for record in kept] == ["a.pld", "первый"], kept
+    assert dropped == 1, "«второй» did not fit and has to be counted"
+
+    # The budget counts untitled text only, and an empty tab is a placeholder: it
+    # would be replaced by the first opened file anyway.
+    assert documents.session_records(tabs, budget=1000)[1] == 0
+    empty, dropped = documents.session_records([("", "Без имени", "\n\n")], budget=10)
+    assert empty == [] and dropped == 0
+    print("ok: the budget drops whole buffers, counts them, and skips placeholders")
+
+
+def test_a_session_that_cannot_be_read_costs_nothing() -> None:
+    """A hand-edited file may hold rubbish; the start must survive it."""
+    assert documents.decode_tabs([]) == []
+    assert documents.decode_tabs(None) == []
+    assert documents.decode_tabs(["", "без разделителей", "один\tразделитель"]) == []
+    good = "C:/a.pld\ta.pld\t"
+    assert len(documents.decode_tabs(["мусор", good])) == 1
+    print("ok: a broken session line is dropped, and the rest still reads")
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory(prefix="prologd_documents_") as name:
         directory = pathlib.Path(name)
@@ -188,6 +246,9 @@ def main() -> int:
         test_titles_carry_the_modified_marker()
         test_short_path_keeps_the_place_and_drops_the_prefix()
         test_the_recent_list_is_ordered_bounded_and_pruned(directory)
+        test_the_session_records_round_trip()
+        test_the_session_budget_drops_whole_tabs_and_reports_them()
+        test_a_session_that_cannot_be_read_costs_nothing()
     print("all document checks passed")
     return 0
 

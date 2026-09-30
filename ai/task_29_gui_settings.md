@@ -94,8 +94,9 @@ General
 - [x] язык интерфейса RU/EN (the reference GUI was Russian only),
       восстанавливать открытые вкладки при старте, недавние файлы (сколько
       помнить), проверять обновления — off, this is a local tool.
-      (Сделано только «сколько помнить» (`files/recent_limit`); RU/EN и
-      восстановление вкладок — отдельные задачи, см. «What was built».)
+      (Сделано «сколько помнить» (`files/recent_limit`) и восстановление
+      вкладок (`files/restore_tabs`, 2026-10-01, см. «What was built»); RU/EN и
+      «проверять обновления» — отдельные задачи.)
 
 ## Proposed beyond the request
 
@@ -121,6 +122,13 @@ General
       a widget per row, «Применить» writes and «Отмена» does not, «Сбросить»
       needs applying, «Импорт…» stages a file (unknown keys and all) and
       «Экспорт…» writes one.
+- [x] `src/gui/tests/test_documents.py` (Qt-free) for the session records: the
+      round trip through one ini line, the budget that drops whole buffers, the
+      empty «Без имени» that is not stored, and a broken line that costs nothing;
+      `test_window.py::test_the_tabs_come_back_on_the_next_start` closes a window
+      over three tabs and opens the next one over the same settings file — the
+      file read from disk, the untitled tab modified, the showing tab, a file
+      that has gone, and the switch off.
 - [ ] Manual checklist: change the font size, the line numbers and the output
       side, restart, confirm the values are back.
 
@@ -177,6 +185,23 @@ the editor's.
 * Autosave writes only buffers that have a **name** — a timer must never open a
 question — reports in the status line, and a failure goes to the output pane
 instead of a modal box.
+* 2026-10-01, the session: **the tabs of the previous run come back**
+(`files/restore_tabs`, on by default).  A file tab is stored by **path** and an
+untitled one by its **text** (`documents.TabRecord`), and the two new keys are
+machine rows the window writes for itself (`session/tabs`, `session/current`).
+The rules, and why: a *file* is read from disk on the next start, so a change the
+user refused to save is not resurrected; an *untitled* buffer spends a budget of
+`documents.SESSION_TEXT_BUDGET` (256 KiB), and a record that does not fit is
+dropped whole and counted — a tab that comes back with half of its text is worse
+than one that does not come back — while an empty untitled tab is not stored at
+all, being the placeholder the first opened file replaces; a stored path whose
+file has gone is skipped and **named** in the status line, because a session that
+is quietly one tab short is worse than one that says so; and a restored untitled
+tab is **unsaved work**, so the next close asks about it.  The store is written in
+`closeEvent` *before* `close_all()`: «Отмена» leaves the window open, and a
+session written on the way out would describe a window that never closed.
+Unticking the box opens the welcome program instead — the setting is the only
+switch.
 
 The working folder and the `-I` list reach the engine as `-I` arguments on every
 session (`PrologSession.set_includes`), after the command line's own ones; the
@@ -189,8 +214,6 @@ importing file's directory still wins inside the engine.
 - [ ] the colours of Latin vs Cyrillic, «использовать системные цвета»;
 - [ ] **RU/EN** — the reference front-end was Russian only, and translating the
       window is a task of its own;
-- [ ] session restore (reopening the tabs of the previous run, untitled buffers
-      included);
 - [ ] the interpreter profiles, the sandbox limits (run time, `НАЙТИВСЕ` cap),
       the query timeout and the path to the interpreter (still `--exe`), and the
       working directory of the process (`ЗАПИСЬ_В`/`ЧТЕНИЕ_ИЗ` are relative to

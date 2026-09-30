@@ -2184,6 +2184,96 @@ def test_running_programs_without_questions_finishes(executable: str) -> None:
     print("ok: a program without questions finishes instead of hanging in «выполняется»")
 
 
+def test_the_tabs_come_back_on_the_next_start(
+    executable: str, directory: pathlib.Path
+) -> None:
+    """task_29: the session — the tabs of the previous run open again.
+
+    A *file* tab is read from disk, so a change the user refused to save is not
+    resurrected; an untitled tab comes back with its text and stays unsaved work;
+    the tab that was showing is the one that shows again; and a file that has gone
+    is named instead of silently missing from the session.
+    """
+    from prologd_gui import documents
+    from prologd_gui import window as window_module
+    from prologd_gui.settings import Settings
+    from prologd_gui.window import MainWindow
+
+    one = directory / "сессия_один.pld"
+    one.write_text("снег.\n", encoding="utf-8")
+    two = directory / "сессия_два.pld"
+    two.write_text("дождь.\n", encoding="utf-8")
+
+    window = empty_window(executable)
+    settings_path = window._settings.path
+    try:
+        window.open_path(str(one))
+        window.open_path(str(two))
+        window.new_buffer()
+        window.editor().insertPlainText("факт(1).\n")
+        third = window.current_buffer().model.name
+        assert window.tab_count() == 3, window.tab_count()
+
+        # The window closes with that text unsaved — the answer is «не сохранять»,
+        # which is exactly the case the path-not-text rule is about.
+        window._ask_save = lambda name: window_module.DISCARD
+        window.close()
+    finally:
+        window.stop_program()
+
+    settings = Settings(settings_path)
+    assert settings.restore_tabs is True, "«восстанавливать вкладки» is on by default"
+    stored = documents.decode_tabs(settings.session_tabs)
+    assert [record.name for record in stored] == [one.name, two.name, third], stored
+    assert [record.text for record in stored[:2]] == ["", ""], "a file is a path, not text"
+    assert stored[2].text == "факт(1).\n", "the untitled tab carries its text"
+    assert settings.session_current == third, settings.session_current
+
+    # Every window stores its own session when it closes, so a window opened and
+    # closed inside this check would overwrite what the first run left.  The two
+    # lines below stand for «the session as the first run left it», and each
+    # window starts from that.
+    left_tabs, left_current = list(settings.session_tabs), settings.session_current
+
+    def next_start():
+        settings.session_tabs = list(left_tabs)
+        settings.session_current = left_current
+        return MainWindow(executable, [], settings)
+
+    reopened = next_start()
+    try:
+        assert reopened.tab_count() == 3, [b.model.name for b in reopened.buffers()]
+        assert reopened.buffers()[0].text() == "снег.\n", "read from the file"
+        assert reopened.buffers()[0].is_modified() is False
+        assert reopened.buffers()[2].text() == "факт(1).\n"
+        assert reopened.buffers()[2].is_modified() is True, "unsaved work stays unsaved"
+        assert reopened.current_buffer().model.name == third, "the tab that was showing"
+        assert "восстановлено вкладок: 3" in reopened.status_text(), reopened.status_text()
+    finally:
+        discard_changes(reopened)
+
+    # A file that has gone is named, and the rest of the session still opens.
+    one.unlink()
+    reopened = next_start()
+    try:
+        assert reopened.tab_count() == 2, [b.model.name for b in reopened.buffers()]
+        said = reopened.status_text()
+        assert "не найдено" in said and one.name in said, said
+    finally:
+        discard_changes(reopened)
+
+    # Switching it off gives the welcome program: the setting is the only switch.
+    settings.restore_tabs = False
+    reopened = next_start()
+    try:
+        assert reopened.tab_count() == 1, [b.model.name for b in reopened.buffers()]
+        assert reopened.buffers()[0].model.path is None
+        assert "восстановлено" not in reopened.status_text(), reopened.status_text()
+    finally:
+        discard_changes(reopened)
+    print("ok: the open tabs come back on the next start, and can be switched off")
+
+
 def main(argv: list[str]) -> int:
     if QApplication is None:
         print("skipped: PySide6 is not installed")
@@ -2264,6 +2354,7 @@ def main(argv: list[str]) -> int:
         test_the_shared_folder_reaches_the_interpreter(executable)
         test_autosave_writes_named_buffers_and_skips_the_rest(executable, files)
         test_saving_before_a_run_writes_the_file(executable, files)
+        test_the_tabs_come_back_on_the_next_start(executable, files)
     print("all window checks passed")
     del application
     return 0

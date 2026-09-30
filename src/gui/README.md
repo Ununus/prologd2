@@ -246,27 +246,26 @@ split could not be undone without a restart.
 
 `test_icons.py` is the guard: it fails as soon as a name is misspelled, and it
 also checks that an icon which *does* have a file is not still listed as missing.
-The code references **49** names, **42** of which have a file in
+The code references **49** names, **44** of which have a file in
 `src/gui/assets` (64×64 PNG, transparent background).  A missing file is not an
 error: the action is built without a picture, and the name is reported once on
 stderr (`icons: no view-theme.png — the action will have no picture`).
 
-Present (42): `edit-clear`, `edit-comment`, `edit-copy`, `edit-cut`, `edit-del`,
+Present (44): `edit-clear`, `edit-comment`, `edit-copy`, `edit-cut`, `edit-del`,
 `edit-find-replace`, `edit-format`, `edit-paste`, `edit-redo`, `edit-uncomment`,
 `edit-undo`, `execution-abort`, `execution-execute`, `execution-step-into`,
-`execution-tracing`, `file`, `file-close`, `file-close-all`, `file-exit`,
-`file-modified`, `file-new`, `file-open`, `file-recent`, `file-reload`,
-`file-save`, `file-save-all`, `file-save-as`, `file-saved`, `help`, `help-about`,
-`prologd2`, `search-find`, `search-find-next`, `search-find-prev`,
-`search-find-selected-next`, `search-find-selected-prev`, `tools-settings`,
-`view-full-screen`, `view-graphics`, `view-zoom-in`, `view-zoom-out`,
-`view-zoom-reset`.
+`execution-step-over`, `execution-tracing`, `file`, `file-close`,
+`file-close-all`, `file-exit`, `file-modified`, `file-new`, `file-open`,
+`file-recent`, `file-reload`, `file-save`, `file-save-all`, `file-save-as`,
+`file-saved`, `help`, `help-about`, `prologd2`, `search-find`, `search-find-next`,
+`search-find-prev`, `search-find-selected-next`, `search-find-selected-prev`,
+`tools-settings`, `view-full-screen`, `view-graphics`, `view-zoom-in`,
+`view-zoom-out`, `view-zoom-reset`.
 
-Still to draw (7 names, listed in `assets.MISSING`) — the «Вид» switches
+Still to draw (6 names, listed in `assets.MISSING`) — the «Вид» switches
 `view-toolbar`, `view-split-editor`, `view-output-right`, `view-output-bottom`,
-`view-line-numbers` and `view-theme`, plus `execution-step-over`, the picture of
-«Шаг с обходом» (the action is live since task_28 and shows its caption until the
-file appears) and `execution-restart`, which nothing refers to yet.
+`view-line-numbers` and `view-theme` — plus `execution-restart`, which nothing
+refers to yet.
 
 Five of the names are not buttons at all: `file`, `file-saved` and
 `file-modified` are the states of a tab, `prologd2` is the window icon, and
@@ -539,7 +538,7 @@ every record has a widget and every widget writes its key.
 | Вид | theme (light or system), toolbar, the output panel (shown, right or bottom), the input queue field, the output's font size and its line limit |
 | Формат | the formatter's mode, width, indent and unit, «только выделенное» |
 | Выполнение | save before run, the shared folder for `ИМПОРТ`, more `-I` folders |
-| Файлы | autosave in minutes (0 = off), how many recent files to remember |
+| Файлы | autosave in minutes (0 = off), how many recent files to remember, restoring the open tabs at start-up |
 | Вставки | the live `Ctrl`+key table (task_31), the settings file path, «Вернуть встроенную таблицу» |
 
 * **ОК** and **Применить** write through `Settings` and say so
@@ -594,6 +593,22 @@ guesswork.  Dropping a `.pld` file on the window opens it in a new tab — it is
 run.  The last directory and the ten most recent files are remembered in the
 settings file and shown in the «Последние» submenu of **Файл**, which prunes the
 entries whose file is gone and can be emptied in one click.
+
+The tabs that were open come back on the next start (`files/restore_tabs`, on by
+default).  A *file* tab is remembered by its **path**, not by its text: the next
+run reads the file, so a change the user refused to save is not resurrected.  An
+*untitled* tab has no file to read, so its text travels with the record
+(`documents.TabRecord`), up to `documents.SESSION_TEXT_BUDGET` (256 KiB) — a
+buffer that does not fit is dropped whole and counted, because a tab that comes
+back with half of its text is worse than one that does not come back at all, and
+an empty untitled tab is not stored, being the placeholder a first file would
+replace anyway.  A stored path whose file has gone is skipped and **named** in the
+status bar («не найдено: …») while the rest of the session opens.  A restored
+untitled tab counts as **unsaved work**, so the next close asks about it.  The
+session is written when the window really closes, and *before* the questions about
+unsaved buffers — «Отмена» leaves the window open, and a session stored on the way
+out would then describe a window that never closed.  Untick the box and the window
+opens on the welcome program instead.
 
 `Ctrl+\` splits the editor into two panes side by side — each with its own tab
 bar, both over the *same* document set, so an edit in either pane is the same
@@ -738,6 +753,7 @@ failure (for example an interrupted query).
 * A graphics pane fed by a `GraphicsBackend` that emits protocol events
   (`ТОЧКА`, `ЛИНИЯ`, … currently reach a null backend).
 * Step-by-step execution over the `ТРАССА` stream.
-* Settings persistence: the file and the editor's values exist; the dialog and
-  the rest of the list (interpreter path, include directories, window layout)
-  are task_29.
+* The rest of task_29's list: the dark theme (a second syntax palette, WCAG 4.5),
+  RU/EN, interpreter profiles and sandbox limits, «выводить вопросы» and
+  «следить за выводом» as switches.  The settings dialog itself, the live apply,
+  the session restore and the recent files are done.

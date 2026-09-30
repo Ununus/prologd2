@@ -200,6 +200,83 @@ class Document:
         return self.path or str(target)
 
 
+#: How much *untitled* text a remembered session may hold (task_29).  The store
+#: is a text file a human may open, so the budget is small enough to keep it
+#: readable; what does not fit is dropped, and the window says how much.
+SESSION_TEXT_BUDGET = 256 * 1024
+
+
+@dataclass(frozen=True)
+class TabRecord:
+    """One tab as it is remembered between runs (task_29).
+
+    A file is remembered by its **path**: the next run reads the file, so the tab
+    shows the file on disk rather than what the editor held when the window
+    closed — a user who answered «не сохранять» meant it.  An untitled buffer has
+    no file to read, so its text travels with the record, up to the budget.
+    """
+
+    path: str = ""
+    name: str = ""
+    text: str = ""
+
+    @property
+    def untitled(self) -> bool:
+        return not self.path
+
+
+def encode_tabs(records: Iterable[TabRecord]) -> list[str]:
+    """The records as the settings file holds them: `path<TAB>name<TAB>text`.
+
+    One entry per tab, in the order the tab bar shows them, and the tab character
+    as the separator simply because no path or buffer name may contain one.
+    """
+    return [f"{record.path}\t{record.name}\t{record.text}" for record in records]
+
+
+def decode_tabs(lines: Iterable[str]) -> list[TabRecord]:
+    """The other way.  A line that makes no sense is dropped, never fatal.
+
+    The file may be hand-edited, or written by another version: a session that
+    cannot be read may cost the *session*, never the start.
+    """
+    records: list[TabRecord] = []
+    for line in lines or []:
+        if not isinstance(line, str) or line.count("\t") < 2:
+            continue
+        path, name, text = line.split("\t", 2)
+        records.append(TabRecord(path=path, name=name, text=text))
+    return records
+
+
+def session_records(
+    tabs: Iterable[tuple[str, str, str]], budget: int = SESSION_TEXT_BUDGET
+) -> tuple[list[TabRecord], int]:
+    """What of the open tabs is worth remembering, and how many were dropped.
+
+    `tabs` are `(path, name, text)` triples in tab-bar order.  Only an *untitled*
+    buffer spends the budget, and one that does not fit is dropped whole: a tab
+    that comes back with half of its text is worse than one that does not come
+    back, and the window says how many were left out.  An empty untitled tab is
+    skipped altogether — it is the placeholder a first file would replace anyway.
+    """
+    records: list[TabRecord] = []
+    dropped = 0
+    spent = 0
+    for path, name, text in tabs:
+        if path:
+            records.append(TabRecord(path=str(path), name=str(name)))
+            continue
+        if not str(text).strip():
+            continue
+        if spent + len(text) > budget:
+            dropped += 1
+            continue
+        spent += len(text)
+        records.append(TabRecord(name=str(name), text=str(text)))
+    return records, dropped
+
+
 class RecentFiles:
     """The files opened last, newest first, at most `max` of them."""
 

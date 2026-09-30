@@ -29,7 +29,6 @@ DEFAULT_DIRECTORY = pathlib.Path(__file__).resolve().parent.parent / "assets"
 MISSING = frozenset(
     {
         "execution-restart",
-        "execution-step-over",
         "view-line-numbers",
         "view-output-bottom",
         "view-output-right",
