@@ -7,7 +7,7 @@ rev([H|T_],L):-rev(T_,T),conc(T,[H],L).
 conc([],L,L).
 conc([H|A],B,[H|C]):-conc(A,B,C).
 len([],0).
-len([A_|B_],L_):-len(B_,M),СЛОЖЕНИЕ(M,1,L_).
+len([_|B_],L_):-len(B_,M),СЛОЖЕНИЕ(M,1,L_).
 pyr([]).
 pyr([N|T_]):-len(T_,H),disk(N,1,H,N),pyr(T_).
 move(A,B,C):-ask(R),make(R,A,B,C).

@@ -43,6 +43,8 @@ std::string_view errorCodeText(ErrorCode code) {
       return "неверное использование \"_\"";
     case ErrorCode::MisplacedCut:
       return "неверное использование \"!\"";
+    case ErrorCode::SingletonVariable:
+      return "переменная встречается один раз";
 
     // Runtime.
     case ErrorCode::TypeMismatch:

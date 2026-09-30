@@ -1,5 +1,5 @@
-monk(N):-begin(N,A,B,C),move(N,1,2,3,A,B,C,D,E,F).
-move(1,X,Y,Z,A,B,C,D,E,F):-make(X,Y,A,B,C,D,E,F).
+monk(N):-begin(N,A,B,C),move(N,1,2,3,A,B,C,_,_,_).
+move(1,X,Y,_,A,B,C,D,E,F):-make(X,Y,A,B,C,D,E,F).
 move(N,X,Y,Z,A,B,C,D,E,F):-БОЛЬШЕ(N,1),move(#N-1#,X,Z,Y,A,B,C,A_,B_,C_),make(X,Y,A_,B_,C_,D_,E_,F_), move(#N-1#,Z,Y,X,D_,E_,F_,D,E,F).
 begin(N,A,[],[]):-БОЛЬШЕ(N,0),МЕНЬШЕ(N,15),list(N,B),rev(B,A),pyr(A).
 list(1,[1]).
@@ -9,7 +9,7 @@ rev([H|T_],L):-rev(T_,T),conc(T,[H],L).
 conc([],L,L).
 conc([H|A],B,[H|C]):-conc(A,B,C).
 len([],0).
-len([A_|B_],L_):-len(B_,M),СЛОЖЕНИЕ(M,1,L_).
+len([_|B_],L_):-len(B_,M),СЛОЖЕНИЕ(M,1,L_).
 pyr([]).
 pyr([N|T_]):-len(T_,H),disk(N,1,H,N),pyr(T_).
 make(1,2,[A_|A],B,C,A,[A_|B],C):-len(A,D_),disk(A_,1,D_,15),len(B,E_),disk(A_,2,E_,A_).

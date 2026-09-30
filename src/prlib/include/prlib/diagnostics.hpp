@@ -37,6 +37,8 @@ enum class ErrorCode {
   MisplacedQuestion,
   MisplacedUnderscore,
   MisplacedCut,
+  /// A variable that appears once in a clause; see `Parser::warnSingletonVariables`.
+  SingletonVariable,
 
   // Runtime.
   TypeMismatch,

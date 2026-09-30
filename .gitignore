@@ -29,3 +29,6 @@ src/gui/tests/_debug*.py
 
 # Written by examples/lessons/lesson_07.pld when the lesson runs.
 lesson_07_данные.txt
+
+# Written by examples/file_io.pld when it runs from the workspace root.
+output.txt

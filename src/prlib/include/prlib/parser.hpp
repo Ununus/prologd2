@@ -83,6 +83,11 @@ class Parser {
   void reportUnclosedBracket(char open, const SourceLocation& location);
   /// Report a statement that ran into end-of-file without its final dot.
   void reportMissingDot();
+  /// Report a warning: advice that never fails the load.
+  void warn(ErrorCode code, const SourceLocation& location, std::string message);
+  /// Warn about every variable of the clause just parsed that appears exactly
+  /// once — in the head that usually means a constant was meant.
+  void warnSingletonVariables(bool has_body);
   void recoverToStatementEnd();
 
   // Statements.
@@ -105,8 +110,17 @@ class Parser {
   Term parseUnaryArithmetic();
   Term parsePrimaryArithmetic();
 
-  VarId variableFor(std::string_view name, bool anonymous);
+  VarId variableFor(std::string_view name, bool anonymous, const SourceLocation& location);
   void beginScope();
+
+  /// One variable of the statement being parsed, for the singleton warning.
+  struct VarUsage {
+    std::string name;
+    std::size_t count = 0;
+    SourceLocation first;
+    /// True once the variable was seen in the head of a clause.
+    bool in_head = false;
+  };
 
   std::vector<Token> tokens_;
   std::size_t position_ = 0;
@@ -114,6 +128,8 @@ class Parser {
   DiagnosticSink* sink_;
   std::unordered_map<std::string, VarId> scope_;
   std::vector<std::pair<std::string, VarId>> query_variables_;
+  std::vector<VarUsage> usages_;
+  std::unordered_map<std::string, std::size_t> usage_index_;
   bool failed_ = false;
 };
 

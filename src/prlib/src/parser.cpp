@@ -84,6 +84,48 @@ void Parser::reportMissingDot() {
          "предложение заканчивается точкой");
 }
 
+void Parser::warn(ErrorCode code, const SourceLocation& location, std::string message) {
+  if (sink_ == nullptr) {
+    return;  // a warning never fails the statement, so there is nothing else to do
+  }
+  PrologError warning;
+  warning.code = code;
+  warning.severity = Severity::Warning;
+  warning.location = location;
+  warning.message = std::move(message);
+  warning.isParseError = true;
+  sink_->report(std::move(warning));
+}
+
+void Parser::warnSingletonVariables(bool has_body) {
+  for (const VarUsage& usage : usages_) {
+    if (usage.count != 1) {
+      continue;
+    }
+    if (usage.in_head && !has_body) {
+      // A fact that never mentions the name again: almost always a constant
+      // somebody wrote without quotes.
+      warn(ErrorCode::SingletonVariable, usage.first,
+           usage.name +
+               " — переменная, а не константа; если имелась в виду константа, "
+               "запишите её в одинарных кавычках: '" +
+               usage.name + "'");
+    } else if (usage.in_head) {
+      // In a rule the name can also be a forgotten wildcard, so both readings
+      // are named — `_` is how the dialect says "the value does not matter".
+      warn(ErrorCode::SingletonVariable, usage.first,
+           usage.name +
+               " — переменная, а не константа; если это пропуск, назовите её _" +
+               usage.name + ", а если константа — запишите её в одинарных кавычках: '" +
+               usage.name + "'");
+    } else {
+      warn(ErrorCode::SingletonVariable, usage.first,
+           "переменная " + usage.name +
+               " встречается один раз; если это намеренно, назовите её _" + usage.name);
+    }
+  }
+}
+
 void Parser::recoverToStatementEnd() {
   while (!atEnd()) {
     const TokenKind kind = peek().kind;
@@ -98,13 +140,31 @@ void Parser::recoverToStatementEnd() {
 void Parser::beginScope() {
   scope_.clear();
   query_variables_.clear();
+  usages_.clear();
+  usage_index_.clear();
 }
 
-VarId Parser::variableFor(std::string_view name, bool anonymous) {
+VarId Parser::variableFor(std::string_view name, bool anonymous,
+                          const SourceLocation& location) {
   if (anonymous) {
     return allocator_("");
   }
   const std::string key(name);
+  // A name written with a leading underscore is the dialect's way of saying
+  // "deliberately unused", so it is not a singleton and not recorded.
+  if (!key.empty() && key.front() != '_') {
+    const auto known = usage_index_.find(key);
+    if (known == usage_index_.end()) {
+      usage_index_.emplace(key, usages_.size());
+      VarUsage usage;
+      usage.name = key;
+      usage.count = 1;
+      usage.first = location;
+      usages_.push_back(std::move(usage));
+    } else {
+      ++usages_[known->second].count;
+    }
+  }
   auto it = scope_.find(key);
   if (it != scope_.end()) {
     return it->second;
@@ -153,7 +213,8 @@ Term Parser::parsePrimary() {
       return makeAtom(token.text);
     case TokenKind::Variable:
       advance();
-      return makeVar(variableFor(token.text, token.text == "_"), token.text);
+      return makeVar(variableFor(token.text, token.text == "_", token.location),
+                     token.text);
     case TokenKind::Identifier:
       return parseCompoundOrAtom();
     case TokenKind::LBracket:
@@ -408,6 +469,13 @@ bool Parser::parseClause(ParsedProgram& out) {
     out.ok = false;
     return false;
   }
+  // Everything recorded so far is in the head; a variable of the head that the
+  // clause never mentions again is the "constant without quotes" trap.
+  for (VarUsage& usage : usages_) {
+    if (usage.count > 0) {
+      usage.in_head = true;
+    }
+  }
   if (head.kind == TermKind::Var || isList(head)) {
     report(ErrorCode::InvalidGoal, location,
            "Голова предложения не может быть списком или переменной");
@@ -445,6 +513,7 @@ bool Parser::parseClause(ParsedProgram& out) {
     return false;
   }
   advance();  // terminator
+  warnSingletonVariables(!body.empty());
   Clause clause;
   clause.head = std::move(head);
   clause.body = std::move(body);
