@@ -69,6 +69,7 @@ const std::vector<std::string>& checkedLessons() {
       "lesson_05.pld",
       "lesson_06.pld",
       "lesson_07.pld",
+      "lesson_08.pld",
   };
   return names;
 }
@@ -93,7 +94,7 @@ std::string withoutQueries(const std::string& source) {
 
 TEST_CASE("ported example programs parse cleanly") {
   const std::vector<std::string> files = {
-      "lessons/lesson_5.pld", "lessons/lesson_6.pld",
+      "lessons/lesson_6.pld",
       "lessons/lesson_8.pld", "lessons/lesson_9.pld",
       "factorial.pld",        "file_io.pld",         "drawing.pld",
       "monk.pld",             "monkd.pld",           "findall_demo.pld",
@@ -123,14 +124,6 @@ TEST_CASE("every lesson prints exactly what its comments promise") {
     REQUIRE_FALSE(result.runtimeError);
     REQUIRE(result.output == expectedOutput(source));
   }
-}
-
-TEST_CASE("lesson 5 monkey and bananas") {
-  const auto result = runProgram(readExample("lessons/lesson_5.pld"));
-  REQUIRE(result.loaded);
-  REQUIRE(result.output.find("Слева [волк,коза,капуста]") != std::string::npos);
-  REQUIRE(result.output.find("Справа [коза,капуста,волк]") != std::string::npos);
-  REQUIRE(result.output.find("ДА") != std::string::npos);
 }
 
 TEST_CASE("lesson 6 logic puzzles") {
