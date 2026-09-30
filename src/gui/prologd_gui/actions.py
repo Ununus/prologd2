@@ -19,10 +19,16 @@ from dataclasses import dataclass
 #: and named here so the icon audit sees it.
 RECENT_ICON = "file-recent"
 
-#: The lens at the left of the find bar (task_33).  Not an action of its own:
-#: the bar is built by the window, and the five «Поиск» commands carry the other
-#: search pictures.
+#: The lens of the find bar (task_33): the picture at the left of the field and,
+#: since 2026-10-01, the picture of «Поиск и замена…» itself (it was
+#: `edit-find-replace` — a magnifier over an `R`, which reads as «замена» rather
+#: than as «поиск»).  Not an action of its own: the bar is built by the window.
 FIND_ICON = "search-find"
+
+#: The picture of «замена» — a magnifier over an `R`: the «Замена» triangle of
+#: the find bar, the control that opens the replacement half.  The other four
+#: «Поиск» commands carry their own search pictures.
+REPLACE_ICON = "edit-find-replace"
 
 #: Names that belong to no action: the tab picture of a buffer (never saved,
 #: saved, modified) and the application icon.  They live here because
@@ -104,7 +110,7 @@ ACTIONS: tuple[Action, ...] = (
     Action(
         "find",
         "Поиск и замена…",
-        "edit-find-replace",
+        FIND_ICON,
         ("Ctrl+F",),
     ),
     Action(
@@ -194,7 +200,8 @@ BY_KEY: dict[str, Action] = {action.key: action for action in ACTIONS}
 #: files in `assets/` and against the documented `MISSING` list.
 ICON_NAMES: frozenset[str] = frozenset(
     [action.icon for action in ACTIONS if action.icon]
-    + [RECENT_ICON, FIND_ICON, FILE_ICON, SAVED_ICON, MODIFIED_ICON, APPLICATION_ICON]
+    + [RECENT_ICON, FIND_ICON, REPLACE_ICON, FILE_ICON, SAVED_ICON, MODIFIED_ICON,
+       APPLICATION_ICON]
 )
 
 #: The menu bar: (title, entries).  `-` is a separator, `recent` the submenu of

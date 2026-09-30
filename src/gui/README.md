@@ -267,11 +267,13 @@ Still to draw (7 names, listed in `assets.MISSING`) — the «Вид» switches
 «Шаг с обходом» (the action is live since task_28 and shows its caption until the
 file appears) and `execution-restart`, which nothing refers to yet.
 
-Six of the names are not buttons at all:
-`file`, `file-saved` and `file-modified` are the states of a tab, `prologd2` is
-the window icon, `search-find` is the lens at the left of the find bar
-(`actions.FIND_ICON`), and `edit-del` is the picture of «Удалить» in the «Правка»
-menu.
+Five of the names are not buttons at all: `file`, `file-saved` and
+`file-modified` are the states of a tab, `prologd2` is the window icon, and
+`edit-del` is the picture of «Удалить» in the «Правка» menu.  `search-find`
+(`actions.FIND_ICON`) is the lens at the left of the find bar *and* the picture of
+«Поиск и замена…» — the plain lens, because the command is the search; the
+«замена» picture (`edit-find-replace`, `actions.REPLACE_ICON`) is the triangle
+that opens the replacement half of the bar.
 
 ## Stepping through a program
 

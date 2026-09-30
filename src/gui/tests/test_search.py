@@ -128,6 +128,7 @@ def main() -> int:
 
     application = QApplication(sys.argv[:1])
     test_the_five_search_commands_are_live()
+    test_the_two_magnifiers_are_on_the_right_controls()
     test_the_bar_opens_on_the_word_under_the_caret()
     test_f3_walks_the_matches_and_reports_the_wrap()
     test_enter_in_the_field_steps_and_escape_closes()
@@ -229,6 +230,40 @@ def test_the_five_search_commands_are_live() -> None:
     finally:
         discard_changes(window)
     print("ok: the five search commands are live in the menu and on the keys")
+
+
+def test_the_two_magnifiers_are_on_the_right_controls() -> None:
+    """«Поиск и замена…» carries the lens; the `R` belongs to «Замена».
+
+    Both pictures are the same drawing with a letter in the glass — `search-find`
+    (`F`) and `edit-find-replace` (`R`).  The command *opens the search*, so it
+    shows the lens; the `R` sits on the triangle that opens the replacement half
+    of the bar.  Each is named in `actions` (`FIND_ICON`, `REPLACE_ICON`), which
+    is what keeps `test_icons.py` holding the files to a name — and this check is
+    what stops a later tidy-up from swapping the two back, where the bar would
+    show the same lens twice.
+    """
+    from prologd_gui import assets
+
+    assert actions.BY_KEY["find"].icon == actions.FIND_ICON
+    assert actions.FIND_ICON != actions.REPLACE_ICON
+
+    window = search_window()
+    try:
+        lens = assets.icon(actions.FIND_ICON)
+        replace = assets.icon(actions.REPLACE_ICON)
+        assert lens is not None and replace is not None, "both pictures are drawn"
+        assert lens.cacheKey() != replace.cacheKey(), "the two files are one and the same"
+        assert window._actions["find"].icon().cacheKey() == lens.cacheKey(), (
+            "«Поиск и замена…» is showing the wrong magnifier"
+        )
+        triangle = window.find_bar()._disclosure
+        assert triangle.icon().cacheKey() == replace.cacheKey(), (
+            "the «Замена» triangle is showing the wrong magnifier"
+        )
+    finally:
+        discard_changes(window)
+    print("ok: the lens is on «Поиск и замена…» and the R on the «Замена» triangle")
 
 
 def test_the_bar_opens_on_the_word_under_the_caret() -> None:

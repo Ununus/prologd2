@@ -1,7 +1,7 @@
 # task_33 — GUI: find and replace
 
 **Status:** done — the bar, the keys, the highlight, «Заменить всё» as one undo
-step and `search.py` are in; `test_search.py` has sixteen checks, half of which
+step and `search.py` are in; `test_search.py` has seventeen checks, half of which
 open a window but start no interpreter
 **Depends on:** task_22 (the editor), task_26 (the action table, where the five
 menu entries already sit disabled)
@@ -29,16 +29,16 @@ menus and shortcuts are already declared, and the tooltips say «ещё не
     выделении**;
   * a count of what was found, in the form «3 из 17», and the search's own
     wrapping reported rather than silent.
-- [ ] Keys: `Ctrl+F` opens the bar and focuses the field, `Esc` closes it and
+- [x] Keys: `Ctrl+F` opens the bar and focuses the field, `Esc` closes it and
       returns focus to the editor, `F3` and `Shift+F3` find forwards and
       backwards even with the bar closed, `Ctrl+F3` and `Ctrl+Shift+F3` search
       for the word under the cursor, `Enter`/`Shift+Enter` in the field are the
       same as `F3`/`Shift+F3`.  The five actions stop being `implemented=False`.
-- [ ] Every match is highlighted in the editor while the bar is open (an extra
+- [x] Every match is highlighted in the editor while the bar is open (an extra
       selection in a palette colour, the way the error line already is), and the
       *current* match is told apart from the rest.  The highlight goes when the
       bar closes; the document itself is never modified by searching.
-- [ ] **Заменить всё** is *one* undo step, the way comment/uncomment is: a single
+- [x] **Заменить всё** is *one* undo step, the way comment/uncomment is: a single
       `beginEditBlock`/`endEditBlock` around the whole replacement.  Nothing is
       replaced inside the *found* text by accident: replacements never re-scan
       their own output.
@@ -130,3 +130,14 @@ matches, or the pale occurrence colour was painted over the warm one and the
 The `search-find` icon was given a name in the table (`actions.FIND_ICON`) rather
 than renamed, so the audit covers it; `edit-del` (drawn at the same time) became
 the picture of «Удалить» in the «Правка» menu.
+
+**2026-10-01 — which of the two magnifiers goes where.**  The user redrew
+`edit-find-replace.png` (a magnifier over a red `R`) and then asked for the menu
+entry «Поиск и замена…» to carry `search-find.png` instead — the plain lens, which
+is what the command actually does: it *opens the search*.  So the action names
+`FIND_ICON`, and the picture with the `R` moved to the control that really is
+about replacement: the «Замена» triangle of the bar, which opens the second row.
+It is named `actions.REPLACE_ICON`, so it stays in `ICON_NAMES` and the audit
+still holds the file to a name (`test_icons.py`: 49 names, 42 drawn, 7 missing).
+Without the move the bar would have shown the same lens twice — once at the left
+of the field and once on the triangle.

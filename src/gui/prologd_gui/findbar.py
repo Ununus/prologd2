@@ -122,7 +122,10 @@ class FindBar(QWidget):
         self._disclosure.setCheckable(True)
         self._disclosure.setToolTip("Показать поле «Заменить на» и кнопки замены")
         self._disclosure.toggled.connect(self.show_replace)
-        picture = assets.icon(actions.BY_KEY["find"].icon or "")
+        # The «поиск с заменой» picture: `find` carries the plain lens (it is the
+        # command that opens the search), so the triangle that opens the
+        # replacement half is where the `R` belongs.
+        picture = assets.icon(actions.REPLACE_ICON)
         if picture is not None:
             self._disclosure.setIcon(picture)
 
