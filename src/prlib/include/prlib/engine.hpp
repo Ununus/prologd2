@@ -226,6 +226,11 @@ class Engine {
   /// undefined predicate or an arity a predicate does not have is reported as
   /// a warning through the usual diagnostic path (hook or error stream).
   void checkCallSites(const ParsedProgram& program);
+  /// Report a warning about the whole program, with no position of its own —
+  /// the module collision of task_43 names both files in its text.  Goes
+  /// through the usual diagnostic path: hook when installed, error stream
+  /// otherwise.
+  void reportWarning(ErrorCode code, std::string message);
   void initialize();
 
   /// Run a query; `onSolution` is called for every solution and may return

@@ -5,6 +5,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -66,12 +67,25 @@ class ModuleLoader {
   /// Remove the historical `$...` preloaded input lines from source text.
   void extractInputLines(std::string& text) const;
 
+  /// Warn once per predicate whose clauses came from two files that do not
+  /// import one another: `ИМПОРТ` merges everything into one database, so two
+  /// unrelated definitions silently become one predicate.  Runs after the
+  /// outermost file finished loading (task_43).
+  void reportModuleCollisions();
+  /// True when `from` imports `to`, directly or through other files.
+  [[nodiscard]] bool importsPath(const std::string& from, const std::string& to) const;
+
   Engine& engine_;
   std::vector<std::filesystem::path> include_paths_;
   std::optional<std::filesystem::path> root_;
   std::unordered_set<std::string> loaded_;
   std::vector<std::string> loading_stack_;
   std::vector<std::filesystem::path> loaded_paths_;
+  /// Import edges seen so far (`importer -> imported`, canonical keys) and the
+  /// predicate/file pairs already reported — a file loaded later can join a
+  /// clash the previous load already described.
+  std::unordered_map<std::string, std::unordered_set<std::string>> imports_;
+  std::unordered_set<std::string> reported_collisions_;
   QueryRunner query_runner_;
 };
 

@@ -148,6 +148,11 @@ bool ModuleLoader::loadFile(const std::filesystem::path& path, std::string* erro
   std::error_code code;
   const auto canonical = std::filesystem::weakly_canonical(path, code);
   const std::string key = toUtf8PathGeneric(code ? path : canonical);
+  if (!loading_stack_.empty()) {
+    // The file on top of the stack resolved this import.  Recorded before the
+    // import-once test, so a diamond keeps all of its edges (task_43).
+    imports_[loading_stack_.back()].insert(key);
+  }
   if (loaded_.count(key) != 0) {
     return true;  // import-once
   }
@@ -191,6 +196,11 @@ bool ModuleLoader::loadFile(const std::filesystem::path& path, std::string* erro
   }
   loaded_.insert(key);
   loaded_paths_.push_back(file_path);
+  if (loading_stack_.empty()) {
+    // The outermost file and everything it imports are in: the cross-file view
+    // of the database can be checked now (task_43).
+    reportModuleCollisions();
+  }
   return true;
 }
 
@@ -246,6 +256,83 @@ bool ModuleLoader::process(const ParsedProgram& program, const std::filesystem::
   // nothing can now be told apart from one that simply has no solutions.
   engine_.checkCallSites(program);
   return true;
+}
+
+bool ModuleLoader::importsPath(const std::string& from, const std::string& to) const {
+  if (from == to) {
+    return true;
+  }
+  std::vector<std::string> pending{from};
+  std::unordered_set<std::string> seen{from};
+  while (!pending.empty()) {
+    const std::string current = std::move(pending.back());
+    pending.pop_back();
+    const auto it = imports_.find(current);
+    if (it == imports_.end()) {
+      continue;
+    }
+    for (const std::string& next : it->second) {
+      if (next == to) {
+        return true;
+      }
+      if (seen.insert(next).second) {
+        pending.push_back(next);
+      }
+    }
+  }
+  return false;
+}
+
+void ModuleLoader::reportModuleCollisions() {
+  // A predicate fed by two files that do not import one another is the clash the
+  // old lessons hit: the definitions were separate, and the one global database
+  // silently made one predicate with more clauses out of them.  A file that adds
+  // clauses to a module it imports is the wanted extension and stays silent —
+  // the import graph tells the two apart (task_43).
+  for (const Functor& functor : engine_.database().predicates()) {
+    const Database::ClauseListPtr clauses = engine_.database().clausesFor(functor);
+    std::vector<std::pair<std::string, std::size_t>> by_file;
+    for (const Clause& clause : *clauses) {
+      const std::string& file = clause.location.file;
+      if (file.empty() || file.front() == '<') {
+        continue;  // made at run time, or a virtual source (tests, the prompt)
+      }
+      const auto found = std::find_if(by_file.begin(), by_file.end(),
+                                      [&file](const auto& entry) { return entry.first == file; });
+      if (found == by_file.end()) {
+        by_file.emplace_back(file, 1);
+      } else {
+        ++found->second;
+      }
+    }
+    if (by_file.size() < 2) {
+      continue;
+    }
+    bool warned = false;
+    for (std::size_t i = 0; i < by_file.size() && !warned; ++i) {
+      for (std::size_t j = i + 1; j < by_file.size(); ++j) {
+        if (importsPath(by_file[i].first, by_file[j].first) ||
+            importsPath(by_file[j].first, by_file[i].first)) {
+          continue;  // one file can see the other: an extension, not a clash
+        }
+        std::string key = functor.name + '/' + std::to_string(functor.arity) + '|' +
+                          by_file[i].first + '|' + by_file[j].first;
+        if (reported_collisions_.insert(std::move(key)).second) {
+          std::string message = functor.name + '/' + std::to_string(functor.arity);
+          message += ": предложения из разных файлов объединены в один предикат — ";
+          message += by_file[i].first;
+          message += " (предложений: " + std::to_string(by_file[i].second) + ')';
+          message += ", ";
+          message += by_file[j].first;
+          message += " (предложений: " + std::to_string(by_file[j].second) + ')';
+          message += "; если это разные определения, переименуйте одно";
+          engine_.reportWarning(ErrorCode::ConflictingDefinitions, std::move(message));
+        }
+        warned = true;  // one warning per predicate
+        break;
+      }
+    }
+  }
 }
 
 }  // namespace prologd

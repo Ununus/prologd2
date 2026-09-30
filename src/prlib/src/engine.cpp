@@ -867,6 +867,14 @@ void Engine::checkCallSites(const ParsedProgram& program) {
                           [this](const PrologError& diagnostic) { report(diagnostic); });
 }
 
+void Engine::reportWarning(ErrorCode code, std::string message) {
+  PrologError warning;
+  warning.code = code;
+  warning.severity = Severity::Warning;
+  warning.message = std::move(message);
+  report(warning);
+}
+
 std::string Engine::format(const Term& term) const {
   PrintOptions options;
   options.evaluate = [this](const Term& expression) {

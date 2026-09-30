@@ -55,6 +55,9 @@ enum class ErrorCode {
   IoError,
   NotImplemented,
   ImportError,
+  /// Two files that do not import one another define the same predicate (see
+  /// `ModuleLoader`).
+  ConflictingDefinitions,
   RuntimeError,
   Unknown,
 };

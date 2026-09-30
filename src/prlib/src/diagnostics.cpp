@@ -75,6 +75,8 @@ std::string_view errorCodeText(ErrorCode code) {
       return "предикат не реализован";
     case ErrorCode::ImportError:
       return "ошибка импорта модуля";
+    case ErrorCode::ConflictingDefinitions:
+      return "предикат определён в нескольких файлах";
     case ErrorCode::RuntimeError:
       return "ошибка времени выполнения";
     case ErrorCode::Unknown:

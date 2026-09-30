@@ -183,4 +183,41 @@ TEST_CASE("the diamond example loads its shared module once") {
           "Сколько=2\n"
           "Остаток=[1,3]\n"
           "Н=2\n");
+  // Один общий модуль по трём путям — и ни одного слова о столкновении имён.
+  REQUIRE(outcome.error.find("предложения из разных файлов") == std::string::npos);
+}
+
+TEST_CASE("two imported files that define one name are reported") {
+  // База одна на всю программу: два независимых файла определили `член/2`, и
+  // предикат молча получил бы предложения обоих.
+  TempDir dir;
+  dir.write("first.pld", "член(X, [X|_]).\n");
+  dir.write("second.pld", "член(X, [_|T]) :- член(X, T).\n");
+  dir.write("main.pld",
+            ":- ИМПОРТ(\"first.pld\").\n"
+            ":- ИМПОРТ(\"second.pld\").\n"
+            "?член(X, [1, 2]).\n");
+  const LoadOutcome outcome = load(dir.path() / "main.pld");
+  REQUIRE(outcome.ok);
+  REQUIRE(outcome.output == "X=1\nX=2\n");
+  REQUIRE(outcome.error.find("warning") != std::string::npos);
+  REQUIRE(outcome.error.find("член/2") != std::string::npos);
+  REQUIRE(outcome.error.find("first.pld") != std::string::npos);
+  REQUIRE(outcome.error.find("second.pld") != std::string::npos);
+  REQUIRE(outcome.error.find("предложения из разных файлов") != std::string::npos);
+}
+
+TEST_CASE("a file that extends an imported predicate is not a clash") {
+  // Расширение модуля своими предложениями — законный приём: файл видит и сам
+  // подключает тот модуль, о котором речь, поэтому предупреждения нет.
+  TempDir dir;
+  dir.write("base.pld", "фрукт(яблоко).\n");
+  dir.write("main.pld",
+            ":- ИМПОРТ(\"base.pld\").\n"
+            "фрукт(груша).\n"
+            "?фрукт(X).\n");
+  const LoadOutcome outcome = load(dir.path() / "main.pld");
+  REQUIRE(outcome.ok);
+  REQUIRE(outcome.output == "X=яблоко\nX=груша\n");
+  REQUIRE(outcome.error.find("предложения из разных файлов") == std::string::npos);
 }

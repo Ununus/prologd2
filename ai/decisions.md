@@ -499,3 +499,30 @@ the bootstrap back — it belongs in a file that says exactly that and must not 
 loaded by default.
 
 **Status.** Accepted.
+
+## ADR-019: A predicate fed by two unrelated files is a warning
+
+**Context.** `ИМПОРТ` merges everything into one global database.  Two files that
+each define `член/2` produce one predicate with the clauses of both, in load
+order — silently.  That is what made the old lessons 8 and 9 unrunnable when a
+teacher loaded both.  Two neighbouring cases must *not* be reported: the diamond
+(`examples/diamond/`: one module reached by several import paths, loaded once)
+and the extension pattern (a file adding clauses to a predicate of a module it
+imports).
+
+**Decision.** After the outermost file and its imports are loaded, every
+predicate whose clauses come from more than one file is examined.  If two of
+those files have no import path between them — direct or transitive, in either
+direction — one warning names the predicate, both files and their clause counts
+(once per predicate).  Files related by imports are skipped, which is exactly
+what keeps the extension pattern silent.  A clause made at run time (`ДОБ`) and a
+virtual source (`<test>`, `<stdin>`) is not a file for this purpose.  The check
+runs only when the outermost load was a file; a session at the prompt is not
+asked about itself.
+
+**Consequences.** The clash and the extension are told apart by the import graph
+the loader already keeps (it detects cycles with it), so no extra bookkeeping.
+A program that intends one name across two unrelated files gets a warning it can
+ignore — warnings never change exit codes and `--no-warnings` drops it.
+
+**Status.** Accepted.
