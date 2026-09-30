@@ -1,6 +1,7 @@
 # task_42 — the hot path: allocations per goal, clause indexing, term weight
 
-**Status:** not started
+**Status:** done — stage 1 landed; stages 2 (indexing) and 3 (interning)
+measured/deferred with numbers (see the Result below and ADR-017).
 **Depends on:** task_38 (`tools/bench_engine.py` is the instrument this task
 measures with; it also owns the depth/memory work that must land first, or the
 numbers here will be measured against a crashing engine)
@@ -43,26 +44,73 @@ landing as code.
 
 ## Deliverables
 
-- [ ] Stage 1 — no allocations per goal: the two lookups above.  Behaviour must
+- [x] Stage 1 — no allocations per goal: the two lookups above.  Behaviour must
       not change at all (same clauses in the same order, same diagnostics).
-- [ ] Stage 2 — measure, then decide on clause indexing: the bench script must
+      Landed; the interleaved before/after is in the Result.
+- [x] Stage 2 — measure, then decide on clause indexing: the bench script must
       include a program with many facts *and* a program with a few expensive
       clauses (a river crossing or a puzzle from the lessons), because indexing
       wins where the clause body is heavy.  The deliverable is either the index
       with numbers, or a paragraph in `ai/decisions.md` saying it was measured
-      and deferred, with the numbers that made the case.
+      and deferred, with the numbers that made the case.  Deferred — ADR-017.
 - [ ] Stage 3 — atom interning and the term layout, only if measured and only
       with the whole suite green at every commit: `Term` gains an atom id
       (a `CompoundTerm` stores ids, not names), comparison of functor names
       becomes an integer compare, and the `std::string` leaves the common cases.
       This is the one change in the task that can ripple into `term_print`,
       `big_int` conversions and the tests' expectations, so it is planned as a
-      sequence of mechanical steps, not a rewrite of the engine.
-- [ ] `tools/bench_engine.py` grows the two indexing workloads and prints a
+      sequence of mechanical steps, not a rewrite of the engine.  Left
+      unticked on purpose: not attempted, and the Result records the measurement
+      that bounds what it could buy.
+- [x] `tools/bench_engine.py` grows the two indexing workloads and prints a
       before/after table; the numbers of every stage go into `ai/status.md` and
       into `doc/technical.typ` where the design is described.
-- [ ] No behaviour change anywhere: the lessons' `%!` output, the CLI
+- [x] No behaviour change anywhere: the lessons' `%!` output, the CLI
       diagnostics and the GUI tests must be identical, which the suite proves.
+
+## Result (2026-09-30)
+
+**Stage 1 — landed.**  `findBuiltin` no longer builds a `BuiltinKey{std::string,
+arity}` per goal (the table is keyed by `string_view`; every name in it is a
+string literal), and `Database` no longer builds a `"name/arity"` string per
+lookup: it is a two-level map (`name -> (arity -> clause list)`, looked up with
+`std::less<>`, so a `std::string_view` finds a `std::string` key in place) and the
+`key_order_` prefix scans went with it.  Interleaved runs (six pairs; the old
+binary built from HEAD with the change stashed; same script, same machine):
+
+| workload | before | after |
+|---|---|---|
+| dispatch 100 000 steps | 1.45 s (1.43–1.47) | 1.40 s (1.35–1.43) |
+
+Every pair came out faster, by 0–7 %, median ≈ 4 %.  The workload is 14 trivial
+built-in goals plus one user goal per step — the most dispatch-bound program in
+the suite — and the saving is the ~40–70 ns of string work per goal.  On every
+other workload the difference is inside the run-to-run spread (recursion
+400 000 steps 1.59 s, 100 000 0.45 s; a list of 60 000 cells 0.25 s; 100 000 facts
+0.31 s first / 0.33 s last; structured facts 0.25 s; queens 8 0.29 s).
+
+**Stage 2 — measured, deferred.**  See ADR-017: a full scan of 100 000 clauses
+costs ≈ 20 ms (≈ 0.1–0.3 µs per failed head attempt), lesson-scale predicates
+have a handful of clauses, and the queens workload is the shape an index cannot
+prune (heavy bodies behind shallow-matching heads).
+
+**Stage 3 — not attempted, and the numbers say why.**  The whole per-goal lookup
+class was worth ≈ 4 % on the most favourable program in the suite; interning
+atoms and splitting the `Term` payload attacks a fraction of that (name
+comparisons inside unification), while touching `term.hpp`, the printer, the
+`ДОБ`/`НАЙТИВСЕ` copy path and every test that names a term.  Revisit when a
+profile shows string comparison or term copying as a hotspot — no workload in the
+suite does today.
+
+**Instrument.**  `tools/bench_engine.py` grew the `dispatch`, `structured` and
+`queens` workloads and an `--only` filter.  A before/after needs the old binary:
+`git stash push -- src/prlib`, build, copy `prologd.exe` aside, `git stash pop`,
+build again — and then *interleave* the runs: the machine drifts between sessions
+by more than the effect being measured (the first attempt compared runs from two
+sessions and saw nothing).
+
+**Behaviour.**  223/223 ctest, 210 Catch2 cases / 3 276 assertions, the headless
+GUI suite and the lessons' `%!` output unchanged; `examples/` untouched.
 
 ## Acceptance criteria
 

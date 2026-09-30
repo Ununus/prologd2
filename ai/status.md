@@ -108,7 +108,7 @@ session.
 | task_39_english_aliases | done | every built-in has an English spelling in lower case (one `kEnglishNames` table in `builtins.cpp`, 47 pairs, is the only place a pair is written; `test_aliases.cpp` walks it and fails on a Russian name without a row); the manual gained appendix 17 with the whole table, `prologd-diff.typ` §15 and `conventions.md` the rule; doing it showed that `int`/`float` were *checks*, not conversions (`integer`/`float` are the ISO type tests, `is_whole`/`is_number` the old ones, and the planned `to_int`/`to_float` were dropped) and `ДЛИНА` became `strlen`; 108 reserved names, one list for CLI, protocol and GUI; renamed on review: `number` → `is_number`, `num_to_float` → `int_to_float` |
 | task_40_diagnostics | done | severity (an error stops a load or a query and keeps exit codes 2/3; a warning never changes either, and `--no-warnings` drops them) with `severity` on the wire (protocol 4) and amber warnings counted in the GUI; positions name what to fix (the opening bracket and its line, the end of a clause without its dot, the goal); a reserved name with an arity that exists nowhere is an error, an undefined predicate or a missing arity is a warning with a suggestion; singleton variables with separate advice for facts, rules and bodies |
 | task_41_semicolon_disjunction | done | `;` is the backtrackable disjunction of ISO, `,` binds tighter, and a branch runs in a frame whose cut barrier sits above the alternative (a cut in a branch is local to it; `ПЕРВОЕ/2` — then still named `ИЛИ/2`, renamed in task_44 — stays the committed form, and lesson 4 shows both side by side); the sentence terminator is the dot alone, and a `;` written as one is an error that says what changed; `examples/factorial.pld` was the only file to convert; parse shapes, solver semantics and diagnostics are all pinned |
-| task_42_engine_hot_path | not started | the constant tax: no string per built-in call, no `"name/arity"` key per predicate call, clause indexing and atom interning only where the benchmark justifies them |
+| task_42_engine_hot_path | done | the constant tax, measured: the two per-goal lookups stop building strings (`BuiltinKey` keyed by `string_view`; the database is a two-level `name -> (arity -> list)` map looked up with `std::less<>`, no `"name/arity"` key, `key_order_` gone) — interleaved six pairs on a dispatch-bound loop: median 1.45 s → 1.40 s, every pair faster, ≈ 4 %; clause indexing measured and deferred (ADR-017: a 100 000-clause scan costs ≈ 20 ms, lesson predicates have a handful of clauses, and the queens workload is a shape an index cannot prune); term interning bounded by that same ≈ 4 % and deferred; `tools/bench_engine.py` gained the `dispatch`, `structured` and `queens` workloads and `--only` |
 | task_43_language_surface | not started | `ВЫП/2..N` (`call/N`), a warning when two imported files define the same predicate, and the removal of the seven library clauses that every built-in already shadows (`?СКОЛЬКО(НЕ, А)` answers 2 today) |
 | task_44_names | done | the two names that promised something else: `ИЛИ/2` → `ПЕРВОЕ/2` (`or` → `first`) with the retired spelling removed from the language (a call is a load error naming the replacement), `НАЙТИВСЁ` → `НАЙТИВСЕ` (the spelling of the task and of the reference notes) with the retired spelling kept reserved, so its call is the ordinary suggestion «возможно, НАЙТИВСЕ/3»; the two `ИЛИ` library clauses removed so the old name cannot answer through the database; `doc/help.typ` §4.6, `prologd-diff.typ` §17/§18, lesson 4's section 5 |
 
@@ -874,3 +874,24 @@ Resolved on 2026-09-29 (GUI planning):
   lost the "the behaviour is preserved" sentence that task_41 had made false.
   223 ctest tests (2 new), 210 Catch2 cases (3 276 assertions), the GUI headless
   suite and all five Typst documents, all green.
+* Performance round, part 26: **task_42, the constant tax — measured, and only
+  what the measurement justified**.  Two per-goal string builders are gone:
+  `findBuiltin` keyed a `BuiltinKey{std::string, arity}` per call (now a
+  `string_view` key; every name in the table is a literal), and `Database` built
+  `"name/arity"` per lookup (now a two-level `name -> (arity -> list)` map looked
+  up with `std::less<>`, so a `string_view` finds a `std::string` key in place;
+  `key_order_` and its prefix scans went with it, which is also what `ПРЕДЛ` and
+  `УДАЛЕНИЕ` by name used).  The instrument mattered more than the change: a
+  first A/B across two sessions showed "no difference" (1.70–1.72 s vs
+  1.64–1.71 s), and only *interleaved* runs of the two binaries in one session —
+  six pairs on a new synthetic loop of 14 trivial built-ins plus a recursive call
+  per step — showed a real ≈ 4 % (median 1.45 s → 1.40 s), with every pair
+  faster.  Clause indexing is deferred *with numbers* (ADR-017): 100 000 facts
+  scan in ≈ 20 ms, structured-head facts in ≤ 10 ms, and the queens workload
+  (14 clauses, heavy bodies, shallow-matching heads) is a shape an index cannot
+  prune.  Term interning stays unattempted and is now bounded: the whole
+  per-goal lookup class is 4 % on the most favourable program in the suite.
+  `tools/bench_engine.py` grew the `dispatch`, `structured` and `queens`
+  workloads and an `--only` filter; `doc/technical.typ` §6.7 carries the
+  numbers.  223/223 ctest, 210 cases / 3 276 assertions, the GUI suite and the
+  lessons unchanged.
