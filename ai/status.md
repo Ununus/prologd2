@@ -109,12 +109,12 @@ session.
 | task_40_diagnostics | done | severity (an error stops a load or a query and keeps exit codes 2/3; a warning never changes either, and `--no-warnings` drops them) with `severity` on the wire (protocol 4) and amber warnings counted in the GUI; positions name what to fix (the opening bracket and its line, the end of a clause without its dot, the goal); a reserved name with an arity that exists nowhere is an error, an undefined predicate or a missing arity is a warning with a suggestion; singleton variables with separate advice for facts, rules and bodies |
 | task_41_semicolon_disjunction | done | `;` is the backtrackable disjunction of ISO, `,` binds tighter, and a branch runs in a frame whose cut barrier sits above the alternative (a cut in a branch is local to it; `ПЕРВОЕ/2` — then still named `ИЛИ/2`, renamed in task_44 — stays the committed form, and lesson 4 shows both side by side); the sentence terminator is the dot alone, and a `;` written as one is an error that says what changed; `examples/factorial.pld` was the only file to convert; parse shapes, solver semantics and diagnostics are all pinned |
 | task_42_engine_hot_path | done | the constant tax, measured: the two per-goal lookups stop building strings (`BuiltinKey` keyed by `string_view`; the database is a two-level `name -> (arity -> list)` map looked up with `std::less<>`, no `"name/arity"` key, `key_order_` gone) — interleaved six pairs on a dispatch-bound loop: median 1.45 s → 1.40 s, every pair faster, ≈ 4 %; clause indexing measured and deferred (ADR-017: a 100 000-clause scan costs ≈ 20 ms, lesson predicates have a handful of clauses, and the queens workload is a shape an index cannot prune); term interning bounded by that same ≈ 4 % and deferred; `tools/bench_engine.py` gained the `dispatch`, `structured` and `queens` workloads and `--only` |
-| task_43_language_surface | not started | `ВЫП/2..N` (`call/N`), a warning when two imported files define the same predicate, and the removal of the seven library clauses that every built-in already shadows (`?СКОЛЬКО(НЕ, А)` answers 2 today) |
+| task_43_language_surface | done | `ВЫП/2..N` (`call/N`): the extra arguments are appended to the goal (callee dereferenced first; the keyword table says `ВЫП/+`; the checker expands the same term; `!` inside the argument stays a parse error and the manual no longer promises it); the module-collision warning — one per predicate fed by two files with no import path between them, silent for the diamond and for extending an imported module (ADR-019); the dead library is gone (`?СКОЛЬКО(НЕ, А)` answers 0; ADR-018) |
 | task_44_names | done | the two names that promised something else: `ИЛИ/2` → `ПЕРВОЕ/2` (`or` → `first`) with the retired spelling removed from the language (a call is a load error naming the replacement), `НАЙТИВСЁ` → `НАЙТИВСЕ` (the spelling of the task and of the reference notes) with the retired spelling kept reserved, so its call is the ordinary suggestion «возможно, НАЙТИВСЕ/3»; the two `ИЛИ` library clauses removed so the old name cannot answer through the database; `doc/help.typ` §4.6, `prologd-diff.typ` §17/§18, lesson 4's section 5 |
 
 ## Test suite
 
-223 tests, about four seconds: 210 Catch2 cases plus 13 command-line and
+229 tests, about four seconds: 216 Catch2 cases plus 13 command-line and
 integration tests (seven option tests, two `--list-keywords` tests, the
 import-search report, the JSON protocol session and the engine-limit cases). Groups:
 BigInt, lexer, keywords, parser, unification, engine, every built-in group,
@@ -895,3 +895,20 @@ Resolved on 2026-09-29 (GUI planning):
   workloads and an `--only` filter; `doc/technical.typ` §6.7 carries the
   numbers.  223/223 ctest, 210 cases / 3 276 assertions, the GUI suite and the
   lessons unchanged.
+* Language-surface round, part 27: **task_43 — the rest of the standard
+  surface**.  `ВЫП/2..N` is `call/N` now: the extra arguments are appended to the
+  goal (the goal first), the callee is dereferenced before the append, a free
+  variable there is the usual «Цель должна быть предикатом», and the keyword
+  table says `ВЫП/+`, so completion and `--list-keywords` follow.  Writing the
+  behaviour probes found two open questions of the task and settled both: `!`
+  *inside* the argument is a parse error («неверное использование "!"» — the
+  argument is a term position), so the manual sentence promising a cut inside
+  `ВЫП` was removed instead of made true, and the step hook shows the expanded
+  goal one environment deeper (`цель(_1) @1`), never `ВЫП`.  The module-collision
+  warning reports a predicate fed by two files with no import path between them —
+  one warning, naming the predicate, both files and their clause counts — and
+  stays silent for the diamond and for a file extending a module it imports; the
+  import graph the loader already keeps tells the cases apart.  The dead library
+  went: `Engine::initialize()` loads nothing, `?СКОЛЬКО(НЕ, А)` answers 0, and
+  ADR-018 records why the seven clauses could never be selected.  229 ctest tests
+  (5 new), 216 Catch2 cases / 3 304 assertions.

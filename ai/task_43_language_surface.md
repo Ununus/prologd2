@@ -1,6 +1,7 @@
 # task_43 — the rest of the standard surface
 
-**Status:** not started
+**Status:** done — all three deliverables landed; the two questions the task left
+open were decided and pinned (`!` inside the argument; the extension pattern).
 **Depends on:** task_39 (the English spellings: `call/N` and the module warning
 are the same "looks like ordinary Prolog" work), task_40 (the module-collision
 report is a warning, and warnings are what task_40 introduces)
@@ -14,7 +15,7 @@ the size task_41 has.
 
 ## Deliverables
 
-- [ ] **`ВЫП/2..N` (`call/N`).**  Today only `ВЫП/1` exists
+- [x] **`ВЫП/2..N` (`call/N`).**  Today only `ВЫП/1` exists
       (`kEngineCallables`, answered by the engine, transparent to the cut).
       `call(P, A1, A2)` must append the extra arguments to the goal `P`
       (an atom becomes a compound; a compound gets the arguments added; the
@@ -26,7 +27,7 @@ the size task_41 has.
       `step`/`trace` hooks reporting the expanded goal, not `call` itself.
       Docs: `doc/help.typ` §4.3 (its `ВЫП` section) and the alias table in
       task_39 (`call`, arities 1..N).
-- [ ] **A warning when two imported files define the same predicate.**  `ИМПОРТ`
+- [x] **A warning when two imported files define the same predicate.**  `ИМПОРТ`
       merges everything into one global database, so a name clash between two
       files silently becomes one predicate with more clauses — this is exactly
       what made the old lessons 8–9 unrunnable, and the diamond example
@@ -39,7 +40,7 @@ the size task_41 has.
       pattern — decide whether that is a warning or a note) → pinned behaviour.
       Docs: `doc/help.typ` §8 (modules) and `src/gui/README.md` is untouched
       (diagnostics travel as `error` events with a severity).
-- [ ] **Remove the dead library.**  `Engine::initialize()` loads six clauses
+- [x] **Remove the dead library.**  `Engine::initialize()` loads six clauses
       into the database (`НЕ`, `РАВНО`, `МЕНЬШЕ`, `СЛОЖЕНИЕ`, `ПС`, `ДЛИНА`; the
       two `ИЛИ` clauses left with the rename, task_44), and *every* one of those
       names is also in the dispatch table.
@@ -58,6 +59,39 @@ the size task_41 has.
       `(A ; B)` as the goal today) --- decide together with task_41's cross
       reference.  The library halves of the old `ИЛИ` left with task_44, so
       nothing in the trace says `ИЛИ` any more.
+
+## Result (2026-09-30)
+
+**`call/N` landed** (`ВЫП/2..N`, `call`): the extra arguments are appended to the
+goal — an atom becomes a compound, a compound grows — after dereferencing the
+callee, so `РАВНО(Ц, член), ВЫП(Ц, Х, [1, 2])` expands as well.  A free variable
+in the callee position keeps the usual «Цель должна быть предикатом».
+`kEngineCallables` became a set and means «variadic from arity 1»; `hasArity`
+treats a variadic name as «one argument at least» (so bare `ВЫП.` and `ВЫВОД.`
+are errors instead of a silent failure); `--list-keywords` prints `ВЫП/+`; and
+the call-site checker expands the same term (`ВЫП(ф, 1)` is checked as `ф/1`).
+Two questions the task left open were decided:
+
+* a cut *inside* the argument stays unwritable — `ВЫП((!, Ложь))` is «неверное
+  использование "!"» (an argument is a term position); the manual no longer
+  promises a cut inside `ВЫП`, and `test_parser.cpp` pins the refusal;
+* the step hook shows the expanded goal, at the depth of the meta frame
+  (`цель(_1) @1`), never `ВЫП` — pinned in `test_stepping.cpp`.
+
+**The module-collision warning landed** (ADR-019): after the outermost file and
+its imports load, a predicate whose clauses come from two files with no import
+path between them gets one warning naming the predicate, both files and their
+clause counts.  The diamond stays silent (one file), and so does a file
+extending a module it imports — the import graph the loader already keeps tells
+the two cases apart.  `test_module_loader.cpp` pins the clash with both names,
+the extension, and the diamond's silence.
+
+**The dead library is gone** (ADR-018): `Engine::initialize()` loads nothing;
+`?СКОЛЬКО(НЕ, А)` answers `0` and `?ПРЕДЛ(НЕ, 1, _, _)` fails — pinned in
+`test_builtins_database.cpp`.
+
+229/229 ctest (5 new), 216 Catch2 cases / 3 304 assertions, the headless GUI
+suite and all five documents; `examples/` untouched.
 
 ## Acceptance criteria
 
