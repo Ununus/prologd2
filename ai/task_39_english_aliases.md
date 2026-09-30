@@ -25,9 +25,9 @@ registered alias appears everywhere by itself.
    assumed that `int(X)`/`float(X)` convert and that `to_int/1`/`to_float/1`
    should take their place; reading the implementation showed that they never
    converted — they *check* whether a value can be read as an integer or as any
-   number (`is_whole(4.0)` is true, `is_whole(4.5)` is false, `number(4)` is
-   true).  A conversion already exists and is `ЦЕЛВЕЩ/num_to_float`, so the two
-   are `is_whole(X)` and `number(X)` now, and the planned `to_int`/`to_float`
+   number (`is_whole(4.0)` is true, `is_whole(4.5)` is false, `is_number(4)` is
+   true).  A conversion already exists and is `ЦЕЛВЕЩ/int_to_float`, so the two
+   are `is_whole(X)` and `is_number(X)` now, and the planned `to_int`/`to_float`
    were dropped: a second conversion with no caller would be a name without a
    use.  `int/1` and `float/1` are gone.
 2. `ДЛИНА/2` becomes `strlen/2` — **not** `length/2`, which in ISO is the length
@@ -72,7 +72,7 @@ than a matter of remembering.
 | `УМНОЖЕНИЕ` | 3, 4 | `mul` | |
 | `ABS`/`SQRT`/`SIN`/`COS`/`TAN`/`EXP` | 2 | `abs`/… | lowercase becomes canonical |
 | `СЛУЧ` | 1, 3 | `random` | |
-| `ЦЕЛВЕЩ` | 2 | `num_to_float` | int ↔ float, either direction |
+| `ЦЕЛВЕЩ` | 2 | `int_to_float` | int ↔ float, either direction |
 | `СТРЦЕЛ` | 2 | `str_to_int` | string ↔ int |
 | `СТРВЕЩ` | 2 | `str_to_float` | string ↔ float |
 | `СТРСПИС` | 2 | `str_to_list` | string ↔ list of code points |
@@ -115,7 +115,7 @@ same function as its Russian original, the variadic built-in is variadic under
 both names, every Russian built-in has a row, and one program is run in English
 and compared with its whole output.  The renamed arithmetic is pinned in
 `test_builtins_arith.cpp` and `test_keywords.cpp`; `lesson_03.pld` was rewritten
-for `is_whole`/`number` (the lesson checker runs every lesson's output, so the
+for `is_whole`/`is_number` (the lesson checker runs every lesson's output, so the
 rename could not pass unnoticed).
 
 Documentation: `doc/help.typ` §5.5/5.6/5.7 use the new spellings, §9 points at
@@ -125,6 +125,14 @@ is true, and appendix 17 carries the whole table (generated from
 §15 explains the aliases and the two renames in the «что перенести» form, and
 `ai/conventions.md` gained the rule that the table is the one place a pair is
 written.
+
+The names were tightened once more after the user read them: `number` became
+`is_number` (ISO `number/1` is deliberately NOT provided — it would promise a
+plain failure where our soft checks raise a type error) and `num_to_float`
+became `int_to_float`, because `num` was doing two jobs («целое» in a
+conversion, «число» in a check).  The short stem for «целое» is now `int`
+everywhere (`str_to_int`, `read_int`, `int_to_float`).  The rule is written in
+`conventions.md` and in appendix 17 of the manual.
 
 Left for a follow-up: the course appendix file (`examples/lessons/appendix_english.pld`
 and its registration in `test_lessons.cpp`, `examples/lessons/README.md` and

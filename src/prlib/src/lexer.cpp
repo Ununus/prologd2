@@ -17,7 +17,7 @@ const std::unordered_set<std::string> kReservedBuiltins = {
     // Arithmetic
     "БОЛЬШЕ", "МЕНЬШЕ", "СЛОЖЕНИЕ", "УМНОЖЕНИЕ", "СЛУЧ", "float", "mod", "div",
     "greater", "less", "plus", "mul", "random", "abs", "sqrt", "sin",
-    "cos", "tan", "exp", "is_whole", "number",
+    "cos", "tan", "exp", "is_whole", "is_number",
     // I/O
     "ЧТЕНИЕ_ИЗ", "ЗАПИСЬ_В", "ВВКОД", "ВВОДЦЕЛ", "ВВОДВЕЩ", "ВВОДСИМВ",
     "ВВОДСТР", "ВЫВОД", "ЖДИ",
@@ -30,7 +30,7 @@ const std::unordered_set<std::string> kReservedBuiltins = {
     "ПЕР", "ЦЕЛ", "ВЕЩ", "СИМВ", "СПИСОК", "СТРСПИС", "СТРЦЕЛ", "СТРВЕЩ",
     "ЦЕЛВЕЩ",
     "var", "integer", "is_text", "is_list", "str_to_list", "str_to_int",
-    "str_to_float", "num_to_float",
+    "str_to_float", "int_to_float",
     // Database
     "СКОЛЬКО", "ПРЕДЛ", "ТЕРМ", "ДОБ", "УДАЛЕНИЕ",
     "clause_count", "clause_at", "univ", "assert", "retract",

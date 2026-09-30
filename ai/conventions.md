@@ -29,7 +29,11 @@ the one table in `builtins.cpp`; `test_aliases.cpp` fails if a Russian name has 
 row there, and the correspondence table in `doc/help.typ` (appendix 17) must be
 regenerated when the table changes.  Names the engine or the parser answers
 (`ВЫП`/`call`, `ИМПОРТ`/`import`) are listed in `keywords.cpp`/`parser.cpp`
-instead.
+instead.  An English name that no Russian name owns follows one rule: bare only
+where the standard means the same thing (`var`, `integer`, `float`), `is_` for a
+check of ours (`is_text`, `is_list`, `is_letter`, `is_digit`, `is_whole`,
+`is_number`), and `X_to_Y` with the short stems `int`, `float`, `str`, `list`
+for a conversion (`int_to_float`, `str_to_int`).
 
 ## File layout
 

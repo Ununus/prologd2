@@ -185,15 +185,15 @@ TEST_CASE("addition: all three modes, integers and floats") {
                             "X=100000000000000000001\nX=-5\n");
 }
 
-TEST_CASE("is_whole, number and the truncating conversion take what they are given") {
+TEST_CASE("is_whole, is_number and the truncating conversion take what they are given") {
   const auto result = runProgram(
       "?is_whole(4).\n"
       "?is_whole(4.0).\n"
       "?is_whole(4.5).\n"
       "?is_whole(-4.5).\n"
-      "?number(4).\n"
-      "?number(4.0).\n"
-      "?number(4.5).\n"
+      "?is_number(4).\n"
+      "?is_number(4.0).\n"
+      "?is_number(4.5).\n"
       "?ЦЕЛВЕЩ(5, X).\n"
       "?ЦЕЛВЕЩ(X, 5.0).\n"
       "?ЦЕЛВЕЩ(5.5, X).\n"
@@ -262,9 +262,10 @@ TEST_CASE("the arithmetic built-ins report a wrong type as an error") {
     REQUIRE(result.error.find("Недопустимый тип аргументов") != std::string::npos);
   }
 
-  // `is_whole` and `number` have an error of their own: the argument is a number
-  // or it is nothing, and «ошибка преобразования типа» says which.
-  for (const std::string& goal : {"is_whole(\"4\")", "number(\"4\")", "is_whole(X)", "number(X)"}) {
+  // `is_whole` and `is_number` have an error of their own: the argument is a
+  // number or it is nothing, and «ошибка преобразования типа» says which.
+  for (const std::string& goal :
+       {"is_whole(\"4\")", "is_number(\"4\")", "is_whole(X)", "is_number(X)"}) {
     const auto result = runProgram("?" + goal + ".\n");
     REQUIRE(result.loaded);
     REQUIRE(result.runtimeError);

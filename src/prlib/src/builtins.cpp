@@ -264,7 +264,7 @@ constexpr std::pair<std::string_view, std::string_view> kEnglishNames[] = {
     {"СПИСОК", "is_list"},      {"НАЙТИВСЁ", "findall"},
     {"БОЛЬШЕ", "greater"},      {"МЕНЬШЕ", "less"},
     {"СЛОЖЕНИЕ", "plus"},       {"УМНОЖЕНИЕ", "mul"},
-    {"СЛУЧ", "random"},       {"ЦЕЛВЕЩ", "num_to_float"},
+    {"СЛУЧ", "random"},       {"ЦЕЛВЕЩ", "int_to_float"},
     {"СТРЦЕЛ", "str_to_int"},    {"СТРВЕЩ", "str_to_float"},
     {"СТРСПИС", "str_to_list"},   {"БУКВА", "is_letter"},
     {"ЦИФРА", "is_digit"},      {"СЦЕП", "concat"},
@@ -352,8 +352,10 @@ const BuiltinTable& builtinTable() {
     // taken as a whole number, or as any number at all (`int(4.0)` holds,
     // `int(4.5)` does not, `float(4)` does).  The strict type tests take the ISO
     // names (`integer`, `float`), so these two got names that say what they do.
+    // They keep the `is_` prefix that marks a predicate of ours: ISO `number/1`
+    // merely fails on an unbound argument, while these raise a type error.
     add("is_whole", 1, builtinToInt);
-    add("number", 1, builtinToFloat);
+    add("is_number", 1, builtinToFloat);
     add("СЛУЧ", 1, builtinRandom);
     add("СЛУЧ", 3, builtinRandom);
     add("ЦЕЛВЕЩ", 2, builtinConvertIntFloat);

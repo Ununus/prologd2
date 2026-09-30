@@ -85,7 +85,7 @@ TEST_CASE("the English surface works from a program") {
       "?write(ok), nl.\n"
       "?integer(3).\n"
       "?float(3).\n"
-      "?number(3).\n"
+      "?is_number(3).\n"
       "?is_whole(3.0).\n"
       "?strlen(\"ёжик\", N).\n"
       "?less(1, 2).\n"
