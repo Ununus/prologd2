@@ -167,3 +167,20 @@ TEST_CASE("import works with UTF-8 file names") {
   REQUIRE(outcome.ok);
   REQUIRE(outcome.output == "X=мир\n");
 }
+
+TEST_CASE("the diamond example loads its shared module once") {
+  // `examples/diamond`: the top file imports two branches, each branch imports
+  // `base.pld`, and the top file imports it directly as well - three paths to a
+  // single file, which must still be loaded exactly once, so the shared
+  // predicate keeps its two clauses instead of gaining more.
+  const fs::path entry =
+      fromUtf8Path(std::string(PROLOGD_TEST_DATA_DIR) + "/diamond/main.pld");
+  const LoadOutcome outcome = load(entry, {entry.parent_path()});
+  REQUIRE(outcome.ok);
+  REQUIRE(outcome.output ==
+          "ДА\n"
+          "НЕТ\n"
+          "Сколько=2\n"
+          "Остаток=[1,3]\n"
+          "Н=2\n");
+}
