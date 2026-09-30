@@ -107,7 +107,7 @@ TEST_CASE("a disjunction is one goal and `,` binds tighter") {
   }
   {
     // A parenthesised disjunction is a goal argument, the way a parenthesised
-    // conjunction already is for НАЙТИВСЁ.
+    // conjunction already is for НАЙТИВСЕ.
     DiagnosticSink sink;
     const auto program = parse("p :- ВЫП((a ; b)).", sink);
     REQUIRE_FALSE(sink.hasErrors());

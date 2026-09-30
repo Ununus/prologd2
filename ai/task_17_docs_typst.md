@@ -17,7 +17,7 @@ Produce the three Russian Typst documents required by the request.
     compounds, lists);
   * every built-in predicate with syntax, argument types, semantics and
     examples, grouped as in the original;
-  * the `НАЙТИВСЁ/3` section with the required examples;
+  * the `НАЙТИВСЕ/3` section with the required examples;
   * a short migration section pointing to `prologd-diff.typ`;
   * update it in the same commit/change as each predicate implementation
     (per `conventions.md`).

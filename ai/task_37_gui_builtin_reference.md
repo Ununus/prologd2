@@ -84,7 +84,7 @@ So the work is not writing documentation: it is giving that documentation a
       file must degrade to "no descriptions", never to a failed start-up — the
       GUI has to work in a checkout where `doc/` was not copied.
 - [ ] **In the popup:** a detail label under the completion list, updated from
-      `QCompleter.highlighted`, showing `НАЙТИВСЁ/3 — собирает все решения цели в
+      `QCompleter.highlighted`, showing `НАЙТИВСЕ/3 — собирает все решения цели в
       список` and, if there is room, the first variant line.  Qt's completer has
       no second row, so this is a frameless `QLabel` positioned under
       `completer.popup()` and hidden when the popup closes; it must not take

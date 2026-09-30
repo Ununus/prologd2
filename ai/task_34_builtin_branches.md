@@ -33,7 +33,7 @@ Six defects, each fixed and covered by a test:
 |---|---------|-------|-----|
 | 1 | `SQRT(-4, X)` → `X=0`, `SQRT(-4.0, X)` → `X=nan`, `EXP(X, -1.0)`, `SIN(X, 2.0)`, `COS(X, 2.0)` → `nan` | `std::sqrt`/`ln`/`asin` of a value outside the domain returns `nan`, `BigInt::fromDouble(nan)` is 0, and unification put that in the variable | a value the function does not have is a **failure**; `std::isfinite` guards in `builtinSqrt` and `unaryFloat` |
 | 2 | `РАВНО(16777217, 16777216.0)` true, `РАВНО(16777217, 16777217.0)` false | the integer was narrowed to `float` and compared with the double, so the two sides were compared in different precisions | compare exactly: the real must be whole and `BigInt::fromDouble(real)` must equal the integer |
-| 3 | `?РАВНО(X, f(X)).` ended the process (0xC00000FD, stack overflow); `?РАВНО(X, [1|X]).` never ended | no occurs check, so the query builds a cyclic term, and the printer followed it (a cyclic list in a loop, without depth growth) | the printer remembers the nodes it is inside and writes `...`; the term copy behind `ДОБ`/`НАЙТИВСЁ` reports "Циклический терм нельзя скопировать"; the print depth default is 2000, not 100000 |
+| 3 | `?РАВНО(X, f(X)).` ended the process (0xC00000FD, stack overflow); `?РАВНО(X, [1|X]).` never ended | no occurs check, so the query builds a cyclic term, and the printer followed it (a cyclic list in a loop, without depth growth) | the printer remembers the nodes it is inside and writes `...`; the term copy behind `ДОБ`/`НАЙТИВСЕ` reports "Циклический терм нельзя скопировать"; the print depth default is 2000, not 100000 |
 | 4 | `ВВОДЦЕЛ(X, "Число: ")` printed no prompt | the documented second argument was never read (nothing in the engine knew about a prompt) | `writePrompt` writes it before the read; a non-text prompt is a type error |
 | 5 | `ТОЧКА(a, 1, 2)`, `ЛИНИЯ(1, 1, 2, 3, a)`, `ЗАКРАСКА([1], 1, 2)` … all *succeeded* | every call site dereferenced `std::optional` from `asInteger` without checking — undefined behaviour, which happened to read memory instead of raising | every non-free argument is validated by `coordinate(...)` |
 | 6 | `ВВКОД(1114112)`, `ВВКОД(55296)` wrote four bytes that are not UTF-8 | `utf8Encode` encodes any value, only negative ones were rejected | a code point must be a Unicode scalar value (0…U+10FFFF, no surrogates) |
@@ -75,7 +75,7 @@ Six defects, each fixed and covered by a test:
       being truncated.
 - [x] `test_findall.cpp`: the copy semantics (binding the list does not bind the
       template and the other way round), a bound list argument, a template that is
-      not a variable, a nested `НАЙТИВСЁ` and an error from the goal.
+      not a variable, a nested `НАЙТИВСЕ` and an error from the goal.
 - [x] `test_unify.cpp`: the integer/real comparison at the precision edges.
 - [x] `doc/help.typ`: §4.4 (negation and the database), §4.6 (numbers, cyclic
       terms), §5.5–5.6 (domains — a behaviour change), §5.7, §6.3 (code points),

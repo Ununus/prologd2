@@ -204,7 +204,7 @@ accepted them.
 callbacks (originally Qt `QPainter`, originally `maxgrx=1024`, `maxgry=768`).
 In the console build they must be no-ops behind an interface.
 
-### New: `НАЙТИВСЁ/3`
+### New: `НАЙТИВСЕ/3`
 
 Standard `findall/3`:
 

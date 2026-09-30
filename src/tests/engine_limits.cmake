@@ -47,7 +47,7 @@ foreach(index RANGE 1 60000)
   string(APPEND fact_lines "ф(${index}).\n")
 endforeach()
 file(WRITE "${WORK_DIR}/engine_deep_term.pld"
-  "${fact_lines}?ТИХО, НАЙТИВСЁ(И, ф(И), _), ВЫВОД(ok), ПС.\n")
+  "${fact_lines}?ТИХО, НАЙТИВСЕ(И, ф(И), _), ВЫВОД(ok), ПС.\n")
 
 execute_process(
   COMMAND "${PROLOGD_EXE}" --max-depth 0 -s "${WORK_DIR}/engine_deep_term.pld"

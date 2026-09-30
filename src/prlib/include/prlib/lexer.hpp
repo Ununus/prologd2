@@ -51,7 +51,9 @@ struct Token {
 /// with an upper-case letter (ADR-005).
 const std::unordered_set<std::string>& reservedBuiltinNames();
 
-/// True when `name` is a reserved built-in predicate name.
+/// True when `name` must lex as a predicate name rather than a variable: a
+/// current reserved built-in or a retired spelling of one (which the checks
+/// then report with a suggestion).
 bool isReservedBuiltinName(std::string_view name);
 
 /// UTF-8 aware lexer for the PrologD surface language.

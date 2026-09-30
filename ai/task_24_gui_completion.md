@@ -23,7 +23,7 @@ can be written without switching the keyboard layout for every name.
     (`член` matches, `Член` does not, unless the option is off);
   * ranking: exact case > matching at all > the same alphabet as the prefix >
     reserved names > predicates, then alphabetical;
-  * the popup shows `НАЙТИВСЁ/3` and inserts only `НАЙТИВСЁ`;
+  * the popup shows `НАЙТИВСЕ/3` and inserts only `НАЙТИВСЕ`;
   * `is_code_position()` says whether the caret is inside a comment, a string, a
     quoted atom or a `#…#` block (an odd number of `#` before the caret), and
     `word_before()` reads the word being typed.
@@ -78,6 +78,6 @@ can be written without switching the keyboard layout for every name.
 
 ## Acceptance
 
-Typing `НАЙ` offers `НАЙТИВСЁ/3`; typing `чле` after defining `член/2` offers
+Typing `НАЙ` offers `НАЙТИВСЕ/3`; typing `чле` after defining `член/2` offers
 `член`; completion does not appear inside `% комментарий`, `"строка"` or
 `#выражение#`; `Ctrl+Space` opens the popup on demand.

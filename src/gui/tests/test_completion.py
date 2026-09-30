@@ -34,7 +34,7 @@ DOCUMENT = """\
 RESERVED = Keywords.from_event(
     {
         "keywords": [
-            {"name": "НАЙТИВСЁ", "kind": "predicate", "arities": [3]},
+            {"name": "НАЙТИВСЕ", "kind": "predicate", "arities": [3]},
             {"name": "ВЫВОД", "kind": "predicate", "arities": [], "variadic": True},
             {"name": "mod", "kind": "operator", "arities": []},
         ]
@@ -66,7 +66,7 @@ def test_lists_do_not_inflate_the_arity() -> None:
 
 
 def test_reserved_names_come_with_their_arity() -> None:
-    assert labels("НАЙ") == ["НАЙТИВСЁ/3"]
+    assert labels("НАЙ") == ["НАЙТИВСЕ/3"]
     assert labels("ВЫ") == ["ВЫВОД/+"]
     assert labels("mo") == ["mod"], "an operator is offered as the bare name"
     assert labels("чле") == ["член/2"]
@@ -76,8 +76,8 @@ def test_reserved_names_come_with_their_arity() -> None:
 
 def test_only_the_name_is_inserted() -> None:
     offers = {offer.name: offer for offer in completion.collect(DOCUMENT, RESERVED)}
-    assert offers["НАЙТИВСЁ"].label == "НАЙТИВСЁ/3"
-    assert offers["НАЙТИВСЁ"].insert_text == "НАЙТИВСЁ", "the arity must not be typed for the user"
+    assert offers["НАЙТИВСЕ"].label == "НАЙТИВСЕ/3"
+    assert offers["НАЙТИВСЕ"].insert_text == "НАЙТИВСЕ", "the arity must not be typed for the user"
     print("ok: the arity is shown but never inserted")
 
 
@@ -253,7 +253,7 @@ def test_ctrl_space_opens_on_demand() -> None:
     editor.moveCursor(QTextCursor.MoveOperation.End)
     QTest.keyClick(editor, Qt.Key.Key_Space, Qt.KeyboardModifier.ControlModifier)
     assert editor.completion_visible(), "Ctrl+Space must complete a short prefix"
-    assert editor.completion_labels() == ["НАЙТИВСЁ/3"]
+    assert editor.completion_labels() == ["НАЙТИВСЕ/3"]
     print("ok: Ctrl+Space opens the popup before the automatic threshold")
 
 

@@ -181,7 +181,7 @@ class Solver {
 };
 
 /// Puts the engine's current location back when a query ends, however it ends.
-/// A nested query (`НАЙТИВСЁ`, `НЕ`, `ИЛИ`) runs its own solver over its own
+/// A nested query (`НАЙТИВСЕ`, `НЕ`, `ИЛИ`) runs its own solver over its own
 /// environment chain, and the outer one has to keep its own idea of where it is.
 class LocationGuard {
  public:

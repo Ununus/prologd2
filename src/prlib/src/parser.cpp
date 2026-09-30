@@ -207,7 +207,7 @@ Term Parser::parseCommaGroup() {
   while (!failed_ && match(TokenKind::Comma)) {
     parts.push_back(parseTerm());
   }
-  // A parenthesised conjunction is a goal argument (НАЙТИВСЁ, ВЫП): represent
+  // A parenthesised conjunction is a goal argument (НАЙТИВСЕ, ВЫП): represent
   // it as the compound `,`/2, which is what the solver expands in place.
   Term result = std::move(parts.front());
   for (std::size_t i = 1; i < parts.size(); ++i) {
@@ -256,7 +256,7 @@ Term Parser::parsePrimary() {
       Term result = parseCommaGroup();
       // `(A ; B)` is a disjunction: `,` binds tighter, as in ISO, so the
       // operands of `;` are comma groups.  A parenthesised disjunction is how
-      // one reaches `ВЫП` and `НАЙТИВСЁ`, whose goals are arguments.
+      // one reaches `ВЫП` and `НАЙТИВСЕ`, whose goals are arguments.
       while (!failed_ && match(TokenKind::Semicolon)) {
         const Token semicolon = previous();
         if (check(TokenKind::Dot) || atEnd()) {

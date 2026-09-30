@@ -119,7 +119,7 @@ plan met the corpus:
 * **Call-site warnings** run after the whole unit and its imports are loaded, so
   forward and mutual references stay quiet (a test pins a mutual-recursion
   program).  The meta-predicates whose arguments are goals are opened up
-  (`ВЫП`, `НЕ`, `ИЛИ`, `НАЙТИВСЁ`, `,`/2); `!` is skipped as a name.  The
+  (`ВЫП`, `НЕ`, `ИЛИ`, `НАЙТИВСЕ`, `,`/2); `!` is skipped as a name.  The
   suggestion is the nearest name of the same arity within a small edit distance
   over *code points* (one Cyrillic letter = one edit), and the comparison is
   ordered by `std::map`, so a suggestion never depends on hash order.

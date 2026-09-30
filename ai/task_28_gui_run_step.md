@@ -144,7 +144,7 @@ is answered from the input pane.
   are not announced, which is what makes the `call`/`exit` pairs balance.
 * `prlib`: `Engine::raise` fills in the location of the clause being solved, so
   **runtime errors carry a position** — the gap the task asked to check for.  A
-  nested query (`НАЙТИВСЁ`, `НЕ`, `ИЛИ`) saves and restores it.
+  nested query (`НАЙТИВСЕ`, `НЕ`, `ИЛИ`) saves and restores it.
 * `prlib`: `IoContext::setTraceSink` — the trace text goes to the front-end when one
   asks for it, and to the output stream as before when none does.  That is how the
   GUI colours the trace apart from the program's own output.

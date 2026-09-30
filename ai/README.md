@@ -46,7 +46,7 @@ the regression corpus and the Qt GUI — is published at
 * `prologd_test/test.txt` – original test corpus (`TEST`/`INPUT`/`EXPECTED`/`END`).
 * the Qt GUI – the boundary kept for the future front-end (`task_20`).
 
-`НАЙТИВСЁ/3` (`findall/3`) is the one predicate that did not exist in the
+`НАЙТИВСЕ/3` (`findall/3`) is the one predicate that did not exist in the
 original; it was an explicit requirement of this rewrite. Its examples are
 quoted in `task_13_findall.md` and in `examples/findall_demo.pld`.
 

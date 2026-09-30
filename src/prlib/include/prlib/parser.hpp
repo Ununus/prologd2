@@ -99,7 +99,7 @@ class Parser {
   std::vector<Term> parseGoalList(std::vector<SourceLocation>* locations = nullptr);
   Term parseGoal();
   /// `a, b, c` as the compound `,`/2 (left-nested); used inside parentheses,
-  /// where a conjunction can be a goal argument (НАЙТИВСЁ, ВЫП).
+  /// where a conjunction can be a goal argument (НАЙТИВСЕ, ВЫП).
   Term parseCommaGroup();
 
   // Terms.

@@ -43,7 +43,7 @@ session.
   `ЧТЕНИЕ_ИЗ`, `ЗАПИСЬ_В`, preloaded `$...` input lines.
 * Program database: `СКОЛЬКО`, `ПРЕДЛ`, `ТЕРМ`, `ДОБ`, `УДАЛЕНИЕ`.
 * Graphics over `GraphicsBackend` (null and recording implementations).
-* `НАЙТИВСЁ/3` reproduces the required examples.
+* `НАЙТИВСЕ/3` reproduces the required examples.
 * `ИМПОРТ` loader: import-once, include paths, cycle detection, root containment.
 * CLI11 front-end with conventional options (positional files, `-s/--source`,
   `-I/--include`, `-q`, `-t`, `--help`, `--version`); UTF-8 console setup on
@@ -117,7 +117,7 @@ session.
 integration tests (seven option tests, two `--list-keywords` tests, the
 import-search report, the JSON protocol session and the engine-limit cases). Groups:
 BigInt, lexer, keywords, parser, unification, engine, every built-in group,
-`НАЙТИВСЁ`, module loader (including the import search report), the I/O seams,
+`НАЙТИВСЕ`, module loader (including the import search report), the I/O seams,
 typical tasks (factorial, Fibonacci, GCD, insertion sort, 4-queens, knapsack),
 ported lesson/example programs (golden output) and the CLI (`-s`, `--source`,
 `--source=`, positional, `-I`, `--help`, `--version`, `--list-keywords`,
@@ -606,7 +606,7 @@ Resolved on 2026-09-29 (GUI planning):
      followed it until the C++ stack ran out (a cyclic *list* did not end at all,
      because its cells are followed in a loop).  The printer now remembers the
      compound nodes it is inside and writes `...` at the repeat, and the copy
-     behind `ДОБ`/`НАЙТИВСЁ` refuses a cyclic term with a diagnostic instead of
+     behind `ДОБ`/`НАЙТИВСЕ` refuses a cyclic term with a diagnostic instead of
      recursing.  The default print depth also came down from 100000 to 2000, which
      is a stack-safety number, not a formatting choice.
   4. The second argument of `ВВОДЦЕЛ`/`ВВОДВЕЩ`/`ВВОДСИМВ`/`ВВОДСТР` — the prompt —
@@ -628,7 +628,7 @@ Resolved on 2026-09-29 (GUI planning):
   numbering by name *across arities*, the snapshot a running enumeration keeps while
   the database is edited, `ПЕР`/`ЦЕЛ`/`ВЕЩ`/`СИМВ`/`СПИСОК` as a truth table over
   every term kind, `НЕ` undoing bindings but not `ДОБ`, `ИЛИ` committing to the
-  first solution of its first goal, `ТИХО` being a per-query flag, `НАЙТИВСЁ`
+  first solution of its first goal, `ТИХО` being a per-query flag, `НАЙТИВСЕ`
   copying its template, and the token/line interplay of the reading predicates.
   Two new files carry it (`test_builtins_control.cpp`, `test_builtins_types.cpp`, both
   from `task_09`'s plan, which had never been written), and `test_builtins_io.cpp`,

@@ -14,7 +14,7 @@ this file records the rules and the manual checks.
 | `Имя'` / `x'` | `Имя` / `X` | trailing apostrophe marked a variable |
 | multi-letter name starting with an upper-case letter, used as a predicate (`XOR(...)`, `Фиб(...)`) | lower-cased (`xor`, `фиб`) | predicate names start lower-case |
 | multi-letter name starting with an upper-case letter, used as a constant (`Россия`, `Stelle`, `CPM`) | quoted (`'Россия'`, `'Stelle'`, `'CPM'`) | upper-case start means variable |
-| reserved built-in names (`БОЛЬШЕ`, `НАЙТИВСЁ`, …) | unchanged | reserved atoms |
+| reserved built-in names (`БОЛЬШЕ`, `НАЙТИВСЕ`, …) | unchanged | reserved atoms |
 | comments, strings, quoted atoms | unchanged | copied verbatim |
 
 ## Automatic mapping

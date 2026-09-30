@@ -44,7 +44,7 @@ nested solves.
 * Fresh variables for a clause attempt are created when the clause is selected
   and trailed so that they become unbound again on backtracking.
 * Deep recursion must not overflow the C++ stack: the main loop is iterative.
-  Nested solves (`НЕ`, `НАЙТИВСЁ`) do recurse; impose a configurable depth
+  Nested solves (`НЕ`, `НАЙТИВСЕ`) do recurse; impose a configurable depth
   limit with `ErrorCode::StackOverflow` (28).
 * Execution budget/interrupt hook: a `std::function<bool()>` `shouldStop` checked
   periodically, mapped to `ExecutionInterrupted` (27); used by the CLI for

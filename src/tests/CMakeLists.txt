@@ -84,7 +84,7 @@ if(TARGET prologd)
   # CLI shape — `/3` for a predicate, `/+` for the variadic ВЫВОД.
   add_test(NAME cli_list_keywords COMMAND prologd --list-keywords)
   set_tests_properties(cli_list_keywords PROPERTIES
-    PASS_REGULAR_EXPRESSION "НАЙТИВСЁ/3")
+    PASS_REGULAR_EXPRESSION "НАЙТИВСЕ/3")
 
   add_test(NAME cli_list_keywords_variadic COMMAND prologd --list-keywords)
   set_tests_properties(cli_list_keywords_variadic PROPERTIES

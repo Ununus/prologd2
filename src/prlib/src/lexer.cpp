@@ -38,7 +38,17 @@ const std::unordered_set<std::string> kReservedBuiltins = {
     "ТОЧКА", "ЛИНИЯ", "ОКРУЖНОСТЬ", "ЗАКРАСКА",
     "point", "line", "circle", "fill",
     // Newcomers
-    "НАЙТИВСЁ", "ИМПОРТ", "findall", "import",
+    "НАЙТИВСЕ", "ИМПОРТ", "findall", "import",
+};
+
+/// Spellings the dialect has retired.  They stay reserved so that a call to
+/// one is still parsed as a goal and reaches the checks, which know what to
+/// say about it.  They are deliberately *not* in `kReservedBuiltins`: the
+/// keyword table, completion and `--list-keywords` must not offer them.
+const std::unordered_set<std::string> kRetiredBuiltinNames = {
+    // The ported help spelled findall with ё for a while; the original manual
+    // and the task spelled it without.
+    "НАЙТИВСЁ",
 };
 
 }  // namespace
@@ -46,7 +56,8 @@ const std::unordered_set<std::string> kReservedBuiltins = {
 const std::unordered_set<std::string>& reservedBuiltinNames() { return kReservedBuiltins; }
 
 bool isReservedBuiltinName(std::string_view name) {
-  return kReservedBuiltins.find(std::string(name)) != kReservedBuiltins.end();
+  const std::string text(name);
+  return kReservedBuiltins.count(text) != 0 || kRetiredBuiltinNames.count(text) != 0;
 }
 
 Lexer::Lexer(std::string_view source, std::string file_name)

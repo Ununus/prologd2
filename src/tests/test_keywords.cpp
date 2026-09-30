@@ -74,7 +74,7 @@ TEST_CASE("reserved names are classified") {
 TEST_CASE("keyword arities come from the dispatch table") {
   const std::vector<prologd::KeywordInfo> keywords = prologd::reservedKeywords();
 
-  const prologd::KeywordInfo* findall = findKeyword(keywords, "НАЙТИВСЁ");
+  const prologd::KeywordInfo* findall = findKeyword(keywords, "НАЙТИВСЕ");
   REQUIRE(findall != nullptr);
   REQUIRE(findall->kind == prologd::KeywordKind::Predicate);
   REQUIRE(findall->arities == std::vector<std::size_t>{3});

@@ -153,6 +153,21 @@ TEST_CASE("an undefined predicate is a warning with a suggestion") {
   REQUIRE(warning.message == "не найдено: члеен/2; возможно, член/2");
 }
 
+TEST_CASE("the retired findall spelling suggests the current one") {
+  // The name with ё left the language (task_44): it is one letter away from
+  // `НАЙТИВСЕ`, so the ordinary unknown-name path already says exactly what to
+  // fix — the checker needs no special case for it.
+  const std::vector<PrologError> diagnostics =
+      diagnosticsOf("?НАЙТИВСЁ(_, ЛОЖЬ, _).\n");
+  REQUIRE(diagnostics.size() == 1);
+  const PrologError& warning = diagnostics.front();
+  REQUIRE(warning.code == ErrorCode::UnknownPredicate);
+  REQUIRE(warning.severity == Severity::Warning);
+  REQUIRE(warning.location.line == 1);
+  REQUIRE(warning.location.column == 2);
+  REQUIRE(warning.message == "не найдено: НАЙТИВСЁ/3; возможно, НАЙТИВСЕ/3");
+}
+
 TEST_CASE("an arity a user predicate does not have lists the ones it has") {
   const std::vector<PrologError> diagnostics = diagnosticsOf("дв(1, 2).\n?дв(1).\n");
   REQUIRE(diagnostics.size() == 1);

@@ -63,7 +63,7 @@ Output
 Execution
 
 - [ ] путь к интерпретатору (`--exe` today), сохранять перед запуском,
-      таймаут запроса, лимит числа решений `НАЙТИВСЁ`;
+      таймаут запроса, лимит числа решений `НАЙТИВСЕ`;
 - [ ] **рабочая папка** — the one directory the user keeps shared sources in
       ("общие функции для стандартной реализации").  It is passed as `-I` on
       every session, so `ИМПОРТ("library.pld")` works from any program, saved or
@@ -95,7 +95,7 @@ General
 * **Профиль интерпретатора**: named sets of `-I` directories and options, so a
   lesson and a project do not fight over the search path.
 * **Песочница/лимиты** as settings rather than constants: run time, output
-  lines, `НАЙТИВСЁ` cap — the three ways a student program can hang the GUI.
+  lines, `НАЙТИВСЕ` cap — the three ways a student program can hang the GUI.
 * **Экспорт настроек для класса**: one ini file the teacher can hand out.
 
 ## Tests

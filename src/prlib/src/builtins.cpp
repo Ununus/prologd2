@@ -209,7 +209,7 @@ BuiltinResult builtinIsList(Engine& engine, std::span<const Term> args) {
 }
 
 // ---------------------------------------------------------------------------
-// НАЙТИВСЁ/3
+// НАЙТИВСЕ/3
 // ---------------------------------------------------------------------------
 
 BuiltinResult builtinFindAll(Engine& engine, std::span<const Term> args) {
@@ -243,7 +243,7 @@ using BuiltinTable = std::unordered_map<BuiltinKey, BuiltinFn, BuiltinKeyHash>;
 /// The English spelling of every built-in that has a Russian name.
 ///
 /// The Russian name is the one the course teaches and stays first; the alias is
-/// what a reader of ordinary Prolog expects (`НАЙТИВСЁ`/`findall`), and it is
+/// what a reader of ordinary Prolog expects (`НАЙТИВСЕ`/`findall`), and it is
 /// lowercase, like the two names that were always English in this dialect
 /// (`mod`, `div`) and like `to_int`/`to_float`.  The table is *data* on purpose:
 /// a name cannot be registered without its Russian original, and the alias is
@@ -262,7 +262,7 @@ constexpr std::pair<std::string_view, std::string_view> kEnglishNames[] = {
     {"ПС", "nl"},            {"ЖДИ", "wait"},
     {"ПЕР", "var"},           {"ЦЕЛ", "integer"},
     {"ВЕЩ", "float"},         {"СИМВ", "is_text"},
-    {"СПИСОК", "is_list"},      {"НАЙТИВСЁ", "findall"},
+    {"СПИСОК", "is_list"},      {"НАЙТИВСЕ", "findall"},
     {"БОЛЬШЕ", "greater"},      {"МЕНЬШЕ", "less"},
     {"СЛОЖЕНИЕ", "plus"},       {"УМНОЖЕНИЕ", "mul"},
     {"СЛУЧ", "random"},       {"ЦЕЛВЕЩ", "int_to_float"},
@@ -335,7 +335,7 @@ const BuiltinTable& builtinTable() {
     add("СПИСОК", 1, builtinIsList);
 
     // findall.
-    add("НАЙТИВСЁ", 3, builtinFindAll);
+    add("НАЙТИВСЕ", 3, builtinFindAll);
 
     // Arithmetic.
     add("БОЛЬШЕ", 2, builtinGreater);

@@ -35,7 +35,7 @@ def test_decode_with_keywords() -> None:
             "version": "2.0.0",
             "keywords": [
                 {"name": "ВЫВОД", "kind": "predicate", "arities": [], "variadic": True},
-                {"name": "НАЙТИВСЁ", "kind": "predicate", "arities": [3]},
+                {"name": "НАЙТИВСЕ", "kind": "predicate", "arities": [3]},
                 {"name": "УМНОЖЕНИЕ", "kind": "predicate", "arities": [3, 4]},
                 {"name": "mod", "kind": "operator", "arities": []},
                 {"name": "ИМПОРТ", "kind": "directive", "arities": []},
@@ -44,9 +44,9 @@ def test_decode_with_keywords() -> None:
     )
     table = Keywords.from_event(event)
     assert len(table) == 5
-    assert table.names() == ["mod", "ВЫВОД", "ИМПОРТ", "НАЙТИВСЁ", "УМНОЖЕНИЕ"]
+    assert table.names() == ["mod", "ВЫВОД", "ИМПОРТ", "НАЙТИВСЕ", "УМНОЖЕНИЕ"]
 
-    assert table.is_reserved("НАЙТИВСЁ")
+    assert table.is_reserved("НАЙТИВСЕ")
     assert "ИМПОРТ" in table
     assert not table.is_reserved("нет_такого")
     assert table.arity("УМНОЖЕНИЕ") == (3, 4)
@@ -61,12 +61,12 @@ def test_decode_with_keywords() -> None:
         "mod",
         "ВЫВОД/+",
         "ИМПОРТ",
-        "НАЙТИВСЁ/3",
+        "НАЙТИВСЕ/3",
         "УМНОЖЕНИЕ/3",
         "УМНОЖЕНИЕ/4",
     ]
 
-    assert [keyword.name for keyword in table.predicates()] == ["ВЫВОД", "НАЙТИВСЁ", "УМНОЖЕНИЕ"]
+    assert [keyword.name for keyword in table.predicates()] == ["ВЫВОД", "НАЙТИВСЕ", "УМНОЖЕНИЕ"]
     assert [keyword.name for keyword in table] == table.names()
     print("ok: decoding, lookups and labels")
 
@@ -138,9 +138,9 @@ def test_against_the_interpreter(executable: str) -> None:
     table = Keywords.from_event(ready)
 
     assert table.all_labels() == lines, (table.all_labels(), lines)
-    assert table.is_reserved("НАЙТИВСЁ")
-    assert table.arity("НАЙТИВСЁ") == (3,)
-    assert "НАЙТИВСЁ/3" in lines
+    assert table.is_reserved("НАЙТИВСЕ")
+    assert table.arity("НАЙТИВСЕ") == (3,)
+    assert "НАЙТИВСЕ/3" in lines
     print(f"ok: {len(table)} reserved names, CLI and protocol agree")
 
 

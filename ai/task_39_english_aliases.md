@@ -11,7 +11,7 @@ task, its analysis kept here)
 ## Goal
 
 Spell every built-in two ways: the Russian name the course teaches, and the
-name a reader of ordinary Prolog expects (`НАЙТИВСЁ`/`findall`).  The mechanism
+name a reader of ordinary Prolog expects (`НАЙТИВСЕ`/`findall`).  The mechanism
 touches two lists in the interpreter and nothing in the GUI — highlighting,
 completion, `--list-keywords` and the cheat-sheet all read the reserved names
 from the interpreter's `ready` event (`src/gui/prologd_gui/keywords.py`), so a
@@ -65,7 +65,7 @@ than a matter of remembering.
 | `ВЕЩ` | 1 | `float` | ISO `float/1` |
 | `СИМВ` | 1 | `is_text` | true for an atom *and* a string, unlike ISO `atom/1` |
 | `СПИСОК` | 1 | `is_list` | ISO `is_list/1` |
-| `НАЙТИВСЁ` | 3 | `findall` | argument order already ISO |
+| `НАЙТИВСЕ` | 3 | `findall` | argument order already ISO |
 | `БОЛЬШЕ` | 2 | `greater` | ISO spells it `>` (an operator — not this task) |
 | `МЕНЬШЕ` | 2 | `less` | ISO spells it `<` |
 | `СЛОЖЕНИЕ` | 3 | `plus` | `plus/3` exists in several systems |
@@ -188,7 +188,7 @@ string are interchangeable (in SWI they are different types).
 
 ## Acceptance criteria
 
-1. `?findall(X, член(X, [а, б]), список).` and `?НАЙТИВСЁ(X, член(X, [а, б]), список).`
+1. `?findall(X, член(X, [а, б]), список).` and `?НАЙТИВСЕ(X, член(X, [а, б]), список).`
    behave identically, for every row of the table.
 2. `integer(3)` is true and `integer(3.0)` is false; `to_int(3.7, X)` converts;
    `float(3)` is false (it is a test now) — the two meaning changes are the ones

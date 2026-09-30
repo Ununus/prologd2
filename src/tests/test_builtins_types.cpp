@@ -170,10 +170,10 @@ TEST_CASE("a cyclic term is written, not followed") {
 }
 
 TEST_CASE("a cyclic term cannot be copied") {
-  // `ДОБ` and `НАЙТИВСЁ` copy what they are given, and a cyclic term has no
+  // `ДОБ` and `НАЙТИВСЕ` copy what they are given, and a cyclic term has no
   // finite copy: they say so instead of recursing until the stack ends.
   for (const std::string& goal : {"?РАВНО(X, f(X)), ДОБ(X, [], 1).\n",
-                                  "?РАВНО(X, f(X)), НАЙТИВСЁ(X, НЕ(ЛОЖЬ), L).\n"}) {
+                                  "?РАВНО(X, f(X)), НАЙТИВСЕ(X, НЕ(ЛОЖЬ), L).\n"}) {
     const auto result = runProgram(goal);
     REQUIRE(result.loaded);
     REQUIRE(result.runtimeError);

@@ -22,7 +22,7 @@ built-ins, `<-` rules, `?` queries, `#expr#` arithmetic, `[H|T]` lists) while
 adopting the **standard Prolog lexical convention** for variables and atoms, and
 modern C++ engineering.
 
-`НАЙТИВСЁ/3` (a `findall/3` analogue) was an explicit requirement of this
+`НАЙТИВСЕ/3` (a `findall/3` analogue) was an explicit requirement of this
 rewrite, and the one predicate that did not exist in the original: it must work
 exactly as specified. The requirement examples are quoted in
 `task_13_findall.md`.
@@ -40,7 +40,7 @@ exactly as specified. The requirement examples are quoted in
    including the program database predicates (`ДОБ`, `УДАЛЕНИЕ`, `ПРЕДЛ`,
    `ТЕРМ`, `СКОЛЬКО`), string predicates and the graphics predicates as no-op
    backend stubs.
-6. `НАЙТИВСЁ/3` implemented natively, matching the required examples.
+6. `НАЙТИВСЕ/3` implemented natively, matching the required examples.
 7. A clean, modular `ИМПОРТ` (module import) subsystem replacing the student
    preprocessor.
 8. Test suite (Catch2) covering: parser errors, unification, backtracking/cut,
@@ -80,7 +80,7 @@ Core design:
   the current predicate invocation's barrier. This keeps cut semantics exactly
   standard and makes recursion depth independent of the C++ stack for the
   search loop.
-* **Nested solves** (for `НЕ`, `ВЫП` inside negation, `НАЙТИВСЁ`, `СКОЛЬКО`)
+* **Nested solves** (for `НЕ`, `ВЫП` inside negation, `НАЙТИВСЕ`, `СКОЛЬКО`)
   run a fresh engine that shares bindings and the trail, so results are copied
   out and all temporary bindings are undone.
 * **Numbers**: a hand-written `BigInt` (base 10^9, sign-magnitude) plus IEEE
@@ -107,7 +107,7 @@ Adopted from standard Prolog:
 Retained from PrologD:
 
 * Russian built-in names in upper case are **reserved atoms** (so they are not
-  parsed as variables), e.g. `БОЛЬШЕ`, `НАЙТИВСЁ`.
+  parsed as variables), e.g. `БОЛЬШЕ`, `НАЙТИВСЕ`.
 * `# expression #` arithmetic expressions with infix `+ - * / mod div`.
 * `<-` implication.
 * String literals with double quotes, single-quoted atoms.

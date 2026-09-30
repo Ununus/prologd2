@@ -31,12 +31,12 @@ PrologD semantics, including arithmetic-expression evaluation.
     * expression vs int/float/expression → evaluate and compare per
       `reference_notes.md` §2;
     * `[]` only unifies with `[]`/var.
-  * `unifyWithOccursCheck` provided for optional use and for `НАЙТИВСЁ`
+  * `unifyWithOccursCheck` provided for optional use and for `НАЙТИВСЕ`
     diagnostics (not enabled globally).
 - [ ] `include/prlib/copy_term.hpp`, `src/copy_term.cpp`
   * `Term copyTermResolved(const Term&, const Bindings&, Bindings& target)` —
     applies current bindings and renumbers remaining variables fresh; used by
-    `НАЙТИВСЁ`, `ПРЕДЛ`, `ТЕРМ`, `ДОБ`.
+    `НАЙТИВСЕ`, `ПРЕДЛ`, `ТЕРМ`, `ДОБ`.
 
 ## Design notes
 
@@ -64,5 +64,5 @@ PrologD semantics, including arithmetic-expression evaluation.
 
 ## Acceptance
 
-All unification tests pass and `НАЙТИВСЁ`'s variable-copy requirement is
+All unification tests pass and `НАЙТИВСЕ`'s variable-copy requirement is
 satisfied by `copyTermResolved`.

@@ -43,7 +43,7 @@ from prologd_gui.tokens import (  # noqa: E402
 # name.  `keywords.py` decodes the real table; here a small one is enough.
 TABLE = Keywords(
     [
-        {"name": "НАЙТИВСЁ", "kind": "predicate", "arities": [3]},
+        {"name": "НАЙТИВСЕ", "kind": "predicate", "arities": [3]},
         {"name": "ВЫВОД", "kind": "predicate", "arities": [], "variadic": True},
         {"name": "ВЫП", "kind": "predicate", "arities": [1]},
         {"name": "ПС", "kind": "predicate", "arities": [0]},
@@ -113,8 +113,8 @@ def test_numbers() -> None:
 
 
 def test_reserved_names_variables_and_atoms() -> None:
-    assert kinds("НАЙТИВСЁ(X,цель(X),L)") == [
-        (KEYWORD, "НАЙТИВСЁ"),
+    assert kinds("НАЙТИВСЕ(X,цель(X),L)") == [
+        (KEYWORD, "НАЙТИВСЕ"),
         (PUNCTUATION, "("),
         (VARIABLE, "X"),
         (PUNCTUATION, ","),
@@ -148,7 +148,7 @@ def test_reserved_names_variables_and_atoms() -> None:
     ]
     # Without a table (an interpreter older than protocol 2) nothing is reserved,
     # so a built-in name is just a variable — the documented fallback.
-    assert kinds("НАЙТИВСЁ", None) == [(VARIABLE, "НАЙТИВСЁ")]
+    assert kinds("НАЙТИВСЕ", None) == [(VARIABLE, "НАЙТИВСЕ")]
     print("ok: reserved names, variables and atoms")
 
 

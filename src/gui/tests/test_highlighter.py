@@ -28,7 +28,7 @@ from prologd_gui.theme import Theme  # noqa: E402
 
 TABLE = Keywords(
     [
-        {"name": "НАЙТИВСЁ", "kind": "predicate", "arities": [3]},
+        {"name": "НАЙТИВСЕ", "kind": "predicate", "arities": [3]},
         {"name": "ИМПОРТ", "kind": "directive", "arities": []},
         {"name": "mod", "kind": "operator", "arities": []},
         {"name": "ПС", "kind": "predicate", "arities": [0]},
@@ -76,7 +76,7 @@ class Coloured:
 
 
 def test_colours_by_kind() -> None:
-    coloured = Coloured("член(X) :- member(X), НАЙТИВСЁ(Y, цель(Y), L), ПС. % привет")
+    coloured = Coloured("член(X) :- member(X), НАЙТИВСЕ(Y, цель(Y), L), ПС. % привет")
 
     # Names: the colour tells the two alphabets apart, atoms and variables apart.
     assert coloured.colour("член") == THEME.atom_cyrillic
@@ -86,7 +86,7 @@ def test_colours_by_kind() -> None:
     assert coloured.colour("L") == THEME.variable_latin
 
     # Reserved names, comments and punctuation.
-    assert coloured.colour("НАЙТИВСЁ") == THEME.keyword
+    assert coloured.colour("НАЙТИВСЕ") == THEME.keyword
     assert coloured.colour("ПС") == THEME.keyword
     assert coloured.colour("% привет") == THEME.comment
     assert coloured.colour(":-") == THEME.punctuation
@@ -107,8 +107,8 @@ def test_colours_on_a_query_line() -> None:
 
 def test_the_comment_is_not_tokenized_further() -> None:
     """A `%` swallows the line: nothing inside it may be coloured as code."""
-    coloured = Coloured("цель(X). % НАЙТИВСЁ(X) и \"строка\"")
-    assert coloured.colour("% НАЙТИВСЁ(X) и \"строка\"") == THEME.comment
+    coloured = Coloured("цель(X). % НАЙТИВСЕ(X) и \"строка\"")
+    assert coloured.colour("% НАЙТИВСЕ(X) и \"строка\"") == THEME.comment
     # The code before the comment still is.
     assert coloured.colour("цель") == THEME.atom_cyrillic
     assert coloured.colour("X") == THEME.variable_latin
@@ -116,8 +116,8 @@ def test_the_comment_is_not_tokenized_further() -> None:
 
 
 def test_builtins_are_bold_and_names_are_not() -> None:
-    coloured = Coloured("НАЙТИВСЁ(X)")
-    keyword_colour, keyword_weight = coloured.at("НАЙТИВСЁ")
+    coloured = Coloured("НАЙТИВСЕ(X)")
+    keyword_colour, keyword_weight = coloured.at("НАЙТИВСЕ")
     assert keyword_colour == THEME.keyword
     assert keyword_weight == int(QFont.Weight.Bold)
     assert coloured.at("X")[1] != int(QFont.Weight.Bold)
@@ -126,12 +126,12 @@ def test_builtins_are_bold_and_names_are_not() -> None:
 
 def test_changing_the_table_recolours() -> None:
     """An interpreter older than protocol 2 sends no names — and that is visible."""
-    coloured = Coloured("НАЙТИВСЁ(X)", keywords=Keywords())
-    assert coloured.colour("НАЙТИВСЁ") == THEME.variable_cyrillic
+    coloured = Coloured("НАЙТИВСЕ(X)", keywords=Keywords())
+    assert coloured.colour("НАЙТИВСЕ") == THEME.variable_cyrillic
 
     # The session then says `ready` and the same text is a built-in again.
     coloured.highlighter.set_keywords(TABLE)
-    assert coloured.colour("НАЙТИВСЁ") == THEME.keyword
+    assert coloured.colour("НАЙТИВСЕ") == THEME.keyword
     print("ok: the keyword table arrives with `ready` and re-colours the text")
 
 

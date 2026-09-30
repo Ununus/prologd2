@@ -119,7 +119,7 @@ TEST_CASE("a disjunction is a goal in a rule, under negation, call and findall")
   REQUIRE(meta.loaded);
   REQUIRE(meta.output == "X=1\nX=2\n");
 
-  const auto findall = runProgram("?НАЙТИВСЁ(X, (РАВНО(X, 1) ; РАВНО(X, 2)), L).\n");
+  const auto findall = runProgram("?НАЙТИВСЕ(X, (РАВНО(X, 1) ; РАВНО(X, 2)), L).\n");
   REQUIRE(findall.loaded);
   REQUIRE(findall.output == "X=_1\nL=[1,2]\n");
 }

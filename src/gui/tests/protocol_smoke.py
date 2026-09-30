@@ -75,7 +75,7 @@ def main(argv: list[str]) -> int:
     ready = find(events, "ready")
     assert ready["protocol"] == protocol.PROTOCOL_VERSION, ready
     reserved = {entry["name"] for entry in ready["keywords"]}
-    assert {"НАЙТИВСЁ", "ВЫП", "ПС"} <= reserved, sorted(reserved)
+    assert {"НАЙТИВСЕ", "ВЫП", "ПС"} <= reserved, sorted(reserved)
     assert find(events, "output", text="X=1\nX=2\n"), events
     assert len([e for e in events if e.get("event") == "result"]) == 2, events
     assert events[-1].get("event") == "bye", events

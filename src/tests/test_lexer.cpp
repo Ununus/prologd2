@@ -39,7 +39,7 @@ TEST_CASE("lexer recognises structural tokens") {
 
 TEST_CASE("lexer distinguishes atoms, variables and reserved names") {
   DiagnosticSink sink;
-  const auto tokens = lex("foo Bar _ _Hidden БОЛЬШЕ НАЙТИВСЁ 'quoted atom'", sink);
+  const auto tokens = lex("foo Bar _ _Hidden БОЛЬШЕ НАЙТИВСЕ 'quoted atom'", sink);
   REQUIRE_FALSE(sink.hasErrors());
   REQUIRE(tokens[0].kind == TokenKind::Identifier);
   REQUIRE(tokens[1].kind == TokenKind::Variable);
@@ -51,9 +51,22 @@ TEST_CASE("lexer distinguishes atoms, variables and reserved names") {
   REQUIRE(tokens[4].kind == TokenKind::Identifier);
   REQUIRE(tokens[4].text == "БОЛЬШЕ");
   REQUIRE(tokens[5].kind == TokenKind::Identifier);
-  REQUIRE(tokens[5].text == "НАЙТИВСЁ");
+  REQUIRE(tokens[5].text == "НАЙТИВСЕ");
   REQUIRE(tokens[6].kind == TokenKind::QuotedAtom);
   REQUIRE(tokens[6].text == "quoted atom");
+}
+
+TEST_CASE("a retired spelling is still a predicate name, not a variable") {
+  // `НАЙТИВСЁ` (with ё) left the language in favour of `НАЙТИВСЕ`; the lexer
+  // keeps it reserved so the call reaches the checks and gets a message
+  // instead of failing as an upper-case variable.
+  DiagnosticSink sink;
+  const auto tokens = lex("НАЙТИВСЁ", sink);
+  REQUIRE_FALSE(sink.hasErrors());
+  REQUIRE(tokens[0].kind == TokenKind::Identifier);
+  REQUIRE(isReservedBuiltinName("НАЙТИВСЁ"));
+  // ... but it is not one of the names the keyword table is built from.
+  REQUIRE(reservedBuiltinNames().count("НАЙТИВСЁ") == 0);
 }
 
 TEST_CASE("lexer handles numbers") {

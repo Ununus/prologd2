@@ -2,7 +2,7 @@
 
 A modern C++23 re-implementation of the **PrologD** logic programming
 interpreter: UTF-8 native, console first, with Russian built-in predicates,
-arbitrary precision integers and the `НАЙТИВСЁ/3` (`findall`) predicate.
+arbitrary precision integers and the `НАЙТИВСЕ/3` (`findall`) predicate.
 
 The original PrologD sources (CP1251, C++/Qt) are not bundled with this
 repository; the previous implementation is published at
@@ -60,12 +60,12 @@ The executable is `build\src\cli\Release\prologd.exe`.
 член(X, [_|T]) :- член(X, T).
 
 % a query (variables start with an upper-case letter)
-?НАЙТИВСЁ(И, студент(И, Ф), А).
+?НАЙТИВСЕ(И, студент(И, Ф), А).
 ```
 
 * Variables: `Name`, `_Name`; `_` is anonymous.
 * Atoms: lower-case names or `'quoted atoms'`.
-* Russian built-in predicate names (`БОЛЬШЕ`, `СЛОЖЕНИЕ`, `НАЙТИВСЁ`, …) are
+* Russian built-in predicate names (`БОЛЬШЕ`, `СЛОЖЕНИЕ`, `НАЙТИВСЕ`, …) are
   reserved atoms.
 * Clauses end with `.` or `;`; rules use `:-` or `<-`; queries start with `?`.
 * Arithmetic expressions are written `#expr#` and support `+ - * / mod div`.
@@ -151,10 +151,10 @@ Implemented: lexer, parser with diagnostics, unification with trail, the
 resolution engine (backtracking, cut, meta-call, negation, disjunction),
 arithmetic with a hand-written `BigInt`, all documented built-in predicate
 groups (control, types, conversions, strings, I/O, program database, graphics
-stubs), `НАЙТИВСЁ/3`, the module loader (`ИМПОРТ`) and the CLI.
+stubs), `НАЙТИВСЕ/3`, the module loader (`ИМПОРТ`) and the CLI.
 
 Ported examples live in `examples/` (lessons, typical tasks, the required
-`НАЙТИВСЁ` demo) and are covered by golden tests. The PySide6 front-end in
+`НАЙТИВСЕ` demo) and are covered by golden tests. The PySide6 front-end in
 `src/gui` drives the interpreter through the JSON protocol: tabs, syntax
 highlighting that tells Latin names from Cyrillic ones, completion built from
 the reserved names and the program's own, run/stop with a fresh interpreter per

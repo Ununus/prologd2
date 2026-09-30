@@ -117,7 +117,7 @@ The syntax change landed as planned, with one deviation and two notes.
   (`A, B ; C ; D` builds a left-nested `;`/2), and the parenthesised group now
   parses `(A ; B)` the way it already parsed `(A, B)`.  **Deviation:** the plan
   said a `;` inside an argument list stays an error; a *parenthesised*
-  `(A ; B)` is allowed there after all, because `ВЫП` and `НАЙТИВСЁ` take their
+  `(A ; B)` is allowed there after all, because `ВЫП` and `НАЙТИВСЕ` take their
   goals as arguments and the parser cannot tell a goal argument from data — the
   same line `,`/2 already crosses.  A bare `;` in an argument list is still an
   error, with its own message (`заключите её в скобки: (A ; B)`), as is a `;`
@@ -137,7 +137,7 @@ The syntax change landed as planned, with one deviation and two notes.
   `ai/porting_notes.md`.
 * Tests: six parse shapes, the solver's semantics (both branches and all their
   solutions, the right branch entered only after the left one, both failing,
-  the local cut, `;` under `НЕ`, `ВЫП` and `НАЙТИВСЁ`, the comma precedence) and
+  the local cut, `;` under `НЕ`, `ВЫП` and `НАЙТИВСЕ`, the comma precedence) and
   two diagnostics (the retired terminator with its position, both branches of a
   disjunction checked for undefined predicates).
 * A follow-up made the printer write `,`/2 and `;`/2 infix (`(A ; B)`): a query

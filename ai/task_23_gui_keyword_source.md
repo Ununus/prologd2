@@ -36,7 +36,7 @@ interpreter, not from a copy in the GUI: today the names live in
   * Catch2: every name the dispatcher registers is in the lexer's reserved set,
     and every reserved name is registered (no orphans in either direction);
   * CTest: `prologd --list-keywords` output parses, is sorted and contains
-    `НАЙТИВСЁ/3`, `ВЫП/1`, `ПС/0`;
+    `НАЙТИВСЕ/3`, `ВЫП/1`, `ПС/0`;
   * Python: `protocol.Decoder` accepts a `ready` event with and without the
     `keywords` field (an older interpreter must still work).
 
@@ -69,7 +69,7 @@ interpreter, not from a copy in the GUI: today the names live in
   ABS/2
   ...
   ИМПОРТ
-  НАЙТИВСЁ/3
+  НАЙТИВСЕ/3
   УМНОЖЕНИЕ/3
   УМНОЖЕНИЕ/4
   ВЫВОД/+

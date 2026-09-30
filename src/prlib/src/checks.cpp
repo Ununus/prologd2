@@ -143,7 +143,7 @@ std::string suggestName(std::string_view name, std::size_t arity,
 /// Visit every goal written in the unit as `(name, arity, location)`.
 ///
 /// The meta-predicates whose arguments are *goals* are opened up, so
-/// `ВЫП(члены(Х))` and `НАЙТИВСЁ(Х, п(Х), L)` are checked too; `НАЙТИВСЁ`'s
+/// `ВЫП(члены(Х))` and `НАЙТИВСЕ(Х, п(Х), L)` are checked too; `НАЙТИВСЕ`'s
 /// template and the arguments of `ДОБ` are terms, not goals, and stay closed.
 void walkGoal(const Term& goal, const SourceLocation& location,
               const std::function<void(std::string_view, std::size_t,
@@ -190,7 +190,7 @@ void walkGoal(const Term& goal, const SourceLocation& location,
     visit(name, 2, location);
     return;
   }
-  if ((name == "НАЙТИВСЁ" || name == "findall") && arity == 3) {
+  if ((name == "НАЙТИВСЕ" || name == "findall") && arity == 3) {
     walkGoal(args[1], location, visit);
     visit(name, 3, location);
     return;

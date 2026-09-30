@@ -52,7 +52,7 @@ class Candidate:
 
     @property
     def label(self) -> str:
-        """What the popup shows: `НАЙТИВСЁ/3`, `ВЫВОД/+` or the bare name."""
+        """What the popup shows: `НАЙТИВСЕ/3`, `ВЫВОД/+` or the bare name."""
         if self.variadic:
             return f"{self.name}/+"
         if self.arity is None:

@@ -25,7 +25,7 @@ breakdown in `ai/`.
   control machine (`control`), built-ins (`extfunc`).
 - Full user help studied (original `prologd-help.txt`).
 - Lesson programs and original test corpus reviewed.
-- The `НАЙТИВСЁ/3` requirement reviewed.
+- The `НАЙТИВСЕ/3` requirement reviewed.
 - Toolchain: GCC 15.2, CMake 4.2, Ninja 1.13, Python 3.14, network available.
 - Boost not installed; Boost.Multiprecision standalone build fails (needs
   Boost.Config) → own `BigInt` (ADR-003).

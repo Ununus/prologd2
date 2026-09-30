@@ -105,7 +105,7 @@ quadratic.
 
 `!` truncates the choice-point stack to the current environment's barrier.
 `ВЫП(G)` pushes `G` into a child environment that *inherits* the caller's cut
-barrier (transparent `call/1`). `НЕ(G)`, `НАЙТИВСЁ` and `СКОЛЬКО` run nested
+barrier (transparent `call/1`). `НЕ(G)`, `НАЙТИВСЕ` and `СКОЛЬКО` run nested
 engine instances over the same bindings/trail.
 
 **Consequences.** Backtracking is O(1) per choice point; the 50 000-step
@@ -120,7 +120,7 @@ directly testable. Memory per choice point is one `EnvRef` plus a few words.
 
 **Context.** Standard Prolog says an identifier starting with an upper-case
 letter is a variable. PrologD built-ins are Russian names in upper case
-(`БОЛЬШЕ`, `СЛОЖЕНИЕ`, `НАЙТИВСЁ`, …). Strict application of the standard would
+(`БОЛЬШЕ`, `СЛОЖЕНИЕ`, `НАЙТИВСЕ`, …). Strict application of the standard would
 turn every built-in into a variable.
 
 **Decision.** The lexer keeps a compile-time set of reserved built-in names.
@@ -409,7 +409,7 @@ its own:
    There is no occurs check (ADR/notes), so `РАВНО(X, f(X))` is legal and makes a
    term that contains itself.  Printing stops at the repeat and writes `...`
    (`f(...)`, `[1|...]`), the print depth is a stack-safety number (2000, not
-   100000), and a *copy* — what `ДОБ` and `НАЙТИВСЁ` need — is refused with
+   100000), and a *copy* — what `ДОБ` and `НАЙТИВСЕ` need — is refused with
    «Циклический терм нельзя скопировать» instead of recursing until the process
    dies.  The alternative (enabling the occurs check) was rejected: it changes
    unification for every program to protect one line at the prompt.

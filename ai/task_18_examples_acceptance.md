@@ -44,7 +44,7 @@ syntax, and add typical-task regression tests.
   * parliament problem (`lesson 5` парламент);
   * **knapsack** (`рюкзак`) — add a new idiomatic PrologD program with a known
     answer, plus a test;
-  * `НАЙТИВСЁ` examples from the requirement;
+  * `НАЙТИВСЕ` examples from the requirement;
   * long arithmetic (`111!`, `1333!`).
 - [ ] `ctest` runs the full suite; every previously passing original test that
       is still meaningful has an equivalent after porting.
@@ -63,4 +63,4 @@ syntax, and add typical-task regression tests.
 ## Acceptance
 
 `ctest` is green, including the ported corpus and all typical-task programs, and
-`НАЙТИВСЁ` reproduces the required examples exactly.
+`НАЙТИВСЕ` reproduces the required examples exactly.

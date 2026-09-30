@@ -24,7 +24,7 @@
 
 Built-in predicate names are Russian and must be written with UTF-8 in string
 literals. Never split a multi-byte character.  Every built-in with a Russian name
-also has an English spelling in lower case (`НАЙТИВСЁ`/`findall`), registered from
+also has an English spelling in lower case (`НАЙТИВСЕ`/`findall`), registered from
 the one table in `builtins.cpp`; `test_aliases.cpp` fails if a Russian name has no
 row there, and the correspondence table in `doc/help.typ` (appendix 17) must be
 regenerated when the table changes.  Names the engine or the parser answers
@@ -100,7 +100,7 @@ Tests are written **together with** the feature, never after.
   * engine: backtracking order, cut, failure, deep recursion, `ВЫП`, `НЕ`, `ИЛИ`;
   * arithmetic: each operator, mixed int/float, division by zero, big values;
   * one test file per built-in predicate group;
-  * `НАЙТИВСЁ/3` with the exact examples from the requirements;
+  * `НАЙТИВСЕ/3` with the exact examples from the requirements;
   * typical tasks: factorial, Fibonacci, GCD, sorting, N-queens, water jugs,
     knapsack, monkey & bananas.
 * Golden tests: the ported `test.txt` corpus is executed by a Catch2 generator
