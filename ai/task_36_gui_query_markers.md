@@ -68,7 +68,7 @@ rule itself is written down in a comment so nobody "improves" it into a parser.
 
 ## Deliverables
 
-- [ ] **Quiet load (prlib/protocol).**  A run loads the program *and runs its own
+- [x] **Quiet load (prlib/protocol).**  A run loads the program *and runs its own
       `?` statements* — that is what `Запустить` must keep doing.  A single query
       must not: otherwise the output pane holds the whole lesson before the one
       answer asked for, and the feature defeats itself.  The seam exists:
@@ -77,12 +77,12 @@ rule itself is written down in a comment so nobody "improves" it into a parser.
       `load` request gains an optional `"questions": false`, and the loader
       either keeps or drops the runner for that load.  Default stays `true`.
       Covered by the existing `cli_json_protocol` ctest.
-- [ ] `src/gui/prologd_gui/queries.py`, Qt-free: `find_statements(text, keywords)`,
+- [x] `src/gui/prologd_gui/queries.py`, Qt-free: `find_statements(text, keywords)`,
       returning `(line, text)` per statement, plus `statement_at(text, line)`.
       Pure text in, pure data out, no Qt import — the same shape as
       `completion.py` and `search.py`.  The keyword table is passed in, so the
       module has no dependency on the interpreter being up.
-- [ ] Editor margin: the line-number area grows an icon column (~14 px, added to
+- [x] Editor margin: the line-number area grows an icon column (~14 px, added to
       `line_number_area_width`), a marker is painted for every line that has a
       statement, and a click on it emits `queryRequested(str)`.
       `LineNumberArea` is a plain `QWidget` today (`editor.py:71-95`) — it needs
@@ -91,7 +91,7 @@ rule itself is written down in a comment so nobody "improves" it into a parser.
       `paint_line_numbers` already uses.  A pointing-hand cursor over a marker,
       and no marker where `line_numbers` is switched off (the margin is zero
       wide then).
-- [ ] Window: `queryRequested` runs the statement the way the query line does —
+- [x] Window: `queryRequested` runs the statement the way the query line does —
       `_run_query` (`window.py:934`) already prepends `?` when it is missing,
       starts the session if there is none and reports the run state.  The path
       for a marker is: load the current buffer (or its file, exactly as
@@ -100,16 +100,16 @@ rule itself is written down in a comment so nobody "improves" it into a parser.
       user; a marker click during a runaway query is the case that matters).
       The statement is put into the query line first so the user sees what is
       about to run, which is the other half of the motivation.
-- [ ] `%?` is visible as a question, not as a comment: `theme.py` gains a colour
+- [x] `%?` is visible as a question, not as a comment: `theme.py` gains a colour
       for a comment whose first non-blank character after `%` is `?` (orange, as
       the user asked), the rule lives next to the other token rules in
       `highlighter.py`, and `test_appearance.py` measures its contrast like every
       other palette entry.
-- [ ] Docs: `doc/gui.typ` gains a short section (what the marker does, that
+- [x] Docs: `doc/gui.typ` gains a short section (what the marker does, that
       `%?` is for a question the program itself must not run),
       `examples/lessons/README.md` gets one paragraph saying the same in the
       course's own words, and `src/gui/README.md` records the protocol addition.
-- [ ] Tests: a new `src/gui/tests/test_queries.py` (the table above, plus a sweep
+- [x] Tests: a new `src/gui/tests/test_queries.py` (the table above, plus a sweep
       over every lesson and example file that pins the *number* of statements per
       file — so a query added to a lesson shows up as a failing expectation rather
       than as a silently missing marker, and no `%!` line ever yields one), the
@@ -117,7 +117,7 @@ rule itself is written down in a comment so nobody "improves" it into a parser.
       `test_window.py` (drive it through `trigger()`/the signal, not synthetic
       keys — see part 13 of the session log), and `test_highlighter.py` for the
       new rule.
-- [ ] Nothing in `examples/` changes, and the catch: the feature must work for a
+- [x] Nothing in `examples/` changes, and the catch: the feature must work for a
       buffer with unsaved changes (the same rule as `Запустить`: load the text
       under the file's own name so `ИМПОРТ` still resolves).
 
@@ -148,3 +148,28 @@ rule itself is written down in a comment so nobody "improves" it into a parser.
   "improves" it into a parser.
 * Out of scope: changing the lesson format to `%?`-only (the file must stay
   runnable end to end — that is its main property), and running a *selection*.
+
+## Result (2026-10-01)
+
+Four commits: `e9c3beb` (protocol 5 — the `questions` flag of `load`),
+`c38acc6` (the rule in `queries.py`, the margin and its marker, the wiring,
+tests and docs), `a99c906` (two findings from the first hands-on run: a failed
+query is named `<query>` and marks no line of the program; `Ctrl+C` copies from
+the focused pane, the output included), `cebd2c0` (the `%?` colour — the token
+kind is decided in `tokens.py` beside the comment branch, which is where that
+rule belongs, and `test_appearance.py` measures the new orange at 5.02 against
+the 4.5 threshold).
+
+Findings worth keeping:
+
+* the sweep in `test_queries.py` pins the number of statements per example file
+  *and* asserts that no live `?`-line anywhere is left without a marker — the
+  half of the rule that costs when it is wrong (a refused live question is a
+  marker missing where the user can see the question run);
+* a live line's own words count as names the document uses (the line is part of
+  it), so the word check is really about *commented* questions — the test table
+  now says so in as many words;
+* `%` with `?` anywhere but the start of the line stays a comment, so the colour
+  and the marker agree about what a parked question is;
+* no lesson file was edited: the acceptance ran on the files as they stand, and
+  the numbers they produced are pinned.

@@ -102,7 +102,7 @@ session.
 | task_33_gui_search_replace | done | `search.py` (plain-text, Qt-free) + the find bar: question from the selection or the word at the caret, `F3`/`Shift+F3` with the wrap reported, three switches, «Заменить всё» as one undo step, the matches lit in every view; `test_search.py` has 16 checks |
 | task_34_builtin_branches | done | every built-in branch-tested in Catch2 (186 cases); the sweep found and fixed five defects: two in the float built-ins (`nan` instead of a failure), the integer/real comparison, the cyclic term that ended the process, the ignored read prompt, the unchecked graphics arguments and the code points that were written as invalid UTF-8 |
 | task_35_lessons_rework | done | the course in `examples/lessons` is rewritten for the current dialect, one commit per lesson, from the plan in `ai/task_35_lessons_rework.md`; `test_lessons.cpp` runs every lesson (12 + the debug appendix) and compares its whole output with the `%!` lines the lesson itself carries, so a lesson cannot drift again; the old files are in `lessons/_old/`; the index is `examples/lessons/README.md` and the fifth Typst document `doc/lessons.typ` (the `docs` target builds it); writing the expectations found and fixed mistakes in the source material (a non-terminating `нод/3`, descending sorts, a hanging `?длина(Х, 2)`, a failed read that leaves the rest of its line) and taught the check two tricks: input files for lesson 7 and include paths for lesson 11 |
-| task_36_gui_query_markers | not started | run one question from the editor margin: a marker next to `?Goal.` and `% ?Goal.`, the `%?` colour, and a `questions: false` load so the clicked query answers *alone*; the task file carries the rule for what counts as a statement (a lesson's commented query often has prose after the goal) and the finding that no lesson file has to change |
+| task_36_gui_query_markers | done | a blue triangle in the margin runs the question it stands at — `?Goal.` and `% ?Goal.` alike: the commented query of a lesson (its own lines still run whole), the `%?` line coloured as a question, and a `questions: false` load so the clicked query answers *alone*; the rule is not a parser and refuses a line it cannot read (commits e9c3beb/c38acc6/a99c906/cebd2c0); the first hands-on run added two fixes — a failed query marks no line of the program (`<query>`), and `Ctrl+C` copies from the focused pane |
 | task_37_gui_builtin_reference | not started | `doc/builtins.json` as the one machine-readable source for the built-in reference, a checker keeping it in step with `--list-keywords` and the sections of `help.typ`, a summary line under the completion popup and `Shift+F1` on the word under the caret (the English-alias work of task_39 would land in the same file) |
 | task_38_engine_limits | done | recursion depth and long runs: the crash is gone (the chain and deep terms are released iteratively — the trigger was a *surviving* deep reference, a choice point whose base clause does not cut, or the solver's final environment), `maxDepth` turns runaway recursion into a diagnostic, the variable growth is documented instead of "fixed", and `tools/bench_engine.py` made the numbers reproducible |
 | task_39_english_aliases | done | every built-in has an English spelling in lower case (one `kEnglishNames` table in `builtins.cpp`, 47 pairs, is the only place a pair is written; `test_aliases.cpp` walks it and fails on a Russian name without a row); the manual gained appendix 17 with the whole table, `prologd-diff.typ` §15 and `conventions.md` the rule; doing it showed that `int`/`float` were *checks*, not conversions (`integer`/`float` are the ISO type tests, `is_whole`/`is_number` the old ones, and the planned `to_int`/`to_float` were dropped) and `ДЛИНА` became `strlen`; 108 reserved names, one list for CLI, protocol and GUI; renamed on review: `number` → `is_number`, `num_to_float` → `int_to_float` |
@@ -669,7 +669,10 @@ Resolved on 2026-09-29 (GUI planning):
   `ai/porting_notes.md` records the deviation from the original file.  Worth
   remembering: this is the second time a *lesson's* behaviour has been the only
   evidence for a built-in's semantics — the lessons are the acceptance material, and
-  a commented-out query is not a test.
+  a commented-out query is not a test.  (Later the original sources were found on
+  this machine, and the reference itself was checked: the 2025 build keeps the
+  post-fix `find` branch, so it too answers `Н=3` — the «старый 3 против порта 1»
+  framing above was the premise of that session, not an open discrepancy.)
 * Lessons session, part 1: the course was stale — lesson 1 still answered with
   the old interpreter's values, lesson 7 never existed, and lessons 5 and 8 could
   not be run whole.  It is being rebuilt from the plan in
@@ -912,3 +915,25 @@ Resolved on 2026-09-29 (GUI planning):
   went: `Engine::initialize()` loads nothing, `?СКОЛЬКО(НЕ, А)` answers 0, and
   ADR-018 records why the seven clauses could never be selected.  229 ctest tests
   (5 new), 216 Catch2 cases / 3 304 assertions.
+* GUI round, part 28: **task_36 — вопросы на полях**.  In the margin left of the
+  line numbers every question now carries a blue triangle, and a click answers
+  exactly that statement: the program is loaded *quietly* (`"questions": false`
+  on `load`, protocol 5) so the pane holds the one answer and not the whole
+  lesson, and the statement goes into the query line first, where it stays while
+  the answer arrives.  The rule that decides which lines are questions lives in
+  `queries.py` and is deliberately not a parser: shape first (`?` or `%` with `?`
+  at the start of the line; the sentence ends at the first `.` outside strings,
+  `#…#` and matched brackets), then *words* — every bare word must be a
+  variable, a reserved name or a name the document itself uses, which is what
+  refuses prose like `% ?длина(Х, 2) не завершится.`.  A live line's own words
+  count as used (the line is part of the document), so the word check really
+  guards commented questions; the sweep asserts that no live `?`-line anywhere
+  in `examples/` is left without a marker and pins the counts per file.  A click
+  during a run stops it first.  The first hands-on run of the feature produced
+  two more fixes, both now tests: a failed query is named `<query>` — the window
+  shows it in the pane and no longer marks line 1 of the program and pulls the
+  caret there — and `Ctrl+C` copies the selection of the *focused* pane, so text
+  can be copied out of the output at last.  The `%?` question-comment is orange
+  (`#b45309`, contrast 5.02 — the tightest colour in the palette, still above
+  the 4.5 threshold).  No lesson file was edited; 231/231 ctest, the 16 headless
+  GUI scripts, all six Typst documents.
