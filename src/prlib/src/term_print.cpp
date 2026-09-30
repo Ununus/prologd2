@@ -159,6 +159,18 @@ class TermWriter {
       out += ']';
       return;
     }
+    // Control constructs print the way they are written: `(A, B)`, `(A ; B)`.
+    // A conjunction or a disjunction reaches a query echo, a trace line and a
+    // step point, and `;(a,b)` is not what the program says.
+    if ((term.compound->name == "," || term.compound->name == ";") &&
+        term.compound->args.size() == 2) {
+      out += '(';
+      append(out, term.compound->args[0], depth + 1);
+      out += term.compound->name == "," ? ", " : " ; ";
+      append(out, term.compound->args[1], depth + 1);
+      out += ')';
+      return;
+    }
     out += term.compound->name;
     out += '(';
     for (std::size_t i = 0; i < term.compound->args.size(); ++i) {
