@@ -10,7 +10,13 @@ can be repeated instead of remembered.
 Usage:
     python tools/bench_engine.py                 # the default sizes
     python tools/bench_engine.py --quick         # small, for a smoke run
+    python tools/bench_engine.py --only queens   # one workload, by label substring
     python tools/bench_engine.py --exe build/windows-msvc/src/cli/Release/prologd.exe
+
+task_42 added two workloads: a dispatch-bound step loop (the per-goal lookup
+cost) and the N-queens search (few clauses with heavy bodies — the shape
+first-argument indexing cannot prune) plus structured fact heads (the shape it
+can).  See `ai/decisions.md`, ADR-017, for what they measured.
 
 Output is ASCII only: when this script is piped through `Select-String`, a
 redirect or a log file, Python encodes stdout with the ANSI code page, and a raw
@@ -42,6 +48,46 @@ DEEP_TERM = """\
 
 FACTS = """\
 {facts}?ТИХО, ф({query}), ВЫВОД(ok), ПС.
+"""
+
+# Dispatch-bound (task_42 stage 1): fourteen trivial built-in goals and one user
+# predicate per step, so the per-goal lookup cost is a large share of the work.
+DISPATCH = """\
+проверка(0) :- !.
+проверка(Н) :- БОЛЬШЕ(Н, 0), РАВНО(1, 1), РАВНО(2, 2), РАВНО(3, 3),
+    РАВНО(4, 4), РАВНО(5, 5), РАВНО(6, 6), РАВНО(7, 7), РАВНО(8, 8),
+    РАВНО(9, 9), РАВНО(10, 10), РАВНО(11, 11), РАВНО(12, 12),
+    СЛОЖЕНИЕ(М, 1, Н), проверка(М).
+?ТИХО, проверка({steps}), ВЫВОД(ok), ПС.
+"""
+
+# Structured fact heads (task_42 stage 2): the same scan as FACTS, but every
+# failed attempt compares a compound head, which is the work first-argument
+# indexing would skip.
+STRUCTURED_FACTS = """\
+{facts}?ТИХО, ф(к({query})), ВЫВОД(ok), ПС.
+"""
+
+# Few clauses, heavy bodies (task_42 stage 2): the N-queens search, where every
+# clause head shallow-matches and the work is in the body — the shape indexing
+# cannot prune (measured; see ai/decisions.md, ADR-017).
+QUEENS = """\
+ферзь(0, N, [], A) :- список(N, A), !.
+ферзь(N, M, [[N,X]|A], C) :- ферзь(#N-1#, #M+1#, A, B), выбрать(X, B, C),
+                            можно([N,X], A).
+список(0, []).
+список(N, [N|A]) :- список(#N-1#, A).
+выбрать(X, [X|A], A).
+выбрать(X, [Y|A], [Y|B]) :- выбрать(X, A, B).
+можно(_, []) :- !.
+можно(A, [B|C]) :- НЕ(нельзя(A, B)), можно(A, C).
+нельзя([A,_], [A,_]) :- !.
+нельзя([_,A], [_,A]) :- !.
+нельзя([A,B], [C,D]) :- abs(#A-C#, E), abs(#B-D#, F), РАВНО(E, F).
+abs(X, Y) :- МЕНЬШЕ(X, 0), !, РАВНО(Y, #-1*X#).
+abs(X, X).
+ферзи(N, A) :- ферзь(N, 0, A, []).
+?ТИХО, НАЙТИВСЕ(A, ферзи({size}, A), _), ВЫВОД(ok), ПС.
 """
 
 
@@ -108,7 +154,12 @@ def main() -> int:
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--exe", default=None, help="path to the prologd executable")
     parser.add_argument("--quick", action="store_true", help="small sizes, for a smoke run")
+    parser.add_argument("--only", default=None,
+                        help="run only the workloads whose label contains this text")
     args = parser.parse_args()
+
+    def wanted(label: str) -> bool:
+        return args.only is None or args.only in label
 
     root = pathlib.Path(__file__).resolve().parents[1]
     candidates = [
@@ -125,6 +176,9 @@ def main() -> int:
     depth_sizes = [10_000, 50_000] if args.quick else [50_000, 100_000, 400_000]
     list_sizes = [10_000] if args.quick else [20_000, 60_000]
     fact_sizes = [10_000] if args.quick else [100_000]
+    dispatch_steps = [10_000] if args.quick else [100_000]
+    structured_sizes = [20_000] if args.quick else [50_000]
+    queens_sizes = [6] if args.quick else [8]
     # The depth guard would stop these programs before the release is exercised,
     # which is the point of the measurement.
     unlimited = ["--max-depth", "0"]
@@ -133,28 +187,78 @@ def main() -> int:
     rows: list[tuple[str, float, float | None, int]] = []
 
     for depth in depth_sizes:
+        label = f"recursion depth {depth}"
+        if not wanted(label):
+            continue
         seconds, peak, code, out, err = measure(executable, work, f"recursion_{depth}",
                                                 DEEP_RECURSION.format(depth=depth), unlimited)
-        rows.append((f"recursion depth {depth}", seconds, peak, code))
+        rows.append((label, seconds, peak, code))
         if code != 0 or out != "ok":
             print(f"  ! recursion depth {depth}: exit {code} (0x{code & 0xFFFFFFFF:08X}) "
                   f"out={out[:20]!r} err={err[:60]!r}")
 
     for size in list_sizes:
+        label = f"list of {size} cells"
+        if not wanted(label):
+            continue
         facts = "".join(f"ф({index}).\n" for index in range(1, size + 1))
         seconds, peak, code, out, err = measure(executable, work, f"list_{size}",
                                                 DEEP_TERM.format(facts=facts), unlimited)
-        rows.append((f"list of {size} cells", seconds, peak, code))
+        rows.append((label, seconds, peak, code))
         if code != 0 or out != "ok":
             print(f"  ! list {size}: exit {code} (0x{code & 0xFFFFFFFF:08X}) err={err[:60]!r}")
 
     for size in fact_sizes:
         facts = "".join(f"ф({index}).\n" for index in range(1, size + 1))
-        for label, index in (("first", 1), ("last", size)):
-            seconds, peak, code, out, err = measure(executable, work, f"facts_{size}_{label}",
+        for label, index in ((f"{size} facts, first clause", 1),
+                             (f"{size} facts, last clause", size)):
+            if not wanted(label):
+                continue
+            seconds, peak, code, out, err = measure(executable, work, f"facts_{size}_{index}",
                                                     FACTS.format(facts=facts, query=index),
                                                     unlimited)
-            rows.append((f"{size} facts, {label} clause", seconds, peak, code))
+            rows.append((label, seconds, peak, code))
+
+    for steps in dispatch_steps:
+        label = f"dispatch {steps} steps"
+        if not wanted(label):
+            continue
+        seconds, peak, code, out, err = measure(executable, work, f"dispatch_{steps}",
+                                                DISPATCH.format(steps=steps), unlimited)
+        rows.append((label, seconds, peak, code))
+        if code != 0 or out != "ok":
+            print(f"  ! dispatch {steps}: exit {code} (0x{code & 0xFFFFFFFF:08X}) "
+                  f"out={out[:20]!r} err={err[:60]!r}")
+
+    for size in structured_sizes:
+        facts = "".join(f"ф(к({index})).\n" for index in range(1, size + 1))
+        for label, index in ((f"structured {size} facts, first", 1),
+                             (f"structured {size} facts, last", size)):
+            if not wanted(label):
+                continue
+            seconds, peak, code, out, err = measure(executable, work, f"structured_{size}_{index}",
+                                                    STRUCTURED_FACTS.format(facts=facts,
+                                                                            query=index),
+                                                    unlimited)
+            rows.append((label, seconds, peak, code))
+            if code != 0 or out != "ok":
+                print(f"  ! structured {size}/{index}: exit {code} "
+                      f"(0x{code & 0xFFFFFFFF:08X}) err={err[:60]!r}")
+
+    for size in queens_sizes:
+        label = f"queens {size}"
+        if not wanted(label):
+            continue
+        seconds, peak, code, out, err = measure(executable, work, f"queens_{size}",
+                                                QUEENS.format(size=size), unlimited)
+        rows.append((label, seconds, peak, code))
+        if code != 0 or out != "ok":
+            print(f"  ! queens {size}: exit {code} (0x{code & 0xFFFFFFFF:08X}) "
+                  f"out={out[:20]!r} err={err[:60]!r}")
+
+    if not rows:
+        print(f"no workload matched --only {args.only!r}")
+        return 2
 
     print(f"{executable}")
     print(f"{'workload':>26} {'time':>9} {'peak':>10}  exit")
