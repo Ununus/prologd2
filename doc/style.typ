@@ -1,0 +1,77 @@
+// Общий внешний вид документации Пролог-Д.
+//
+// Подключается первыми строками документа:
+//
+//   #import "style.typ": apply
+//   #show: apply
+//
+// Именно `#show: apply`, а не `#include`: правила оформления действуют на то,
+// что идёт дальше, поэтому их нужно навесить на содержимое документа целиком.
+//
+// Здесь только оформление листингов: страницу, шрифт, заголовки и колонтитулы
+// каждый документ настраивает сам.
+
+// Фон панели.
+#let fill-code = rgb("#F1F4F8")   // программы и фрагменты кода
+#let fill-shell = rgb("#EDF4F0")  // команды оболочки: их набирают, а не читают
+#let fill-plain = rgb("#F3F3F5")  // структура каталогов, произвольный текст
+#let fill-inline = rgb("#EDF1F7") // встроенный код в строке текста: чуть темнее панели
+
+// Полоса слева и тонкая рамка: цвет говорит, что это за листинг.
+#let bar-prolog = rgb("#3B6EA5")  // Пролог-Д
+#let bar-cpp = rgb("#7A5CA8")     // C++
+#let bar-shell = rgb("#2E7D62")   // команды оболочки
+#let bar-plain = rgb("#9AA5B1")   // язык не указан
+#let edge = rgb("#DCE3EC")
+
+// Панель листинга.  Шире текста на `outset`: строке кода достаётся чуть больше
+// места, чем строке обычного текста, и она реже переносится.  `breakable`
+// оставлен: длинный листинг по-прежнему может перейти на следующую страницу,
+// как переходил раньше.  Кегль кода не трогаем — у Typst для листингов свой,
+// меньше основного текста.
+#let panel(
+  body,
+  bar: bar-plain,
+  fill: fill-plain,
+) = block(
+  width: 100%,
+  fill: fill,
+  inset: (x: 10pt, y: 9pt),
+  outset: (x: 12pt),
+  radius: 6pt,
+  stroke: (
+    left: 2.5pt + bar,
+    top: 0.6pt + edge,
+    right: 0.6pt + edge,
+    bottom: 0.6pt + edge,
+  ),
+  breakable: true,
+  body,
+)
+
+// Язык задаётся в тройных кавычках: ```prolog, ```cpp, ```sh.  Листинг без
+// языка (структура каталогов, простой текст) получает нейтральную полосу.
+#let apply(body) = {
+  // Встроенный код: в панели он не попадает, а фон получает тот же оттенок,
+  // что и панели, иначе два серых рядом выглядят случайными.
+  show raw.where(block: false): box.with(
+    fill: fill-inline,
+    inset: (x: 0.2em, y: 0.2em),
+    outset: (y: 0.25em),
+    radius: 0.2em,
+  )
+
+  show raw.where(block: true): it => {
+    let lang = it.lang
+    if lang == "prolog" {
+      panel(it, bar: bar-prolog, fill: fill-code)
+    } else if lang == "cpp" {
+      panel(it, bar: bar-cpp, fill: fill-code)
+    } else if lang == "sh" {
+      panel(it, bar: bar-shell, fill: fill-shell)
+    } else {
+      panel(it)
+    }
+  }
+  body
+}

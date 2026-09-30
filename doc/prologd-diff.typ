@@ -1,3 +1,7 @@
+// Оформление листингов — общее для всех документов (см. doc/style.typ).
+#import "style.typ": apply
+#show: apply
+
 #set document(title: "Пролог-Д 2.0: изменения языка", author: "Проект PrologD")
 #set page(
   paper: "a5",
