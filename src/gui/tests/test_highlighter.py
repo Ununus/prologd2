@@ -115,6 +115,16 @@ def test_the_comment_is_not_tokenized_further() -> None:
     print("ok: a trailing comment keeps its own colour to the end of the line")
 
 
+def test_a_parked_question_is_coloured_as_a_question() -> None:
+    """`%   ?ВЕРСИЯ.` is a question the margin runs, not a note about one."""
+    assert Coloured("%   ?ВЕРСИЯ.").colour("%") == THEME.query_comment
+    # A comment that is not a question, and a question that does not start the
+    # line, both keep the comment colour.
+    assert Coloured("% привет").colour("%") == THEME.comment
+    assert Coloured("факт(1). % ?факт(X).").colour("%") == THEME.comment
+    print("ok: a question parked in a comment is coloured as a question")
+
+
 def test_builtins_are_bold_and_names_are_not() -> None:
     coloured = Coloured("НАЙТИВСЕ(X)")
     keyword_colour, keyword_weight = coloured.at("НАЙТИВСЕ")
@@ -157,6 +167,7 @@ def main() -> int:
     test_colours_by_kind()
     test_colours_on_a_query_line()
     test_the_comment_is_not_tokenized_further()
+    test_a_parked_question_is_coloured_as_a_question()
     test_builtins_are_bold_and_names_are_not()
     test_changing_the_table_recolours()
     test_changing_the_theme_recolours()

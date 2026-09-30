@@ -33,6 +33,7 @@ from prologd_gui.tokens import (  # noqa: E402
     OPERATOR,
     PUNCTUATION,
     QUERY,
+    QUERY_COMMENT,
     QUOTED_ATOM,
     STRING,
     VARIABLE,
@@ -77,7 +78,15 @@ def test_comments_and_clause_terminators() -> None:
     ]
     # A comment swallows the rest of the line whole, quotes included.
     assert kinds("цель(X). % не '\"строка")[-1] == (COMMENT, "% не '\"строка")
-    print("ok: comments and terminators")
+    # A question parked in a comment is a question all the same: the margin marks
+    # it and runs it (task_36), so it is not coloured as prose.
+    assert kinds("%   ?ВЕРСИЯ.") == [(QUERY_COMMENT, "%   ?ВЕРСИЯ.")]
+    assert kinds("%?monk(14).") == [(QUERY_COMMENT, "%?monk(14).")]
+    # …but only where the line *begins*: a question after code is a comment, and
+    # so is a comment that only starts like one.
+    assert kinds("факт(1). % ?факт(X).")[-1] == (COMMENT, "% ?факт(X).")
+    assert kinds("%! С=15") == [(COMMENT, "%! С=15")]
+    print("ok: comments, parked questions and terminators")
 
 
 def test_strings_and_quoted_atoms() -> None:

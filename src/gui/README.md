@@ -108,7 +108,10 @@ refuses prose like `% ?длина(Х, 2) не завершится.` — the rul
 a parser, and a line it cannot read gets no marker: no marker is a small loss, a
 marker that runs the wrong text is a wrong program.  The sweep over `examples/`
 pins the number of statements per file, and that no live `?`-line anywhere is
-left without a marker.
+left without a marker.  A comment-shaped line that starts with `%` and `?` is
+coloured as a question (orange) rather than as a comment: that is the shape of a
+parked question — whether the word rule then gives it a marker is the rule's own
+decision.
 
 A click during a run stops it first (`Остановить`) and then runs the clicked
 question in a fresh interpreter: the marker is the way out of a runaway query as

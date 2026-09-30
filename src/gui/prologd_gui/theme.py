@@ -29,6 +29,9 @@ class Theme:
     """
 
     comment: str = "#0d6a0d"
+    # A question parked in a comment (`%   ?ВЕРСИЯ.`): a question to the reader,
+    # and the margin will run it — orange, so it does not read as prose.
+    query_comment: str = "#b45309"
     string: str = "#a31515"
     quoted_atom: str = "#b03060"
     keyword: str = "#00008b"  # reserved names: built-ins, `mod`/`div`, `ИМПОРТ`
@@ -47,6 +50,8 @@ class Theme:
         """The colour of a token; an empty string means "leave it alone"."""
         if kind == tokens.COMMENT:
             return self.comment
+        if kind == tokens.QUERY_COMMENT:
+            return self.query_comment
         if kind == tokens.STRING:
             return self.string
         if kind == tokens.QUOTED_ATOM:

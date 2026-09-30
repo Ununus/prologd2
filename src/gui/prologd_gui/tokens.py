@@ -39,6 +39,7 @@ INTEGER = "integer"
 FLOAT = "float"
 PUNCTUATION = "punctuation"
 QUERY = "query"  # `?`
+QUERY_COMMENT = "query_comment"  # a question parked in a comment: `% ?…`
 EXPRESSION = "expression"  # the `#` of `#… #`
 
 # -- alphabets --------------------------------------------------------------
@@ -139,7 +140,15 @@ def tokenize(line: str, keywords: Keywords | None = None) -> list[Token]:
             index += 1
             continue
         if ch == "%":
-            tokens.append(Token(COMMENT, line[index:], index, length))
+            # A question parked in a comment (`%   ?ВЕРСИЯ.`) is a question all the
+            # same — the margin marks it and runs it (task_36) — so it is coloured
+            # as one.  Only a comment that *starts* the line can be one: the rule
+            # the margin uses is `%`, blanks and `?` where the line begins.
+            rest = line[index:]
+            if not line[:index].strip() and rest[1:].lstrip(" \t").startswith("?"):
+                tokens.append(Token(QUERY_COMMENT, rest, index, length))
+            else:
+                tokens.append(Token(COMMENT, rest, index, length))
             break
         if ch == '"':
             end = _scan_delimited(line, index, '"', doubled=False, backslash=True)
