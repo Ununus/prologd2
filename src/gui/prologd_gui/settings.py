@@ -1,16 +1,25 @@
-"""Persisted preferences.
+"""Persisted preferences, and the description the dialog is built from.
 
-Small on purpose: this holds what the window already uses (font, line numbers,
-indent, theme) and nothing more.  Task_29 adds the dialog, the rest of the list
-and the "unknown keys are preserved" rule — which `QSettings` gives for free, as
-long as values are read through here rather than written over the whole file.
+`Settings` is the store: typed properties for what the window reads, one key at
+ a time, in an ini file (`%LOCALAPPDATA%\\PrologD\\gui\\ini`, or `--settings
+FILE`).  `SETTINGS` is the *list* of what the user may change: label, section,
+kind, default and bounds — the dialog builds a row from each record and
+«Сбросить» writes those defaults back, so a value cannot be editable without
+being stored, or stored without being documented.
 
-A value that cannot be read (a hand-edited file, or a string where a number used
-to be) falls back to the default instead of taking the window down with it.
+Three promises hold for a hand-edited or foreign file:
+
+* a value that cannot be read (a string where a number used to be) falls back to
+  the default instead of taking the window down with it;
+* a number outside its bounds is clamped, never rejected;
+* a key this version does not know is **preserved** — an ini written by a newer
+  build must survive a round through this one, which is why values are written
+  one key at a time rather than by replacing the file.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 from PySide6.QtCore import QSettings, QStandardPaths
@@ -48,6 +57,23 @@ FORMAT_SELECTION = "format/selection"
 #: a string rather than a parsed table: a file a human edited may hold nonsense,
 #: and turning nonsense into the built-in table is `Shortcuts.from_json`'s job.
 SHORTCUTS_TABLE = "shortcuts/table"
+#: The output panel has a size of its own since task_29: a log is read at a
+#: different distance from the program, and the two used to share one number.
+OUTPUT_FONT_SIZE = "output/font_size"
+OUTPUT_LINE_LIMIT = "output/line_limit"
+#: Whether «най» offers `НАЙТИВСЕ` (off) or only `найти` (on) — task_24's model
+#: has both, the switch is new (task_29).
+COMPLETION_MATCH_CASE = "editor/completion_match_case"
+#: The pale band behind the line the caret is on.
+CURRENT_LINE = "editor/current_line"
+#: Minutes between two automatic saves of *named* buffers; 0 is off.
+AUTOSAVE_MINUTES = "files/autosave_minutes"
+RECENT_LIMIT = "files/recent_limit"
+#: The one folder the user keeps shared sources in (task_29): passed as `-I`
+#: on every session, so `ИМПОРТ("library.pld")` works from any program.
+WORKING_DIRECTORY = "execution/working_directory"
+#: More `-I` folders, in the order the engine will search them.
+IMPORT_PATHS = "execution/import_paths"
 
 DEFAULT_FONT_FAMILY = "Cascadia Mono"
 DEFAULT_FONT_SIZE = 11.0
@@ -81,7 +107,141 @@ MAXIMUM_FORMAT_INDENT = 8
 DEFAULT_FORMAT_UNIT = "tab"
 FORMAT_UNITS = ("tab", "spaces")
 
+#: task_29.  The output starts at the editor's size, so an old file (and a fresh
+#: one) behaves as it did; the two only differ once the user splits them.
+DEFAULT_OUTPUT_FONT_SIZE = DEFAULT_FONT_SIZE
+DEFAULT_OUTPUT_LINE_LIMIT = 50_000
+MINIMUM_OUTPUT_LINE_LIMIT = 100
+MAXIMUM_OUTPUT_LINE_LIMIT = 500_000
+
+#: 0 is off.  An interval rather than «перед запуском»: that switch is
+#: `save_before_run`, and it is a different promise (this one saves work the user
+#: has not run at all).
+DEFAULT_AUTOSAVE_MINUTES = 0
+MAXIMUM_AUTOSAVE_MINUTES = 120
+
+DEFAULT_RECENT_LIMIT = 10
+MAXIMUM_RECENT_LIMIT = 50
+
 _TRUE = ("1", "true", "yes", "y", "да")
+
+
+@dataclass(frozen=True)
+class Setting:
+    """One preference, described once.
+
+    The same record is what the dialog builds its row from, what validation
+    clamps against, and what «Сбросить» writes back — so a value can neither be
+    editable without being stored nor stored without being documented.  `kind` is
+    one of `bool`, `int`, `float`, `choice`, `text`, `directory`, `dirs`.
+    """
+
+    key: str
+    label: str
+    section: str
+    kind: str = "text"
+    default: object = ""
+    low: float | None = None
+    high: float | None = None
+    #: `(value, what the user reads)` for `kind == "choice"`.
+    choices: tuple[tuple[str, str], ...] = ()
+    suffix: str = ""
+    hint: str = ""
+
+    def label_of(self, value: object) -> str:
+        """How this value is written on screen (the label of a choice, else str)."""
+        for choice, text in self.choices:
+            if choice == value:
+                return text
+        return str(value)
+
+
+#: The sections of the dialog, in the order they are shown.
+SECTIONS = ("Редактор", "Вид", "Формат", "Выполнение", "Файлы")
+
+#: Everything the dialog edits.  The keys the *window* writes for itself
+#: (geometry, recent files, the insert table) are not here — see `MACHINE_KEYS`.
+SETTINGS: tuple[Setting, ...] = (
+    # -- editor
+    Setting(FONT_FAMILY, "Шрифт", "Редактор", "text", DEFAULT_FONT_FAMILY,
+            hint="Моноширинный шрифт с кириллицей; остальные панели берут его же"),
+    Setting(FONT_SIZE, "Размер шрифта", "Редактор", "float", DEFAULT_FONT_SIZE,
+            MINIMUM_FONT_SIZE, MAXIMUM_FONT_SIZE, suffix=" pt"),
+    Setting(LINE_NUMBERS, "Номера строк", "Редактор", "bool", True),
+    Setting(CURRENT_LINE, "Подсвечивать текущую строку", "Редактор", "bool", True,
+            hint="Бледная полоса под курсором"),
+    Setting(WRAP, "Переносить длинные строки", "Редактор", "bool", False,
+            hint="Только в редакторе: строку вывода переносить нельзя"),
+    Setting(INDENT_CHARACTER, "Отступ", "Редактор", "choice", "\t",
+            choices=(("\t", "табуляция"), (" ", "пробелы"))),
+    Setting(INDENT_WIDTH, "Ширина отступа", "Редактор", "int", 1, 1, 16,
+            suffix=" знаков"),
+    Setting(COMPLETION, "Автодополнение", "Редактор", "bool", True),
+    Setting(AUTO_COMPLETE_AFTER, "Показывать после", "Редактор", "int",
+            DEFAULT_AUTO_COMPLETE_AFTER, MINIMUM_AUTO_COMPLETE_AFTER,
+            MAXIMUM_AUTO_COMPLETE_AFTER, suffix=" букв"),
+    Setting(COMPLETION_MATCH_CASE, "Учитывать регистр в подсказках", "Редактор",
+            "bool", True,
+            hint="С выключенным: «най» предлагает и «НАЙТИВСЕ», и «найти»"),
+    # -- view
+    Setting(THEME, "Оформление", "Вид", "choice", DEFAULT_THEME,
+            choices=(("light", "светлое"), ("system", "как в системе"))),
+    Setting(TOOLBAR, "Панель инструментов", "Вид", "bool", True),
+    Setting(OUTPUT_VISIBLE, "Панель вывода", "Вид", "bool", True),
+    Setting(OUTPUT_POSITION, "Панель вывода", "Вид", "choice",
+            DEFAULT_OUTPUT_POSITION,
+            choices=(("right", "справа"), ("bottom", "снизу"))),
+    Setting(INPUT_QUEUE, "Поле очереди ввода", "Вид", "bool", True,
+            hint="Строки под панелью вывода, по одной на запрос программы"),
+    Setting(OUTPUT_FONT_SIZE, "Размер шрифта вывода", "Вид", "float",
+            DEFAULT_OUTPUT_FONT_SIZE, MINIMUM_FONT_SIZE, MAXIMUM_FONT_SIZE,
+            suffix=" pt", hint="Отдельно от редактора: колесо над панелью меняет его"),
+    Setting(OUTPUT_LINE_LIMIT, "Помнить строк вывода", "Вид", "int",
+            DEFAULT_OUTPUT_LINE_LIMIT, MINIMUM_OUTPUT_LINE_LIMIT,
+            MAXIMUM_OUTPUT_LINE_LIMIT, suffix=" строк",
+            hint="Старые строки удаляются, чтобы долгий прогон не съел память"),
+    # -- format
+    Setting(FORMAT_MODE, "Режим", "Формат", "choice", DEFAULT_FORMAT_MODE,
+            choices=(("line", "в одну строку"), ("soft", "мягкое"),
+                     ("hard", "жёсткое"))),
+    Setting(FORMAT_WIDTH, "Ширина строки", "Формат", "int", DEFAULT_FORMAT_WIDTH,
+            MINIMUM_FORMAT_WIDTH, MAXIMUM_FORMAT_WIDTH, suffix=" знаков"),
+    Setting(FORMAT_INDENT, "Отступ продолжения", "Формат", "int",
+            DEFAULT_FORMAT_INDENT, MINIMUM_FORMAT_INDENT, MAXIMUM_FORMAT_INDENT),
+    Setting(FORMAT_UNIT, "Единица отступа", "Формат", "choice", DEFAULT_FORMAT_UNIT,
+            choices=(("tab", "табуляция"), ("spaces", "четыре пробела"))),
+    Setting(FORMAT_SELECTION, "Форматировать только выделенное", "Формат", "bool",
+            False),
+    # -- execution
+    Setting(SAVE_BEFORE_RUN, "Сохранять перед запуском", "Выполнение", "bool", False),
+    Setting(WORKING_DIRECTORY, "Рабочая папка (ИМПОРТ)", "Выполнение", "directory", "",
+            hint="Общие программы: каталог ищется при каждом ИМПОРТ, в любом файле"),
+    Setting(IMPORT_PATHS, "Дополнительные каталоги ИМПОРТ", "Выполнение", "dirs", (),
+            hint="Передаются интерпретатору как -I, в этом порядке"),
+    # -- files
+    Setting(AUTOSAVE_MINUTES, "Автосохранение, мин", "Файлы", "int",
+            DEFAULT_AUTOSAVE_MINUTES, 0, MAXIMUM_AUTOSAVE_MINUTES,
+            hint="0 — выключено.  Сохраняются только файлы с именем"),
+    Setting(RECENT_LIMIT, "Помнить недавних файлов", "Файлы", "int",
+            DEFAULT_RECENT_LIMIT, 0, MAXIMUM_RECENT_LIMIT),
+)
+
+#: The key of a record, for the callers that have one and not the other.
+BY_KEY: dict[str, Setting] = {setting.key: setting for setting in SETTINGS}
+
+#: Stored, but written by the window rather than by the user: window geometry,
+#: the recent list, the insert table.  Kept here so a test can prove that every
+#: key of this module is either editable in the dialog or on this list.
+MACHINE_KEYS = (
+    RECENT_FILES,
+    LAST_DIRECTORY,
+    SPLIT_EDITOR,
+    SPLIT_SIZES,
+    RESTORE_SPLIT,
+    OUTPUT_SIZES,
+    PANEL_SIZES,
+    SHORTCUTS_TABLE,
+)
 
 
 def default_path() -> Path:
@@ -145,6 +305,152 @@ class Settings:
     def all_keys(self) -> list[str]:
         """Every key in the file, known to this class or not."""
         return list(self._store.allKeys())
+
+    def has(self, key: str) -> bool:
+        """Whether the file holds this key at all.
+
+        Asked by the one preference that *follows* another until it is given a
+        value of its own: the output's font size reads as the editor's while
+        nobody has ever set it (task_29).
+        """
+        return self._store.contains(key)
+
+    # -- the described settings (task_29) -----------------------------------
+    def value_of(self, setting: Setting) -> object:
+        """One described setting, read with its own default and bounds.
+
+        The single reader for the dialog and for «Сбросить»: a kind that is not
+        known here is a programming mistake, and saying so beats a widget that
+        silently shows the default for ever.
+        """
+        if setting.kind == "bool":
+            return self._flag(setting.key, bool(setting.default))
+        if setting.kind == "int":
+            return int(self._number(setting.key, float(setting.default),
+                                    float(setting.low), float(setting.high)))
+        if setting.kind == "float":
+            return float(self._number(setting.key, float(setting.default),
+                                      float(setting.low), float(setting.high)))
+        if setting.kind == "choice":
+            return self._choice(setting)
+        if setting.kind == "dirs":
+            return self._paths(setting.key)
+        if setting.kind in ("text", "directory"):
+            return self._text(setting.key, str(setting.default))
+        raise ValueError(f"unknown kind {setting.kind!r} for {setting.key}")
+
+    def set_value(self, setting: Setting, value: object) -> None:
+        """Writes one described setting, validated by its own description."""
+        if setting.kind == "bool":
+            self._write(setting.key, bool(value))
+        elif setting.kind == "int":
+            self._write(setting.key, int(self._clamp(setting, value)))
+        elif setting.kind == "float":
+            self._write(setting.key, float(self._clamp(setting, value)))
+        elif setting.kind == "choice":
+            values = [choice for choice, _ in setting.choices]
+            self._write(setting.key, value if value in values else setting.default)
+        elif setting.kind == "dirs":
+            self._write(setting.key, [str(item) for item in value or [] if str(item)])
+        elif setting.kind in ("text", "directory"):
+            self._write(setting.key, str(value))
+        else:
+            raise ValueError(f"unknown kind {setting.kind!r} for {setting.key}")
+
+    def reset(self, settings: tuple[Setting, ...] | None = None) -> int:
+        """«Сбросить»: every described setting back to its default.
+
+        Only the described ones.  The recent list, the window geometry and the
+        insert table are not preferences the user set in this dialog, and
+        clearing them on «Сбросить» would throw away work rather than undo a
+        choice.  Returns how many keys were written.
+        """
+        chosen = SETTINGS if settings is None else settings
+        for setting in chosen:
+            self.set_value(setting, setting.default)
+        return len(chosen)
+
+    def export_to(self, path: str | Path) -> int:
+        """Writes the whole configuration to `path`, unknown keys included.
+
+        An empty store is filled with the defaults first: the file a teacher
+        hands out has to be a complete configuration, not an empty ini.
+        """
+        self._store.sync()
+        target = QSettings(str(path), QSettings.Format.IniFormat)
+        for key in self._store.allKeys():
+            target.setValue(key, self._store.value(key))
+        for setting in SETTINGS:
+            if not target.contains(setting.key):
+                target.setValue(setting.key, self.value_of(setting))
+        target.sync()
+        return len(target.allKeys())
+
+    def read_keys(self, path: str | Path) -> dict[str, object]:
+        """Every key of another ini, read but not written (task_29's «Импорт…»).
+
+        Reading and writing are apart so the dialog can *show* an imported file
+        before it keeps it: «Отмена» after «Импорт…» must leave the settings as
+        they were, and staging is what makes that true.
+        """
+        source = QSettings(str(path), QSettings.Format.IniFormat)
+        keys = source.allKeys()
+        if not keys:
+            raise ValueError(f"{path}: это не файл настроек")
+        return {key: source.value(key) for key in keys}
+
+    def write_keys(self, values: dict[str, object]) -> int:
+        """Writes a set of keys as they are — unknown names included."""
+        for key, value in values.items():
+            self._store.setValue(key, value)
+        self._store.sync()
+        return len(values)
+
+    def import_from(self, path: str | Path) -> int:
+        """Reads a configuration written by `export_to`; returns how many keys came.
+
+        Everything in the file is copied, not just the keys this version knows:
+        a class file from a newer build keeps its own settings for when the
+        student's machine is updated.
+        """
+        return self.write_keys(self.read_keys(path))
+
+    def _choice(self, setting: Setting) -> str:
+        """A stored choice: exact match first, then ignoring case and space.
+
+        `indent_character` is a space or a tab, so the fallback has to compare
+        without stripping; `theme` and the format modes are words, and a file
+        that says `System` means the same as `system`.
+        """
+        value = self._text(setting.key, str(setting.default))
+        for choice, _ in setting.choices:
+            if value == choice:
+                return choice
+        folded = value.strip().lower()
+        for choice, _ in setting.choices:
+            if choice.strip().lower() == folded and choice.strip():
+                return choice
+        return str(setting.default)
+
+    def _paths(self, key: str) -> list[str]:
+        """A stored list of directories, tolerating a hand-edited file (a single
+        path comes back as a string, and a blank one as nothing at all)."""
+        value = self._store.value(key, [])
+        if isinstance(value, str):
+            value = [value] if value else []
+        return [str(item) for item in value or [] if str(item)]
+
+    @staticmethod
+    def _clamp(setting: Setting, value: object) -> float:
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return float(setting.default)
+        if number != number:  # NaN
+            return float(setting.default)
+        low = float(setting.low) if setting.low is not None else number
+        high = float(setting.high) if setting.high is not None else number
+        return min(high, max(low, number))
 
     # -- editor -------------------------------------------------------------
     @property
@@ -224,6 +530,24 @@ class Settings:
             int(min(MAXIMUM_AUTO_COMPLETE_AFTER, max(MINIMUM_AUTO_COMPLETE_AFTER, value))),
         )
 
+    @property
+    def completion_match_case(self) -> bool:
+        """Whether the popup honours the case of what is typed (task_29)."""
+        return self._flag(COMPLETION_MATCH_CASE, True)
+
+    @completion_match_case.setter
+    def completion_match_case(self, value: bool) -> None:
+        self._write(COMPLETION_MATCH_CASE, bool(value))
+
+    @property
+    def current_line(self) -> bool:
+        """Whether the line the caret is on is tinted."""
+        return self._flag(CURRENT_LINE, True)
+
+    @current_line.setter
+    def current_line(self, value: bool) -> None:
+        self._write(CURRENT_LINE, bool(value))
+
     # -- view ---------------------------------------------------------------
     @property
     def theme(self) -> str:
@@ -254,6 +578,27 @@ class Settings:
     @last_directory.setter
     def last_directory(self, value: str) -> None:
         self._write(LAST_DIRECTORY, str(value))
+
+    @property
+    def recent_limit(self) -> int:
+        """How many files the «Последние» menu remembers."""
+        return int(self._number(RECENT_LIMIT, DEFAULT_RECENT_LIMIT, 0, MAXIMUM_RECENT_LIMIT))
+
+    @recent_limit.setter
+    def recent_limit(self, value: int) -> None:
+        self._write(RECENT_LIMIT, min(MAXIMUM_RECENT_LIMIT, max(0, int(value))))
+
+    @property
+    def autosave_minutes(self) -> int:
+        """Minutes between two automatic saves; 0 is off."""
+        return int(
+            self._number(AUTOSAVE_MINUTES, DEFAULT_AUTOSAVE_MINUTES, 0,
+                         MAXIMUM_AUTOSAVE_MINUTES)
+        )
+
+    @autosave_minutes.setter
+    def autosave_minutes(self, value: int) -> None:
+        self._write(AUTOSAVE_MINUTES, min(MAXIMUM_AUTOSAVE_MINUTES, max(0, int(value))))
 
     # -- the split editor ---------------------------------------------------
     @property
@@ -341,6 +686,40 @@ class Settings:
         self._write(INPUT_QUEUE, bool(value))
 
     @property
+    def output_font_size(self) -> float:
+        """The output panel's own size since task_29.
+
+        It starts *shared* with the editor (`DEFAULT_OUTPUT_FONT_SIZE` is the
+        same number), and only a change in the dialog or a wheel over the panel
+        pulls them apart; a file written by an older build therefore reads as one
+        size, exactly as it looked before.
+        """
+        return self._number(OUTPUT_FONT_SIZE, self.font_size, MINIMUM_FONT_SIZE,
+                            MAXIMUM_FONT_SIZE)
+
+    @output_font_size.setter
+    def output_font_size(self, value: float) -> None:
+        self._write(
+            OUTPUT_FONT_SIZE,
+            min(MAXIMUM_FONT_SIZE, max(MINIMUM_FONT_SIZE, float(value))),
+        )
+
+    @property
+    def output_line_limit(self) -> int:
+        """How many lines of output are kept before the oldest are dropped."""
+        return int(
+            self._number(OUTPUT_LINE_LIMIT, DEFAULT_OUTPUT_LINE_LIMIT,
+                         MINIMUM_OUTPUT_LINE_LIMIT, MAXIMUM_OUTPUT_LINE_LIMIT)
+        )
+
+    @output_line_limit.setter
+    def output_line_limit(self, value: int) -> None:
+        self._write(
+            OUTPUT_LINE_LIMIT,
+            min(MAXIMUM_OUTPUT_LINE_LIMIT, max(MINIMUM_OUTPUT_LINE_LIMIT, int(value))),
+        )
+
+    @property
     def output_sizes(self) -> list[int]:
         """The heights of the output and of the input queue inside the panel."""
         return self._sizes(OUTPUT_SIZES)
@@ -385,6 +764,29 @@ class Settings:
     @save_before_run.setter
     def save_before_run(self, value: bool) -> None:
         self._write(SAVE_BEFORE_RUN, bool(value))
+
+    @property
+    def working_directory(self) -> str:
+        """The shared folder passed as `-I` on every session; "" means none.
+
+        A *search* directory for `ИМПОРТ`, not the working directory of the
+        process, and it comes after the importing file's own folder, so a local
+        `lib/x.pld` always wins over a same-named file in the shared one.
+        """
+        return self._text(WORKING_DIRECTORY, "")
+
+    @working_directory.setter
+    def working_directory(self, value: str) -> None:
+        self._write(WORKING_DIRECTORY, str(value))
+
+    @property
+    def import_paths(self) -> list[str]:
+        """More `-I` folders, in the order the engine will search them."""
+        return self._paths(IMPORT_PATHS)
+
+    @import_paths.setter
+    def import_paths(self, paths) -> None:
+        self._write(IMPORT_PATHS, [str(path) for path in paths if str(path)])
 
     # -- the formatter (task_30) ---------------------------------------------
     @property

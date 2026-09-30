@@ -185,6 +185,10 @@ class CompletionModel:
         self._keywords = keywords
         self._text = None  # the reserved half of the list changed
 
+    def set_case_sensitive(self, flag: bool) -> None:
+        """Whether the case of what is typed has to match (task_29's switch)."""
+        self._case_sensitive = bool(flag)
+
     def update(self, text: str) -> None:
         if text != self._text:
             self._text = text

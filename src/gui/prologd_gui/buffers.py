@@ -62,8 +62,12 @@ class Buffer(QObject):
             font_family=self._settings.font_family,
             font_size=self._settings.font_size,
             line_numbers=self._settings.line_numbers,
+            indent_character=self._settings.indent_character,
+            indent_width=self._settings.indent_width,
             completion=self._settings.completion,
             auto_complete_after=self._settings.auto_complete_after,
+            completion_match_case=self._settings.completion_match_case,
+            current_line=self._settings.current_line,
         )
         editor.setDocument(self.document)
         editor.set_completion_keywords(self.highlighter.keywords)
@@ -141,6 +145,10 @@ class Buffer(QObject):
         for view in self._views:
             view.set_font_size(size)
 
+    def set_font_family(self, family: str) -> None:
+        for view in self._views:
+            view.set_font_family(family)
+
     def set_line_numbers(self, enabled: bool) -> None:
         for view in self._views:
             view.set_line_numbers(enabled)
@@ -148,6 +156,21 @@ class Buffer(QObject):
     def set_wrap(self, enabled: bool) -> None:
         for view in self._views:
             view.set_wrap(enabled)
+
+    def set_current_line(self, enabled: bool) -> None:
+        for view in self._views:
+            view.set_current_line(enabled)
+
+    def set_indent(self, character: str, width: int) -> None:
+        for view in self._views:
+            view.set_indent(character, width)
+
+    def set_completion(self, enabled: bool, after: int, match_case: bool) -> None:
+        """The three completion switches of task_29, in one call per view."""
+        for view in self._views:
+            view.enable_completion(enabled)
+            view.set_auto_complete_after(after)
+            view.set_completion_match_case(match_case)
 
     def title(self) -> str:
         return self.model.title()

@@ -95,7 +95,7 @@ session.
 | task_26_gui_toolbar | done | one action table (48 commands, 12 disabled with a reason) feeding the menu bar, the toolbar and the context menu; icon audit in `src/gui/README.md` (48 names referenced, 42 drawn, 6 left: the «Вид» switches) |
 | task_27_gui_panels | done | movable panel (`F4`, `Ctrl+F4`), output pane (colour by kind, visible half-lines, bounded history, auto-scroll, save to a file), input console with the queue switch, status-bar details and the two-state run/stop |
 | task_28_gui_run_step | done | `EngineOptions::stepHook` + `StepInfo`, protocol 3 (`step`/`trace` events, `step` request, positions on `error`), the step strip with the call stack, the trace line in the editor, `F10`/`Shift+F10`/`F5`, error and trace lines from structured positions |
-| task_29_gui_settings | not started | settings dialog and persistence |
+| task_29_gui_settings | done | `settings.SETTINGS` — one record per preference (key, label, section, kind, default, bounds, hint) that drives the dialog's row, validation, `«Сбросить»` and the map_positions-style test; `settingsdialog.SettingsDialog` with sections `Редактор/Вид/Формат/Выполнение/Файлы/Вставки`, «ОК»/«Применить»/«Отмена»/«Сбросить»/«Импорт…»/«Экспорт…»; the window applies everything without a restart (`apply_settings`); new keys: `output/font_size` (unset = follow the editor), `output/line_limit`, `editor/completion_match_case`, `editor/current_line`, `execution/working_directory`, `execution/import_paths`, `files/autosave_minutes`, `files/recent_limit`; unknown keys preserved through a foreign file; the dark theme, RU/EN, session restore and the sandbox limits stay open (named in the task file) |
 | task_30_gui_formatter | done | `prlib/formatter.cpp` (whitespace-only, everything else copied byte for byte); three modes — **в одну строку**, **мягкое** (строки строятся заново: цели собираются до ширины) and **жёсткое** — chosen in «Правка → Формат»; `prologd --format[=soft|hard|line]` with `--format-width`, `--format-indent` and `--format-unit`; protocol **7**+**8** (`format` → `formatted`/`error`, answerable between queries; `loaded` when a run is over); the window's `Ctrl+I` with one undo step and the caret and selection mapped onto the new text; a source that does not parse is never rewritten |
 | task_31_gui_shortcuts | done | `shortcuts.py` — a Qt-free table of `Ctrl`+**physical key** insertions, matched on `nativeScanCode()`: `:-.`, `()`, `[]`, `#`, `?`, `РАВНО(,)`, `БОЛЬШЕ(,)`, `МЕНЬШЕ(,)`, `СЛОЖЕНИЕ(,,)`, `УМНОЖЕНИЕ(,,)` and the simple symbols `/ - _ ! '' ""`; `:` and `?` carry two chords each (Russian `Shift+6`/`Shift+7`), a selection is *wrapped* by the bracket-like rows, every insert is one undo step, only `Ctrl` (plus `Shift`) is accepted — `Alt` and `Ctrl+Alt` are left to the window; the table is data in the settings file (`shortcuts/table`, JSON, one entry per insert with a list of chords) and «Справка → Шпаргалка по вставкам» lists it from the same object; zoom stays on the keypad, `|` has no chord (merge keeps `Ctrl+Shift+\`) |
 | task_32_import_search_report | done | `ИМПОРТ` failure names the directories tried, with reasons |
@@ -1128,3 +1128,28 @@ Added on 2026-10-02 while implementing task_31:
   hiding them.  `test_shortcuts.py` (Qt-free plus an offscreen editor group and
   the Windows layout check) and two new window checks; 251/251 ctest, the 18 GUI
   scripts, the six PDFs.
+* GUI round, part 36: **task_29 — the settings dialog**, run as option B (dialog +
+  the "almost ready" keys).  The core is a single description table
+  (`settings.SETTINGS`: key, label, section, kind, default, bounds, suffix, hint)
+  that drives three things at once — the dialog's row, validation in
+  `value_of`/`set_value`, and «Сбросить» — so a preference cannot be editable
+  without being stored or stored without being documented; two checks hold that:
+  one that every key the module defines is either in the table or on
+  `MACHINE_KEYS` (geometry, recent files, the insert table), another that every
+  row has a widget and every widget writes its key.  «Применить» writes only the
+  rows that *differ*, and the reason is the one preference that follows another:
+  `output/font_size` unset means «the output goes with the editor», exactly as
+  before this round, and the first wheel over the panel (or a value in the
+  dialog) gives it a size of its own for good — the wheel over the editor and
+  over the output now mean two different things, which is what the split is for.
+  Two traps of the round, both about Qt and tests: a `QDialog` *hangs* a headless
+  run (so the modal `exec()` lives in one replaceable method and the folder list
+  looks its chooser up through a closure — a bound method captured in the
+  constructor kept pointing at the real `QFileDialog` and blocked the suite with
+  no output), and a `zoomChanged` signal still connected to the wrong handler
+  dragged the editor's font along with the output's.  The rest of the list from
+  task_29 is named in the task file with reasons: the dark theme (a second syntax
+  palette), RU/EN, session restore, interpreter profiles and the sandbox limits
+  need machinery that does not exist yet.  251/251 ctest, 20 GUI scripts, five
+  PDFs; `gui.typ` §8 (rewritten around the dialog), §9.1 and §10, the README's
+  new «Settings» section.

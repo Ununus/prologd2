@@ -899,11 +899,15 @@ def test_the_menus_come_from_the_action_table(executable: str) -> None:
 
         # What is not implemented yet says so instead of doing nothing quietly.
         # The execution group left this list in task_28 — `Запустить с
-        # трассировкой`, `Шаг` and `Шаг с обходом` are live now — and `test_search.py`
-        # is where the search entries are checked.
+        # трассировкой`, `Шаг` and `Шаг с обходом` are live now — `test_search.py`
+        # is where the search entries are checked, and «Настройки…» left it in
+        # task_29.  Only «Графическое окно» is still waiting for a task file.
         settings = window._actions["settings"]
-        assert settings.isEnabled() is False
-        assert "task_29" in settings.toolTip(), settings.toolTip()
+        assert settings.isEnabled() is True, "«Настройки…» is live since task_29"
+        assert "не реализовано" not in settings.toolTip(), settings.toolTip()
+        assert settings.icon().isNull() is False, "tools-settings.png is drawn"
+        assert window._actions["graphics"].isEnabled() is False
+        assert "не реализовано" in window._actions["graphics"].toolTip()
         assert window._actions["format"].isEnabled() is True, "the formatter is live now (task_30)"
         assert window._actions["step"].isEnabled() is True, "stepping is implemented now"
         assert window._actions["run_trace"].isEnabled() is True
@@ -1010,21 +1014,154 @@ def test_the_context_menu_reuses_the_shared_actions(executable: str) -> None:
         discard_changes(window)
 
 
-def test_the_font_control_and_the_wheel_are_one_setting(executable: str) -> None:
+def test_two_font_sizes_and_one_wheel(executable: str) -> None:
+    """The editor and the output keep sizes of their own (task_29).
+
+    One number used to cover both panels.  The toolbar's box and the wheel over
+    the editor move the *editor's* size; the wheel over the output moves the
+    output's, and the query line goes with the editor, because a goal is typed
+    like a program rather than read like a log.
+    """
     window = empty_window(executable)
     try:
         box = window._font_size_box
         assert box.currentData() == float(window._settings.font_size), box.currentData()
+        assert window.output().font_size == window.editor().font_size, "one size out of the box"
 
         box.setCurrentIndex(box.findData(20.0))
         assert window.editor().font_size == 20.0
-        assert window.output().font_size == 20.0
         assert window._settings.font_size == 20.0
+        # The output follows until it is given a size of its own: that is how it
+        # behaved before task_29 split the two numbers.
+        assert window.output().font_size == 20.0
+        assert window._query_line.font().pointSizeF() == 20.0, "a goal is typed like a program"
 
-        # A size from the wheel need not be in the list; the box still shows it.
+        # A wheel over the output separates them for good.
+        window.output().set_font_size(9)
+        assert window._settings.output_font_size == 9.0
+        assert window.input_pane().font_size == 9.0, "the queue belongs to the output side"
         window.editor().set_font_size(23)
+        assert window.output().font_size == 9.0, "the output followed the editor again"
+        assert window._settings.output_font_size == 9.0
         assert box.currentText() == "23", box.currentText()
-        print("ok: the toolbar's size control and the zoom are one preference")
+        print("ok: the output follows the editor until it gets a size of its own")
+    finally:
+        discard_changes(window)
+
+
+def test_the_settings_dialog_changes_the_window_without_a_restart(executable: str) -> None:
+    """What «Применить» writes shows at once: no restart, no reopening the file.
+
+    The dialog itself is driven the way the user drives it (widgets and buttons),
+    and only the modal `exec()` is replaced — a modal box hangs a headless run
+    instead of failing it.
+    """
+    from prologd_gui import settings as settings_module
+
+    window = empty_window(executable)
+    try:
+        def drive(dialog) -> bool:
+            widgets = dialog.widgets()
+            widgets[settings_module.LINE_NUMBERS].setChecked(False)
+            widgets[settings_module.CURRENT_LINE].setChecked(False)
+            widgets[settings_module.FONT_SIZE].setValue(14)
+            widgets[settings_module.OUTPUT_FONT_SIZE].setValue(20)
+            widgets[settings_module.OUTPUT_LINE_LIMIT].setValue(1000)
+            position = widgets[settings_module.OUTPUT_POSITION]
+            position.setCurrentIndex(position.findData("bottom"))
+            widgets[settings_module.IMPORT_PATHS].add_path("C:/общие")
+            dialog.button("apply").click()
+            return False  # «Применить», then «Отмена»: what was applied stays
+
+        window._run_settings_dialog = drive
+        assert window.show_settings() is False, "nothing was accepted by this driver"
+
+        assert window.editor().line_numbers() is False
+        assert window.editor().font_size == 14.0
+        assert window.editor()._current_line is False
+        assert window.output().font_size == 20.0
+        assert window.output().line_limit() == 1000
+        assert window.output_position() == "bottom"
+        assert window._font_size_box.currentData() == 14.0, "the toolbar box is a view of it too"
+        assert "C:/общие" in window.session._includes
+        assert window.session is window._session
+        print("ok: «Применить» reaches the editor, the output and the session at once")
+    finally:
+        discard_changes(window)
+
+
+def test_the_shared_folder_reaches_the_interpreter(executable: str) -> None:
+    """The «Рабочая папка (ИМПОРТ)» of task_29 is what makes `ИМПОРТ` work everywhere.
+
+    An untitled buffer has no folder of its own, so `ИМПОРТ("library.pld")`
+    fails until the shared folder is set — and works in every tab afterwards.
+    """
+    library = pathlib.Path(__file__).resolve().parents[3] / "examples" / "lib"
+    if not (library / "library.pld").is_file():
+        print(f"skipped: {library / 'library.pld'} is missing")
+        return
+
+    window = empty_window(executable)
+    try:
+        def concluded() -> bool:
+            # `Запустить` is live again when the run is over; the *status* is not a
+            # good signal here, because a failed load in the protocol session ends
+            # the process (the CLI exits 2) instead of answering «выполнено».
+            return window._actions["run"].isEnabled()
+
+        window.editor().setPlainText(':- ИМПОРТ("library.pld").\n')
+        window.run_program()
+        assert pump(window, concluded), ascii(window.output_text())
+        assert "Не найден" in window.output_text(), ascii(window.output_text())
+
+        window._settings.working_directory = str(library)
+        window.apply_settings()
+        assert str(library) in window._session._includes
+
+        window.run_program()
+        assert pump(window, concluded), ascii(window.output_text())
+        assert window.status_text() == "выполнено", ascii(window.output_text())
+        assert "Не найден" not in window.output_text(), ascii(window.output_text())
+        print("ok: the shared folder is passed as -I, and an unnamed buffer imports from it")
+    finally:
+        discard_changes(window)
+
+
+def test_autosave_writes_named_buffers_and_skips_the_rest(
+    executable: str, directory: pathlib.Path
+) -> None:
+    """task_29's autosave: named buffers only, never a question, one timer."""
+    target = directory / "автосохранение.pld"
+    target.write_text("факт(1).\n", encoding="utf-8")
+
+    window = empty_window(executable)
+    try:
+        window.open_path(str(target))
+        window.editor().insertPlainText("?факт(1).\n")
+        assert window.buffers()[0].is_modified() is True
+        assert window.autosave_now() == 1
+        assert target.read_text(encoding="utf-8") == "?факт(1).\nфакт(1).\n"
+        assert window.buffers()[0].is_modified() is False
+        assert "автосохранение" in window.status_text(), window.status_text()
+
+        # An untitled buffer has no file to write, and an autosave must not ask
+        # for a name: that question belongs to «Сохранить».
+        window._ask_save_path = lambda buffer: (_ for _ in ()).throw(
+            AssertionError("autosave asked for a file name")
+        )
+        window.new_buffer()
+        window.editor().insertPlainText("снег.\n")
+        assert window.autosave_now() == 0
+        assert window.current_path() is None
+
+        # The timer follows the setting: 0 is off, a minute count arms it.
+        window._settings.autosave_minutes = 5
+        window.apply_settings()
+        assert window._autosave.isActive() is True
+        window._settings.autosave_minutes = 0
+        window.apply_settings()
+        assert window._autosave.isActive() is False
+        print("ok: autosave writes named buffers, skips unnamed ones, and follows its switch")
     finally:
         discard_changes(window)
 
@@ -1198,11 +1335,11 @@ def test_opening_does_not_run(executable: str) -> None:
 
 
 def test_the_editor_remembers_the_font_size(executable: str) -> None:
-    """Zoom is written straight to the settings and reaches every pane.
+    """Zoom is written straight to the settings and survives a restart.
 
-    The output pane is read-only but it is read next to the program, so it grows
-    with the editor; storing the size once is what makes it survive a restart in
-    both places.
+    The editor's size only: the output panel has a size of its own since task_29
+    (`test_two_font_sizes_and_one_wheel`), and *this* check is about the stored
+    value coming back — which is what a restart has to keep.
     """
     window = make_window(executable)
     path = window._settings.path
@@ -1211,9 +1348,11 @@ def test_the_editor_remembers_the_font_size(executable: str) -> None:
         window.editor().set_font_size(17)
         size = window.editor().font_size
         assert size == 17
-        assert window.output().font_size == size, "the output must zoom with the editor"
-        assert window._query_line.font().pointSizeF() == size, "and so must the query line"
+        assert window._query_line.font().pointSizeF() == size, "a goal is typed like a program"
         assert window._settings.font_size == size
+        # Nobody gave the output a size of its own, so it came along — but it is
+        # a value of its own in the file from now on.
+        assert window._settings.output_font_size == size
     finally:
         window.stop_program()
         window.close()
@@ -2106,7 +2245,10 @@ def main(argv: list[str]) -> int:
         test_a_remapped_table_decides_what_ctrl_key_inserts(executable)
         test_the_output_can_be_saved(executable, files)
         test_the_context_menu_reuses_the_shared_actions(executable)
-        test_the_font_control_and_the_wheel_are_one_setting(executable)
+        test_two_font_sizes_and_one_wheel(executable)
+        test_the_settings_dialog_changes_the_window_without_a_restart(executable)
+        test_the_shared_folder_reaches_the_interpreter(executable)
+        test_autosave_writes_named_buffers_and_skips_the_rest(executable, files)
         test_saving_before_a_run_writes_the_file(executable, files)
     print("all window checks passed")
     del application

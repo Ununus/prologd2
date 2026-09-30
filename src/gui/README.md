@@ -224,8 +224,9 @@ tooltip names what it waits for: «Настройки…» — task_29; «Гра
 **no task file yet** (the roadmap below has the
 plan).  A menu that silently lacks half of the feature list is worse than one that
 says so.  «Поиск» left that list in task_33, the «Выполнение» group in task_28 —
-«Запустить с трассировкой», «Шаг» and «Шаг с обходом» are live — and
-«Форматировать» in task_30.  The toolbar is
+«Запустить с трассировкой», «Шаг» and «Шаг с обходом» are live — «Форматировать»
+in task_30, and «Настройки…» in task_29.  Only «Графическое окно» still says «ещё
+не реализовано».  The toolbar is
 grouped as
 the reference front-end had it: file | run/stop/step | editing (comment,
 uncomment, format) | font size | tools (graphics, settings, help), and at the far
@@ -361,15 +362,19 @@ the next start.  A pane cannot be dragged away to nothing — `childrenCollapsib
 is off and each half has a minimum size — because a panel squeezed to zero pixels
 looks like a lost window rather than a hidden one.
 
-The text inside is `panels.OutputPane`: read-only, the editor's font and zoom,
-and never wrapped (a log line cut in the middle cannot be read as data).  It
+The text inside is `panels.OutputPane`: read-only, its own font and zoom (task_29:
+the editor and the output keep two sizes, and the output follows the editor's
+while nobody has set one of its own), and never wrapped (a log line cut in the
+middle cannot be read as data).  It
 **colours by kind** — program output plain, our echo of an answer in the query
 blue, our own markers grey, diagnostics crimson — and the kind comes from the
 window, which knows whether it is feeding the program's text, a note or an
 error; nothing is guessed from the text itself.  Chunks arrive mid-line, so a
 line is held until its newline (or until the run ends, which flushes it): that is
 the defect this code exists to avoid, and `LineBuffer` keeps it Qt-free so
-`test_output.py` hammers it.  The history is bounded — 50 000 lines by default —
+`test_output.py` hammers it.  The history is bounded — 50 000 lines by default,
+and the limit is a setting since task_29 (`output/line_limit`, 100…500 000:
+a smaller one trims the pane at once) —
 and the oldest lines are dropped in one edit with `*** вывод усечён … ***` kept
 as the first line.  The view follows the end of the output until the user scrolls
 up to read something, and follows again as soon as they come back to the bottom.
@@ -519,6 +524,46 @@ program that does not parse is **never rewritten** — the status bar says «н�
 удалось разобрать», the offending line is marked, and the buffer keeps its text.
 An edit that arrives while the answer is in flight cancels the format instead of
 discarding the edit.
+
+## Settings
+
+**Правка → Настройки…** is built from `settings.SETTINGS`: a table of records —
+key, label, section, kind, default, bounds, hint — that is also what validation
+clamps against and what «Сбросить» writes back.  A new preference is therefore a
+new record, and the dialog grows by itself; `test_settingsdialog.py` checks that
+every record has a widget and every widget writes its key.
+
+| Section | What is in it |
+| --- | --- |
+| Редактор | font family and size, line numbers, the current-line band, word wrap, tabs or spaces and the width, completion (on/off, after how many letters, `Учитывать регистр`) |
+| Вид | theme (light or system), toolbar, the output panel (shown, right or bottom), the input queue field, the output's font size and its line limit |
+| Формат | the formatter's mode, width, indent and unit, «только выделенное» |
+| Выполнение | save before run, the shared folder for `ИМПОРТ`, more `-I` folders |
+| Файлы | autosave in minutes (0 = off), how many recent files to remember |
+| Вставки | the live `Ctrl`+key table (task_31), the settings file path, «Вернуть встроенную таблицу» |
+
+* **ОК** and **Применить** write through `Settings` and then the window re-reads
+them, so a change shows without a restart (font, line numbers, the side of the
+output panel, the search path) — and «Применить» writes only the rows that
+actually differ, so a fresh file stays fresh.  «Отмена» closes without writing.
+* **Сбросить** puts the defaults into the widgets; they still have to be applied,
+so a reset can be looked at before it is kept.  It touches the preferences only —
+the recent list, the window geometry and the insert table are records the window
+keeps, not choices the user made in this dialog.
+* **Импорт…** stages a file and shows it («ОК» keeps it, «Отмена» drops it, and
+a key this version does not know travels with the rest); **Экспорт…** applies
+first and writes the whole configuration, unknown keys included, so one ini file
+can be handed out to a class.
+* Values live in `%LOCALAPPDATA%\PrologD\gui\gui.ini` (or `--settings FILE`), and
+a value that cannot be read falls back to its default instead of taking the
+window down.
+
+The split of the two font sizes is the one place where an old file behaves
+differently from a new one: `output/font_size` unset means «follow the editor»,
+and the first wheel over the output panel (or a value typed in the dialog) gives
+it a size of its own for good.  `Ctrl`+wheel over the editor moves the editor's
+size, over the output pane its own; the toolbar's box and `Ctrl+Num±` / `Ctrl+0`
+are the editor's.
 
 ## Tabs and files
 

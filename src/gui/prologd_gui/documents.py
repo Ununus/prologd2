@@ -201,19 +201,25 @@ class Document:
 
 
 class RecentFiles:
-    """The files opened last, newest first, at most `MAX` of them."""
+    """The files opened last, newest first, at most `max` of them."""
 
     MAX = 10
 
-    def __init__(self, paths: Iterable[str] = ()) -> None:
-        self._paths = _unique(paths)[: self.MAX]
+    def __init__(self, paths: Iterable[str] = (), max_size: int | None = None) -> None:
+        """`max_size` is the limit from the settings (task_29's «Помнить
+        недавних файлов»); `MAX` stays the default for a caller that has none."""
+        self._max = self.MAX if max_size is None else max(0, int(max_size))
+        self._paths = _unique(paths)[: self._max]
 
     def paths(self) -> list[str]:
         return list(self._paths)
 
+    def limit(self) -> int:
+        return self._max
+
     def add(self, path: str | os.PathLike[str]) -> list[str]:
         """Records a use, moving an already known file to the front."""
-        self._paths = _unique([str(path), *self._paths])[: self.MAX]
+        self._paths = _unique([str(path), *self._paths])[: self._max]
         return self.paths()
 
     def remove(self, path: str | os.PathLike[str]) -> list[str]:

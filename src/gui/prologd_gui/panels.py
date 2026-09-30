@@ -212,6 +212,13 @@ class OutputPane(ZoomablePlainTextEdit):
     def line_limit(self) -> int:
         return self._line_limit
 
+    def set_line_limit(self, limit: int) -> None:
+        """A new bound for the history (task_29's dialog).  Applied at once: a
+        smaller limit trims now, not on the next run, or the pane would keep more
+        than it claims to."""
+        self._line_limit = max(100, int(limit))
+        self._trim()
+
     def truncated(self) -> bool:
         """Whether the oldest output has been dropped."""
         return self._truncated

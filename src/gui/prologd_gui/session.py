@@ -91,6 +91,15 @@ class PrologSession(QObject):
         self._process.readyReadStandardOutput.connect(self._on_stdout)
         self._process.finished.connect(self._on_finished)
 
+    def set_includes(self, includes: list[str] | None) -> None:
+        """Replaces the `-I` directories (task_29's dialog).
+
+        A session already running keeps the ones it was started with: the list is
+        put on the command line, and a process cannot be re-argued.  «Запустить»
+        starts a fresh session anyway, which is when the new path takes effect.
+        """
+        self._includes = [str(directory) for directory in includes or [] if str(directory)]
+
     # -- lifecycle ---------------------------------------------------------
     def start(self) -> None:
         """Starts a *fresh* interpreter.

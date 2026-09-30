@@ -43,6 +43,11 @@ SEARCH_CURRENT = "#ffc14d"
 TRACE_BACKGROUND = "#d8e6f7"
 TRACE_NUMBER = "#1b4f86"
 
+#: The pale band behind the line the caret is on (task_29).  Painted *first* of
+#: all, so an error line, a step line or a search match still stands out when
+#: they fall on the same line.
+CURRENT_LINE_BACKGROUND = "#f4f6f9"
+
 #: Background of the other places the selected word appears, and the size of a
 #: document worth scanning for them on every selection change.
 OCCURRENCE_BACKGROUND = "#e8ecf5"
@@ -263,11 +268,15 @@ class CodeEditor(ZoomablePlainTextEdit):
         indent_width: int = 1,
         completion: bool = True,
         auto_complete_after: int = 2,
+        completion_match_case: bool = True,
+        current_line: bool = True,
     ) -> None:
         super().__init__(parent, font_family=font_family, font_size=font_size)
         self._indent_character = indent_character
         self._indent_width = max(1, indent_width)
         self._line_numbers = line_numbers
+        #: Whether the line the caret is on gets a pale band (task_29).
+        self._current_line = bool(current_line)
         self._error_line: int | None = None
         #: The line of the clause a stepped run is standing on (task_28).
         self._trace_line: int | None = None
@@ -276,6 +285,7 @@ class CodeEditor(ZoomablePlainTextEdit):
         self._current_range: tuple[int, int] | None = None
         self._keywords: object | None = None
         self._auto_complete_after = max(1, int(auto_complete_after))
+        self._completion_match_case = bool(completion_match_case)
         self._completion: completion.CompletionModel | None = None
         self._offers: list[completion.Candidate] = []
         self._completer: QCompleter | None = None
@@ -295,6 +305,9 @@ class CodeEditor(ZoomablePlainTextEdit):
         self.blockCountChanged.connect(self._update_margin_width)
         self.updateRequest.connect(self._update_margin)
         self.cursorPositionChanged.connect(self._margin.update)
+        # The current line's band moves with the caret, so the same signal keeps
+        # it in place (the margin updates on it anyway).
+        self.cursorPositionChanged.connect(self._refresh_extra_selections)
         # Selecting a word shows every other place it appears.  `QPlainTextEdit` has
         # one list of extra selections, so all the pieces are composed in one place
         # (`_refresh_extra_selections`) instead of overwriting each other.
@@ -546,6 +559,17 @@ class CodeEditor(ZoomablePlainTextEdit):
         diagnostic line disappeared the moment a word was selected.
         """
         selections: list[QTextEdit.ExtraSelection] = []
+        if self._current_line:
+            block = self.textCursor().block()
+            if block.isValid():
+                selection = QTextEdit.ExtraSelection()
+                selection.format.setBackground(QColor(CURRENT_LINE_BACKGROUND))
+                selection.format.setProperty(QTextFormat.Property.FullWidthSelection, True)
+                cursor = QTextCursor(block)
+                cursor.clearSelection()
+                selection.cursor = cursor
+                selections.append(selection)
+
         if self._error_line is not None:
             block = self.document().findBlockByNumber(self._error_line - 1)
             if block.isValid():
@@ -701,12 +725,16 @@ class CodeEditor(ZoomablePlainTextEdit):
             self._completion = None
             self._offers = []
             return
-        self._completion = completion.CompletionModel(self._keywords)
+        self._completion = completion.CompletionModel(
+            self._keywords, case_sensitive=self._completion_match_case
+        )
         self._offer_list = QStringListModel(self)
         completer = QCompleter(self)
         completer.setModel(self._offer_list)
         completer.setWidget(self)
         completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
+        # The *model* decides what matches; the completer only shows the rows it
+        # was handed, so its own case rule would be a second, hidden filter.
         completer.setCaseSensitivity(Qt.CaseSensitivity.CaseSensitive)
         # A click in the popup is the mouse's Enter.  Keyboard accepts are
         # handled in `keyPressEvent`, and `activated` is deliberately left
@@ -768,6 +796,17 @@ class CodeEditor(ZoomablePlainTextEdit):
 
     def set_auto_complete_after(self, letters: int) -> None:
         self._auto_complete_after = max(1, int(letters))
+
+    def set_completion_match_case(self, flag: bool) -> None:
+        """Whether «най» offers `НАЙТИВСЕ` too (task_29's switch)."""
+        self._completion_match_case = bool(flag)
+        if self._completion is not None:
+            self._completion.set_case_sensitive(flag)
+
+    def set_current_line(self, enabled: bool) -> None:
+        """Whether the caret's line gets a pale band behind it."""
+        self._current_line = bool(enabled)
+        self._refresh_extra_selections()
 
     def show_completion(self) -> None:
         """Opens the popup on demand (`Ctrl+Space`)."""

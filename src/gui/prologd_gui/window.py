@@ -15,6 +15,7 @@ from PySide6.QtGui import (
     QAction,
     QActionGroup,
     QDesktopServices,
+    QFont,
     QIntValidator,
     QKeySequence,
     QTextCursor,
@@ -46,13 +47,14 @@ from . import (
     panels,
     reference,
     search,
+    settingsdialog,
     shortcuts,
 )
 from .buffers import Buffer
 from .editor import CodeEditor, ZoomablePlainTextEdit
 from .panes import Pane
 from .session import PrologSession, read_keywords
-from .settings import Settings
+from .settings import OUTPUT_FONT_SIZE, Settings
 
 #: How long «Остановить» waits for the interpreter to end its query by itself
 #: before the process is taken down (`stop_program`).
@@ -97,8 +99,13 @@ class MainWindow(QMainWindow):
         if not self._settings.shortcuts_table:
             self._settings.shortcuts_table = shortcuts.Shortcuts.default().to_json()
         self._shortcuts = shortcuts.Shortcuts.from_json(self._settings.shortcuts_table)
+        #: The `-I` directories exactly as they arrived on the command line; the
+        #: ones from the dialog (task_29) are added to them by
+        #: `_import_directories`, since what the launcher was told is not a
+        #: preference the dialog may quietly replace.
+        self._command_line_includes = list(includes or [])
 
-        self._session = PrologSession(executable, includes, self)
+        self._session = PrologSession(executable, self._import_directories(), self)
         # Completion, colouring and the cheat sheet need the reserved names
         # *before* anything is run — waiting for the first `ready` is why
         # autocompletion used to work only after the first run.  A window that
@@ -135,7 +142,9 @@ class MainWindow(QMainWindow):
         #: Set when the user cancelled an input question: the run is stopped and
         #: nothing else is asked during it.
         self._stopped_input = False
-        self._recent = documents.RecentFiles(self._settings.recent_files)
+        self._recent = documents.RecentFiles(
+            self._settings.recent_files, max_size=self._settings.recent_limit
+        )
         #: What the interpreter announced in `ready`, for «О программе».
         self._version = ""
         #: The exit code of the last run, shown in the status bar until the next one.
@@ -148,6 +157,11 @@ class MainWindow(QMainWindow):
         self._stop_grace = QTimer(self)
         self._stop_grace.setSingleShot(True)
         self._stop_grace.timeout.connect(self._stop_expired)
+        #: The autosave timer (task_29).  Minutes in the settings, so the interval
+        #: is re-armed by `_apply_autosave` whenever they change; a test drives
+        #: `autosave_now` directly instead of waiting for it.
+        self._autosave = QTimer(self)
+        self._autosave.timeout.connect(self.autosave_now)
         #: Two states, not one: the interpreter is a process that can be *up* and
         #: idle, and a computation can be *in flight* in it.  `Запустить` needs the
         #: second (there is nothing to start while one is running) and `Остановить`
@@ -169,6 +183,9 @@ class MainWindow(QMainWindow):
         self._format_pending: dict | None = None
 
         self._build_ui()
+        # The autosave interval the settings ask for; a change in the dialog
+        # re-arms it through `apply_settings`.
+        self._apply_autosave()
         # The split editor comes back if it was left open, and before the first
         # document, so the welcome program is shown in both panes on that start.
         if self._settings.restore_split and self._settings.split_editor:
@@ -198,10 +215,11 @@ class MainWindow(QMainWindow):
         # chunks — lives in `panels.py`.
         self._output = panels.OutputPane(
             font_family=self._settings.font_family,
-            font_size=self._settings.font_size,
+            font_size=self._settings.output_font_size,
+            line_limit=self._settings.output_line_limit,
         )
         self._output.setPlaceholderText("вывод интерпретатора")
-        self._output.zoomChanged.connect(self._on_zoom_changed)
+        self._output.zoomChanged.connect(self._on_output_zoom)
         # A dropped program opens in a tab wherever it lands (see `dropEvent`).
         self._output.fileDropped.connect(self.open_path)
 
@@ -209,14 +227,14 @@ class MainWindow(QMainWindow):
         # will ask for, fed automatically until the list runs out (`_input_lines`).
         self._input_pane = ZoomablePlainTextEdit(
             font_family=self._settings.font_family,
-            font_size=self._settings.font_size,
+            font_size=self._settings.output_font_size,
         )
         self._input_pane.setPlaceholderText("ввод: по строке на каждый запрос")
         self._input_pane.setToolTip(
             "Строки для ВВКОД, ВВОДСТР, ВВОДСИМВ и подобных: по одной на каждый запрос.\n"
             "Пустые строки пропускаются. Когда строки кончатся, окно спросит в диалоге."
         )
-        self._input_pane.zoomChanged.connect(self._on_zoom_changed)
+        self._input_pane.zoomChanged.connect(self._on_output_zoom)
         self._input_pane.fileDropped.connect(self.open_path)
 
         # The console: what the program asks once the prepared lines under it run
@@ -224,14 +242,14 @@ class MainWindow(QMainWindow):
         # how a run that waits for an answer is abandoned.
         self._input_console = panels.InputPane(
             font_family=self._settings.font_family,
-            font_size=self._settings.font_size,
+            font_size=self._settings.output_font_size,
         )
         self._input_console.submitted.connect(self._send_input)
 
         self._query_line = QLineEdit()
-        # The same face as the panes, so a goal looks like the program it asks
-        # about; `_on_zoom_changed` keeps it in step.
-        self._query_line.setFont(self._output.font())
+        # The same face as the program, because a goal is typed like one;
+        # `_sync_query_line_font` keeps it in step with the editor's size.
+        self._sync_query_line_font()
         self._query_line.setPlaceholderText("?цель(X). — Enter, чтобы выполнить")
         self._query_line.returnPressed.connect(self._run_query)
 
@@ -416,6 +434,7 @@ class MainWindow(QMainWindow):
             "comment": self._comment,
             "uncomment": self._uncomment,
             "format": self.format_document,
+            "settings": self.show_settings,
             "shortcuts": self.show_shortcuts,
             "reference": self.show_reference,
             "clear_output": self.clear_output,
@@ -2270,24 +2289,187 @@ class MainWindow(QMainWindow):
         self._update_details()
 
     def _on_zoom_changed(self, size: float) -> None:
-        """One size for every editor, the output and the query line, stored at once.
+        """The editor's own size — a preference since task_29, not both panels'.
 
-        Setting the size on the other panes emits `zoomChanged` again; those
+        Setting the size on the other editors emits `zoomChanged` again; those
         calls change nothing and stop there, because `set_font_size` returns
-        early when the size is already the one asked for.
+        early when the size is already the one asked for.  The output panel has a
+        size of its own (`_on_output_zoom`), which is why the two are apart.
         """
         self._settings.font_size = size
         for buffer in self._buffers:
             buffer.set_font_size(size)
-        self._output.set_font_size(size)
-        self._input_pane.set_font_size(size)
-        self._input_console.set_font_size(size)
+        # The output has no size of its own until someone gives it one: while the
+        # key is unwritten it follows the editor, exactly as it did before task_29
+        # split the two.  A wheel over the panel writes the key, and from then on
+        # the two are apart for good.
+        if not self._settings.has(OUTPUT_FONT_SIZE):
+            self._settings.output_font_size = size
+            self._apply_output_font()
+        # The step strip and the two help panes show program text, so they read
+        # at the program's size; the query line is typed like one, too.
         self._step_pane.set_font_size(size)
         self._reference_pane.set_font_size(size)
         self._shortcut_pane.set_font_size(size)
-        self._query_line.setFont(self._output.font())
+        self._sync_query_line_font()
         self._show_font_size(size)
-        self._status.setText(f"шрифт {size:.0f} pt")
+        self._status.setText(f"шрифт редактора: {size:.0f} pt")
+
+    def _on_output_zoom(self, size: float) -> None:
+        """The output's own size: the pane, the input queue and the console."""
+        self._settings.output_font_size = size
+        self._apply_output_font()
+        self._status.setText(f"шрифт вывода: {size:.0f} pt")
+
+    def _apply_output_font(self) -> None:
+        """Pushes the output's size into the three widgets on that side."""
+        size = self._settings.output_font_size
+        self._output.set_font_size(size)
+        self._input_pane.set_font_size(size)
+        self._input_console.set_font_size(size)
+
+    def _sync_query_line_font(self) -> None:
+        """The query line reads like the program it asks about, not like the log."""
+        font = QFont(self._settings.font_family)
+        font.setStyleHint(QFont.StyleHint.Monospace)
+        font.setFixedPitch(True)
+        font.setPointSizeF(self._settings.font_size)
+        self._query_line.setFont(font)
+
+    # -- the settings dialog (task_29) --------------------------------------
+    def show_settings(self) -> bool:
+        """«Правка → Настройки…»: the dialog, then whatever it changed.
+
+        The dialog writes through `Settings` itself (ОК, «Применить»), and the
+        window re-reads the store afterwards — which is what makes a change show
+        without a restart.  `_run_settings_dialog` is the modal `exec()` in one
+        replaceable method: a modal box hangs a headless test instead of failing
+        it, and the settings are not worth breaking that rule for.
+        """
+        dialog = settingsdialog.SettingsDialog(self._settings, self)
+        try:
+            accepted = self._run_settings_dialog(dialog)
+            applied = dialog.applied()
+        finally:
+            dialog.deleteLater()
+        if applied:
+            self.apply_settings()
+        return accepted and applied
+
+    def _run_settings_dialog(self, dialog) -> bool:
+        """Runs the dialog modally; tests replace this with a scripted answer."""
+        from PySide6.QtWidgets import QDialog
+
+        return dialog.exec() == QDialog.DialogCode.Accepted
+
+    def apply_settings(self) -> None:
+        """Pushes every preference into the widgets — no restart needed.
+
+        The whole list, not the difference: it is cheap, it makes «Применить» and
+        a start-up read share one code path, and a switch that forgot to arrive is
+        exactly the bug this method exists to prevent.
+        """
+        for buffer in self._buffers:
+            buffer.set_font_family(self._settings.font_family)
+            buffer.set_font_size(self._settings.font_size)
+            buffer.set_line_numbers(self._settings.line_numbers)
+            buffer.set_current_line(self._settings.current_line)
+            buffer.set_wrap(self._settings.wrap)
+            buffer.set_indent(self._settings.indent_character, self._settings.indent_width)
+            buffer.set_completion(
+                self._settings.completion,
+                self._settings.auto_complete_after,
+                self._settings.completion_match_case,
+            )
+        self._apply_output_font()
+        self._output.set_line_limit(self._settings.output_line_limit)
+        self._sync_query_line_font()
+        self._step_pane.set_font_size(self._settings.font_size)
+        self._reference_pane.set_font_size(self._settings.font_size)
+        self._shortcut_pane.set_font_size(self._settings.font_size)
+
+        self._toolbar.setVisible(self._settings.toolbar_visible)
+        self._sidebar.setVisible(self._settings.output_visible)
+        self._apply_output_position(remember=False)
+        self._input_pane.setVisible(self._settings.input_queue)
+        appearance.apply_theme(QApplication.instance(), self._settings.theme)
+
+        # The search path and the cheap timers: `-I`, autosave, the recent list.
+        self._session.set_includes(self._import_directories())
+        self._apply_autosave()
+        self._trim_recent()
+
+        self._sync_format_menu()
+        self._sync_actions()
+        self._status.setText("настройки применены")
+
+    def _import_directories(self) -> list[str]:
+        """The `-I` directories of the next session: command line, then settings.
+
+        The working folder of task_29 and the list under it are *search*
+        directories for `ИМПОРТ`, not the working directory of the process, and
+        they are passed exactly like `--include`: the engine tries the importing
+        file's own folder first, so a local `lib/x.pld` still wins over a
+        same-named file in the shared folder.
+        """
+        directories = list(self._command_line_includes)
+        working = self._settings.working_directory.strip()
+        if working:
+            directories.append(working)
+        directories.extend(self._settings.import_paths)
+        seen: set[str] = set()
+        result: list[str] = []
+        for directory in directories:
+            text = str(directory).strip()
+            if not text or text in seen:
+                continue
+            seen.add(text)
+            result.append(text)
+        return result
+
+    def _trim_recent(self) -> None:
+        """Applies a new «Помнить недавних файлов» to the list already stored."""
+        limit = self._settings.recent_limit
+        if self._recent.limit() == limit:
+            return
+        self._recent = documents.RecentFiles(self._recent.paths(), max_size=limit)
+        self._settings.recent_files = self._recent.paths()
+
+    # -- autosave (task_29) -------------------------------------------------
+    def _apply_autosave(self) -> None:
+        """Arms or disarms the autosave timer from the settings."""
+        minutes = self._settings.autosave_minutes
+        if minutes <= 0:
+            self._autosave.stop()
+            return
+        self._autosave.start(int(minutes) * 60_000)
+
+    def autosave_now(self) -> int:
+        """Writes every modified buffer that has a name; returns how many.
+
+        The timer calls this, and a test calls it directly rather than waiting a
+        minute.  A buffer without a path is *skipped*: an autosave must never ask
+        a question (a name nobody chose is not a file), and a modal box out of a
+        timer would be the worst possible one.  A buffer that cannot be written
+        — read-only file, locked directory — is reported in the output pane and
+        left alone; nothing is lost, because the text stays in the tab.
+        """
+        written = 0
+        for buffer in self._buffers:
+            if buffer.model.path is None or not buffer.is_modified():
+                continue
+            buffer.take_text()
+            try:
+                buffer.model.save()
+            except (OSError, UnicodeEncodeError) as error:
+                self._append_note(f"*** автосохранение: {buffer.title()}: {error}\n")
+                continue
+            buffer.mark_saved()
+            written += 1
+        if written:
+            self._refresh_titles()
+            self._status.setText(f"автосохранение: файлов {written}")
+        return written
 
     def _on_result(self, found: bool) -> None:
         """Records the outcome; the text of the answer already arrived as output.

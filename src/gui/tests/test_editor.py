@@ -22,7 +22,7 @@ from PySide6.QtGui import QTextCursor  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
-from prologd_gui.editor import QUERY_MARKER_WIDTH, CodeEditor  # noqa: E402
+from prologd_gui.editor import CURRENT_LINE_BACKGROUND, QUERY_MARKER_WIDTH, CodeEditor  # noqa: E402
 from prologd_gui.keywords import Keywords  # noqa: E402
 
 
@@ -184,14 +184,22 @@ def test_the_error_line_is_marked_and_cleared() -> None:
     editor = make_editor("а\nб\nв\n")
     editor.mark_error_line(2)
     assert editor.error_line() == 2
+    # One selection for the mark and one for the current line's band (task_29):
+    # the band is painted first, so a mark on the same line still stands out.
     selections = editor.extraSelections()
-    assert len(selections) == 1
-    # Its background is the error colour, and it spans the line.
-    assert selections[0].format.background().color().name() == "#ffd9d9"
+    backgrounds = [selection.format.background().color().name() for selection in selections]
+    assert "#ffd9d9" in backgrounds, backgrounds
+    assert backgrounds[0] != "#ffd9d9", "the current-line band must stay underneath"
+    marked = [selection for selection in selections
+              if selection.format.background().color().name() == "#ffd9d9"]
+    assert len(marked) == 1, backgrounds
 
     editor.mark_error_line(None)
     assert editor.error_line() is None
-    assert editor.extraSelections() == []
+    assert [selection.format.background().color().name()
+            for selection in editor.extraSelections()] == [CURRENT_LINE_BACKGROUND], (
+        "only the caret's line is left"
+    )
 
     # A line past the end is marked on the last line that exists: `непарные скобки`
     # is reported where the input ran out, which for a file that ends without its
@@ -199,14 +207,39 @@ def test_the_error_line_is_marked_and_cleared() -> None:
     # is not a mark at all.
     editor.mark_error_line(99)
     assert editor.error_line() == editor.document().blockCount(), editor.error_line()
-    assert len(editor.extraSelections()) == 1
+    assert any(
+        selection.format.background().color().name() == "#ffd9d9"
+        for selection in editor.extraSelections()
+    )
 
     # An edit clears the marks: a red line over text it no longer describes would
     # be a lie about where the program broke.
     editor.setPlainText("а\n")
     assert editor.error_line() is None
-    assert editor.extraSelections() == []
+    assert [selection.format.background().color().name()
+            for selection in editor.extraSelections()] == [CURRENT_LINE_BACKGROUND]
     print("ok: the error line is marked, clamped to a line that exists, and cleared by an edit")
+
+
+def test_the_current_line_band_can_be_switched_off() -> None:
+    """task_29: the pale band behind the caret's line, and its switch."""
+    editor = make_editor("а\nб\n")
+    assert [selection.format.background().color().name()
+            for selection in editor.extraSelections()] == [CURRENT_LINE_BACKGROUND]
+
+    # It follows the caret.
+    cursor = editor.textCursor()
+    cursor.setPosition(3)
+    editor.setTextCursor(cursor)
+    selections = editor.extraSelections()
+    assert len(selections) == 1
+    assert selections[0].cursor.blockNumber() == 1, selections[0].cursor.blockNumber()
+
+    editor.set_current_line(False)
+    assert editor.extraSelections() == [], "the band stayed behind"
+    editor.set_current_line(True)
+    assert len(editor.extraSelections()) == 1
+    print("ok: the current line is banded while the switch is on, and only then")
 
 
 def test_a_document_made_outside_takes_the_pane_font() -> None:
@@ -310,6 +343,7 @@ def main() -> int:
     test_zoom_is_bounded_and_reported()
     test_line_number_width_grows_with_the_document()
     test_the_error_line_is_marked_and_cleared()
+    test_the_current_line_band_can_be_switched_off()
     test_a_document_made_outside_takes_the_pane_font()
     test_the_margin_marks_questions_and_nothing_else()
     test_a_click_on_a_marker_runs_the_question_and_changes_nothing_else()

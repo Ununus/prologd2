@@ -99,13 +99,10 @@ ACTIONS: tuple[Action, ...] = (
     Action("uncomment", "Раскомментировать", "edit-uncomment", ("Ctrl+U",)),
     Action("clear_output", "Очистить вывод", "edit-clear", ("Ctrl+L",)),
     Action("format", "Форматировать", "edit-format", ("Ctrl+I",)),
-    Action(
-        "settings",
-        "Настройки…",
-        "tools-settings",
-        implemented=False,
-        waiting_for="task_29 — значения правятся в файле настроек",
-    ),
+    # «Настройки…» was the last disabled entry that named a task file (task_29).
+    # No key of its own: the menu is where it is looked for, and every `Ctrl`
+    # chord on the main row belongs to the insert table of task_31.
+    Action("settings", "Настройки…", "tools-settings"),
     # -- search
     Action(
         "find",
@@ -156,10 +153,10 @@ ACTIONS: tuple[Action, ...] = (
     # Long clauses are easier to read wrapped, but a log line cut in the middle is
     # not — so this switch is the *editor's*, and the output stays as it is.
     Action("wrap", "Переносить длинные строки", None, checkable=True),
-    # The zoom keys are the *keypad* ones: `Ctrl+=` and `Ctrl+-` sit on the main
-    # row, where task_31 puts the `РАВНО`/`СЛОЖЕНИЕ`/`ВЫЧИТАНИЕ` skeletons.  Qt
-    # spells the keypad `+` as `Num++` (it is a different combination from `+`:
-    # the keypad modifier is part of the sequence).
+    # The zoom keys are the *keypad* ones: `Ctrl+=`, `Ctrl+-` and `Ctrl+Shift+=`
+    # sit on the main row, where task_31 puts the insertions (`РАВНО(,)`,
+    # `СЛОЖЕНИЕ(,,)`, `-`, `_`).  Qt spells the keypad `+` as `Num++` (it is a
+    # different combination from `+`: the keypad modifier is part of the sequence).
     Action("zoom_in", "Увеличить шрифт", "view-zoom-in", ("Ctrl+Num++",)),
     Action("zoom_out", "Уменьшить шрифт", "view-zoom-out", ("Ctrl+Num+-",)),
     Action("zoom_reset", "Обычный размер шрифта", "view-zoom-reset", ("Ctrl+0",)),
