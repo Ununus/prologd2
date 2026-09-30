@@ -8,6 +8,7 @@ add_library(prlib STATIC
   src/lexer.cpp
   src/keywords.cpp
   src/parser.cpp
+  src/formatter.cpp
   src/program.cpp
   src/bindings.cpp
   src/engine.cpp

@@ -39,6 +39,10 @@ RECENT = "recent"
 #: The font-size control, not an action either: the window puts it here.
 FONT_SIZE = "#font"
 
+#: The formatter's mode control (task_30): a small menu button, not an action —
+#: it carries the mode and the «только выделенное» switch the action reads.
+FORMAT_MODE = "#format-mode"
+
 
 @dataclass(frozen=True)
 class Action:
@@ -86,14 +90,7 @@ ACTIONS: tuple[Action, ...] = (
     Action("comment", "Закомментировать", "edit-comment", ("Ctrl+K",)),
     Action("uncomment", "Раскомментировать", "edit-uncomment", ("Ctrl+U",)),
     Action("clear_output", "Очистить вывод", "edit-clear", ("Ctrl+L",)),
-    Action(
-        "format",
-        "Форматировать",
-        "edit-format",
-        ("Ctrl+I",),
-        implemented=False,
-        waiting_for="task_30",
-    ),
+    Action("format", "Форматировать", "edit-format", ("Ctrl+I",)),
     Action(
         "settings",
         "Настройки…",
@@ -296,6 +293,7 @@ TOOLBAR: tuple[str, ...] = (
     "comment",
     "uncomment",
     "format",
+    FORMAT_MODE,
     SEPARATOR,
     FONT_SIZE,
     SEPARATOR,
@@ -319,6 +317,7 @@ CONTEXT: tuple[str, ...] = (
     SEPARATOR,
     "comment",
     "uncomment",
+    "format",
     SEPARATOR,
     "select_all",
 )

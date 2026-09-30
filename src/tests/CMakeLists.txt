@@ -20,6 +20,7 @@ add_executable(prlib_tests
   test_stepping.cpp
   test_typical_tasks.cpp
   test_diagnostics.cpp
+  test_formatter.cpp
   test_lessons.cpp)
 
 target_link_libraries(prlib_tests PRIVATE
@@ -89,6 +90,16 @@ if(TARGET prologd)
   add_test(NAME cli_list_keywords_variadic COMMAND prologd --list-keywords)
   set_tests_properties(cli_list_keywords_variadic PROPERTIES
     PASS_REGULAR_EXPRESSION "ВЫВОД/\\+")
+
+  # task_30: `--format` is checked by the bytes it writes — the formatted file
+  # must still print what the original printed, and formatting it again must not
+  # change it.  Both need the real executable, so a CMake script drives it.
+  add_test(NAME cli_format
+    COMMAND ${CMAKE_COMMAND}
+            "-DPROLOGD_EXE=$<TARGET_FILE:prologd>"
+            "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}"
+            "-DSOURCE_DIR=${CMAKE_SOURCE_DIR}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cli_format.cmake")
 
   # The JSON session needs byte-exact stdin, so it is driven by a CMake script
   # instead of the usual PASS_REGULAR_EXPRESSION form.

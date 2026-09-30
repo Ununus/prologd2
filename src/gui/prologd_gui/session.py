@@ -33,6 +33,9 @@ class PrologSession(QObject):
     failed = Signal(str, str, str, object)
     #: The trace of `ТРАССА`, one line at a time (protocol 3).
     trace = Signal(str)
+    #: The laid-out text of a `format` request, and whether it differs from what
+    #: was sent (protocol 6, task_30).
+    formatted = Signal(str, bool)
     #: A stepped run stopped at a point: a `protocol.StepPoint`.
     stepped = Signal(object)
     #: The session ended; carries the process exit code.
@@ -145,6 +148,31 @@ class PrologSession(QObject):
     def quit(self) -> None:
         self._send(protocol.quit_session())
 
+    def format_text(
+        self,
+        text: str,
+        *,
+        mode: str = "soft",
+        width: int = 80,
+        indent: int = 1,
+        unit: str = "tab",
+        selection: bool = False,
+        name: str = "<format>",
+    ) -> None:
+        """Asks the interpreter to lay the text out; `formatted` answers it.
+
+        The formatter lives in prlib, next to the grammar it has to understand,
+        so the request travels over the protocol like everything else (protocol
+        6).  It needs no engine and is answered between queries; the reply is
+        either a `formatted` event or `error` events of kind `format`.
+        """
+        self._send(
+            protocol.format_text(
+                text, mode=mode, width=width, indent=indent, unit=unit,
+                selection=selection, name=name,
+            )
+        )
+
     # -- internals ---------------------------------------------------------
     def _send(self, payload: bytes) -> None:
         if not self.is_running():
@@ -193,6 +221,8 @@ class PrologSession(QObject):
             )
         elif name == "trace":
             self.trace.emit(str(event.get("text", "")))
+        elif name == "formatted":
+            self.formatted.emit(str(event.get("text", "")), bool(event.get("changed", False)))
         elif name == "error":
             self.failed.emit(
                 str(event.get("kind", "")),

@@ -19,7 +19,8 @@ from typing import Any, Iterator
 #:    and the `step`/`trace` flags of `load` and `query`.
 #: 5: `load` takes `questions` — `false` loads a program without running its own
 #:    `?`-statements (the editor's margin runs one query alone, task_36).
-PROTOCOL_VERSION = 5
+#: 6: `format` for the formatter; the answer is a `formatted` event (task_30).
+PROTOCOL_VERSION = 6
 
 #: Event names the interpreter emits.
 EVENTS = ("ready", "output", "result", "input_request", "step", "trace", "error", "bye")
@@ -114,6 +115,40 @@ def step_answer(action: str) -> bytes:
     if action not in STEP_ANSWERS:
         raise ValueError(f"unknown step action: {action!r}")
     return encode_request(cmd="step", action=action)
+
+
+def format_text(
+    text: str,
+    *,
+    mode: str = "soft",
+    width: int = 80,
+    indent: int = 1,
+    unit: str = "tab",
+    selection: bool = False,
+    name: str = "<format>",
+) -> bytes:
+    """Asks the interpreter to lay `text` out; the answer is `formatted`.
+
+    The formatter lives in prlib (the grammar is there once already), so the
+    window sends the buffer and receives the laid-out text back.  `selection`
+    tells it the text is a fragment: one that breaks off in the middle of a body
+    comes back formatted up to its last complete goal, the rest untouched
+    (task_30).  Flags that are the defaults are left off the wire.
+    """
+    if mode not in ("soft", "hard", "none"):
+        raise ValueError(f"unknown format mode: {mode!r}")
+    fields: dict[str, Any] = {"cmd": "format", "text": text, "mode": mode}
+    if width != 80:
+        fields["width"] = width
+    if indent != 1:
+        fields["indent"] = indent
+    if unit != "tab":
+        fields["unit"] = unit
+    if selection:
+        fields["selection"] = True
+    if name != "<format>":
+        fields["name"] = name
+    return encode_request(**fields)
 
 
 def _flags(*, step: bool = False, trace: bool = False, questions: bool = True) -> dict:

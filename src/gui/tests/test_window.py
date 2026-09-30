@@ -902,7 +902,7 @@ def test_the_menus_come_from_the_action_table(executable: str) -> None:
         settings = window._actions["settings"]
         assert settings.isEnabled() is False
         assert "task_29" in settings.toolTip(), settings.toolTip()
-        assert window._actions["format"].isEnabled() is False
+        assert window._actions["format"].isEnabled() is True, "the formatter is live now (task_30)"
         assert window._actions["step"].isEnabled() is True, "stepping is implemented now"
         assert window._actions["run_trace"].isEnabled() is True
         print("ok: the menu bar is built from the action table, disabled entries explain themselves")
@@ -1767,6 +1767,107 @@ def test_the_step_strip_is_one_font_and_three_pictures(executable: str) -> None:
     print("ok: the step strip is one font, and its buttons are the toolbar's pictures")
 
 
+def test_formatting_lays_the_buffer_out_and_stays_one_undo_step(executable: str) -> None:
+    """`Ctrl+I` goes through the protocol: whitespace only, one undo, the caret kept."""
+    old = "факт(1).\nцель(Х) :- часть(Х),   ещё(Х).\n"
+    new = "факт(1).\nцель(Х):-часть(Х), ещё(Х).\n"
+    window = empty_window(executable)
+    try:
+        view = window.editor()
+        view.setPlainText(old)
+        place = old.index("часть") + 2
+        cursor = view.textCursor()
+        cursor.setPosition(place)
+        view.setTextCursor(cursor)
+
+        window._actions["format"].trigger()
+        assert pump(window, lambda: view.toPlainText() == new), ascii(view.toPlainText())
+        assert window.status_text() == "отформатировано", window.status_text()
+        assert window.current_buffer().text() == new, "the document itself changed"
+        # Only whitespace moved, so the caret keeps its place — character for
+        # character, not "somewhere near".
+        assert view.textCursor().position() == new.index("часть") + 2
+
+        view.undo()
+        assert view.toPlainText() == old, "one undo puts the whole format back"
+
+        # An already formatted buffer is answered with a note, not a rewrite.
+        view.redo()
+        window._actions["format"].trigger()
+        assert pump(
+            window, lambda: window.status_text() == "уже отформатировано"
+        ), window.status_text()
+        assert view.toPlainText() == new
+    finally:
+        discard_changes(window)
+    print("ok: Ctrl+I formats the buffer, keeps the caret, and one undo takes it back")
+
+
+def test_formatting_only_the_selection(executable: str) -> None:
+    """«Только выделенное»: the fragment is formatted alone, the rest untouched."""
+    old = "цель(Х) :- часть(Х),   ещё(Х).\nфакт(1).\n"
+    fragment = "цель(Х) :- часть(Х),   ещё(Х).\n"
+    expected = "цель(Х):-часть(Х), ещё(Х).\nфакт(1).\n"
+    window = empty_window(executable)
+    try:
+        view = window.editor()
+        view.setPlainText(old)
+        # The switch goes through the menu, the way a user turns it on: the
+        # setting is what the action writes.
+        window._format_selection_action.setChecked(True)
+        assert window._settings.format_selection is True
+        cursor = view.textCursor()
+        cursor.setPosition(0)
+        cursor.setPosition(len(fragment), QTextCursor.MoveMode.KeepAnchor)
+        view.setTextCursor(cursor)
+
+        window._actions["format"].trigger()
+        assert pump(window, lambda: view.toPlainText() == expected), ascii(view.toPlainText())
+        # The formatted fragment stays selected: it is what was rewritten.
+        selection = view.textCursor()
+        assert (selection.selectionStart(), selection.selectionEnd()) == (
+            0,
+            len("цель(Х):-часть(Х), ещё(Х).\n"),
+        ), (selection.selectionStart(), selection.selectionEnd())
+    finally:
+        discard_changes(window)
+    print("ok: with «только выделенное» the selection is formatted alone")
+
+
+def test_a_broken_program_is_reported_and_not_rewritten(executable: str) -> None:
+    window = empty_window(executable)
+    try:
+        broken = "цель(Х:-часть(Х).\n"
+        window.editor().setPlainText(broken)
+        window._actions["format"].trigger()
+        assert pump(window, lambda: "не удалось" in window.status_text()), window.status_text()
+        assert window.editor().toPlainText() == broken, "the buffer was rewritten anyway"
+        assert window.editor().error_line() == 1, "the line is marked"
+    finally:
+        discard_changes(window)
+    print("ok: a broken program keeps its text and its line is marked")
+
+
+def test_the_mode_menu_stores_the_mode_and_the_hard_mode_reaches_the_wire(
+    executable: str,
+) -> None:
+    window = empty_window(executable)
+    try:
+        assert window._format_mode_button.text() == "Формат: мягко"
+        window._format_mode_actions["hard"].trigger()
+        assert window._settings.format_mode == "hard"
+        assert window._format_mode_button.text() == "Формат: жёстко"
+        window.editor().setPlainText("факт(1).\nцель(Х):-часть(Х), ещё(Х).\n")
+        window._actions["format"].trigger()
+        expected = "факт(1).\nцель(Х):-часть(Х),\n\tещё(Х).\n"
+        assert pump(window, lambda: window.editor().toPlainText() == expected), ascii(
+            window.editor().toPlainText()
+        )
+    finally:
+        discard_changes(window)
+    print("ok: the mode menu stores the mode, and the hard mode breaks through the wire")
+
+
 def main(argv: list[str]) -> int:
     if QApplication is None:
         print("skipped: PySide6 is not installed")
@@ -1831,6 +1932,10 @@ def main(argv: list[str]) -> int:
         test_stopping_a_query_asks_first_and_keeps_the_base(executable)
         test_copy_takes_the_selection_where_the_focus_is(executable)
         test_the_step_strip_is_one_font_and_three_pictures(executable)
+        test_formatting_lays_the_buffer_out_and_stays_one_undo_step(executable)
+        test_formatting_only_the_selection(executable)
+        test_a_broken_program_is_reported_and_not_rewritten(executable)
+        test_the_mode_menu_stores_the_mode_and_the_hard_mode_reaches_the_wire(executable)
         test_f1_shows_the_record_of_the_word_under_the_caret(executable)
         test_the_output_can_be_saved(executable, files)
         test_the_context_menu_reuses_the_shared_actions(executable)

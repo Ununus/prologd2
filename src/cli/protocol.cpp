@@ -10,6 +10,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "prlib/formatter.hpp"
 #include "prlib/keywords.hpp"
 #include "prlib/utf8_path.hpp"
 #include "prlib/version.hpp"
@@ -27,7 +28,9 @@ using Json = nlohmann::json;
 /// 4: `error` events carry `severity` (`error` or `warning`).
 /// 5: `load` takes `questions` — `false` loads a program without running its
 ///    own `?`-statements (the editor's margin runs one query alone, task_36).
-constexpr int kProtocolVersion = 5;
+/// 6: `format` — the formatter, answerable at any time; the answer is a
+///    `formatted` event (task_30).
+constexpr int kProtocolVersion = 6;
 
 [[nodiscard]] std::string stepActionName(StepAction action) {
   switch (action) {
@@ -165,6 +168,10 @@ class Session {
       fail("protocol", "нет ожидающего запроса ввода");
       return;
     }
+    if (command == "format") {
+      format(request);
+      return;
+    }
     if (command == "step") {
       // A `step` is the answer to a paused step point, and the pause is the wait
       // inside `onStep`; reaching this line means nothing is paused.
@@ -246,6 +253,51 @@ class Session {
       reportDiagnostic(runtime_error.error(), "runtime");
       exit_code_ = 3;
     }
+  }
+
+  /// The formatter, answerable between queries: it needs no engine, only the
+  /// text, and the answer is the text — whitespace only, every other byte
+  /// copied.  `selection` is what makes a fragment that breaks off in the
+  /// middle of a body come back laid out up to its last complete goal.  A
+  /// source that does not parse answers with `error` events (kind `format`) and
+  /// leaves the exit code alone: the request failed, the session did not.
+  void format(const Json& request) {
+    if (!request.contains("text")) {
+      fail("format", "format: нужен параметр text с исходником");
+      return;
+    }
+    prologd::FormatOptions options;
+    const std::string mode = request.value("mode", std::string("soft"));
+    if (mode == "soft") {
+      options.mode = FormatMode::Soft;
+    } else if (mode == "hard") {
+      options.mode = FormatMode::Hard;
+    } else if (mode == "none") {
+      options.mode = FormatMode::None;
+    } else {
+      fail("format", "format: режим должен быть soft, hard или none, не " + mode);
+      return;
+    }
+    options.width = request.value("width", std::size_t{80});
+    options.indent_steps = request.value("indent", std::size_t{1});
+    options.indent_unit = request.value("unit", std::string("tab")) == "spaces"
+                              ? IndentUnit::Spaces
+                              : IndentUnit::Tab;
+    options.selection_only = request.value("selection", false);
+    options.source_name = request.value("name", std::string("<format>"));
+    const FormatResult formatted =
+        formatSource(request.at("text").get<std::string>(), options);
+    if (!formatted.ok()) {
+      for (const PrologError& diagnostic : formatted.diagnostics) {
+        reportDiagnostic(diagnostic, "format");
+      }
+      return;
+    }
+    // Warnings of a source that parses are dropped here: a formatter is not a
+    // checker, and a front-end asking for layout does not want advice.
+    emit(Json{{"event", "formatted"},
+              {"text", formatted.text},
+              {"changed", formatted.changed}});
   }
 
   /// One diagnostic as an `error` event: the message as the human wrote it, and

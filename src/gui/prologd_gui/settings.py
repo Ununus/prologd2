@@ -39,6 +39,11 @@ INPUT_QUEUE = "view/input_queue"
 OUTPUT_SIZES = "view/output_sizes"
 PANEL_SIZES = "view/panel_sizes"
 SAVE_BEFORE_RUN = "execution/save_before_run"
+FORMAT_MODE = "format/mode"
+FORMAT_WIDTH = "format/width"
+FORMAT_INDENT = "format/indent"
+FORMAT_UNIT = "format/unit"
+FORMAT_SELECTION = "format/selection"
 
 DEFAULT_FONT_FAMILY = "Cascadia Mono"
 DEFAULT_FONT_SIZE = 11.0
@@ -56,6 +61,20 @@ MAXIMUM_FONT_SIZE = 72.0
 DEFAULT_AUTO_COMPLETE_AFTER = 2
 MINIMUM_AUTO_COMPLETE_AFTER = 1
 MAXIMUM_AUTO_COMPLETE_AFTER = 10
+
+#: The formatter (task_30): «не менять» turns the action into a note, the two
+#: modes are the ones the task file drew, and the width is the number of code
+#: points that must fit on one line in the soft mode.
+DEFAULT_FORMAT_MODE = "soft"
+FORMAT_MODES = ("none", "soft", "hard")
+DEFAULT_FORMAT_WIDTH = 80
+MINIMUM_FORMAT_WIDTH = 20
+MAXIMUM_FORMAT_WIDTH = 1000
+DEFAULT_FORMAT_INDENT = 1
+MINIMUM_FORMAT_INDENT = 1
+MAXIMUM_FORMAT_INDENT = 8
+DEFAULT_FORMAT_UNIT = "tab"
+FORMAT_UNITS = ("tab", "spaces")
 
 _TRUE = ("1", "true", "yes", "y", "да")
 
@@ -361,3 +380,59 @@ class Settings:
     @save_before_run.setter
     def save_before_run(self, value: bool) -> None:
         self._write(SAVE_BEFORE_RUN, bool(value))
+
+    # -- the formatter (task_30) ---------------------------------------------
+    @property
+    def format_mode(self) -> str:
+        """`none`, `soft` or `hard`; anything else in the file reads as `soft`."""
+        value = self._text(FORMAT_MODE, DEFAULT_FORMAT_MODE).strip().lower()
+        return value if value in FORMAT_MODES else DEFAULT_FORMAT_MODE
+
+    @format_mode.setter
+    def format_mode(self, value: str) -> None:
+        text = str(value).strip().lower()
+        self._write(FORMAT_MODE, text if text in FORMAT_MODES else DEFAULT_FORMAT_MODE)
+
+    @property
+    def format_width(self) -> int:
+        """What has to fit on one line in the soft mode, in code points."""
+        return int(
+            self._number(FORMAT_WIDTH, DEFAULT_FORMAT_WIDTH, MINIMUM_FORMAT_WIDTH,
+                         MAXIMUM_FORMAT_WIDTH)
+        )
+
+    @format_width.setter
+    def format_width(self, value: int) -> None:
+        self._write(FORMAT_WIDTH, int(value))
+
+    @property
+    def format_indent(self) -> int:
+        """How many indent units a continuation line starts with."""
+        return int(
+            self._number(FORMAT_INDENT, DEFAULT_FORMAT_INDENT, MINIMUM_FORMAT_INDENT,
+                         MAXIMUM_FORMAT_INDENT)
+        )
+
+    @format_indent.setter
+    def format_indent(self, value: int) -> None:
+        self._write(FORMAT_INDENT, int(value))
+
+    @property
+    def format_unit(self) -> str:
+        """`tab` or `spaces` — one tab is one unit, four spaces are one unit."""
+        value = self._text(FORMAT_UNIT, DEFAULT_FORMAT_UNIT).strip().lower()
+        return value if value in FORMAT_UNITS else DEFAULT_FORMAT_UNIT
+
+    @format_unit.setter
+    def format_unit(self, value: str) -> None:
+        text = str(value).strip().lower()
+        self._write(FORMAT_UNIT, text if text in FORMAT_UNITS else DEFAULT_FORMAT_UNIT)
+
+    @property
+    def format_selection(self) -> bool:
+        """«Форматировать только выделенное»: with a selection, only it is sent."""
+        return self._flag(FORMAT_SELECTION, False)
+
+    @format_selection.setter
+    def format_selection(self, value: bool) -> None:
+        self._write(FORMAT_SELECTION, bool(value))

@@ -1,6 +1,6 @@
 # task_30 — GUI: the program formatter
 
-**Status:** not started
+**Status:** done (protocol 6, CLI `--format`, GUI `Ctrl+I`)
 **Depends on:** task_21 (protocol), task_25 (documents), task_29 (settings)
 **Milestone:** M11
 
@@ -43,43 +43,51 @@ and which comma separates two *goals* rather than two arguments — that is the
 grammar, and the grammar already exists once, in the parser.  A second
 implementation in Python would drift.
 
-- [ ] `prlib`: `formatSource(text, FormatOptions) -> FormatResult {text,
+- [x] `prlib`: `formatSource(text, FormatOptions) -> FormatResult {text,
       changed, diagnostics}`, `FormatOptions {mode: none|soft|hard, width
       (default 80 columns), indent_steps (default 1), indent_unit: tab|spaces,
-      selection_only}`.
-- [ ] Algorithm: lex → parse into statements with their `SourceLocation` →
+      selection_only}`.  Also `source_name`, so a diagnostic names the buffer
+      the text came from (the CLI the path, the window `<buffer>`).
+- [x] Algorithm: lex → parse into statements with their `SourceLocation` →
       rebuild the text by inserting and removing **whitespace only**.  The bytes
       of every token are copied verbatim, so quoting, `#expr#` bodies, comments
       and Cyrillic text cannot be damaged, and nothing is re-printed from the
-      AST.
-- [ ] **Trailing whitespace never survives**: the reference examples above were
+      AST.  (The statement structure comes from the token stream — statement
+      ends at a `depth 0` dot, body separators at `depth 0` commas inside the
+      body, `#…#` tracked as a toggle — and the parse is what decides whether
+      the text may be touched at all.)
+- [x] **Trailing whitespace never survives**: the reference examples above were
       written with a space after the final comma and the formatted text has
       none.
-- [ ] **Idempotence**: `format(format(x)) == format(x)`, enforced by a property
-      test over `examples/*.pld`.
-- [ ] **Semantics preserved**: the formatted program must produce the same
-      output as the original for every example (golden test).
-- [ ] Comments: a trailing `% …` stays on its goal's line, a comment on its own
-      line stays on its own line, and a comment is never moved across a goal
-      boundary.
-- [ ] Empty lines: at most one blank line *between* clauses; blank lines inside
+- [x] **Idempotence**: `format(format(x)) == format(x)`, enforced by a property
+      test over `examples/*.pld` (every `.pld` under `examples/`, both modes).
+- [x] **Semantics preserved**: the formatted program must produce the same
+      output as the original for every example (golden test — `cli_format.cmake`
+      runs both and compares; the Catch2 suite keeps the byte-exact shapes).
+- [x] Comments: a trailing `% …` stays on its goal's line, a comment on its own
+      line stays on its own line (indented with the continuation indent inside a
+      body), and a comment is never moved across a goal boundary.
+- [x] Empty lines: at most one blank line *between* clauses; blank lines inside
       a clause are kept (the reference implementation deleted them — see below).
-- [ ] Input that does not parse: return the text unchanged with the diagnostics,
+- [x] Input that does not parse: return the text unchanged with the diagnostics,
       so the GUI can report "не удалось разобрать" and mark the line instead of
-      mangling the buffer.
-- [ ] Selection mode: the selected fragment is parsed as a statement sequence;
+      mangling the buffer (the window does exactly that; the CLI exits 2).
+- [x] Selection mode: the selected fragment is parsed as a statement sequence;
       a partial clause (the caret is in the middle of a body) is formatted up to
-      its last complete goal and the remainder is left alone.
-- [ ] CLI: `prologd --format[=soft|hard] [--format-width N] [--format-indent N]
+      its last complete goal and the remainder is left alone (the cut is the
+      last top-level separator whose prefix parses with a dot).
+- [x] CLI: `prologd --format[=soft|hard] [--format-width N] [--format-indent N]
       [--format-unit tab|spaces] [-s FILE]` → formatted text on stdout, exit 0;
       exit 2 with the usual diagnostic when the source does not parse.  No `-o`
-      needed, so it composes with the shell.
-- [ ] Protocol v2: `{"cmd":"format","text":…,"mode":"hard","indent":2,"width":80}`
-      → `{"event":"formatted","text":…}` or an `error` event; the request must
-      be answerable between queries (it does not need the engine).
-- [ ] GUI: `prologd_gui/formatter.py` (Qt-free client), the action **Форматировать**
-      `Ctrl+I` with a mode dropdown on the toolbar, "форматировать только
-      выделенное" in the settings and a context-menu entry; the replacement is
+      needed, so it composes with the shell; no files means stdin.
+- [x] Protocol **6**: `{"cmd":"format",…}` → `{"event":"formatted","text":…}`
+      or `error` events of kind `format`; the request is answerable between
+      queries (it does not need the engine) and leaves the exit code alone — the
+      request failed, the session did not.
+- [x] GUI: `prologd_gui/formatter.py` (Qt-free client — the position mapping),
+      the action **Форматировать** `Ctrl+I` with a mode menu on the toolbar
+      («не менять»/«мягкое»/«жёсткое» and «только выделенное»; the same settings
+      keys task_29's dialog will edit), a context-menu entry; the replacement is
       one undo step, the caret and the selection survive it, and the cursor does
       not jump to the top of the document.
 
@@ -105,15 +113,20 @@ the colour conventions elsewhere; do not port it.
 
 ## Tests
 
-- [ ] Catch2 golden tests for both examples above, byte-exact (this is the
-      acceptance criterion the user actually wrote down).
-- [ ] Catch2: trailing comment kept, comment-only line kept, `#1+2#` untouched,
+- [x] Catch2 golden tests for both examples above, byte-exact (this is the
+      acceptance criterion the user actually wrote down — with the head spelled
+      `правило`: a capital initial is a *variable* in this dialect, so the task's
+      `Правило` would not parse; the columns are the same).
+- [x] Catch2: trailing comment kept, comment-only line kept, `#1+2#` untouched,
       quoted atoms untouched, a one-goal clause unchanged, `;` terminator,
       `<-` rule, unparsable input returned unchanged, idempotence.
-- [ ] CTest: `prologd --format=hard -s examples/*.pld` output re-parses, and
-      running the formatted file yields the same output as the original.
-- [ ] Python: `src/gui/tests/test_formatter.py` (Qt-free) against the built
-      interpreter — request/response shape and an error case.
+- [x] CTest: `prologd --format=hard -s examples/*.pld` output re-parses, and
+      running the formatted file yields the same output as the original
+      (`src/tests/cli_format.cmake`: both modes × a plain example and a lesson,
+      plus a broken source that must exit 2 and write nothing to stdout).
+- [x] Python: `src/gui/tests/test_formatter.py` (Qt-free) against the built
+      interpreter — request/response shape, the settings on the wire, the
+      selection cut, an error case and the caret mapping.
 
 ## Decisions (from the user, 2026-09-29)
 
@@ -132,3 +145,23 @@ the colour conventions elsewhere; do not port it.
 an already formatted document changes nothing, formatting a selection behaves
 like formatting that fragment alone, a broken program is reported instead of
 rewritten, and the formatted `examples/` still pass their golden tests.
+
+## What was built (notes for the next session)
+
+* The formatter is `prlib/formatter.{hpp,cpp}`; the wire is protocol 6 and the
+  CLI gained `--format`, `--format-width`, `--format-indent`, `--format-unit`
+  (a query of its own: it prints and exits, like `--list-keywords`).
+* The statement structure is taken from the *token stream* (the lexer's output):
+  the parse is the permission, the tokens are the map.  Offsets come from the
+  token `SourceLocation`s (line/column, columns count bytes) and a line table.
+* Canonical spacing the formatter writes: clause `голова:-тело` (glued), a
+  directive `:- цель.` (one space), a query `?цель.` (glued), goal separator
+  `, ` and ` ; `, and no space before the final dot.
+* `FormatOptions::indent_unit == Spaces` means **four** spaces per step.
+* Selection formatting drops the fragment's own parse errors when it found a
+  parsable cut: they are about the part that is deliberately left alone, and a
+  front-end must not report «не удалось разобрать» for a cut it just handled.
+* The window's mapping (old offsets → new) is `prologd_gui/formatter.py`, and the
+  mode control sits on the toolbar until task_29's dialog owns the settings keys.
+* `FormatMode::None` is accepted on the wire (the settings may say «не менять»),
+  and the window says so in the status bar instead of sending anything.

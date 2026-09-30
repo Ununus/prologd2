@@ -9,14 +9,14 @@ session.
   started (protocol + skeleton).
 * Build: the `windows-msvc` preset (Visual Studio 18 2026, MSVC 19.51) build is
   green locally; the Linux presets, including `-Werror`, build cleanly.
-* Tests: 231/231 pass in about four seconds: 218 Catch2 cases plus 13 command-line
+* Tests: 248/248 pass in about five seconds: 234 Catch2 cases plus 14 command-line
   and integration tests (seven option tests, two `--list-keywords` tests, the
-  import-search report, the JSON protocol session, the engine-limit cases and the
-  diagnostics cases).
+  import-search report, the JSON protocol session, the engine-limit cases, the
+  diagnostics cases and the formatter round-trip).
   or `--source`), stdin, the REPL and the `--protocol json` session for
   front-ends.
 * GUI: `src/gui` (PySide6) drives the executable through the JSON protocol; the
-  window, the protocol and the stepping are covered by seventeen offscreen scripts
+  window, the protocol and the stepping are covered by eighteen offscreen scripts
   (`src/gui/tests/`), which need no display.
 * Documentation: `doc/help.typ`, `doc/technical.typ`, `doc/prologd-diff.typ`
   written (Russian); `cmake --build build --target docs` compiles them when
@@ -96,7 +96,7 @@ session.
 | task_27_gui_panels | done | movable panel (`F4`, `Ctrl+F4`), output pane (colour by kind, visible half-lines, bounded history, auto-scroll, save to a file), input console with the queue switch, status-bar details and the two-state run/stop |
 | task_28_gui_run_step | done | `EngineOptions::stepHook` + `StepInfo`, protocol 3 (`step`/`trace` events, `step` request, positions on `error`), the step strip with the call stack, the trace line in the editor, `F10`/`Shift+F10`/`F5`, error and trace lines from structured positions |
 | task_29_gui_settings | not started | settings dialog and persistence |
-| task_30_gui_formatter | not started | soft/hard formatting in prlib + protocol |
+| task_30_gui_formatter | done | `prlib/formatter.cpp` (whitespace-only, everything else copied byte for byte); `prologd --format[=soft|hard]` with `--format-width`, `--format-indent` and `--format-unit`; protocol **6** (`format` → `formatted`/`error`, answerable between queries); the window's `Ctrl+I` with a mode menu («не менять»/«мягкое»/«жёсткое» and «только выделенное»), one undo step, the caret and the selection mapped onto the new text; a source that does not parse is never rewritten |
 | task_31_gui_shortcuts | not started | layout-independent `Ctrl`+ key combinations |
 | task_32_import_search_report | done | `ИМПОРТ` failure names the directories tried, with reasons |
 | task_33_gui_search_replace | done | `search.py` (plain-text, Qt-free) + the find bar: question from the selection or the word at the caret, `F3`/`Shift+F3` with the wrap reported, three switches, «Заменить всё» as one undo step, the matches lit in every view; `test_search.py` has 16 checks |
@@ -114,7 +114,7 @@ session.
 
 ## Test suite
 
-231 tests, about four seconds: 218 Catch2 cases plus 13 command-line and
+248 tests, about five seconds: 234 Catch2 cases plus 14 command-line and
 integration tests (seven option tests, two `--list-keywords` tests, the
 import-search report, the JSON protocol session and the engine-limit cases). Groups:
 BigInt, lexer, keywords, parser, unification, engine, every built-in group,
@@ -1013,3 +1013,42 @@ Resolved on 2026-09-29 (GUI planning):
   `ElidedLabel` paints the tail with «…» in front when even that does not fit —
   Qt's own middle elision reads badly on a path (`…\e…2:1`), the cut is shown,
   and `text()` stays whole, which is what the tooltip and the tests read.
+* GUI round, part 32: **task_30 — the formatter**, and the placement question was
+  the whole design: laying out a clause needs to know where a body starts and
+  which comma separates two *goals* rather than two arguments — that is the
+  grammar, and the grammar lives in prlib, so the formatter went there and the
+  window became its client (`prologd --format` is the same code on the command
+  line).  `formatSource` returns `{text, changed, diagnostics}`; the mechanism is
+  what keeps it safe: the text is lexed and parsed with the interpreter's own
+  grammar, and the output is rebuilt from the *token stream*, inserting and
+  removing whitespace only — every token is copied byte for byte, so quoting,
+  `#expr#` bodies and Cyrillic names cannot be damaged and nothing is re-printed
+  from the AST.  A source that does not parse comes back untouched with its
+  diagnostics (the CLI exits 2 and writes nothing to stdout; the window reports
+  «не удалось разобрать» and marks the line).  The canonical spacing it writes is
+  the corpus's: `голова:-тело` glued, `:- цель.` for a directive with one space,
+  `?цель.` glued, `, ` and ` ; ` between goals, no space before the dot, no
+  trailing whitespace anywhere, at most one blank line between statements and the
+  author's blank lines inside one.  The two acceptance shapes are byte-exact
+  tests — with the head spelled lowercase, because a capital initial is a
+  *variable* in this dialect and the task's `Правило` would not parse (the columns
+  match, since the words are the same length).  Idempotence is a property test
+  over every `.pld` under `examples/` in both modes; `src/tests/cli_format.cmake`
+  runs the executable on a plain example and a lesson, re-formats its own output
+  and compares the *programs'* output with the originals'.  Protocol went to 6:
+  `format` is answered between queries with `formatted` (or `error` of kind
+  `format`) and never touches the exit code — the request failed, the session did
+  not.  In the window, `Ctrl+I` sends the buffer (or the selection, when «только
+  выделенное» is on) and puts the answer back: one undo step around the
+  replacement, the caret and the selection carried over by
+  `prologd_gui/formatter.py` (a Qt-free difflib mapping, so a headless test can
+  hammer it), and an edit that arrives while the answer is in flight cancels the
+  format instead of discarding the edit.  A fragment formats *up to its last
+  complete goal*: the cut is the last top-level separator whose prefix parses with
+  a final dot, and the fragment's own parse errors are dropped then — they are
+  about the part that was deliberately left alone.  The mode control
+  («не менять»/«мягкое»/«жёсткое» and «только выделенное») sits on the toolbar
+  until task_29's dialog owns the settings keys.  Sixteen new Catch2 cases plus the
+  wire test bring the suite to 248/248 (234 Catch2 + 14 integration), the GUI
+  scripts to seventeen `test_*.py`, and the manual gained §15 `--format` and
+  `gui.typ` its §4.3.

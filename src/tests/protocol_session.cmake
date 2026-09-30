@@ -37,7 +37,7 @@ execute_process(
 
 set(expected_events
   "{\"event\":\"ready\","
-  "\"protocol\":5"
+  "\"protocol\":6"
   "\"keywords\":"
   "{\"event\":\"result\",\"found\":true}"
   "{\"event\":\"output\",\"text\":\"X=1\\nX=2\\n\"}"
@@ -84,6 +84,43 @@ if(NOT result_count EQUAL 1)
 endif()
 if(NOT exit_code EQUAL 0)
   message(FATAL_ERROR "Quiet-load session exit code ${exit_code}")
+endif()
+
+# --- format: layout only, and a broken source is reported, not rewritten ------
+# The formatter answers between queries and needs no engine (task_30).  Cyrillic
+# needles cannot survive `execute_process`'s code page, so the check is about the
+# shape of the events: a `formatted` event that says the text changed, a tab as
+# the break's indent, and an `error` of kind `format` for a source that does not
+# parse.  Neither request touches the exit code: the session itself did not fail.
+file(WRITE "${session}"
+  "{\"cmd\":\"format\",\"text\":\"факт(1).\\nцель(Х):-часть(Х), ещё(Х).\\n\",\"mode\":\"hard\"}\n"
+  "{\"cmd\":\"format\",\"text\":\"цель(Х:-часть(Х).\\n\",\"mode\":\"hard\"}\n"
+  "{\"cmd\":\"quit\"}\n")
+
+execute_process(
+  COMMAND "${PROLOGD_EXE}" --protocol json
+  INPUT_FILE "${session}"
+  OUTPUT_VARIABLE events
+  RESULT_VARIABLE exit_code)
+
+string(FIND "${events}" "\"event\":\"formatted\"" position)
+if(position EQUAL -1)
+  message(FATAL_ERROR "Expected a formatted event\n--- got ---\n${events}")
+endif()
+string(FIND "${events}" "\"changed\":true" position)
+if(position EQUAL -1)
+  message(FATAL_ERROR "The formatted event did not say the text changed\n--- got ---\n${events}")
+endif()
+string(FIND "${events}" "\\t" position)
+if(position EQUAL -1)
+  message(FATAL_ERROR "The hard format did not indent the break with a tab\n--- got ---\n${events}")
+endif()
+string(FIND "${events}" "\"kind\":\"format\"" position)
+if(position EQUAL -1)
+  message(FATAL_ERROR "A broken source must answer with an error event of kind format\n--- got ---\n${events}")
+endif()
+if(NOT exit_code EQUAL 0)
+  message(FATAL_ERROR "The format session exited with ${exit_code}")
 endif()
 
 # --- a program that does not parse must be reported and set exit code 2 -------

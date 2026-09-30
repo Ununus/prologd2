@@ -162,14 +162,16 @@ The menus are **Файл** (Новый, Открыть…, Последние, �
 **Справка** (Руководство пользователя, Справка по окну, О программе).
 
 An entry that does not exist yet stays in its menu but is **disabled**, and its
-tooltip names what it waits for: «Форматировать» — task_30 and «Настройки…» —
-task_29; «Графическое окно» has **no task file yet** (the roadmap below has the
+tooltip names what it waits for: «Настройки…» — task_29; «Графическое окно» has
+**no task file yet** (the roadmap below has the
 plan).  A menu that silently lacks half of the feature list is worse than one that
-says so.  «Поиск» left that list in task_33 and the «Выполнение» group in task_28 —
-«Запустить с трассировкой», «Шаг» and «Шаг с обходом» are live.  The toolbar is
+says so.  «Поиск» left that list in task_33, the «Выполнение» group in task_28 —
+«Запустить с трассировкой», «Шаг» and «Шаг с обходом» are live — and
+«Форматировать» in task_30.  The toolbar is
 grouped as
 the reference front-end had it: file | run/stop/step | editing (comment,
-uncomment, format) | font size | tools (graphics, settings, help), and at the far
+uncomment, format and its mode button) | font size | tools (graphics, settings,
+help), and at the far
 right **Очистить вывод**, which acts on the output rather than on the program;
 `QToolBar.setIconSize(QSize(24, 24))` is set explicitly so the layout does not
 depend on the style.
@@ -409,6 +411,36 @@ would make its own message a lie.  «Заменить всё» is **one undo ste
 count is recomputed while the text is edited under the bar, and that never moves
 the caret — typing in the program must not throw the cursor into the next match.
 
+## Formatting a program
+
+**Форматировать** (`Ctrl+I`) only ever moves whitespace: the text is laid out
+again, but every name, number, `#expr#` body, quote and comment is copied byte
+for byte, so formatting cannot damage a program.  The formatter itself lives in
+prlib, next to the grammar it has to understand — a second parser in Python would
+drift — so the window sends the buffer with a `format` request (protocol 6) and
+puts the answer back.  The grammar's copy of that request is `prologd --format`;
+the protocol contract has the details, and `src/gui/tests/test_formatter.py`
+drives the wire headlessly.
+
+The mode is chosen next to the action on the toolbar (it is a preference, so
+task_29's dialog will edit the same keys): **мягкое** keeps the author's line
+breaks and moves a goal that does not fit the width (80 columns by default) to a
+continuation line; **жёсткое** puts each goal of a body on a line of its own;
+«не менять» turns the action into a note.  The same menu carries «только
+выделенное»: with it, only the selected fragment is sent, and a fragment that
+breaks off in the middle of a body is formatted up to its last complete goal —
+the rest is copied as it stands.  Trailing whitespace never survives, runs of
+blank lines between statements collapse into one (inside a statement they stay),
+and a `%` comment stays on the line it was written on.
+
+What the window takes care of around the text: the replacement is **one undo
+step**, the **caret and the selection keep their places** (only whitespace moved,
+so `formatter.map_positions` carries the old offsets onto the new text), and a
+program that does not parse is **never rewritten** — the status bar says «не
+удалось разобрать», the offending line is marked, and the buffer keeps its text.
+An edit that arrives while the answer is in flight cancels the format instead of
+discarding the edit.
+
 ## Tabs and files
 
 A tab is one program.  **Запустить** runs the tab that is showing; a saved,
@@ -456,7 +488,7 @@ Headless check of the protocol, without PySide6 installed:
 python src/gui/tests/protocol_smoke.py
 ```
 
-## Protocol contract (version 5)
+## Protocol contract (version 6)
 
 One JSON object per line in both directions; the interpreter writes nothing else
 to stdout.  The C++ side lives in `src/cli/protocol.cpp`, the Python side in
@@ -466,9 +498,10 @@ to stdout.  The C++ side lives in `src/cli/protocol.cpp`, the Python side in
 of `error`; version 4 adds `severity` to `error` (`error` or `warning` — a warning
 is advice and never ends the run); version 5 adds the `questions` flag of `load`
 (`false` loads a program without running its own `?`-statements — the editor's
-margin uses it to answer one clicked query alone, task_36).  Version 1 sessions
-are still understood by the Python client (the table is then empty and completion
-falls back to the document's own predicates).
+margin uses it to answer one clicked query alone, task_36); version 6 adds
+`format` — the formatter, which needs no engine and is answerable at any time
+(task_30).  Version 1 sessions are still understood by the Python client (the
+table is then empty and completion falls back to the document's own predicates).
 
 ### Requests
 
@@ -479,6 +512,7 @@ falls back to the document's own predicates).
 | `{"cmd":"query","text":"?цель(X)."}` | run one statement |
 | `{"cmd":"input","text":"…"}` | answer the pending `input_request` |
 | `{"cmd":"step","action":"into"}` | answer the pending `step` event; `action` is `into`, `over`, `continue` or `stop` |
+| `{"cmd":"format","text":"…","mode":"hard"}` | lay the text out and answer with `formatted`; `mode` is `soft` (default), `hard` or `none`, and `width`, `indent`, `unit` (`tab`/`spaces`) and `selection` say how |
 | `{"cmd":"interrupt"}` | ask for a stop (see the note below) |
 | `{"cmd":"quit"}` | end the session |
 
@@ -493,12 +527,13 @@ left off the wire.
 
 | Event | Meaning |
 |-------|---------|
-| `{"event":"ready","protocol":5,"version":"2.0.0","keywords":[…]} `| the session is up |
+| `{"event":"ready","protocol":6,"version":"2.0.0","keywords":[…]} `| the session is up |
 | `{"event":"output","text":"…"}` | program output (`ВЫВОД`, query results) |
 | `{"event":"result","found":true}` | one query finished; `found` is false when nothing matched |
 | `{"event":"input_request","kind":"line"}` | `ВВОДСТР`/`ВВОДСИМВ`/`ВВКОД` waits for an answer; `kind` is `token`, `line` or `codepoint` |
 | `{"event":"step","action":"call","goal":"…","depth":2,"file":"…","line":9,"column":1}` | a step point; `action` is `call`, `exit`, `redo` or `fail`.  `goal` is absent for `exit` (the goal is the one its `call` named), and the position is absent when there is none |
 | `{"event":"trace","text":"…"}` | one line of the `ТРАССА` trace |
+| `{"event":"formatted","text":"…","changed":true}` | the laid-out text of a `format` request; `changed` says whether it differs from what was sent |
 | `{"event":"error","kind":"parse","severity":"warning","message":"…","file":"…","line":3,"column":5}` | diagnostic; `kind` is `parse`, `runtime` or `protocol`, `severity` is `error` or `warning` (a warning never ends the run), and the position is absent when there is none to report |
 | `{"event":"bye"}` | the session is over |
 

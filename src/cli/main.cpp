@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "prlib/engine.hpp"
+#include "prlib/formatter.hpp"
 #include "prlib/keywords.hpp"
 #include "prlib/module_loader.hpp"
 #include "prlib/utf8_path.hpp"
@@ -92,6 +93,12 @@ int main(int argc, char** argv) {
   bool noWarnings = false;
   bool listKeywords = false;
   std::string protocol = "text";
+  // `--format` answers and exits like `--list-keywords`; the value is optional
+  // (bare `--format` means the soft mode).
+  std::string formatMode;
+  std::size_t formatWidth = 80;
+  std::size_t formatIndent = 1;
+  std::string formatUnit = "tab";
   // Left unset on purpose: the engine's own defaults are the ones to use, and a
   // flag that repeats them would become a second place to change them.
   std::optional<std::size_t> maxDepth;
@@ -114,6 +121,16 @@ int main(int argc, char** argv) {
       ->check(CLI::IsMember({"text", "json"}));
   app.add_flag("--list-keywords", listKeywords,
                "Print the reserved names as name/arity and exit");
+  CLI::Option* formatOption = app.add_option(
+      "--format", formatMode,
+      "Print the source formatted to stdout and exit: soft (default) or hard")
+                                   ->expected(0, 1);
+  app.add_option("--format-width", formatWidth,
+                 "Soft formatting: what has to fit on one line (default 80)");
+  app.add_option("--format-indent", formatIndent,
+                 "Continuation indent in units (default 1)");
+  app.add_option("--format-unit", formatUnit, "Indent unit: tab (default) or spaces")
+      ->check(CLI::IsMember({"tab", "spaces"}));
   app.add_option("files", positional, "Source files");
 
   try {
@@ -140,6 +157,61 @@ int main(int argc, char** argv) {
       }
     }
     return 0;
+  }
+
+  // A query of its own too: the formatter is a function of the text, and the
+  // answer is the text — no interpreter, no engine.  Unparsable input exits 2
+  // with the usual diagnostics, so a script can tell «formatted» from «not
+  // formatted» without reading the output.
+  if (formatOption != nullptr && formatOption->count() > 0) {
+    if (protocol == "json") {
+      std::cerr << "error: --format writes the source to stdout; drop --protocol json\n";
+      return 1;
+    }
+    prologd::FormatOptions formatOptions;
+    if (formatMode.empty() || formatMode == "soft") {
+      formatOptions.mode = prologd::FormatMode::Soft;
+    } else if (formatMode == "hard") {
+      formatOptions.mode = prologd::FormatMode::Hard;
+    } else {
+      std::cerr << "error: --format expects soft or hard, not " << formatMode << '\n';
+      return 1;
+    }
+    formatOptions.width = formatWidth;
+    formatOptions.indent_steps = formatIndent;
+    formatOptions.indent_unit =
+        formatUnit == "spaces" ? prologd::IndentUnit::Spaces : prologd::IndentUnit::Tab;
+    std::vector<std::pair<std::string, std::string>> inputs;
+    if (sources.empty()) {
+      std::ostringstream buffer;
+      buffer << std::cin.rdbuf();
+      inputs.emplace_back("<stdin>", buffer.str());
+    }
+    for (const std::string& file : sources) {
+      std::ifstream stream(prologd::fromUtf8Path(file), std::ios::binary);
+      if (!stream) {
+        std::cerr << "Cannot open input file: " << file << '\n';
+        return 1;
+      }
+      std::ostringstream buffer;
+      buffer << stream.rdbuf();
+      inputs.emplace_back(file, buffer.str());
+    }
+    int status = 0;
+    for (const auto& [name, text] : inputs) {
+      prologd::FormatOptions options = formatOptions;
+      options.source_name = name;
+      const prologd::FormatResult formatted = prologd::formatSource(text, options);
+      if (!formatted.ok()) {
+        for (const prologd::PrologError& diagnostic : formatted.diagnostics) {
+          std::cerr << prologd::DiagnosticSink::format(diagnostic) << '\n';
+        }
+        status = 2;
+        continue;
+      }
+      std::cout << formatted.text;
+    }
+    return status;
   }
 
   if (protocol == "json" &&

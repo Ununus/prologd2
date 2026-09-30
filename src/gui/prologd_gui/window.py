@@ -11,7 +11,14 @@ from __future__ import annotations
 import pathlib
 
 from PySide6.QtCore import QSize, Qt, QTimer, QUrl
-from PySide6.QtGui import QAction, QDesktopServices, QIntValidator, QKeySequence, QTextCursor
+from PySide6.QtGui import (
+    QAction,
+    QActionGroup,
+    QDesktopServices,
+    QIntValidator,
+    QKeySequence,
+    QTextCursor,
+)
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -21,14 +28,26 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QSplitter,
     QToolBar,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
 
-from . import actions, appearance, assets, documents, findbar, panels, reference, search
+from . import (
+    actions,
+    appearance,
+    assets,
+    documents,
+    findbar,
+    formatter,
+    panels,
+    reference,
+    search,
+)
 from .buffers import Buffer
 from .editor import CodeEditor, ZoomablePlainTextEdit
 from .panes import Pane
@@ -79,6 +98,7 @@ class MainWindow(QMainWindow):
         self._session.failed.connect(self._on_failed)
         self._session.trace.connect(self._on_trace)
         self._session.stepped.connect(self._on_stepped)
+        self._session.formatted.connect(self._on_formatted)
         self._session.ended.connect(self._on_ended)
 
         #: Warnings seen in the current run, shown beside the answer; reset when
@@ -118,6 +138,10 @@ class MainWindow(QMainWindow):
         self._busy = False
         #: Whether a program was loaded into the running interpreter (`run_program`).
         self._loaded = False
+        #: The `format` request that is in flight (task_30): what was sent, where
+        #: it came from and where the caret stood.  The answer arrives as an
+        #: event, so this state outlives the call that started it.
+        self._format_pending: dict | None = None
 
         self._build_ui()
         # The split editor comes back if it was left open, and before the first
@@ -351,6 +375,7 @@ class MainWindow(QMainWindow):
             "select_all": self._select_all,
             "comment": self._comment,
             "uncomment": self._uncomment,
+            "format": self.format_document,
             "reference": self.show_reference,
             "clear_output": self.clear_output,
             "find": lambda: self.show_find(),
@@ -397,10 +422,73 @@ class MainWindow(QMainWindow):
                 self._toolbar.addSeparator()
             elif key == actions.FONT_SIZE:
                 self._toolbar.addWidget(self._build_font_size_box())
+            elif key == actions.FORMAT_MODE:
+                self._toolbar.addWidget(self._build_format_mode_button())
             else:
                 self._toolbar.addAction(self._actions[key])
         self._toolbar.setVisible(self._settings.toolbar_visible)
         self.addToolBar(self._toolbar)
+
+    def _build_format_mode_button(self) -> QWidget:
+        """The formatter's mode, beside its action (task_30).
+
+        The modes themselves are a preference (task_29's dialog will edit the
+        same keys), and «только выделенное» is the switch the task asked for — so
+        the button is a *view* of those values and the menu is where they are
+        changed until the dialog exists.
+        """
+        self._format_mode_button = QToolButton()
+        self._format_mode_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self._format_mode_button.setToolTip(
+            "Как форматировать (Ctrl+I): режим и «только выделенное»"
+        )
+        menu = QMenu(self._format_mode_button)
+        self._format_menu = menu
+        group = QActionGroup(self)
+        group.setExclusive(True)
+        self._format_mode_actions: dict[str, QAction] = {}
+        for value, title in (
+            ("none", "Не менять"),
+            ("soft", "Мягкое — переносить, что не влезло"),
+            ("hard", "Жёсткое — по цели на строку"),
+        ):
+            entry = menu.addAction(title)
+            entry.setCheckable(True)
+            entry.setActionGroup(group)
+            entry.triggered.connect(
+                lambda _checked=False, mode=value: self._set_format_mode(mode)
+            )
+            self._format_mode_actions[value] = entry
+        menu.addSeparator()
+        self._format_selection_action = menu.addAction("Только выделенное")
+        self._format_selection_action.setCheckable(True)
+        self._format_selection_action.toggled.connect(self._set_format_selection)
+        self._format_mode_button.setMenu(menu)
+        self._sync_format_button()
+        return self._format_mode_button
+
+    def _sync_format_button(self) -> None:
+        """Shows the stored mode without answering for it."""
+        if not hasattr(self, "_format_mode_button"):
+            return
+        mode = self._settings.format_mode
+        titles = {"none": "Формат: не менять", "soft": "Формат: мягко", "hard": "Формат: жёстко"}
+        self._format_mode_button.setText(titles.get(mode, titles["soft"]))
+        for value, entry in self._format_mode_actions.items():
+            entry.blockSignals(True)
+            entry.setChecked(value == mode)
+            entry.blockSignals(False)
+        self._format_selection_action.blockSignals(True)
+        self._format_selection_action.setChecked(self._settings.format_selection)
+        self._format_selection_action.blockSignals(False)
+
+    def _set_format_mode(self, mode: str) -> None:
+        self._settings.format_mode = mode
+        self._sync_format_button()
+
+    def _set_format_selection(self, flag: bool) -> None:
+        self._settings.format_selection = bool(flag)
+        self._sync_format_button()
 
     def _build_font_size_box(self) -> QWidget:
         """The font-size control: the same preference `Ctrl`+wheel writes.
@@ -1008,6 +1096,99 @@ class MainWindow(QMainWindow):
             name = pathlib.Path(path).name if path else buffer.title()
             self._status.setText(f"выполняется {name} (есть несохранённые правки)")
         return True
+
+    def format_document(self) -> None:
+        """Lays the current buffer — or the selection — out (task_30).
+
+        The formatter lives in prlib, next to the grammar it has to understand,
+        so the text travels over the protocol and the answer is put back here.
+        What this method has to get right is everything *around* the text: the
+        replacement is one undo step, the caret and the selection keep their
+        places (only whitespace moves, and `formatter.map_positions` carries the
+        old offsets over), and a program that does not parse comes back untouched
+        with its line marked — a formatter must never be the reason a buffer is
+        lost.
+        """
+        mode = self._settings.format_mode
+        if mode == "none":
+            self._status.setText("форматирование выключено: режим «не менять»")
+            return
+        view = self.active_pane().current_view()
+        if view is None or self._format_pending is not None:
+            return
+        cursor = view.textCursor()
+        region = None
+        if self._settings.format_selection and cursor.hasSelection():
+            region = (cursor.selectionStart(), cursor.selectionEnd())
+        old = view.toPlainText()
+        text = old[region[0]:region[1]] if region is not None else old
+        if not text:
+            return
+        self._format_pending = {
+            "view": view,
+            "old": old,
+            "region": region,
+            "anchor": cursor.anchor(),
+            "position": cursor.position(),
+        }
+        # The request goes through the interpreter process — prlib is there — so
+        # a session has to be up; starting one is cheap, and nothing is loaded
+        # into it.
+        if not self._session.is_running():
+            self._session.start()
+        self._status.setText("форматирование…")
+        self._session.format_text(
+            text,
+            mode=mode,
+            width=self._settings.format_width,
+            indent=self._settings.format_indent,
+            unit=self._settings.format_unit,
+            selection=region is not None,
+            name="<buffer>",
+        )
+
+    def _on_formatted(self, text: str, changed: bool) -> None:
+        """Puts the laid-out text back — or says why it was not put back."""
+        pending = self._format_pending
+        self._format_pending = None
+        if pending is None:
+            return
+        view = pending["view"]
+        if self._buffer_of_view(view) is None:
+            return  # the tab was closed while the request was in flight
+        if view.toPlainText() != pending["old"]:
+            # An edit arrived between the question and the answer; rewriting the
+            # buffer now would throw that edit away.
+            self._status.setText("форматирование отменено: текст изменился")
+            return
+        if not changed:
+            self._status.setText("уже отформатировано")
+            return
+        anchor, position = formatter.map_positions(
+            pending["old"], text, [pending["anchor"], pending["position"]]
+        )
+        cursor = view.textCursor()
+        cursor.beginEditBlock()  # one undo step for the whole replacement
+        if pending["region"] is not None:
+            start, end = pending["region"]
+            cursor.setPosition(start)
+            cursor.setPosition(end, QTextCursor.MoveMode.KeepAnchor)
+        else:
+            cursor.select(QTextCursor.SelectionType.Document)
+        cursor.insertText(text)
+        cursor.endEditBlock()
+        restored = view.textCursor()
+        if pending["region"] is not None:
+            # The formatted fragment stays selected: it is what was rewritten,
+            # and formatting it again is one key press away.
+            start = pending["region"][0]
+            restored.setPosition(start)
+            restored.setPosition(start + len(text), QTextCursor.MoveMode.KeepAnchor)
+        else:
+            restored.setPosition(anchor)
+            restored.setPosition(position, QTextCursor.MoveMode.KeepAnchor)
+        view.setTextCursor(restored)
+        self._status.setText("отформатировано")
 
     def _run_query(self) -> None:
         text = self._query_line.text().strip()
@@ -1925,6 +2106,13 @@ class MainWindow(QMainWindow):
         """The document the commands act on: the active pane's current tab."""
         return self.active_pane().current_buffer()
 
+    def _buffer_of_view(self, view) -> Buffer | None:
+        """The open buffer a view shows, or None when that view is gone."""
+        for buffer in self._buffers:
+            if any(shown is view for shown in buffer.views()):
+                return buffer
+        return None
+
     def editor(self) -> CodeEditor:
         """The current tab's editor in the active pane.
 
@@ -2085,6 +2273,21 @@ class MainWindow(QMainWindow):
         why the rest of this handler only runs for an error.
         """
         where = position.where() if position is not None else ""
+        if kind == "format":
+            # The format request failed and the buffer was left exactly as it was.
+            # The line is marked when the diagnostic is about the whole buffer; a
+            # selection is a fragment, and its line numbers are not the buffer's.
+            pending = self._format_pending
+            self._format_pending = None
+            if (
+                position is not None
+                and pending is not None
+                and pending["region"] is None
+                and self._buffer_of_view(pending["view"]) is self.current_buffer()
+            ):
+                self._mark_error_line(position)
+            self._status.setText(f"форматирование: не удалось разобрать — {message}")
+            return
         if self._stopping and self._session.is_running() and severity != "warning":
             # This is the error of the query *we* stopped: the run is over — the
             # note of the stop says so — and a user's own stop marks no line.
@@ -2267,6 +2470,9 @@ class MainWindow(QMainWindow):
                 view.show_line(view.trace_line() or position.line)
 
     def _on_ended(self, exit_code: int) -> None:
+        # A process that died while a `format` request was in flight will not
+        # answer it: the buffer keeps its text and the state is dropped.
+        self._format_pending = None
         # A process *we* killed has no meaningful code: Windows reports the
         # termination status as a number nobody can read (62097), so the message
         # stays «остановлено» and the status bar keeps the last real code.
