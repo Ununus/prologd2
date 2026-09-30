@@ -76,6 +76,17 @@ struct EngineOptions {
   std::size_t maxNestedDepth = 10'000;
   std::size_t maxFindAllSolutions = 1'000'000;
   std::size_t maxSteps = 0;  // 0 = unlimited
+  /// How deep a clause body may nest before the solver refuses to go on.
+  ///
+  /// The solver itself is a loop — logical depth costs heap, not the C++ stack —
+  /// but a frame chain is still *released* through shared_ptr destructors, and
+  /// a chain of tens of thousands of frames coming down in one go is a real
+  /// stack overflow (measured at ~16 000-32 000 on Windows, where a correct
+  /// program printed its answer and then died with 0xC00000FD).  The chain is
+  /// released iteratively now, so this limit is a *guard against runaway
+  /// programs*, not a workaround: a lesson needs hundreds of levels, and a
+  /// search that needs more asks for it with `--max-depth 0`.
+  std::size_t maxDepth = 10'000;
 
   /// Extra stop condition, polled by the solver next to the internal flag.
   /// A front-end uses it to turn the Ctrl+C signal flag or a GUI "Stop" button

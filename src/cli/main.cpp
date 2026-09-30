@@ -5,6 +5,7 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -90,6 +91,10 @@ int main(int argc, char** argv) {
   bool trace = false;
   bool listKeywords = false;
   std::string protocol = "text";
+  // Left unset on purpose: the engine's own defaults are the ones to use, and a
+  // flag that repeats them would become a second place to change them.
+  std::optional<std::size_t> maxDepth;
+  std::optional<std::size_t> maxSteps;
 
   app.add_option("-s,--source", sources, "Interpret the given source file (repeatable)");
   app.add_option("-I,--include", includeDirectories, "Add an import search directory");
@@ -98,6 +103,10 @@ int main(int argc, char** argv) {
   app.add_option("-e,--error", errorFile, "Write diagnostics to this file");
   app.add_flag("-q,--questions", questions, "Echo queries before executing them");
   app.add_flag("-t,--trace", trace, "Start with tracing enabled");
+  app.add_option("--max-depth", maxDepth,
+                 "Recursion depth limit for one query (0 = unlimited, default 10000)");
+  app.add_option("--max-steps", maxSteps,
+                 "Step limit for one query (0 = unlimited, default unlimited)");
   app.add_option("--protocol", protocol, "Front-end protocol: text (default) or json")
       ->check(CLI::IsMember({"text", "json"}));
   app.add_flag("--list-keywords", listKeywords,
@@ -176,6 +185,12 @@ int main(int argc, char** argv) {
   std::signal(SIGTERM, handleInterruptSignal);
 #endif
   engine.options().externalStop = consumeInterrupt;
+  if (maxDepth) {
+    engine.options().maxDepth = *maxDepth;
+  }
+  if (maxSteps) {
+    engine.options().maxSteps = *maxSteps;
+  }
 
   std::vector<std::filesystem::path> includePaths;
   for (const std::string& directory : includeDirectories) {

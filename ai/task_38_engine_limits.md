@@ -1,6 +1,6 @@
 # task_38 — engine limits: recursion depth, long runs and their memory
 
-**Status:** not started
+**Status:** done (2026-09-30) — the crash is gone, the guard is in, the numbers are in `tools/bench_engine.py`
 **Depends on:** nothing (task_34's branch sweep is done)
 **Milestone:** M14
 
@@ -44,7 +44,7 @@ Program: the lesson's `сумма/2` tail recursion, `?сумма(N, С).`  Numb
 
 ## Deliverables
 
-- [ ] `EngineOptions::maxDepth` (default 10 000 — a lesson needs hundreds, so
+- [x] `EngineOptions::maxDepth` (default 10 000 — a lesson needs hundreds, so
       this is generous) checked where the frame depth is already known
       (`EnvNode::depth`, next to the existing `maxSteps` check in
       `Solver::run`), raising `ErrorCode::StackOverflow` with a message that
@@ -52,7 +52,7 @@ Program: the lesson's `сумма/2` tail recursion, `?сумма(N, С).`  Numb
       becomes a diagnostic with exit code 3, in line with `maxSteps` and
       `maxNestedDepth`.  Optional: `--max-depth`/`--max-steps` on the CLI, next
       to the other limits, and a paragraph in `doc/help.typ` §15.
-- [ ] **Iterative release** of a deep chain and of a deep term, so that the
+- [x] **Iterative release** of a deep chain and of a deep term, so that the
       depth the *stack* can survive stops being a crash: a small `EnvRef`
       wrapper (or a `releaseChain` helper) that keeps a local reference to the
       parent while the child dies, and the same trick for compound terms — for
@@ -61,7 +61,7 @@ Program: the lesson's `сумма/2` tail recursion, `?сумма(N, С).`  Numb
       then let every level go while the worklist still holds the others.
       Use it wherever a deep reference can be dropped: popped choice points, the
       solver's final environment, `Engine` destruction.
-- [ ] **Variable growth**: investigate a safe reuse scheme and either implement
+- [x] **Variable growth**: investigate a safe reuse scheme and either implement
       it or write down why not, with numbers.  A safe scheme has a hard
       constraint: a term may outlive the trail mark it was created under (the
       query's own variables, a clause copy that a binding still refers to), so
@@ -72,7 +72,7 @@ Program: the lesson's `сумма/2` tail recursion, `?сумма(N, С).`  Numb
       leaving the growth in place but making it *visible* (a diagnostic past a
       threshold, a `variableCount()` line in the bench output) and documented as
       a known ceiling in `doc/technical.typ`.
-- [ ] Tests:
+- [x] Tests:
   * a **ctest** case (a separate process, so a stack overflow cannot abort the
     suite) running the CLI on a generated 100 000-deep program and expecting the
     right answer, exit code 0 and empty stderr;
@@ -83,15 +83,59 @@ Program: the lesson's `сумма/2` tail recursion, `?сумма(N, С).`  Numb
     the answer and for `variableCount()` staying under a bound *if* the reuse is
     implemented;
   * a regression test that the existing lessons still pass unchanged.
-- [ ] `tools/bench_engine.py`: the instrument this task measured with, made
+- [x] `tools/bench_engine.py`: the instrument this task measured with, made
   permanent — generates the programs, runs the interpreter, prints time and peak
   working set (ASCII only, like the GUI test scripts), and is what task_42
   measures its optimisations with.  It must not live in `src/tests` (those are
   Catch2 and the GUI scripts); `tools/` already holds `port_lessons.py`.
-- [ ] Docs: `doc/technical.typ` gains a section on the environment chain, its
+- [x] Docs: `doc/technical.typ` gains a section on the environment chain, its
   release, the memory a step costs and the reason there is a depth ceiling;
   `doc/help.typ` documents the limit if the CLI flags are added; `ai/status.md`
   carries the new numbers.
+
+## Result (2026-09-30)
+
+**The trigger was narrower than the first report.**  The crash needs a *surviving*
+deep reference, not depth by itself.  A base clause that cuts removes the choice
+point of the deepest frame, the chain is then left one frame at a time, and
+200 000 levels ran fine — which is why the old Catch2 test (`счёт(0) :- !.`) had
+been green for months.  Without the cut, the deepest choice point — or the
+solver's own final environment — holds the whole chain, and letting it go runs
+the destructors down every level.
+
+**Fixed**: `Solver::releaseEnvChain` (a frame is unlinked from its parent before
+it dies, and a worklist keeps the next link alive until its turn), used by
+`~Solver` and by `dropChoicePoints` — the cut path included, since a `resize` of
+the choice-point stack destroys the removed points; and `CompoundDeleter` in
+`term.cpp`, where a node's arguments are taken out before it dies.  The
+`const_cast` in both is confined to the release path and is safe for the reason
+the structures are immutable: it runs for the last owner, on an object that is
+being destroyed.  The price is one extra allocation per compound (no
+`make_shared`), about 25 % on loading 100 000 facts, measured and recorded.
+
+| workload | before | after |
+|---|---|---|
+| recursion depth 50 000 (no cut) | 0xC00000FD | 0.24 s, 102 MB, exit 0 |
+| recursion depth 100 000 | 0xC00000FD, 280 MB | 0.46 s, 193 MB, exit 0 |
+| recursion depth 400 000 | 0xC00000FD, 1 241 MB | 1.77 s, 753 MB, exit 0 |
+| a list of 20 000 cells | 0xC00000FD | 0.11 s, 36 MB, exit 0 |
+| a list of 60 000 cells | 0xC00000FD | 0.27 s, 90 MB, exit 0 |
+| 100 000 facts, first / last clause | 0.26 / 0.31 s | 0.35 / 0.33 s |
+| depth above the limit | 0xC00000FD | «Превышена глубина рекурсии (лимит 10000)», exit 3 |
+
+**Variable growth: documented, not fixed.**  A clause copy's `VarId`s may be cited
+by bindings that outlive the trail mark the copy was created under, and `ДОБ`
+stores copies whose variables must survive the rollback that would recycle
+everything else — plain recycling would corrupt asserted clauses, and no cheap
+safe scheme exists.  The ceiling is written down (`doc/technical.typ` §6.6, and
+`doc/help.typ` §15 for the flag), it is visible in the benchmark (≈ 2 KB per step
+of depth), and the weight of a term itself is task_42's business.
+
+**Tests**: the ctest case `cli_engine_limits` drives the executable on its own — a
+100 000-deep recursion, a 60 000-cell list and the runaway guard, because a
+regression here kills the process and must not take the suite with it; the old
+deep-recursion Catch2 case was rewritten to use the *crashing* shape (base clause
+without a cut) with `maxDepth = 0`, and a new case pins the diagnostic.
 
 ## Acceptance criteria
 

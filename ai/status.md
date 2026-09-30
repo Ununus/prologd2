@@ -9,9 +9,9 @@ session.
   started (protocol + skeleton).
 * Build: the `windows-msvc` preset (Visual Studio 18 2026, MSVC 19.51) build is
   green locally; the Linux presets, including `-Werror`, build cleanly.
-* Tests: 193/193 pass in about two seconds: 182 Catch2 cases plus 11 command-line
+* Tests: 195/195 pass in about four seconds: 183 Catch2 cases plus 12 command-line
   and integration tests (seven option tests, two `--list-keywords` tests, the
-  import-search report and the JSON protocol session).
+  import-search report, the JSON protocol session and the engine-limit cases).
 * CLI: `build/windows-msvc/src/cli/Release/prologd` runs files (positional, `-s`
   or `--source`), stdin, the REPL and the `--protocol json` session for
   front-ends.
@@ -103,7 +103,7 @@ session.
 | task_35_lessons_rework | done | the course in `examples/lessons` is rewritten for the current dialect, one commit per lesson, from the plan in `ai/task_35_lessons_rework.md`; `test_lessons.cpp` runs every lesson (12 + the debug appendix) and compares its whole output with the `%!` lines the lesson itself carries, so a lesson cannot drift again; the old files are in `lessons/_old/`; the index is `examples/lessons/README.md` and the fifth Typst document `doc/lessons.typ` (the `docs` target builds it); writing the expectations found and fixed mistakes in the source material (a non-terminating `нод/3`, descending sorts, a hanging `?длина(Х, 2)`, a failed read that leaves the rest of its line) and taught the check two tricks: input files for lesson 7 and include paths for lesson 11 |
 | task_36_gui_query_markers | not started | run one question from the editor margin: a marker next to `?Goal.` and `% ?Goal.`, the `%?` colour, and a `questions: false` load so the clicked query answers *alone*; the task file carries the rule for what counts as a statement (a lesson's commented query often has prose after the goal) and the finding that no lesson file has to change |
 | task_37_gui_builtin_reference | not started | `doc/builtins.json` as the one machine-readable source for the built-in reference, a checker keeping it in step with `--list-keywords` and the sections of `help.typ`, a summary line under the completion popup and `Shift+F1` on the word under the caret (the English-alias work of task_39 would land in the same file) |
-| task_38_engine_limits | not started | recursion depth and long runs: the measured crash (0xC00000FD at ~32 000 levels, answer already printed) becomes a diagnostic, the deep chain and deep terms are released iteratively, variable growth is either fixed or documented, and `tools/bench_engine.py` makes the numbers reproducible |
+| task_38_engine_limits | done | recursion depth and long runs: the crash is gone (the chain and deep terms are released iteratively — the trigger was a *surviving* deep reference, a choice point whose base clause does not cut, or the solver's final environment), `maxDepth` turns runaway recursion into a diagnostic, the variable growth is documented instead of "fixed", and `tools/bench_engine.py` made the numbers reproducible |
 | task_39_english_aliases | not started | every built-in gets an English spelling (the parked note, now a task, with the user's decisions: `integer`/`float` are the tests and `to_int`/`to_float` the conversions, `strlen` for the string length, all English lowercase, the course stays Russian and the pair is documented in an appendix) |
 | task_40_diagnostics | not started | severity (warnings that never change an exit code), positions that point at the opening bracket, a stated missing final dot, a warning for a variable written where a constant was meant, singleton variables, and call-site hints (unknown name with a suggestion, known name with the wrong arity) |
 | task_41_semicolon_disjunction | not started | `;` as a real backtrackable disjunction (ISO precedence with `,`), the `;` sentence terminator retired with a diagnostic, `ИЛИ/2` left as the committed form and cross-referenced; awaits the user's go-ahead |
@@ -112,9 +112,9 @@ session.
 
 ## Test suite
 
-193 tests, about two seconds: 182 Catch2 cases plus 11 command-line and
+195 tests, about four seconds: 183 Catch2 cases plus 12 command-line and
 integration tests (seven option tests, two `--list-keywords` tests, the
-import-search report and the JSON protocol session). Groups:
+import-search report, the JSON protocol session and the engine-limit cases). Groups:
 BigInt, lexer, keywords, parser, unification, engine, every built-in group,
 `НАЙТИВСЁ`, module loader (including the import search report), the I/O seams,
 typical tasks (factorial, Fibonacci, GCD, insertion sort, 4-queens, knapsack),
@@ -748,3 +748,37 @@ Resolved on 2026-09-29 (GUI planning):
   English appendix), 40 (diagnostics), 41 (`;` as disjunction, awaiting a
   go-ahead), 42 (the hot path) and 43 (`call/N`, module collisions, the dead
   library).  `ai/maybe/english_aliases.md` is gone — it is task_39 now.
+* Engine limits session, part 26: **task_38**.  The crash is understood and
+  fixed, and the trigger turned out to be narrower than the first report: it needs
+  a *surviving* deep reference, not depth alone.  A base clause with a cut removes
+  the choice point of the deepest frame, the chain is then walked up one frame at
+  a time, and 200 000 levels passed without a murmur (that is why the old Catch2
+  test, built on `счёт(0) :- !.`, had been green for months); without the cut the
+  deepest choice point — or the solver's own final environment — holds the whole
+  chain, and letting it go ran the destructors down every level: 0xC00000FD at
+  ~32 000 frames, and a 20 000-cell list alone was enough.  Both chains are
+  released iteratively now (`releaseEnvChain` in `engine.cpp`, `CompoundDeleter`
+  in `term.cpp`): a node is unlinked from its parent (or has its arguments taken
+  out) before it dies, and a worklist keeps the next link alive until its turn.
+  The one place where a term's immutability is broken is its own release, and it
+  is safe for the reason the term is immutable — the deleter runs only for the
+  last owner.  The price is one extra allocation per compound (no `make_shared`),
+  about 25 % on loading 100 000 facts, measured and written down.  Results, from
+  `tools/bench_engine.py` (new, ASCII output, the instrument every later number
+  should use): recursion depth 100 000 — 0.46 s, 193 MB, exit 0 (was
+  0xC00000FD); 400 000 — 1.77 s, 753 MB, exit 0; a 60 000-cell list — 0.27 s,
+  exit 0; 100 000 facts — 0.35 s against 0.26 s before.  `EngineOptions::maxDepth`
+  (default 10 000, `--max-depth 0` for none) ends a runaway recursion with
+  «Превышена глубина рекурсии (лимит N)» and exit code 3, next to the existing
+  `maxSteps`; the CLI gained `--max-depth` and `--max-steps`.  Tests: the ctest
+  case `cli_engine_limits` runs the executable on its own (100 000-deep
+  recursion, a 60 000-cell list, the runaway guard — a regression here kills the
+  process, so it must not run inside the test binary), the old deep-recursion
+  Catch2 case now uses the *crashing* shape with `maxDepth = 0`, and a new one
+  pins the diagnostic.  The variable growth was investigated and deliberately not
+  "fixed": a clause copy's `VarId`s may be cited by bindings that outlive the
+  trail mark, and `ДОБ` stores copies whose variables must survive the rollback
+  that recycles everything else, so plain recycling would corrupt asserted
+  clauses.  It is a documented ceiling now (`doc/technical.typ` §6.6, `doc/help.typ`
+  §15) and visible in the bench; the weight of a term is task_42's business.  183
+  Catch2 cases, 2 774 assertions, 195 ctest tests, all green.

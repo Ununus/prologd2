@@ -97,6 +97,34 @@ bool isExpression(const Term& term) {
          term.compound->name == "$expr" && term.compound->args.size() == 1;
 }
 
+/// Releases a chain of environments without recursing through it.
+///
+/// A frame owns its parent, so letting the *last* reference to a deep frame go
+/// destroys the whole chain inside the destructors — one C++ stack frame per
+/// level, which is a real stack overflow at tens of thousands of levels
+/// (measured: a correct program printed its answer and then died with
+/// 0xC00000FD).  Here each level is unlinked from its parent before it dies, and
+/// the parent is kept alive by the worklist until its own turn comes.
+///
+/// The `const_cast` is safe for the same reason as in `CompoundDeleter`: the
+/// frame is about to be destroyed and nobody else can observe the cleared link.
+void releaseEnvChain(EnvRef& node) noexcept {
+  if (!node) {
+    return;
+  }
+  std::vector<EnvRef> pending;
+  pending.push_back(std::move(node));
+  while (!pending.empty()) {
+    EnvRef level = std::move(pending.back());
+    pending.pop_back();
+    if (level.use_count() == 1 && level->parent) {
+      auto* mutable_level = const_cast<EnvNode*>(level.get());
+      pending.push_back(std::move(mutable_level->parent));
+    }
+    // `level` dies here; if it was the last owner, its link is already gone.
+  }
+}
+
 }  // namespace
 
 /// Resolution machine over a persistent environment chain and a choice-point
@@ -104,6 +132,17 @@ bool isExpression(const Term& term) {
 class Solver {
  public:
   explicit Solver(Engine& engine) : engine_(engine) {}
+
+  /// Releases whatever is still held when the query ends — the environment
+  /// chain and the choice points — through `releaseEnvChain`, or a deep chain
+  /// would come down inside the destructors and overflow the C++ stack.
+  ~Solver() {
+    releaseEnvChain(env_);
+    dropChoicePoints(0);
+  }
+
+  Solver(const Solver&) = delete;
+  Solver& operator=(const Solver&) = delete;
 
   /// Solve `goals`; `location` is where they stand in the source, which is what
   /// a step point of the query's own goals reports.
@@ -115,6 +154,8 @@ class Solver {
   bool selectClause(ChoicePoint& cp);
   bool backtrack();
   void applyCut();
+  /// Keep `keep` choice points and release the rest through `releaseEnvChain`.
+  void dropChoicePoints(std::size_t keep);
   void pushMeta(const Term& goal, std::size_t barrier);
   void traceGoal(const Term& goal);
   void traceText(std::string_view text);
@@ -184,9 +225,17 @@ void Solver::traceGoal(const Term& goal) {
 }
 
 void Solver::applyCut() {
-  if (cps_.size() > env_->cp_barrier) {
-    cps_.resize(env_->cp_barrier);
+  dropChoicePoints(env_->cp_barrier);
+}
+
+void Solver::dropChoicePoints(std::size_t keep) {
+  if (keep >= cps_.size()) {
+    return;
   }
+  for (std::size_t index = keep; index < cps_.size(); ++index) {
+    releaseEnvChain(cps_[index].env);
+  }
+  cps_.resize(keep);
 }
 
 void Solver::pushMeta(const Term& goal, std::size_t barrier) {
@@ -329,7 +378,7 @@ bool Solver::resolveGoal(const Term& goal) {
 void Solver::run(std::span<const Term> goals, const std::function<bool()>& on_solution,
                  const SourceLocation& location) {
   LocationGuard location_guard(engine_);
-  cps_.clear();
+  dropChoicePoints(0);
   steps_ = 0;
   const std::shared_ptr<std::vector<Term>> root =
       std::make_shared<std::vector<Term>>(goals.begin(), goals.end());
@@ -343,6 +392,14 @@ void Solver::run(std::span<const Term> goals, const std::function<bool()>& on_so
     }
     if (engine_.options().maxSteps != 0 && ++steps_ > engine_.options().maxSteps) {
       engine_.raise(ErrorCode::Interrupted, "Превышен лимит шагов выполнения");
+    }
+    // A guard, not a workaround: the solver loops instead of recursing, and the
+    // chain release is iterative, so this only stops a runaway program with a
+    // message instead of letting it eat memory for an hour.
+    if (engine_.options().maxDepth != 0 && env_->depth > engine_.options().maxDepth) {
+      engine_.raise(ErrorCode::StackOverflow,
+                    "Превышена глубина рекурсии (лимит " +
+                        std::to_string(engine_.options().maxDepth) + ")");
     }
     if (env_->index >= env_->goals->size()) {
       if (env_->parent == nullptr) {

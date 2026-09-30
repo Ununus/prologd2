@@ -95,4 +95,13 @@ if(TARGET prologd)
             "-DPROLOGD_EXE=$<TARGET_FILE:prologd>"
             "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/protocol_session.cmake")
+
+  # Deep recursion and deep terms are released iteratively (task_38); a
+  # regression kills the process, so these cases run the executable on its own
+  # instead of inside the test binary.
+  add_test(NAME cli_engine_limits
+    COMMAND ${CMAKE_COMMAND}
+            "-DPROLOGD_EXE=$<TARGET_FILE:prologd>"
+            "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/engine_limits.cmake")
 endif()

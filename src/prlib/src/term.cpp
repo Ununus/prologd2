@@ -42,10 +42,49 @@ Term makeString(std::string_view value) {
   return term;
 }
 
+namespace {
+
+/// Frees a compound without recursing through its arguments.
+///
+/// A list is a chain of `shared_ptr`: the plain deleter destroys the tail inside
+/// the destructor of its head, one C++ stack frame per element, and a list of
+/// about 20 000 cells already killed the process (measured 2026-09-30, together
+/// with the same failure in the environment chain).  The children are *taken
+/// out* of a node before it dies, so no destruction path is ever holding a node
+/// that still owns its own children — the worklist below keeps every child alive
+/// while its parent goes.
+///
+/// The `const_cast` is the one place where the immutability of a term is broken,
+/// and it is safe for the reason the class is immutable in the first place: the
+/// deleter runs only when this `shared_ptr` is the last owner, and the node is
+/// about to be destroyed, so nobody can observe the emptied argument list.
+struct CompoundDeleter {
+  void operator()(const CompoundTerm* node) const noexcept {
+    std::vector<Term> pending = std::move(const_cast<CompoundTerm*>(node)->args);
+    delete node;
+    while (!pending.empty()) {
+      Term child = std::move(pending.back());
+      pending.pop_back();
+      if (child.kind == TermKind::Compound && child.compound != nullptr &&
+          child.compound.use_count() == 1) {
+        auto* payload = const_cast<CompoundTerm*>(child.compound.get());
+        for (Term& argument : payload->args) {
+          pending.push_back(std::move(argument));
+        }
+        payload->args.clear();
+      }
+      // `child` is released here.  A node this loop emptied cannot cascade, and
+      // a node somebody else still holds is not destroyed at all.
+    }
+  }
+};
+
+}  // namespace
+
 Term makeCompound(std::string_view name, std::vector<Term> args) {
   Term term;
   term.kind = TermKind::Compound;
-  auto payload = std::make_shared<CompoundTerm>();
+  auto payload = std::shared_ptr<CompoundTerm>(new CompoundTerm(), CompoundDeleter{});
   payload->name = std::string(name);
   payload->args = std::move(args);
   term.compound = std::move(payload);

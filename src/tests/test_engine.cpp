@@ -82,12 +82,32 @@ TEST_CASE("undefined predicates fail") {
 }
 
 TEST_CASE("deep recursion does not overflow the C++ stack") {
+  // The shape matters.  With a base clause that does *not* cut, a choice point
+  // survives at the deepest level, and letting it go used to release the whole
+  // frame chain inside the shared_ptr destructors — one C++ frame per level,
+  // which is a real stack overflow (the command-line front-end printed the right
+  // answer and then died with 0xC00000FD).  The chain release is iterative now,
+  // and the depth limit is raised so that this exercises the release rather than
+  // the guard.
   const auto result = runProgram(
-      "счёт(0) :- !.\n"
-      "счёт(N) :- счёт(#N-1#).\n"
-      "?счёт(50000).\n");
+      "л(0).\n"
+      "л(Н) :- БОЛЬШЕ(Н, 0), СЛОЖЕНИЕ(Н1, 1, Н), л(Н1).\n"
+      "?л(50000).\n",
+      {}, nullptr, [](prologd::Engine& engine) { engine.options().maxDepth = 0; });
   REQUIRE(result.loaded);
   REQUIRE(result.output == "ДА\n");
+  REQUIRE(result.error.empty());
+}
+
+TEST_CASE("the depth limit reports runaway recursion") {
+  const auto result = runProgram(
+      "л(Н) :- СЛОЖЕНИЕ(Н1, 1, Н), л(Н1).\n"
+      "?л(1).\n",
+      {}, nullptr, [](prologd::Engine& engine) { engine.options().maxDepth = 200; });
+  REQUIRE(result.loaded);
+  REQUIRE(result.runtimeError);
+  REQUIRE(result.error.find("Превышена глубина рекурсии") != std::string::npos);
+  REQUIRE(result.error.find("лимит 200") != std::string::npos);
 }
 
 TEST_CASE("quiet suppresses solution output for its query only") {
