@@ -50,7 +50,7 @@ from . import (
 from .buffers import Buffer
 from .editor import CodeEditor, ZoomablePlainTextEdit
 from .panes import Pane
-from .session import PrologSession
+from .session import PrologSession, read_keywords
 from .settings import Settings
 
 #: How long «Остановить» waits for the interpreter to end its query by itself
@@ -90,6 +90,14 @@ class MainWindow(QMainWindow):
         self._reference = reference.Reference.load()
 
         self._session = PrologSession(executable, includes, self)
+        # Completion, colouring and the cheat sheet need the reserved names
+        # *before* anything is run — waiting for the first `ready` is why
+        # autocompletion used to work only after the first run.  A window that
+        # has only been opened must not keep an interpreter alive, so the table
+        # is fetched once with `--list-keywords` (the same query the CLI answers)
+        # and the first real session replaces it with the `ready` event's copy
+        # of the same data.
+        self._session.keywords = read_keywords(executable)
         self._session.ready.connect(self._on_ready)
         self._session.output.connect(self._append_output)
         self._session.result.connect(self._on_result)
@@ -97,6 +105,7 @@ class MainWindow(QMainWindow):
         self._session.failed.connect(self._on_failed)
         self._session.trace.connect(self._on_trace)
         self._session.stepped.connect(self._on_stepped)
+        self._session.loaded.connect(self._on_loaded)
         self._session.formatted.connect(self._on_formatted)
         self._session.ended.connect(self._on_ended)
 
@@ -137,6 +146,14 @@ class MainWindow(QMainWindow):
         self._busy = False
         #: Whether a program was loaded into the running interpreter (`run_program`).
         self._loaded = False
+        #: How many questions of the current load have answered, whether an error
+        #: concluded it, and whether a question is still to be sent after a quiet
+        #: load (the margin's click).  Together with the `loaded` event they tell
+        #: «the run is over» from «the answers are over», which used to be the
+        #: same thing (protocol 8).
+        self._results_in_load = 0
+        self._failed_in_load = False
+        self._awaiting_query = False
         #: The `format` request that is in flight (task_30): what was sent, where
         #: it came from and where the caret stood.  The answer arrives as an
         #: event, so this state outlives the call that started it.
@@ -1061,6 +1078,9 @@ class MainWindow(QMainWindow):
         # interpreter has the program loaded from here on.
         self._busy = True
         self._loaded = True
+        self._results_in_load = 0
+        self._failed_in_load = False
+        self._awaiting_query = False
         # At once, not when `ready` arrives: the user pressed the button, and it
         # must not be pressable again while the interpreter is coming up.
         self._sync_run_actions()
@@ -1221,6 +1241,9 @@ class MainWindow(QMainWindow):
         if not self.run_program(questions=False):
             return
         self._session.run_query(statement)
+        # The run is over when this question answers, not when the load does:
+        # the `loaded` event of the quiet load is ignored while this is set.
+        self._awaiting_query = True
 
     # -- files -------------------------------------------------------------
     def new_buffer(self, name: str | None = None) -> Buffer:
@@ -2240,6 +2263,8 @@ class MainWindow(QMainWindow):
             self._finish_polite_stop()
             return
         self._busy = False
+        self._results_in_load += 1
+        self._awaiting_query = False
         text = "решение найдено" if found else "решения нет"
         if self._warning_count:
             text += f" · предупреждений: {self._warning_count}"
@@ -2249,6 +2274,27 @@ class MainWindow(QMainWindow):
             # stays marked until the next run or the first edit.
             self._step_pane.idle()
             self._step_stack.clear()
+        self._sync_run_actions()
+        self._update_details()
+
+    def _on_loaded(self) -> None:
+        """The load and the program's own `?`-statements are over (protocol 8).
+
+        `result` arrives once per question, so a program that asks none — an
+        empty one included — used to leave the window saying «выполняется» with
+        `Запустить` disabled forever: nothing said the run had finished.  The
+        event does, and the run state follows it.  The status keeps the last
+        answer when there was one, and the error's message when it was an error
+        that concluded the run; only a run that said nothing at all gets a word
+        of its own instead of the stale «выполняется».
+        """
+        if self._awaiting_query or self._stopping:
+            # A question still has to answer (the margin's click), or a stop of
+            # our own is in flight; both conclude with their own event.
+            return
+        self._busy = False
+        if self._results_in_load == 0 and not self._failed_in_load:
+            self._status.setText("выполнено")
         self._sync_run_actions()
         self._update_details()
 
@@ -2296,6 +2342,8 @@ class MainWindow(QMainWindow):
             return
         self._output.feed(f"*** {kind}: {where + ': ' if where else ''}{message}\n", panels.ERROR)
         self._busy = False
+        self._failed_in_load = True
+        self._awaiting_query = False
         self._step_pane.idle()
         self._step_stack.clear()
         if position is not None and position.line:

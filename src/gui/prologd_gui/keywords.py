@@ -70,6 +70,37 @@ class Keywords:
         """Builds the table from a ``ready`` event; missing field means empty."""
         return cls(event.get("keywords"))
 
+    @classmethod
+    def from_list_lines(cls, text: str) -> "Keywords":
+        """Builds the table from `prologd --list-keywords` output.
+
+        The window fetches the names this way when it is opened, so completion
+        and colouring work before the first run without keeping an interpreter
+        alive; the first real session replaces the table with the `ready`
+        event's copy of the same data.  A line is `name/arity`, `name/+` for a
+        variadic name, or a bare `name` for an operator or a directive — the
+        text form carries no `kind`, so those look like predicates here.  Every
+        consumer that needs the kind waits for `ready`; completion uses names
+        and arities only.
+        """
+        entries: dict[str, dict[str, Any]] = {}
+        for line in text.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            name, slash, tail = line.partition("/")
+            entry = entries.setdefault(name, {"name": name, "arities": []})
+            if not slash:
+                continue
+            if tail == "+":
+                entry["variadic"] = True
+                continue
+            try:
+                entry["arities"].append(int(tail))
+            except ValueError:
+                continue
+        return cls(list(entries.values()))
+
     # -- lookups -----------------------------------------------------------
     def names(self) -> list[str]:
         """Every reserved name, sorted."""

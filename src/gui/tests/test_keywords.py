@@ -118,6 +118,29 @@ def find_executable(argv: list[str]) -> str | None:
     return None
 
 
+def test_list_lines_build_the_same_table() -> None:
+    """`prologd --list-keywords` is what the window fetches at startup."""
+    table = Keywords.from_event(
+        {
+            "keywords": [
+                {"name": "ВЫВОД", "kind": "predicate", "arities": [], "variadic": True},
+                {"name": "НАЙТИВСЕ", "kind": "predicate", "arities": [3]},
+                {"name": "УМНОЖЕНИЕ", "kind": "predicate", "arities": [3, 4]},
+                {"name": "mod", "kind": "operator", "arities": []},
+                {"name": "ИМПОРТ", "kind": "directive", "arities": []},
+            ]
+        }
+    )
+    rebuilt = Keywords.from_list_lines("\n".join(table.all_labels()) + "\n")
+    assert rebuilt.all_labels() == table.all_labels()
+    assert rebuilt.is_reserved("ВЫВОД") and rebuilt.get("ВЫВОД").variadic is True
+    assert rebuilt.arity("УМНОЖЕНИЕ") == (3, 4)
+    # Blank lines are dropped; a line whose arity is not a number keeps the name.
+    assert Keywords.from_list_lines("\n\nбред\n").names() == ["бред"]
+    assert Keywords.from_list_lines("НАЙТИВСЕ/три\n").arity("НАЙТИВСЕ") == ()
+    print("ok: the CLI text builds the same table the ready event carries")
+
+
 def test_against_the_interpreter(executable: str) -> None:
     """The CLI listing and the `ready` event are the same table, same order."""
     listing = subprocess.run(
@@ -125,6 +148,10 @@ def test_against_the_interpreter(executable: str) -> None:
     )
     lines = listing.stdout.decode("utf-8").splitlines()
     assert lines, "no keywords printed"
+
+    # The window's startup shortcut: parse the very same lines back.
+    fetched = Keywords.from_list_lines(listing.stdout.decode("utf-8"))
+    assert fetched.all_labels() == lines, (fetched.all_labels()[:3], lines[:3])
 
     session = subprocess.run(
         [executable, "--protocol", "json"],
@@ -148,6 +175,7 @@ def main(argv: list[str]) -> int:
     test_decode_with_keywords()
     test_decode_without_keywords()
     test_junk_entries_are_ignored()
+    test_list_lines_build_the_same_table()
 
     executable = find_executable(argv)
     if executable is None:

@@ -333,10 +333,19 @@ has not finished on its own within `STOP_GRACE_MS` (500 ms) — so an interrupte
 leaves the interpreter idle *with* its base, and the next press unloads it.  A
 window the user has only opened starts **no**
 interpreter: the session comes up with the first run or with a goal typed into the
-query line, which is also what makes «Остановить» dead until then.  The right-hand
+query line, which is also what makes «Остановить» dead until then.  Opening the
+window *does* start the executable once, briefly, for `--list-keywords`: the
+reserved names are needed by completion and colouring before anything runs, and
+waiting for the first `ready` is why autocompletion used to work only after the
+first run.  That process exits at once — no interpreter is left alive — and the
+first real session replaces the table with the `ready` event's copy of the same
+data.  The right-hand
 side of the status bar says which of the three it is (`выполняется`, `база знаний
 загружена`, `интерпретатор остановлен`), together with the caret's line and column
-and the file's line ending and encoding.
+and the file's line ending and encoding.  A run of a program that asks no
+questions — an empty one included — ends on the `loaded` event (protocol 8) with
+`выполнено`: `result` arrives per question, and without that event a program with
+none left the window saying `выполняется` with `Запустить` disabled forever.
 
 ### The input console
 
@@ -499,7 +508,7 @@ Headless check of the protocol, without PySide6 installed:
 python src/gui/tests/protocol_smoke.py
 ```
 
-## Protocol contract (version 6)
+## Protocol contract (version 8)
 
 One JSON object per line in both directions; the interpreter writes nothing else
 to stdout.  The C++ side lives in `src/cli/protocol.cpp`, the Python side in
@@ -511,8 +520,11 @@ is advice and never ends the run); version 5 adds the `questions` flag of `load`
 (`false` loads a program without running its own `?`-statements — the editor's
 margin uses it to answer one clicked query alone, task_36); version 6 adds
 `format` — the formatter, which needs no engine and is answerable at any time
-(task_30).  Version 1 sessions are still understood by the Python client (the
-table is then empty and completion falls back to the document's own predicates).
+(task_30); version 7 makes its modes `line`, `soft` and `hard`; version 8 adds
+`loaded` — the load and the program's own `?`-statements are over, which is how a
+front-end knows a run *without* questions (an empty program included) finished.
+Version 1 sessions are still understood by the Python client (the table is then
+empty and completion falls back to the document's own predicates).
 
 ### Requests
 
@@ -523,7 +535,7 @@ table is then empty and completion falls back to the document's own predicates).
 | `{"cmd":"query","text":"?цель(X)."}` | run one statement |
 | `{"cmd":"input","text":"…"}` | answer the pending `input_request` |
 | `{"cmd":"step","action":"into"}` | answer the pending `step` event; `action` is `into`, `over`, `continue` or `stop` |
-| `{"cmd":"format","text":"…","mode":"hard"}` | lay the text out and answer with `formatted`; `mode` is `soft` (default), `hard` or `none`, and `width`, `indent`, `unit` (`tab`/`spaces`) and `selection` say how |
+| `{"cmd":"format","text":"…","mode":"hard"}` | lay the text out and answer with `formatted`; `mode` is `soft` (default), `hard` or `line`, and `width`, `indent`, `unit` (`tab`/`spaces`) and `selection` say how |
 | `{"cmd":"interrupt"}` | ask for a stop (see the note below) |
 | `{"cmd":"quit"}` | end the session |
 
@@ -538,9 +550,10 @@ left off the wire.
 
 | Event | Meaning |
 |-------|---------|
-| `{"event":"ready","protocol":6,"version":"2.0.0","keywords":[…]} `| the session is up |
+| `{"event":"ready","protocol":8,"version":"2.0.0","keywords":[…]} `| the session is up |
 | `{"event":"output","text":"…"}` | program output (`ВЫВОД`, query results) |
 | `{"event":"result","found":true}` | one query finished; `found` is false when nothing matched |
+| `{"event":"loaded"}` | a `load` request is over: its program and its own `?`-statements ran (a `query` request is answered by its `result` alone) |
 | `{"event":"input_request","kind":"line"}` | `ВВОДСТР`/`ВВОДСИМВ`/`ВВКОД` waits for an answer; `kind` is `token`, `line` or `codepoint` |
 | `{"event":"step","action":"call","goal":"…","depth":2,"file":"…","line":9,"column":1}` | a step point; `action` is `call`, `exit`, `redo` or `fail`.  `goal` is absent for `exit` (the goal is the one its `call` named), and the position is absent when there is none |
 | `{"event":"trace","text":"…"}` | one line of the `ТРАССА` trace |
@@ -585,8 +598,10 @@ failure (for example an interrupted query).
   directives and the variadic `ВЫВОД`, which is marked with `"variadic":true`.
   The same table is printed by `prologd --list-keywords`, one `name/arity` per
   line (`ВЫВОД/+` for the variadic one), so a front-end never keeps its own copy
-  of the built-in list.  Highlighting, completion and the shortcut cheat-sheet
-  all read it.
+  of the built-in list — and one that needs the names *before* a session is up
+  (completion at startup) can have them from that listing alone:
+  `Keywords.from_list_lines` parses it.  Highlighting, completion and the
+  shortcut cheat-sheet all read it.
 
 * Read the interpreter's stdout line by line and never merge it with stderr; in
   protocol mode all diagnostics travel as `error` events.

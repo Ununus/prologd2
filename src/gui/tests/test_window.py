@@ -1904,6 +1904,42 @@ def test_the_mode_menu_stores_the_mode_and_the_hard_mode_reaches_the_wire(
     print("ok: «Формат» keeps the modes, and hard, soft and one-line reach the wire")
 
 
+def test_the_reserved_names_are_there_before_the_first_run(executable: str) -> None:
+    """Completion must not wait for the first run (a one-off `--list-keywords`)."""
+    window = make_window(executable, ready=False)
+    try:
+        assert window.session.is_running() is False, (
+            "a window that was only opened keeps no interpreter"
+        )
+        table = window.session.keywords
+        assert table.is_reserved("НАЙТИВСЕ") is True
+        assert table.arity("УМНОЖЕНИЕ") == (3, 4)
+        assert table.all_labels(), "the table is empty"
+    finally:
+        discard_changes(window)
+    print("ok: the reserved names are there before the first run")
+
+
+def test_running_programs_without_questions_finishes(executable: str) -> None:
+    """A run is over when the *load* is: `result` only arrives for questions."""
+    window = empty_window(executable)
+    try:
+        # An empty program: nothing to load and nothing to ask — and no hang.
+        window.editor().setPlainText("")
+        window._actions["run"].trigger()
+        assert pump(window, lambda: window.status_text() == "выполнено"), window.status_text()
+        assert window._actions["run"].isEnabled() is True, "the run never finished"
+
+        # Facts without a single question finish the same way.
+        window.editor().setPlainText("факт(1).\n")
+        window._actions["run"].trigger()
+        assert pump(window, lambda: window.status_text() == "выполнено"), window.status_text()
+        assert window._actions["run"].isEnabled() is True, "the run never finished"
+    finally:
+        discard_changes(window)
+    print("ok: a program without questions finishes instead of hanging in «выполняется»")
+
+
 def main(argv: list[str]) -> int:
     if QApplication is None:
         print("skipped: PySide6 is not installed")
@@ -1972,6 +2008,8 @@ def main(argv: list[str]) -> int:
         test_formatting_only_the_selection(executable)
         test_a_broken_program_is_reported_and_not_rewritten(executable)
         test_the_mode_menu_stores_the_mode_and_the_hard_mode_reaches_the_wire(executable)
+        test_the_reserved_names_are_there_before_the_first_run(executable)
+        test_running_programs_without_questions_finishes(executable)
         test_f1_shows_the_record_of_the_word_under_the_caret(executable)
         test_the_output_can_be_saved(executable, files)
         test_the_context_menu_reuses_the_shared_actions(executable)

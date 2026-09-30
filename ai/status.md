@@ -96,7 +96,7 @@ session.
 | task_27_gui_panels | done | movable panel (`F4`, `Ctrl+F4`), output pane (colour by kind, visible half-lines, bounded history, auto-scroll, save to a file), input console with the queue switch, status-bar details and the two-state run/stop |
 | task_28_gui_run_step | done | `EngineOptions::stepHook` + `StepInfo`, protocol 3 (`step`/`trace` events, `step` request, positions on `error`), the step strip with the call stack, the trace line in the editor, `F10`/`Shift+F10`/`F5`, error and trace lines from structured positions |
 | task_29_gui_settings | not started | settings dialog and persistence |
-| task_30_gui_formatter | done | `prlib/formatter.cpp` (whitespace-only, everything else copied byte for byte); three modes — **в одну строку**, **мягкое** (строки строятся заново: цели собираются до ширины) and **жёсткое** — chosen in «Правка → Формат»; `prologd --format[=soft|hard|line]` with `--format-width`, `--format-indent` and `--format-unit`; protocol **7** (`format` → `formatted`/`error`, answerable between queries); the window's `Ctrl+I` with one undo step and the caret and selection mapped onto the new text; a source that does not parse is never rewritten |
+| task_30_gui_formatter | done | `prlib/formatter.cpp` (whitespace-only, everything else copied byte for byte); three modes — **в одну строку**, **мягкое** (строки строятся заново: цели собираются до ширины) and **жёсткое** — chosen in «Правка → Формат»; `prologd --format[=soft|hard|line]` with `--format-width`, `--format-indent` and `--format-unit`; protocol **7**+**8** (`format` → `formatted`/`error`, answerable between queries; `loaded` when a run is over); the window's `Ctrl+I` with one undo step and the caret and selection mapped onto the new text; a source that does not parse is never rewritten |
 | task_31_gui_shortcuts | not started | layout-independent `Ctrl`+ key combinations |
 | task_32_import_search_report | done | `ИМПОРТ` failure names the directories tried, with reasons |
 | task_33_gui_search_replace | done | `search.py` (plain-text, Qt-free) + the find bar: question from the selection or the word at the caret, `F3`/`Shift+F3` with the wrap reported, three switches, «Заменить всё» as one undo step, the matches lit in every view; `test_search.py` has 16 checks |
@@ -1072,3 +1072,26 @@ Resolved on 2026-09-29 (GUI planning):
   file written by the previous build reads its old `none` as the soft mode.  251
   ctest tests (237 Catch2 + 14), the 17 GUI scripts, the six PDFs; `gui.typ`
   §4.3/§9.1/§9.2, the README and `help.typ` §15 tell the same story.
+* GUI round, part 34: **two defects from a fresh window**, both about waiting for
+  something that never comes.  (1) Autocompletion worked only after the first run:
+  the popup reads the reserved names from the session's `ready`, and a window that
+  has merely been opened has no session — by design (part 17).  The window now
+  starts the executable once at startup for `--list-keywords` and parses it with
+  `Keywords.from_list_lines` (Qt-free; `test_keywords.py` proves the text form
+  builds the same table the `ready` event carries, and the window test that the
+  names are there with `ready=False`), so completion, colouring and the shortcut
+  sheet work from the first keypress while no interpreter stays alive; the first
+  real session replaces the table with the `ready` copy of the same data.
+  (2) «Запуск на пустой программе зацикливается» — the interpreter was innocent
+  (an empty file exits 0 in milliseconds; checked with the built executable); the
+  *window* concluded a run on `result`, which arrives **per question**, so a
+  program that asks none (an empty one, a file of facts) kept «выполняется» with a
+  disabled «Запустить» forever.  The protocol grew `loaded` (version 8): a `load`
+  is over when its program and its own `?`-statements ran.  The run state follows
+  it, and the status says «выполнено» only when nothing else concluded the run —
+  an answered question keeps its answer, an error keeps its message (the first
+  version of that rule overwrote a runtime error's «ошибка: …» with «выполнено»,
+  which the existing test caught immediately), and a margin click is concluded by
+  its query as before.  Two new window checks (the names before the first run; an
+  empty program and a facts-only program both finish), plus the keyword and
+  round-trip additions; 251/251 ctest, the 17 GUI scripts, the six PDFs.

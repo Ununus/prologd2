@@ -32,7 +32,9 @@ using Json = nlohmann::json;
 ///    `formatted` event (task_30).
 /// 7: the modes of `format` are `line`, `soft` and `hard` — «не менять» left
 ///    the surface and «в одну строку» joined it.
-constexpr int kProtocolVersion = 7;
+/// 8: `loaded` — the load and the program's own `?`-statements are over, which
+///    is what tells a front-end that a run *finished*.
+constexpr int kProtocolVersion = 8;
 
 [[nodiscard]] std::string stepActionName(StepAction action) {
   switch (action) {
@@ -244,6 +246,16 @@ class Session {
         fail("parse", error);
       }
       exit_code_ = 2;
+      return;
+    }
+    // The program's own `?`-statements and directives ran during the load, so
+    // reaching this line means the whole run is over.  A front-end needs that
+    // for a program *without* questions: `result` arrives per question, and a
+    // run that asks none (an empty program included) would otherwise leave the
+    // window saying «выполняется» forever.  A `query` request is one statement
+    // and is answered by its own `result` — no event here.
+    if (command == "load") {
+      emit(Json{{"event", "loaded"}});
     }
   }
 

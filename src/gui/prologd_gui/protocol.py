@@ -21,7 +21,8 @@ from typing import Any, Iterator
 #:    `?`-statements (the editor's margin runs one query alone, task_36).
 #: 6: `format` for the formatter; the answer is a `formatted` event (task_30).
 #: 7: the modes of `format` are `line`, `soft` and `hard`.
-PROTOCOL_VERSION = 7
+#: 8: `loaded` — a load and the program's own `?`-statements are over.
+PROTOCOL_VERSION = 8
 
 #: Event names the interpreter emits.
 EVENTS = ("ready", "output", "result", "input_request", "step", "trace", "error", "bye")

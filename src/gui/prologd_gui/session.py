@@ -14,6 +14,32 @@ from . import protocol
 from .keywords import Keywords
 
 
+def read_keywords(executable: str, timeout_ms: int = 4000) -> Keywords:
+    """The reserved names without a session: one `prologd --list-keywords` run.
+
+    The window needs the table for completion, colouring and the shortcut sheet
+    *before* anything is run, and a window that has only been *opened* must not
+    keep an interpreter alive — so the names are fetched once with the same
+    query the CLI answers, and the first real session replaces the table with
+    the `ready` event's copy (one source of truth either way).  An interpreter
+    too old to know the option leaves the table empty, which is the state every
+    consumer already handles.
+    """
+    process = QProcess()
+    process.start(executable, ["--list-keywords"])
+    finished = process.waitForFinished(timeout_ms)
+    if (
+        not finished
+        or process.exitStatus() != QProcess.ExitStatus.NormalExit
+        or process.exitCode() != 0
+    ):
+        process.kill()
+        process.waitForFinished(1000)
+        return Keywords()
+    stdout = bytes(process.readAllStandardOutput()).decode("utf-8", "replace")
+    return Keywords.from_list_lines(stdout)
+
+
 class PrologSession(QObject):
     """A running interpreter session."""
 
@@ -38,6 +64,9 @@ class PrologSession(QObject):
     formatted = Signal(str, bool)
     #: A stepped run stopped at a point: a `protocol.StepPoint`.
     stepped = Signal(object)
+    #: A load and the program's own `?`-statements are over (protocol 8).  It is
+    #: what tells a front-end that a run *without* questions finished.
+    loaded = Signal()
     #: The session ended; carries the process exit code.
     ended = Signal(int)
 
@@ -223,6 +252,8 @@ class PrologSession(QObject):
             self.trace.emit(str(event.get("text", "")))
         elif name == "formatted":
             self.formatted.emit(str(event.get("text", "")), bool(event.get("changed", False)))
+        elif name == "loaded":
+            self.loaded.emit()
         elif name == "error":
             self.failed.emit(
                 str(event.get("kind", "")),
