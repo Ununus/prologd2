@@ -310,6 +310,27 @@ bool Solver::backtrack() {
   return false;
 }
 
+namespace {
+
+/// `ВЫП(Цель, Доп...)`: the extra arguments are appended to the goal, so an
+/// atom becomes a compound and a compound grows — this is `call/N` of ordinary
+/// Prolog, where the goal always comes first.  The callee is already
+/// dereferenced and is known to be an atom or a compound.
+Term expandMetaCall(const Term& callee, std::span<const Term> extra) {
+  std::vector<Term> args;
+  std::string_view name;
+  if (callee.kind == TermKind::Compound && callee.compound != nullptr) {
+    name = callee.compound->name;
+    args = callee.compound->args;
+  } else {
+    name = callee.text;
+  }
+  args.insert(args.end(), extra.begin(), extra.end());
+  return makeCompound(name, std::move(args));
+}
+
+}  // namespace
+
 bool Solver::resolveGoal(const Term& goal) {
   std::string_view name;
   std::size_t arity = 0;
@@ -355,13 +376,30 @@ bool Solver::resolveGoal(const Term& goal) {
     pushMeta(goal.compound->args[0], barrier);
     return true;
   }
-  if ((name == "ВЫП" || name == "call") && arity == 1) {
-    // Meta-call: solve the argument in the caller's cut scope.  `call` is the
-    // English spelling of `ВЫП` and reaches the same place: the engine answers
-    // this one, not the dispatch table, so the alias has to be matched here.
+  if ((name == "ВЫП" || name == "call") && arity >= 1) {
+    // Meta-call: solve the goal in the caller's cut scope, so a cut inside it
+    // reaches the caller's predicates.  `call` is the English spelling of `ВЫП`
+    // and reaches the same place: the engine answers this one, not the
+    // dispatch table, so the alias has to be matched here.  With extra
+    // arguments it is `call/N`: they are appended to the goal (task_43).
     const std::size_t barrier = env_->cp_barrier;
+    const std::vector<Term>& args = goal.compound->args;
     setEnv(advanceEnv(env_));
-    pushMeta(goal.compound->args[0], barrier);
+    if (arity == 1) {
+      pushMeta(args[0], barrier);
+      return true;
+    }
+    // A variable callee is dereferenced first: `РАВНО(Ц, член), ВЫП(Ц, Х, …)`
+    // expands.  When it is still free, pushing it unchanged gives the usual
+    // diagnostic («Цель должна быть предикатом») — there is no functor to
+    // attach the extra arguments to.
+    const Term callee = engine_.deref(args[0]);
+    if (callee.kind == TermKind::Atom ||
+        (callee.kind == TermKind::Compound && callee.compound != nullptr)) {
+      pushMeta(expandMetaCall(callee, std::span<const Term>(args).subspan(1)), barrier);
+    } else {
+      pushMeta(args[0], barrier);
+    }
     return true;
   }
 

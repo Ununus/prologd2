@@ -115,6 +115,18 @@ TEST_CASE("a disjunction is one goal and `,` binds tighter") {
   }
 }
 
+TEST_CASE("a cut cannot be written inside a meta-call's argument") {
+  // Аргумент `ВЫП` — терм, а `!` допустим только на месте цели: парсер
+  // отказывает с «неверное использование "!"».  Прозрачность отсечения для
+  // `ВЫП` остаётся свойством движка (goal идёт в области отсечения вызова), но
+  // из исходного текста такое отсечение не написать (task_43).
+  DiagnosticSink sink;
+  const auto program = parse("?ВЫП((!, ЛОЖЬ)).", sink);
+  REQUIRE(sink.hasErrors());
+  REQUIRE(sink.diagnostics().front().code == ErrorCode::MisplacedCut);
+  (void)program;
+}
+
 TEST_CASE("a `;` where the dialect used to accept one is an error") {
   SECTION("as a sentence terminator") {
     DiagnosticSink sink;

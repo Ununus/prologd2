@@ -128,7 +128,7 @@ int main(int argc, char** argv) {
 
   // A query, not a run mode: answer and exit before anything is loaded.  One
   // `name/arity` per line, a bare name for an operator or directive, and `name/+`
-  // for the variadic `ВЫВОД`.
+  // for a variadic name (`ВЫВОД`, `ВЫП`/`call`).
   if (listKeywords) {
     for (const prologd::KeywordInfo& keyword : prologd::reservedKeywords()) {
       if (keyword.arities.empty()) {

@@ -95,6 +95,26 @@ TEST_CASE("a goal with no matching clause reports a failure") {
   CHECK(points[1] == "fail неизвестно(1) @0 <test>:2:1");
 }
 
+TEST_CASE("a meta-call with extra arguments steps into the expanded goal") {
+  std::vector<std::string> points;
+  const test::RunResult result =
+      runProgram("цель(5).\n?ВЫП(цель, X).\n", {}, nullptr, [&points](Engine& engine) {
+        engine.options().stepHook = [&points, &engine](const StepInfo& info) {
+          points.push_back(describe(engine, info));
+          return StepDecision::Continue;
+        };
+      });
+
+  REQUIRE(result.loaded);
+  REQUIRE_FALSE(points.empty());
+  // `ВЫП` не попадает в шаги: сработавшая цель — развёрнутая `цель(_1)`, в
+  // среде мета-вызова (поэтому на шаг глубже, чем цель запроса).
+  CHECK(points[0] == "call цель(_1) @1 <test>:2:1");
+  for (const std::string& point : points) {
+    REQUIRE(point.find("ВЫП") == std::string::npos);
+  }
+}
+
 TEST_CASE("the hook can stop a query at the n-th point") {
   std::size_t seen = 0;
   const test::RunResult result =

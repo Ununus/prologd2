@@ -55,6 +55,55 @@ TEST_CASE("meta-call runs the goal") {
   REQUIRE(result.output == "Y=5\n");
 }
 
+TEST_CASE("a meta-call with extra arguments is call/N") {
+  // `ВЫП(Цель, Доп...)` дописывает аргументы к цели — правило `call/N`:
+  // цель всегда идёт первой, а каждый доп. аргумент — один аргумент.
+  const auto compound = runProgram(
+      "член(X, [X|_]).\n"
+      "член(X, [_|T]) :- член(X, T).\n"
+      "?ВЫП(член(X), [1, 2]).\n");
+  REQUIRE(compound.loaded);
+  REQUIRE(compound.output == "X=1\nX=2\n");
+
+  // Атом от дополнительных аргументов становится составным термом.
+  const auto atom = runProgram("?ВЫП(БОЛЬШЕ, 3, 1).\n?ВЫП(РАВНО, 1, 2).\n");
+  REQUIRE(atom.loaded);
+  REQUIRE(atom.output == "ДА\nНЕТ\n");
+
+  // Цель может прийти переменной: она разыменовывается до подстановки.
+  // (Ответ печатает и связывание запроса: `Ц=член` — по разу на решение.)
+  const auto bound = runProgram(
+      "член(X, [X|_]).\n"
+      "член(X, [_|T]) :- член(X, T).\n"
+      "?РАВНО(Ц, член), ВЫП(Ц, X, [1, 2]).\n");
+  REQUIRE(bound.loaded);
+  REQUIRE(bound.output == "Ц=член\nX=1\nЦ=член\nX=2\n");
+}
+
+TEST_CASE("a meta-call with extra arguments refuses a non-callable goal") {
+  for (const std::string& goal : {"ВЫП(5, 1)", "ВЫП(X, 1)"}) {
+    const auto result = runProgram("? " + goal + ".\n");
+    REQUIRE(result.loaded);
+    REQUIRE(result.runtimeError);
+    REQUIRE(result.error.find("Цель должна быть предикатом") != std::string::npos);
+  }
+}
+
+TEST_CASE("a cut after a meta-call prunes the caller's choices") {
+  // Отсечение после мета-вызова действует на вызывающий предикат как обычная
+  // цель: второе решение `а` и второе предложение `б` уже не рассматриваются.
+  // (Написать `!` *внутри* аргумента нельзя — парсер отказывает, см.
+  // test_parser.cpp.)
+  const auto result = runProgram(
+      "а(1).\n"
+      "а(2).\n"
+      "б(X) :- а(X), ВЫП(РАВНО(1, 1)), !.\n"
+      "б(99).\n"
+      "?б(X).\n");
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "X=1\n");
+}
+
 TEST_CASE("negation as failure") {
   const auto result = runProgram(
       "цель(5).\n"

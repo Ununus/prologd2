@@ -31,8 +31,12 @@ void addArity(NameInfo& info, std::size_t arity) {
 }
 
 bool hasArity(const NameInfo& info, std::size_t arity) {
-  return info.variadic ||
-         std::find(info.arities.begin(), info.arities.end(), arity) != info.arities.end();
+  if (info.variadic) {
+    // `ВЫВОД/+` and `ВЫП/+` take at least one argument: `ВЫВОД.` and `ВЫП.` are
+    // errors, not a silent failure.
+    return arity >= 1;
+  }
+  return std::find(info.arities.begin(), info.arities.end(), arity) != info.arities.end();
 }
 
 /// Every name a goal may call: the reserved names with their arities (which come
@@ -202,9 +206,23 @@ void walkGoal(const Term& goal, const SourceLocation& location,
     walkGoal(args[1], location, visit);
     return;
   }
-  if ((name == "ВЫП" || name == "call") && arity == 1) {
-    walkGoal(args[0], location, visit);
-    visit(name, 1, location);
+  if ((name == "ВЫП" || name == "call") && arity >= 1) {
+    if (arity == 1) {
+      walkGoal(args[0], location, visit);
+      visit(name, 1, location);
+      return;
+    }
+    // `call/N`: the extra arguments are appended to the goal, so what the call
+    // reaches is the expanded term — `ВЫП(ф, 1)` calls `ф/1`.
+    if (args[0].kind == TermKind::Atom) {
+      visit(args[0].text, arity - 1, location);
+    } else if (args[0].kind == TermKind::Compound && args[0].compound != nullptr) {
+      std::vector<Term> expanded_args = args[0].compound->args;
+      expanded_args.insert(expanded_args.end(), args.begin() + 1, args.end());
+      walkGoal(makeCompound(args[0].compound->name, std::move(expanded_args)), location,
+               visit);
+    }
+    visit(name, arity, location);
     return;
   }
   if ((name == "НЕ" || name == "not") && arity == 1) {

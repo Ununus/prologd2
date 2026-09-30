@@ -59,7 +59,7 @@ than a matter of remembering.
 | `РАВНО` | 2 | `equal` | **not** `=`, not `==`: it compares, it does not unify |
 | `ПС` | 0 | `nl` | |
 | `ЖДИ` | 1 | `wait` | |
-| `ВЫП` | 1 | `call` | engine-level (`kEngineCallables`), not the dispatch table |
+| `ВЫП` | 1..N | `call` | engine-level (`kEngineCallables`), not the dispatch table; `call/N` appends its extra arguments to the goal (task_43) |
 | `ПЕР` | 1 | `var` | ISO `var/1` |
 | `ЦЕЛ` | 1 | `integer` | ISO `integer/1` |
 | `ВЕЩ` | 1 | `float` | ISO `float/1` |

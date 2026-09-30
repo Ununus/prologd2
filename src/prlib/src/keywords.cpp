@@ -19,13 +19,15 @@ const std::unordered_set<std::string> kReservedOperators = {"mod", "div"};
 const std::unordered_set<std::string> kReservedDirectives = {"ИМПОРТ", "import"};
 
 /// Callable names the *engine* answers before it consults the dispatch table
-/// (see `Solver::unifyGoal`): they are reserved and callable, but `findBuiltin`
-/// never sees them, so the dispatch table cannot report their arity.  The
-/// conjunction `,`/2 is handled the same way but is punctuation rather than a
-/// reserved name, so it is not listed here.
-const std::unordered_map<std::string, std::vector<std::size_t>> kEngineCallables = {
-    {"ВЫП", {1}},
-    {"call", {1}},
+/// (see `Solver::resolveGoal`): they are reserved and callable, but
+/// `findBuiltin` never sees them, so the dispatch table cannot report their
+/// arity.  `ВЫП` and `call` are `call/N` — the goal first, then any number of
+/// extra arguments appended to it — so they are variadic from arity 1
+/// (task_43).  The conjunction `,`/2 is handled the same way but is punctuation
+/// rather than a reserved name, so it is not listed here.
+const std::unordered_set<std::string> kEngineCallables = {
+    "ВЫП",
+    "call",
 };
 
 }  // namespace
@@ -51,16 +53,16 @@ std::vector<KeywordInfo> reservedKeywords() {
     KeywordInfo info;
     info.name = name;
     const BuiltinArities arities = builtinArities(name);
-    const auto engine_form = kEngineCallables.find(name);
     if (arities.variadic) {
       info.kind = KeywordKind::Predicate;
       info.variadic = true;
     } else if (!arities.arities.empty()) {
       info.kind = KeywordKind::Predicate;
       info.arities = arities.arities;
-    } else if (engine_form != kEngineCallables.end()) {
+    } else if (kEngineCallables.count(name) != 0) {
+      // `ВЫП`/`call` are `call/N`: one argument at least, any number after.
       info.kind = KeywordKind::Predicate;
-      info.arities = engine_form->second;
+      info.variadic = true;
     } else if (kReservedOperators.count(name) != 0) {
       info.kind = KeywordKind::Operator;
     } else if (kReservedDirectives.count(name) != 0) {

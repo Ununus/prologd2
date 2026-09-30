@@ -79,9 +79,15 @@ TEST_CASE("keyword arities come from the dispatch table") {
   REQUIRE(findall->kind == prologd::KeywordKind::Predicate);
   REQUIRE(findall->arities == std::vector<std::size_t>{3});
 
+  // `ВЫП`/`call` are `call/N`: variadic from arity 1, so the table carries the
+  // flag rather than an arity list (task_43).
   const prologd::KeywordInfo* call = findKeyword(keywords, "ВЫП");
   REQUIRE(call != nullptr);
-  REQUIRE(call->arities == std::vector<std::size_t>{1});
+  REQUIRE(call->variadic);
+  REQUIRE(call->arities.empty());
+  const prologd::KeywordInfo* english = findKeyword(keywords, "call");
+  REQUIRE(english != nullptr);
+  REQUIRE(english->variadic);
 
   // Two arities are reported in ascending order, not in registration order.
   const prologd::KeywordInfo* multiplication = findKeyword(keywords, "УМНОЖЕНИЕ");
