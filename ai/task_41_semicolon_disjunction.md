@@ -140,3 +140,6 @@ The syntax change landed as planned, with one deviation and two notes.
   the local cut, `;` under `НЕ`, `ВЫП` and `НАЙТИВСЁ`, the comma precedence) and
   two diagnostics (the retired terminator with its position, both branches of a
   disjunction checked for undefined predicates).
+* A follow-up made the printer write `,`/2 and `;`/2 infix (`(A ; B)`): a query
+  echo, a trace line and a step point used to show `;(a,b)`, which is not what
+  the program says.

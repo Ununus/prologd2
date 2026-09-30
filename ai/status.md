@@ -847,5 +847,7 @@ Resolved on 2026-09-29 (GUI planning):
   unparenthesised argument list has a message of its own.  `examples/factorial.pld`
   — the only file in the repository that used the old terminator — was converted;
   `help.typ` §1.1, the new §4.5 (§4.6/§4.7 renumbered), `prologd-diff.typ` §16
-  with a row in its summary table, and `ai/porting_notes.md` follow.  206 Catch2
+  with a row in its summary table, and `ai/porting_notes.md` follow.  A follow-up
+  commit made `,`/2 and `;`/2 print infix — `(A ; B)` — which is what a query
+  echo, a trace line and a step point carry.  206 Catch2
   cases (3 247 assertions), 219 ctest tests, all green.
