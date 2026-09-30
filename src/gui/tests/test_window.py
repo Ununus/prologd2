@@ -25,6 +25,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from test_session import find_executable, pump  # noqa: E402
 
 try:
+    from PySide6.QtGui import QTextCursor
     from PySide6.QtWidgets import QApplication
 except ImportError:  # pragma: no cover - main() reports it
     QApplication = None  # type: ignore[assignment]
@@ -1554,6 +1555,76 @@ def test_a_marker_while_a_step_is_paused_starts_a_fresh_quiet_run(executable: st
     print("ok: a marker click during a paused step stops it and answers the click")
 
 
+def test_a_failed_query_marks_no_line_and_moves_no_caret(executable: str) -> None:
+    """A query error is about the statement, not about line 1 of the program.
+
+    The statement arrives as a source of its own and is named `<query>`; treating
+    that name as the buffer marked line 1 red and pulled the caret to the top of
+    the program for every failing query — reported as «для целей с ошибкой выдаёт
+    всегда ошибку в первой строке 1:1 и перемещает туда курсор».
+    """
+    window = empty_window(executable)
+    try:
+        window.editor().setPlainText("факт(1).\n?факт(X).\n")
+        window.run_program()
+        wait_for_result(window)
+
+        view = window.editor()
+        cursor = view.textCursor()
+        cursor.setPosition(2)
+        view.setTextCursor(cursor)
+
+        window._query_line.setText('?is_whole("4").')
+        window._run_query()
+        assert pump(window, lambda: "ошибка" in window.status_text()), window.status_text()
+
+        assert "ошибка: <query>:1:1" in window.status_text(), window.status_text()
+        assert "<query>:1:1" in window.output_text(), ascii(window.output_text())
+        assert view.error_line() is None, view.error_line()
+        assert view.textCursor().position() == 2, "the caret moved"
+    finally:
+        discard_changes(window)
+    print("ok: a failed query is shown in the pane without marking the program")
+
+
+def test_copy_takes_the_selection_where_the_focus_is(executable: str) -> None:
+    """`Ctrl+C` is a window shortcut: it must copy what the user is looking at.
+
+    It copied the *editor's* selection no matter where the focus was, so text the
+    user had selected in the output pane could not be copied at all (asked for
+    after the first hands-on run of the margin feature).
+    """
+    window = empty_window(executable)
+    try:
+        window.editor().setPlainText("факт(1).\n?факт(1).\n")
+        window.run_program()
+        wait_for_result(window)
+        window.show()
+
+        output = window._output
+        output.setFocus()
+        QApplication.processEvents()
+        assert window.focusWidget() is output, window.focusWidget()
+        cursor = output.textCursor()
+        cursor.select(QTextCursor.SelectionType.Document)
+        output.setTextCursor(cursor)
+        window._copy()
+        assert QApplication.clipboard().text() == output.toPlainText()
+
+        # With the editor focused the same command is the editor's, as it was.
+        view = window.editor()
+        view.setFocus()
+        QApplication.processEvents()
+        cursor = view.textCursor()
+        cursor.select(QTextCursor.SelectionType.Document)
+        view.setTextCursor(cursor)
+        window._copy()
+        assert QApplication.clipboard().text() == view.toPlainText()
+    finally:
+        discard_changes(window)
+    print("ok: Ctrl+C copies from the focused pane — the output included")
+
+
 def main(argv: list[str]) -> int:
     if QApplication is None:
         print("skipped: PySide6 is not installed")
@@ -1614,6 +1685,8 @@ def main(argv: list[str]) -> int:
         test_a_marker_answers_one_question_alone(executable)
         test_a_question_parked_in_a_comment_runs_from_the_margin(executable)
         test_a_marker_while_a_step_is_paused_starts_a_fresh_quiet_run(executable)
+        test_a_failed_query_marks_no_line_and_moves_no_caret(executable)
+        test_copy_takes_the_selection_where_the_focus_is(executable)
         test_the_output_can_be_saved(executable, files)
         test_the_context_menu_reuses_the_shared_actions(executable)
         test_the_font_control_and_the_wheel_are_one_setting(executable)

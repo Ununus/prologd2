@@ -216,3 +216,34 @@ execute_process(
 if(NOT exit_code EQUAL 1)
   message(FATAL_ERROR "Expected exit code 1 for -o with --protocol json, got ${exit_code}")
 endif()
+
+# --- a query error names the query, not the buffer ----------------------------
+# A front-end marks a line when a diagnostic names one; `<query>` says the error
+# is in the statement it sent (the query line, a margin marker) and not in the
+# program, whose line 1 was marked and shown for every failed query before.
+file(WRITE "${session}"
+  "{\"cmd\":\"load\",\"text\":\"факт(1).\\n\"}\n"
+  "{\"cmd\":\"query\",\"text\":\"?is_whole(\\\"4\\\").\"}\n"
+  "{\"cmd\":\"quit\"}\n")
+
+execute_process(
+  COMMAND "${PROLOGD_EXE}" --protocol json
+  INPUT_FILE "${session}"
+  OUTPUT_VARIABLE events
+  RESULT_VARIABLE exit_code)
+
+string(FIND "${events}" "\"kind\":\"runtime\"" position)
+if(position EQUAL -1)
+  message(FATAL_ERROR "A failed query was not reported as a runtime error\n--- got ---\n${events}")
+endif()
+string(FIND "${events}" "\"file\":\"<query>\"" position)
+if(position EQUAL -1)
+  message(FATAL_ERROR "A query error must name the query\n--- got ---\n${events}")
+endif()
+string(FIND "${events}" "\"file\":\"<buffer>\"" position)
+if(NOT position EQUAL -1)
+  message(FATAL_ERROR "A query error must not name the buffer\n--- got ---\n${events}")
+endif()
+if(NOT exit_code EQUAL 3)
+  message(FATAL_ERROR "Expected exit code 3 after a runtime error, got ${exit_code}")
+endif()

@@ -238,10 +238,16 @@ status bar and in the pane (`path:line:column: message`).  A diagnostic from an
 `ИМПОРТ`ed file names *that* file: the window looks for the tab, then next to the
 file that imported it, then on disk — where it is opened in a tab of its own,
 because marking a line in whatever tab happens to be showing would be worse than
-marking none.  A name in angle brackets (`<buffer>`, `<library>`) is the text the
-window itself sent, so that one is marked where it came from.  A line past the end
-of the file (where `непарные скобки` is reported) is clamped to the last line that
-exists, and the first edit clears the mark.
+marking none.  A name in angle brackets is not a path, and *which* text it names decides whether
+a line is marked at all: `<buffer>` is the program the window sent, so a diagnostic
+in it belongs to the showing tab and is marked where it came from; `<library>` is
+the interpreter's own preloaded text and `<query>` is the one statement of a
+`query` request (typed in the query line or clicked in the margin) — neither has a
+line in any tab, so they are shown in the pane and the caret is left alone.
+Marking line 1 of the program for a failed query is exactly what that rule fixed:
+the error is in the statement, not in the first line of the program.  A line past
+the end of the file (where `непарные скобки` is reported) is clamped to the last
+line that exists, and the first edit clears the mark.
 
 ## The output panel
 
@@ -267,6 +273,11 @@ the defect this code exists to avoid, and `LineBuffer` keeps it Qt-free so
 and the oldest lines are dropped in one edit with `*** вывод усечён … ***` kept
 as the first line.  The view follows the end of the output until the user scrolls
 up to read something, and follows again as soon as they come back to the bottom.
+The pane is read-only, so the one operation it owes beside reading is copying text
+*out* of it: the mouse selects as usual, and `Ctrl+C` copies the selection of
+whichever text widget has the focus — the output, the input queue, the console
+line or the editor — instead of always the editor's (the command is a window
+shortcut and used to do exactly that).
 
 Undo, redo, «Запустить» and «Остановить» follow the *state*, and the state of the
 interpreter is **two** things, not one: the process can be up and idle, and a

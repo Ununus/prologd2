@@ -575,6 +575,19 @@ class MainWindow(QMainWindow):
         self.editor().cut()
 
     def _copy(self) -> None:
+        """`Ctrl+C` copies the selection of wherever the user is looking.
+
+        The command is a window-wide shortcut, so it fires while the *output*
+        pane has the focus — and copying the editor's selection there copied text
+        the user was not looking at, or nothing at all.  The output is read-only,
+        so copying out of it is the one operation it owes beside reading.
+        """
+        focused = QApplication.focusWidget()
+        if focused is not None and focused is not self.editor() and isinstance(
+            focused, (ZoomablePlainTextEdit, QLineEdit)
+        ):
+            focused.copy()
+            return
         self.editor().copy()
 
     def _paste(self) -> None:
@@ -2012,12 +2025,21 @@ class MainWindow(QMainWindow):
         A diagnostic from an `ИМПОРТ`ed file names *that* file, and marking a line
         in the wrong tab would be worse than marking none: the file is looked for
         among the open tabs, then next to the file that imported it, then on disk
-        (where it is opened).  A name in angle brackets (`<buffer>`, `<library>`)
-        is not a file at all — it is the text the window itself sent.
+        (where it is opened).  A name in angle brackets is not a file at all: the
+        text the window itself sent is `<buffer>` (the program — the showing
+        buffer's lines), `<query>` (one statement) or `<library>` (the
+        interpreter's own) — and only the first of them has lines in a tab.
         """
         name = position.file if position is not None else ""
-        if not name or name.startswith("<"):
+        if not name or name == "<buffer>":
+            # The program text the window itself sent: its lines are the buffer's.
             return self.current_buffer()
+        if name.startswith("<"):
+            # `<query>` — the one statement of a `query` request (the query line
+            # or a margin marker); `<library>` — the interpreter's own preloaded
+            # text.  Neither has a line in any tab: marking the current one would
+            # say the program broke where it did not.
+            return None
         wanted = pathlib.Path(name)
         candidates = [wanted]
         current = self.current_buffer()
@@ -2037,6 +2059,12 @@ class MainWindow(QMainWindow):
         """Marks the line a diagnostic names and puts the caret on it."""
         buffer = self._diagnostic_buffer(position)
         if buffer is None:
+            if position.file.startswith("<"):
+                # A statement of its own (`<query>`) or the interpreter's library:
+                # nothing to mark and no caret to move — the error is about text
+                # that is not in any tab.
+                self._status.setText(f"ошибка: {position.where()}")
+                return
             # The file is not there and could not be opened: say where the line is
             # rather than marking a line in a tab that has nothing to do with it.
             self._status.setText(f"ошибка в {position.where()} — файл не открыт")

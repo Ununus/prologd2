@@ -209,7 +209,14 @@ class Session {
     if (has_path) {
       ok = loader_.loadFile(fromUtf8Path(request.at("path").get<std::string>()), &error);
     } else {
-      const std::string name = request.value("name", std::string("<buffer>"));
+      // The text the window sent: a program from an unnamed buffer, or one query
+      // from the query line or a margin marker.  A query is named apart from the
+      // buffer (`<query>`) so a front-end can tell «the error is in the one line
+      // I sent» from «the error is in the buffer at line N»: both used to arrive
+      // as `<buffer>:1:1`, and the window marked line 1 of the program and moved
+      // the caret there for every failed query.
+      const std::string name = request.value(
+          "name", std::string(command == "query" ? "<query>" : "<buffer>"));
       ok = loader_.loadSource(request.at("text").get<std::string>(), name, &error);
     }
     if (!questions) {
