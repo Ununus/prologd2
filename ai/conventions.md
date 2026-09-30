@@ -54,6 +54,13 @@ for a conversion (`int_to_float`, `str_to_int`).
   freely and the user-facing text comes from `errorCodeText`.
 * The CLI prints diagnostics in the usual compiler shape:
   `<file>:<line>:<column>: error: <message>`.
+* Every diagnostic carries a `Severity`.  `Error` stops a load or a query;
+  `Warning` is advice — it never changes a load's success or an exit code
+  (`DiagnosticSink::hasErrors` counts errors only, and `--no-warnings` drops only
+  warnings).  A new check has to answer two questions before it is written: what
+  severity, and what the position points at.  The position names the thing to
+  fix — the opening bracket, the end of the clause, the goal — never "wherever
+  the parser happened to be".
 * Error messages are lower-case Russian phrases without a trailing period, so
   they read well after the `error: ` prefix; predicate-specific messages use the
   form `<ПРЕДИКАТ>: <пояснение>`.

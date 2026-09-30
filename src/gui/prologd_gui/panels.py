@@ -42,6 +42,7 @@ OUTPUT = "output"
 ECHO = "echo"
 NOTE = "note"
 ERROR = "error"
+WARNING = "warning"
 TRACE = "trace"
 
 #: The colours of the kinds that have one.
@@ -49,6 +50,7 @@ KIND_COLORS = {
     ECHO: theme.Theme().query,  # the query blue: our echo of an answer
     NOTE: "#555555",  # our own markers (`--- загрузка программы ---`)
     ERROR: "#a00000",  # diagnostics
+    WARNING: "#b35c00",  # a warning: the same pane, amber instead of red
     TRACE: "#777777",  # the trace stream (task_28)
 }
 

@@ -37,7 +37,7 @@ execute_process(
 
 set(expected_events
   "{\"event\":\"ready\","
-  "\"protocol\":3"
+  "\"protocol\":4"
   "\"keywords\":"
   "{\"event\":\"result\",\"found\":true}"
   "{\"event\":\"output\",\"text\":\"X=1\\nX=2\\n\"}"

@@ -19,6 +19,7 @@ add_executable(prlib_tests
   test_io_context.cpp
   test_stepping.cpp
   test_typical_tasks.cpp
+  test_diagnostics.cpp
   test_lessons.cpp)
 
 target_link_libraries(prlib_tests PRIVATE
@@ -105,4 +106,13 @@ if(TARGET prologd)
             "-DPROLOGD_EXE=$<TARGET_FILE:prologd>"
             "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/engine_limits.cmake")
+
+  # task_40: a warning must leave the exit code alone, `--no-warnings` must
+  # silence it, and an error must still exit 2.  The error stream is the point,
+  # which `PASS_REGULAR_EXPRESSION` cannot see, so a CMake script drives it.
+  add_test(NAME cli_diagnostics
+    COMMAND ${CMAKE_COMMAND}
+            "-DPROLOGD_EXE=$<TARGET_FILE:prologd>"
+            "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cli_diagnostics.cmake")
 endif()

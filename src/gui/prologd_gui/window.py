@@ -72,6 +72,10 @@ class MainWindow(QMainWindow):
         self._session.stepped.connect(self._on_stepped)
         self._session.ended.connect(self._on_ended)
 
+        #: Warnings seen in the current run, shown beside the answer; reset when
+        #: the interpreter comes up, because every run starts a fresh one.
+        self._warning_count = 0
+
         #: The open documents, in the order every pane shows them.  A pane has its
         #: own *current* tab, but the set and the order are shared: a tab dragged in
         #: one pane has to move in the other as well.
@@ -1820,6 +1824,7 @@ class MainWindow(QMainWindow):
         # by `_add_buffer`.
         self._version = version
         self._exit_code = None
+        self._warning_count = 0
         for buffer in self._buffers:
             buffer.set_keywords(self._session.keywords)
         self._status.setText(f"PrologD {version} готов")
@@ -1856,7 +1861,10 @@ class MainWindow(QMainWindow):
         knowledge base is still loaded, and the next run restarts the file.
         """
         self._busy = False
-        self._status.setText("решение найдено" if found else "решения нет")
+        text = "решение найдено" if found else "решения нет"
+        if self._warning_count:
+            text += f" · предупреждений: {self._warning_count}"
+        self._status.setText(text)
         if not self._session.paused():
             # Whatever was being stepped through is over; the line it stopped on
             # stays marked until the next run or the first edit.
@@ -1865,14 +1873,26 @@ class MainWindow(QMainWindow):
         self._sync_run_actions()
         self._update_details()
 
-    def _on_failed(self, kind: str, message: str, position=None) -> None:
+    def _on_failed(self, kind: str, severity: str, message: str, position=None) -> None:
         """A diagnostic: the pane shows it with its file, the editor marks the line.
 
         The position arrives in fields of its own (protocol 3), so nothing is
         parsed out of the message — the message is what the interpreter wrote, and
-        the file and the line are put in front of it here.
+        the file and the line are put in front of it here.  A *warning* is amber
+        in the pane and counted in the status bar; it never ends the run, which is
+        why the rest of this handler only runs for an error.
         """
         where = position.where() if position is not None else ""
+        if severity == "warning":
+            self._output.feed(
+                f"*** предупреждение: {where + ': ' if where else ''}{message}\n",
+                panels.WARNING,
+            )
+            self._warning_count += 1
+            self._status.setText(
+                f"предупреждение: {where or 'без места'} (всего: {self._warning_count})"
+            )
+            return
         self._output.feed(f"*** {kind}: {where + ': ' if where else ''}{message}\n", panels.ERROR)
         self._busy = False
         self._step_pane.idle()

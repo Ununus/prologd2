@@ -1360,6 +1360,35 @@ def test_a_parse_error_marks_the_line_the_parser_stopped_at(executable: str) -> 
     print("ok: a parse error marks its line as well")
 
 
+def test_a_warning_is_amber_and_counted(executable: str) -> None:
+    """A warning is advice: amber in the pane, counted, and the run goes on.
+
+    `мама(Лена, Таня).` is the porting trap the course itself teaches — both
+    names are variables, and the interpreter now says so instead of answering
+    `Лена=_1` in silence.  It must not turn the answer into a failure.
+    """
+    from prologd_gui import panels
+
+    window = empty_window(executable)
+    try:
+        window.editor().setPlainText("мама(Лена, Таня).\n?мама(Лена, Таня).\n")
+        window.run_program()
+        assert pump(window, lambda: "предупреждений: 2" in window.status_text()), (
+            window.status_text()
+        )
+        lines = window.output_text().splitlines()
+        amber = [
+            number for number, line in enumerate(lines) if line.startswith("*** предупреждение")
+        ]
+        assert len(amber) == 2, ascii(window.output_text())
+        assert colour_of(window._output, amber[0]) == panels.KIND_COLORS[panels.WARNING]
+        # The run was not disturbed: the query still answered.
+        assert "Лена=_1" in window.output_text(), ascii(window.output_text())
+    finally:
+        discard_changes(window)
+    print("ok: a warning is amber, counted, and does not end the run")
+
+
 def test_a_diagnostic_from_an_imported_file_opens_it(executable: str, directory) -> None:
     """A failure in an `ИМПОРТ`ed file marks the line in *that* file.
 
@@ -1383,8 +1412,10 @@ def test_a_diagnostic_from_an_imported_file_opens_it(executable: str, directory)
         assert any(view.error_line() is not None for view in buffer.views()), "no line marked"
         # The diagnostic names the file it came from, and the line in it.  The
         # interpreter writes its paths with forward slashes, so the file's name is
-        # what is looked for here rather than the platform's own spelling.
-        assert "модуль.pld:4:1" in window.output_text(), ascii(window.output_text())
+        # what is looked for here rather than the platform's own spelling, and the
+        # position is the opening bracket (task_40), not the token the parser
+        # happened to stop at.
+        assert "модуль.pld:2:15" in window.output_text(), ascii(window.output_text())
     finally:
         discard_changes(window)
     print("ok: a diagnostic from an imported file opens that file and marks its line")
@@ -1503,6 +1534,7 @@ def main(argv: list[str]) -> int:
         test_the_wrap_switch_reaches_every_editor(executable)
         test_a_runtime_error_marks_its_line(executable)
         test_a_parse_error_marks_the_line_the_parser_stopped_at(executable)
+        test_a_warning_is_amber_and_counted(executable)
         test_a_diagnostic_from_an_imported_file_opens_it(executable, files)
         test_stepping_shows_the_goal_the_stack_and_the_line(executable)
         test_the_trace_is_coloured_apart_from_the_output(executable)

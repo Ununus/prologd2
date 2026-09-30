@@ -202,7 +202,8 @@ was; the sink is what the protocol installs.)
 ### Where an error happened
 
 `error` events carry `file`, `line` and `column` next to the human message
-(protocol 3), so nothing is parsed out of the text.  A parse error has a position
+(protocol 3) and its `severity` (protocol 4), so nothing is parsed out of the
+text.  A parse error has a position
 from the parser and a **runtime error has one too**: the solver keeps the clause it
 is solving in step with its environment, and `raise` fills in that clause's
 location, so `деление на ноль` in the third clause of `модуль.pld` marks line 3
@@ -374,16 +375,17 @@ Headless check of the protocol, without PySide6 installed:
 python src/gui/tests/protocol_smoke.py
 ```
 
-## Protocol contract (version 3)
+## Protocol contract (version 4)
 
 One JSON object per line in both directions; the interpreter writes nothing else
 to stdout.  The C++ side lives in `src/cli/protocol.cpp`, the Python side in
 `prologd_gui/protocol.py`.  Version 2 added the reserved names to `ready`; version
 3 added stepping (`step` events and the `step` request), the `trace` events, the
 `step`/`trace` flags of `load` and `query`, and the `file`/`line`/`column` fields
-of `error`.  Version 1 sessions are still understood by the Python client (the
-table is then empty and completion falls back to the document's own
-predicates).
+of `error`; version 4 adds `severity` to `error` (`error` or `warning` — a warning
+is advice and never ends the run).  Version 1 sessions are still understood by
+the Python client (the table is then empty and completion falls back to the
+document's own predicates).
 
 ### Requests
 
@@ -405,13 +407,13 @@ step point and waits for a `step` request.  A false flag is left off the wire.
 
 | Event | Meaning |
 |-------|---------|
-| `{"event":"ready","protocol":3,"version":"2.0.0","keywords":[…]}` | the session is up |
+| `{"event":"ready","protocol":4,"version":"2.0.0","keywords":[…]}` | the session is up |
 | `{"event":"output","text":"…"}` | program output (`ВЫВОД`, query results) |
 | `{"event":"result","found":true}` | one query finished; `found` is false when nothing matched |
 | `{"event":"input_request","kind":"line"}` | `ВВОДСТР`/`ВВОДСИМВ`/`ВВКОД` waits for an answer; `kind` is `token`, `line` or `codepoint` |
 | `{"event":"step","action":"call","goal":"…","depth":2,"file":"…","line":9,"column":1}` | a step point; `action` is `call`, `exit`, `redo` or `fail`.  `goal` is absent for `exit` (the goal is the one its `call` named), and the position is absent when there is none |
 | `{"event":"trace","text":"…"}` | one line of the `ТРАССА` trace |
-| `{"event":"error","kind":"parse","message":"…","file":"…","line":3,"column":5}` | diagnostic; `kind` is `parse`, `runtime` or `protocol`, and the position is absent when there is none to report |
+| `{"event":"error","kind":"parse","severity":"warning","message":"…","file":"…","line":3,"column":5}` | diagnostic; `kind` is `parse`, `runtime` or `protocol`, `severity` is `error` or `warning` (a warning never ends the run), and the position is absent when there is none to report |
 | `{"event":"bye"}` | the session is over |
 
 Exit codes: `0` clean, `1` usage error, `2` load/parse failure, `3` runtime

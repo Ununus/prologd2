@@ -24,7 +24,8 @@ using Json = nlohmann::json;
 /// 3: `step` events and the `step` command, `trace` events, and `file`/`line`/
 ///    `column` on `error` events (a front-end no longer parses them out of the
 ///    message), plus `step`/`trace` flags on `load` and `query`.
-constexpr int kProtocolVersion = 3;
+/// 4: `error` events carry `severity` (`error` or `warning`).
+constexpr int kProtocolVersion = 4;
 
 [[nodiscard]] std::string stepActionName(StepAction action) {
   switch (action) {
@@ -227,7 +228,10 @@ class Session {
   /// One diagnostic as an `error` event: the message as the human wrote it, and
   /// the position in fields of its own.
   void reportDiagnostic(const PrologError& diagnostic, const std::string& kind) {
-    Json event{{"event", "error"}, {"kind", kind}, {"message", diagnostic.message}};
+    Json event{{"event", "error"},
+               {"kind", kind},
+               {"severity", std::string(severityText(diagnostic.severity))},
+               {"message", diagnostic.message}};
     addLocation(event, diagnostic.location);
     reported_diagnostics_ = true;
     emit(event);

@@ -80,10 +80,13 @@ class Recorder:
         session.ready.connect(self.on_ready)
         session.trace.connect(self.on_trace)
         session.stepped.connect(self.on_stepped)
-        # A failure carries where it happened as well (protocol 3); the position is
-        # a `protocol.Position` or None, and the message is what a test looks at.
+        # A failure carries where it happened as well (protocol 3) and how bad
+        # it is (protocol 4: "error" or "warning"); the position is a
+        # `protocol.Position` or None, and the message is what a test looks at.
         session.failed.connect(
-            lambda kind, message, _position: self.failures.append(f"{kind}: {message}")
+            lambda kind, severity, message, _position: self.failures.append(
+                f"{kind}/{severity}: {message}"
+            )
         )
 
     def on_output(self, text: str) -> None:

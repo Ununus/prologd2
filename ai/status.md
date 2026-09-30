@@ -9,10 +9,10 @@ session.
   started (protocol + skeleton).
 * Build: the `windows-msvc` preset (Visual Studio 18 2026, MSVC 19.51) build is
   green locally; the Linux presets, including `-Werror`, build cleanly.
-* Tests: 199/199 pass in about four seconds: 187 Catch2 cases plus 12 command-line
+* Tests: 211/211 pass in about four seconds: 198 Catch2 cases plus 13 command-line
   and integration tests (seven option tests, two `--list-keywords` tests, the
-  import-search report, the JSON protocol session and the engine-limit cases).
-* CLI: `build/windows-msvc/src/cli/Release/prologd` runs files (positional, `-s`
+  import-search report, the JSON protocol session, the engine-limit cases and the
+  diagnostics cases).
   or `--source`), stdin, the REPL and the `--protocol json` session for
   front-ends.
 * GUI: `src/gui` (PySide6) drives the executable through the JSON protocol; the
@@ -106,14 +106,14 @@ session.
 | task_37_gui_builtin_reference | not started | `doc/builtins.json` as the one machine-readable source for the built-in reference, a checker keeping it in step with `--list-keywords` and the sections of `help.typ`, a summary line under the completion popup and `Shift+F1` on the word under the caret (the English-alias work of task_39 would land in the same file) |
 | task_38_engine_limits | done | recursion depth and long runs: the crash is gone (the chain and deep terms are released iteratively — the trigger was a *surviving* deep reference, a choice point whose base clause does not cut, or the solver's final environment), `maxDepth` turns runaway recursion into a diagnostic, the variable growth is documented instead of "fixed", and `tools/bench_engine.py` made the numbers reproducible |
 | task_39_english_aliases | done | every built-in has an English spelling in lower case (one `kEnglishNames` table in `builtins.cpp`, 47 pairs, is the only place a pair is written; `test_aliases.cpp` walks it and fails on a Russian name without a row); the manual gained appendix 17 with the whole table, `prologd-diff.typ` §15 and `conventions.md` the rule; doing it showed that `int`/`float` were *checks*, not conversions (`integer`/`float` are the ISO type tests, `is_whole`/`is_number` the old ones, and the planned `to_int`/`to_float` were dropped) and `ДЛИНА` became `strlen`; 108 reserved names, one list for CLI, protocol and GUI; renamed on review: `number` → `is_number`, `num_to_float` → `int_to_float` |
-| task_40_diagnostics | not started | severity (warnings that never change an exit code), positions that point at the opening bracket, a stated missing final dot, a warning for a variable written where a constant was meant, singleton variables, and call-site hints (unknown name with a suggestion, known name with the wrong arity) |
+| task_40_diagnostics | done | severity (an error stops a load or a query and keeps exit codes 2/3; a warning never changes either, and `--no-warnings` drops them) with `severity` on the wire (protocol 4) and amber warnings counted in the GUI; positions name what to fix (the opening bracket and its line, the end of a clause without its dot, the goal); a reserved name with an arity that exists nowhere is an error, an undefined predicate or a missing arity is a warning with a suggestion; singleton variables with separate advice for facts, rules and bodies |
 | task_41_semicolon_disjunction | approved | `;` as a real backtrackable disjunction (ISO precedence with `,`), the `;` sentence terminator retired with a diagnostic, `ИЛИ/2` left as the committed form and cross-referenced; the user gave the go-ahead on 2026-09-30, work not started |
 | task_42_engine_hot_path | not started | the constant tax: no string per built-in call, no `"name/arity"` key per predicate call, clause indexing and atom interning only where the benchmark justifies them |
 | task_43_language_surface | not started | `ВЫП/2..N` (`call/N`), a warning when two imported files define the same predicate, and the removal of the seven library clauses that every built-in already shadows (`?СКОЛЬКО(НЕ, А)` answers 2 today) |
 
 ## Test suite
 
-199 tests, about four seconds: 187 Catch2 cases plus 12 command-line and
+211 tests, about four seconds: 198 Catch2 cases plus 13 command-line and
 integration tests (seven option tests, two `--list-keywords` tests, the
 import-search report, the JSON protocol session and the engine-limit cases). Groups:
 BigInt, lexer, keywords, parser, unification, engine, every built-in group,
@@ -809,3 +809,26 @@ Resolved on 2026-09-29 (GUI planning):
   would promise a plain failure where ours raises a type error), and a
   conversion reads `X_to_Y` with the short stems (`int_to_float`, `str_to_int`,
   `read_int`).
+- **2026-09-30 — task_40: diagnostics a beginner can use.**  A diagnostic now
+  says whether it is an error or a warning: `PrologError` carries a `Severity`,
+  `DiagnosticSink` counts warnings apart from errors, the text form prints
+  `warning:`, `--no-warnings` drops them, the wire format went to protocol 4
+  (`severity` on `error` events) and the GUI shows warnings amber and counts them
+  beside the answer.  Positions now name what to fix: an unclosed bracket is
+  reported at the bracket itself with its line, a statement without its final dot
+  at the end of the clause, an unclosed quote at the quote.  Two checks run after
+  parsing: a *reserved* name with an arity that exists nowhere is an error
+  (`?УМНОЖЕНИЕ(2, 3).` says «УМНОЖЕНИЕ не имеет арности 2 (есть 3 и 4)» and exits
+  2, where it used to answer НЕТ in silence — five tests that pinned that silence
+  were rewritten), and, once the whole unit and its imports are loaded, an
+  undefined predicate is a warning with a «возможно, имя/арность» suggestion
+  within a small edit distance over code points, while a name called with an
+  arity it does not have lists the ones it does.  A clause also audits its own
+  variables: a name used once in a fact is «... — переменная, а не константа;
+  запишите её в одинарных кавычках: 'Лена'», in a rule the message also offers
+  `_Имя` as the other reading, and a body singleton is told to use `_`.  The
+  corpus paid for the checks at once: the ported `examples/monkd.pld` had been
+  calling ЗАКРАСКА with four arguments, and eight unused variables in
+  `drawing.pld`, lessons 6 and 7 and monk/monkd were found and fixed.  198 Catch2
+  cases (3 182 assertions), 211 ctest tests, all green; the course is silent
+  except the debug appendix, which shows the unknown-name warning on purpose.

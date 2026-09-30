@@ -89,6 +89,7 @@ int main(int argc, char** argv) {
   std::string errorFile;
   bool questions = false;
   bool trace = false;
+  bool noWarnings = false;
   bool listKeywords = false;
   std::string protocol = "text";
   // Left unset on purpose: the engine's own defaults are the ones to use, and a
@@ -103,6 +104,8 @@ int main(int argc, char** argv) {
   app.add_option("-e,--error", errorFile, "Write diagnostics to this file");
   app.add_flag("-q,--questions", questions, "Echo queries before executing them");
   app.add_flag("-t,--trace", trace, "Start with tracing enabled");
+  app.add_flag("--no-warnings", noWarnings,
+               "Do not print warnings (they never change the exit code)");
   app.add_option("--max-depth", maxDepth,
                  "Recursion depth limit for one query (0 = unlimited, default 10000)");
   app.add_option("--max-steps", maxSteps,
@@ -179,6 +182,17 @@ int main(int argc, char** argv) {
 
   engine.initialize();
   engine.setTrace(trace);
+  if (noWarnings) {
+    // Warnings are advice: dropping them touches nothing else, so the filter is
+    // a diagnostic hook that still writes the usual `file:line:column: error:`
+    // lines for everything else.
+    engine.setDiagnosticHook([&engine](const prologd::PrologError& diagnostic) {
+      if (diagnostic.severity == prologd::Severity::Warning) {
+        return;
+      }
+      engine.io().errorStream() << prologd::DiagnosticSink::format(diagnostic) << '\n';
+    });
+  }
 
   std::signal(SIGINT, handleInterruptSignal);
 #if defined(SIGTERM)

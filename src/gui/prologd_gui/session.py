@@ -25,10 +25,12 @@ class PrologSession(QObject):
     result = Signal(bool)
     #: The interpreter waits for input; carries "token", "line" or "codepoint".
     input_request = Signal(str)
-    #: A diagnostic; a kind ("parse", "runtime", "protocol"), a text, and where
-    #: it happened — a `protocol.Position`, or None when there is nothing to point
-    #: at (a goal typed at the prompt, an error with no clause).
-    failed = Signal(str, str, object)
+    #: A diagnostic; a kind ("parse", "runtime", "protocol"), its severity
+    #: ("error" or "warning"; protocol 4 — an older interpreter sends none, and
+    #: then the default is an error), a text, and where it happened — a
+    #: `protocol.Position`, or None when there is nothing to point at (a goal
+    #: typed at the prompt, an error with no clause).
+    failed = Signal(str, str, str, object)
     #: The trace of `ТРАССА`, one line at a time (protocol 3).
     trace = Signal(str)
     #: A stepped run stopped at a point: a `protocol.StepPoint`.
@@ -192,13 +194,14 @@ class PrologSession(QObject):
         elif name == "error":
             self.failed.emit(
                 str(event.get("kind", "")),
+                str(event.get("severity", "error")),
                 str(event.get("message", "")),
                 protocol.Position.from_event(event),
             )
         elif name == "bye":
             pass  # the process exit reports the end of the session
         else:
-            self.failed.emit("protocol", f"неизвестное событие: {name}", None)
+            self.failed.emit("protocol", "error", f"неизвестное событие: {name}", None)
 
     def _on_finished(self, exit_code: int, _status) -> None:
         for event in self._decoder.feed(b"\n"):

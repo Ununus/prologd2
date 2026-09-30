@@ -17,7 +17,7 @@ from typing import Any, Iterator
 #: 2: the `ready` event carries `keywords` (the reserved names and their arities).
 #: 3: `step` events and the `step` request, `trace` events, positions on `error`,
 #:    and the `step`/`trace` flags of `load` and `query`.
-PROTOCOL_VERSION = 3
+PROTOCOL_VERSION = 4
 
 #: Event names the interpreter emits.
 EVENTS = ("ready", "output", "result", "input_request", "step", "trace", "error", "bye")
