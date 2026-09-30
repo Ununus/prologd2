@@ -891,19 +891,13 @@ bool Engine::runQuery(const Query& query, const std::function<bool()>& onSolutio
 }
 
 void Engine::initialize() {
-  // No `ПЕРВОЕ/2` clause here: it is a built-in (task_44), and a library copy
-  // would keep answering the retired `ИЛИ` spelling it was renamed from.
-  static constexpr std::string_view kLibrary = R"PLD(
-НЕ(X) :- ВЫП(X), !, ЛОЖЬ.
-НЕ(_).
-РАВНО(X, X).
-МЕНЬШЕ(X, Y) :- БОЛЬШЕ(Y, X).
-СЛОЖЕНИЕ(X, Y, Z) :- УМНОЖЕНИЕ(1, X, Y, Z).
-ПС :- ВВКОД(10).
-ДЛИНА(X, Y) :- КОПИЯ(X, 1, Y, X).
-)PLD";
-  ParsedProgram library = parseSource(kLibrary, "<library>");
-  loadProgram(library);
+  // The built-ins *are* the definitions (ADR-018): a library used to be loaded
+  // here as well (`НЕ`, `РАВНО`, `МЕНЬШЕ`, `СЛОЖЕНИЕ`, `ПС`, `ДЛИНА`), but
+  // `findBuiltin` answers every one of those names, so the clauses could only
+  // be seen by reading the database directly — `?СКОЛЬКО(НЕ, А)` answered 2,
+  // a number that described nothing callable.  A future build without a
+  // dispatch table would want the bootstrap back, in a file that says exactly
+  // that and is not loaded by default (task_43).
 }
 
 }  // namespace prologd

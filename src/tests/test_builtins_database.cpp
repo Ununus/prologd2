@@ -57,6 +57,30 @@ TEST_CASE("the clause counter counts every arity of a name") {
   REQUIRE(lenient.output == "ДА\nДА\nN=1\n");
 }
 
+TEST_CASE("the built-ins are not also database clauses") {
+  // До task_43 `Engine::initialize()` грузил в базу предложения для `НЕ`,
+  // `РАВНО`, `МЕНЬШЕ`, `СЛОЖЕНИЕ`, `ПС` и `ДЛИНА`.  Вызывает их всё равно
+  // таблица встроенных, поэтому такие предложения мог увидеть только тот, кто
+  // читает базу напрямую: `?СКОЛЬКО(НЕ, А)` отвечал 2.  Теперь определений
+  // ровно ноль — и это то, что описывает вызываемые предикаты.
+  const auto counts = runProgram(
+      "?СКОЛЬКО(НЕ, А).\n"
+      "?СКОЛЬКО(РАВНО, А).\n"
+      "?СКОЛЬКО(МЕНЬШЕ, А).\n"
+      "?СКОЛЬКО(СЛОЖЕНИЕ, А).\n"
+      "?СКОЛЬКО(ПС, А).\n"
+      "?СКОЛЬКО(ДЛИНА, А).\n");
+  REQUIRE(counts.loaded);
+  REQUIRE(counts.output == "А=0\nА=0\nА=0\nА=0\nА=0\nА=0\n");
+
+  // И `ПРЕДЛ` по тем же именам не находит ни одного предложения.
+  const auto clauses = runProgram(
+      "?ПРЕДЛ(НЕ, 1, _, _).\n"
+      "?ПРЕДЛ(ДЛИНА, 1, _, _).\n");
+  REQUIRE(clauses.loaded);
+  REQUIRE(clauses.output == "НЕТ\nНЕТ\n");
+}
+
 TEST_CASE("the clause counter: a bad name or count is an error") {
   for (const std::string& goal : {"СКОЛЬКО(5, N)", "СКОЛЬКО(X, N)", "СКОЛЬКО(прим, \"1\")"}) {
     checkBadArguments(goal, "СКОЛЬКО");

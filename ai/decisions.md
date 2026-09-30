@@ -476,3 +476,26 @@ snapshot; the benchmark knows the workload that would justify an index.
 calls a predicate with thousands of clauses *repeatedly* with a bound first
 argument, or when clause heads become expensive to unify (then the per-attempt
 cost and the scan length both matter).
+
+## ADR-018: The built-ins are the definitions; the engine loads no library
+
+**Context.** `Engine::initialize()` used to parse and load a seven-clause library
+(`НЕ`, `ИЛИ`, `РАВНО`, `МЕНЬШЕ`, `СЛОЖЕНИЕ`, `ПС`, `ДЛИНА`).  Every one of those
+names is also in the dispatch table, and `Solver::resolveGoal` consults
+`findBuiltin` first, so the clauses could never be selected — they were visible
+only where the database is read directly: `?СКОЛЬКО(НЕ, А)` answered `А=2` (the
+`НЕ(X) :- ВЫП(X), !, ЛОЖЬ.` and `НЕ(_).` pair) and `?СКОЛЬКО(ДЛИНА, В)` answered
+`В=1`, while a call to `НЕ` never reached those clauses.  A reader asking «сколько
+предложений у НЕ» got a number that described nothing callable.
+
+**Decision.** Delete the library (task_43; the two `ИЛИ` clauses had already left
+with the rename, task_44).  `Engine::initialize()` keeps its place and does
+nothing but say why.
+
+**Consequences.** `СКОЛЬКО`/`ПРЕДЛ`/`УДАЛЕНИЕ` report only what the program
+defines; nothing observable changes for a call (the dispatch table answered those
+names before and does now).  A future build without a dispatch table would want
+the bootstrap back — it belongs in a file that says exactly that and must not be
+loaded by default.
+
+**Status.** Accepted.
