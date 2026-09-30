@@ -43,7 +43,7 @@ not a port; the old lesson it replaces is kept under `examples/lessons/_old/`.
 | `lessons/_old/lesson_5.pld` | archived when lesson 8 was rewritten for the course (state search moved there: the ferry and the queens; the parliament puzzle belongs to lesson 9); apostrophe variables in the ferry puzzle; the file defines `список/2`, `можно/2`, `нельзя/2` twice (queens and parliament sections) — this is faithful to the original and is why `ферзи` cannot be queried from the full file (the parliament `можно/2` clashes); use the queens fragment or a standalone program. |
 | `lessons/_old/lesson_6.pld` | archived when lesson 9 was rewritten for the course (the criminal, the names and the places puzzles moved there; the surnames-and-jobs one is left in the archive); `XOR` → `xor`; `Денис`, `Кирилл`, `Максим`, `Миша`, … quoted; `М`/`м` and `П`/`п` stay distinct. |
 | `lessons/lesson_8.pld` | graphics; the animation query recurses forever and is therefore not executed by the tests. |
-| `lessons/lesson_9.pld` | interactive (`ВВОДСИМВ`); the queries need input, so only parsing is tested. |
+| `lessons/_old/lesson_9.pld` | archived when lesson 10 was rewritten for the course (its subject, the dialogue and input/output, is lesson 7 now); interactive (`ВВОДСИМВ`); the queries need input, so only parsing is tested. |
 | `factorial.pld` | `н`, `ф`, `х` → `Н`, `Ф`, `Х`. |
 | `file_io.pld` | `Н` stays `Н`. |
 | `drawing.pld` | tabs preserved; single-letter coordinates renamed. |

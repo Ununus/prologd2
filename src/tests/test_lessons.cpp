@@ -71,6 +71,7 @@ const std::vector<std::string>& checkedLessons() {
       "lesson_07.pld",
       "lesson_08.pld",
       "lesson_09.pld",
+      "lesson_10.pld",
   };
   return names;
 }
@@ -95,7 +96,7 @@ std::string withoutQueries(const std::string& source) {
 
 TEST_CASE("ported example programs parse cleanly") {
   const std::vector<std::string> files = {
-      "lessons/lesson_8.pld", "lessons/lesson_9.pld",
+      "lessons/lesson_8.pld",
       "factorial.pld",        "file_io.pld",         "drawing.pld",
       "monk.pld",             "monkd.pld",           "findall_demo.pld",
       "import_demo.pld",      "lib/library.pld",
