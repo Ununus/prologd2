@@ -75,6 +75,7 @@ const std::vector<std::string>& checkedLessons() {
       "lesson_10.pld",
       "lesson_11.pld",
       "lesson_12.pld",
+      "appendix_debug.pld",
   };
   return names;
 }
