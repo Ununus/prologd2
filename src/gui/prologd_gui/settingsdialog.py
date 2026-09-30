@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import pathlib
 
-from PySide6.QtCore import Qt, QUrl
+from PySide6.QtCore import Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -144,6 +144,15 @@ def _same(value: object, other: object) -> bool:
 
 class SettingsDialog(QDialog):
     """The described settings, one page per section, built from the table."""
+
+    #: Emitted after the values were written — «Применить» and «ОК».
+    #: The window behind a modal dialog is blocked for input but still painted,
+    #: so this is what makes an applied change visible *there and then* (font,
+    #: line numbers, the side of the output panel) instead of after the dialog
+    #: closes.  The dialog itself knows nothing about editors: it says «written»
+    #: and whoever is interested re-reads the store.
+    changesApplied = Signal()
+
 
     def __init__(self, settings: settings_module.Settings, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -375,6 +384,9 @@ class SettingsDialog(QDialog):
         twenty-seven keys into a fresh file the user never touched, and it would
         *freeze* the one preference that follows another (the output's font size
         reads as the editor's until it is set).
+
+        `changesApplied` goes out even when nothing changed: the caller's answer
+        to it is a re-read of the store, which is cheap and always right.
         """
         changed = 0
         for setting in settings_module.SETTINGS:
@@ -388,6 +400,7 @@ class SettingsDialog(QDialog):
             self._staged = {}
         self._applied = True
         self._message(f"настройки записаны: {changed}" if changed else "ничего не изменилось")
+        self.changesApplied.emit()
 
     def _accept(self) -> None:
         self.apply()
@@ -407,6 +420,7 @@ class SettingsDialog(QDialog):
         self._fill_inserts()
         self._applied = True
         self._message("таблица вставок возвращена к встроенной")
+        self.changesApplied.emit()
 
     def export_to(self, path: str | None = None) -> bool:
         """Writes the whole configuration to a file (the current values included)."""

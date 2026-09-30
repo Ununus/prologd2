@@ -1050,11 +1050,13 @@ def test_two_font_sizes_and_one_wheel(executable: str) -> None:
 
 
 def test_the_settings_dialog_changes_the_window_without_a_restart(executable: str) -> None:
-    """What «Применить» writes shows at once: no restart, no reopening the file.
+    """«Применить» shows in the editor *while the dialog is still open*.
 
-    The dialog itself is driven the way the user drives it (widgets and buttons),
-    and only the modal `exec()` is replaced — a modal box hangs a headless run
-    instead of failing it.
+    The dialog is driven the way the user drives it (widgets and buttons), and
+    only the modal `exec()` is replaced — a modal box hangs a headless run
+    instead of failing it.  What is checked inside `drive` is the whole point of
+    the `changesApplied` signal: the window behind a modal dialog still paints,
+    so a change must arrive there without closing it.
     """
     from prologd_gui import settings as settings_module
 
@@ -1070,12 +1072,24 @@ def test_the_settings_dialog_changes_the_window_without_a_restart(executable: st
             position = widgets[settings_module.OUTPUT_POSITION]
             position.setCurrentIndex(position.findData("bottom"))
             widgets[settings_module.IMPORT_PATHS].add_path("C:/общие")
+
+            # Touching a widget changes nothing anywhere: the file is written by
+            # the buttons, not by the fields.
+            assert window.editor().font_size == 11.0, "the editor changed on its own"
+            assert window.editor().line_numbers() is True
+
             dialog.button("apply").click()
+            # ...and the dialog is still open right here.
+            assert window.editor().font_size == 14.0, "«Применить» did not reach the editor"
+            assert window.editor().line_numbers() is False
+            assert window.output().font_size == 20.0
+            assert "C:/общие" in window.session._includes
             return False  # «Применить», then «Отмена»: what was applied stays
 
         window._run_settings_dialog = drive
         assert window.show_settings() is False, "nothing was accepted by this driver"
 
+        # Everything applied before «Отмена» is still in force afterwards.
         assert window.editor().line_numbers() is False
         assert window.editor().font_size == 14.0
         assert window.editor()._current_line is False

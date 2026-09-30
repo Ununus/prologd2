@@ -2347,6 +2347,10 @@ class MainWindow(QMainWindow):
         it, and the settings are not worth breaking that rule for.
         """
         dialog = settingsdialog.SettingsDialog(self._settings, self)
+        # «Применить» must be *visible*: the window behind a modal dialog still
+        # paints, so the dialog says «written» and the window re-reads the store
+        # right then, instead of waiting for the dialog to close.
+        dialog.changesApplied.connect(self.apply_settings)
         try:
             accepted = self._run_settings_dialog(dialog)
             applied = dialog.applied()
@@ -2393,6 +2397,13 @@ class MainWindow(QMainWindow):
         self._apply_output_position(remember=False)
         self._input_pane.setVisible(self._settings.input_queue)
         appearance.apply_theme(QApplication.instance(), self._settings.theme)
+
+        # The insert table is data in the same file, and «Вернуть встроенную
+        # таблицу» in the dialog has to reach the editors of an open window too.
+        table = shortcuts.Shortcuts.from_json(self._settings.shortcuts_table)
+        self._shortcuts = table
+        for buffer in self._buffers:
+            buffer.set_shortcuts(table)
 
         # The search path and the cheap timers: `-I`, autosave, the recent list.
         self._session.set_includes(self._import_directories())

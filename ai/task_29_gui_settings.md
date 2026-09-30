@@ -150,6 +150,14 @@ that *follows* another (below) from being frozen by a no-op apply.
 * The window applies everything without a restart (`apply_settings`), and the
 menu entry is live — «Настройки…» is the last command that left the disabled
 list except «Графическое окно».
+* 2026-10-01, follow-up on the first hands-on run: **«Применить» is visible while
+the dialog is still open**.  The dialog announces what it wrote
+(`changesApplied`) and the window answers by re-reading the store — the parent of
+a modal dialog is blocked for input but keeps painting, so the change was
+otherwise only visible after closing the box, which made «Применить» and «ОК»
+look like the same button.  The same signal fixed a second gap it exposed: the
+insert table of task_31 is data in the same file, so «Вернуть встроенную
+таблицу» now reaches the editors of an open window too.
 * New keys of this round: `output/font_size` (unset = follow the editor, exactly
 as before), `output/line_limit` (applied at once: a smaller limit trims),
 `editor/completion_match_case`, `editor/current_line`,

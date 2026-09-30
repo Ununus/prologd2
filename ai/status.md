@@ -1153,3 +1153,15 @@ Added on 2026-10-02 while implementing task_31:
   need machinery that does not exist yet.  251/251 ctest, 20 GUI scripts, five
   PDFs; `gui.typ` §8 (rewritten around the dialog), §9.1 and §10, the README's
   new «Settings» section.
+* GUI round, part 36 (follow-up after the first hands-on run): **«Применить» had to
+  become visible**.  Writing the file was not enough — the window behind a modal
+  dialog is blocked for input but keeps painting, and it only re-read the settings
+  after `exec()` returned, so «Применить» and «ОК» looked like the same button.
+  The dialog now says what it did (`changesApplied`) and the window answers by
+  re-reading every value, so the editor, the output panel and the search path
+  change with the dialog still open.  The same signal closed a second gap it
+  exposed: the insert table of task_31 lives in the same file, so «Вернуть
+  встроенную таблицу» reached nothing until `apply_settings` started pushing
+  `shortcuts/table` into the open buffers.  The window test now asserts the new
+  font and the missing line numbers *inside* the dialog's own callback; 251/251
+  ctest, 20 GUI scripts, five PDFs.

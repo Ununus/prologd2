@@ -542,10 +542,13 @@ every record has a widget and every widget writes its key.
 | Файлы | autosave in minutes (0 = off), how many recent files to remember |
 | Вставки | the live `Ctrl`+key table (task_31), the settings file path, «Вернуть встроенную таблицу» |
 
-* **ОК** and **Применить** write through `Settings` and then the window re-reads
-them, so a change shows without a restart (font, line numbers, the side of the
-output panel, the search path) — and «Применить» writes only the rows that
-actually differ, so a fresh file stays fresh.  «Отмена» closes without writing.
+* **ОК** and **Применить** write through `Settings` and say so
+(`SettingsDialog.changesApplied`); the window's answer to that signal is
+`apply_settings`, which re-reads every value — so a change shows *there and then*,
+with the dialog still open (the window behind a modal dialog is blocked for
+input but keeps painting).  «Применить» writes only the rows that actually
+differ, so a fresh file stays fresh.  «Отмена» closes without writing what was
+not applied; what *was* applied stays, the way `Применить` means everywhere.
 * **Сбросить** puts the defaults into the widgets; they still have to be applied,
 so a reset can be looked at before it is kept.  It touches the preferences only —
 the recent list, the window geometry and the insert table are records the window

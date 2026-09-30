@@ -212,6 +212,37 @@ def test_the_folder_rows_and_the_insert_page(directory: pathlib.Path) -> None:
     print("ok: the folder rows work, and the insert page lists and restores the table")
 
 
+def test_applying_announces_itself(directory: pathlib.Path) -> None:
+    """`changesApplied` is what makes «Применить» visible behind the dialog.
+
+    Not every button writes: «Отмена» writes nothing, «Сбросить» only fills the
+    widgets, while «Применить», «ОК» and «Вернуть встроенную таблицу» write and
+    therefore have to say so.
+    """
+    keys = {setting.key: setting for setting in settings_module.SETTINGS}
+    seen: list[int] = []
+
+    dialog = dialog_for(directory, "signal.ini")
+    dialog.changesApplied.connect(lambda: seen.append(1))
+    dialog._widgets[keys["editor/line_numbers"].key].setChecked(False)
+    dialog.button("cancel").click()
+    assert seen == [], "«Отмена» announced a change"
+
+    dialog = dialog_for(directory, "signal.ini")
+    dialog.changesApplied.connect(lambda: seen.append(1))
+    dialog._widgets[keys["editor/line_numbers"].key].setChecked(False)
+    dialog.button("reset").click()
+    assert seen == [], "«Сбросить» wrote without being applied"
+    dialog.button("apply").click()
+    assert len(seen) == 1, seen
+    dialog.button("ok").click()
+    assert len(seen) == 2, seen
+
+    dialog.restore_shortcuts()
+    assert len(seen) == 3, seen
+    print("ok: «Применить», «ОК» and the built-in table announce themselves, «Отмена» does not")
+
+
 def main(argv: list[str]) -> int:
     try:
         from PySide6.QtWidgets import QApplication
@@ -228,6 +259,7 @@ def main(argv: list[str]) -> int:
         test_import_stages_a_file_and_carries_unknown_keys(directory)
         test_export_writes_a_file_another_store_can_read(directory)
         test_the_folder_rows_and_the_insert_page(directory)
+        test_applying_announces_itself(directory)
     del application
     print("all settings-dialog checks passed")
     return 0
