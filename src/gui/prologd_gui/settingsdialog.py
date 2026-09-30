@@ -36,7 +36,6 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
-    QDialogButtonBox,
     QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
@@ -46,6 +45,7 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QPushButton,
+    QSizePolicy,
     QSpinBox,
     QStackedWidget,
     QToolButton,
@@ -171,7 +171,14 @@ class SettingsDialog(QDialog):
     def _build(self) -> None:
         self._nav = QListWidget(self)
         self._nav.setMaximumWidth(160)
+        # Long section names elide instead of bringing in a scrollbar: a scrollbar
+        # in a six-row list of sections is noise.
+        self._nav.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._pages = QStackedWidget(self)
+        #: The pages' form layouts and the labels in them, for the one column
+        #: width they all get at the end of this method.
+        self._forms: list[QFormLayout] = []
+        self._labels: list[QLabel] = []
         for section in settings_module.SECTIONS:
             page = QWidget(self)
             form = QFormLayout(page)
@@ -181,17 +188,27 @@ class SettingsDialog(QDialog):
                 widget = self._make_widget(setting)
                 self._widgets[setting.key] = widget
                 label = QLabel(f"{setting.label}:")
+                self._labels.append(label)
                 field: QWidget = widget
                 if setting.kind == "directory":
                     field = self._with_browse(setting, widget)
+                # Every value fills its column, so the right edge of the fields is
+                # one line on the page; a checkbox stays its own size and sits at
+                # the left edge of that column, which is where it is ticked.
+                if not isinstance(widget, QCheckBox):
+                    field.setSizePolicy(
+                        QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+                    )
                 for view in (label, field):
                     if setting.hint:
                         view.setToolTip(setting.hint)
                 form.addRow(label, field)
             form.addRow(QWidget())  # a stretch row: the rows stay at the top
+            self._forms.append(form)
             self._sections[section] = self._pages.addWidget(page)
             self._nav.addItem(section)
         self._build_inserts_page()
+        self._align_columns()
         self._nav.currentRowChanged.connect(self._pages.setCurrentIndex)
         self._nav.setCurrentRow(0)
 
@@ -208,6 +225,30 @@ class SettingsDialog(QDialog):
         body.addLayout(row, 1)
         body.addWidget(self._message_label)
         body.addWidget(self._build_buttons())
+
+    def _align_columns(self) -> None:
+        """One label width for every page.
+
+        A `QFormLayout` sizes its first column to the longest label *on that
+        page*, so the fields started at a different x on every section and the
+        page shifted sideways when the user walked through them.  A fixed width —
+        the widest label of the whole dialog — puts every page on the same grid;
+        the labels are right-aligned, so what the eye compares (the colon column
+        and the left edge of the fields) is in the same place everywhere.
+
+        `QFormLayout` has no column width to set in PySide6 (`setColumnMinimumWidth`
+        belongs to the grid and box layouts), and a fixed label is what actually
+        makes the column the same width wherever it is used.
+        """
+        self._label_column = max(
+            (label.sizeHint().width() for label in self._labels), default=0
+        )
+        for label in self._labels:
+            label.setFixedWidth(self._label_column)
+
+    def label_column_width(self) -> int:
+        """The width every page's label column has (what `_align_columns` set)."""
+        return self._label_column
 
     def _rows(self, section: str) -> list[settings_module.Setting]:
         return [entry for entry in settings_module.SETTINGS if entry.section == section]
@@ -287,21 +328,49 @@ class SettingsDialog(QDialog):
         self._sections[INSERTS_PAGE] = self._pages.addWidget(page)
         self._nav.addItem(INSERTS_PAGE)
 
-    def _build_buttons(self) -> QDialogButtonBox:
-        self._box = QDialogButtonBox(self)
-        ok = self._box.addButton(QDialogButtonBox.StandardButton.Ok)
-        apply_button = self._box.addButton(QDialogButtonBox.StandardButton.Apply)
-        cancel = self._box.addButton(QDialogButtonBox.StandardButton.Cancel)
-        reset = self._box.addButton("Сбросить", QDialogButtonBox.ButtonRole.ResetRole)
-        import_button = self._box.addButton("Импорт…", QDialogButtonBox.ButtonRole.ActionRole)
-        export_button = self._box.addButton("Экспорт…", QDialogButtonBox.ButtonRole.ActionRole)
-        export_button.setToolTip("Выгрузить настройки в файл (текущие значения применяются)")
+    def _build_buttons(self) -> QWidget:
+        """The buttons, in the order the user asked for.
+
+        A `QDialogButtonBox` lays its buttons out by *role* and by the current
+        style, so the order cannot be chosen with it — and the order matters
+        here: «Сбросить», «Импорт…» and «Экспорт…» act on the whole file and
+        belong on the left, while «ОК», «Отмена» and «Применить» close or end
+        the dialog and belong on the right, where every other window has them.
+        """
+        def make(title: str, tooltip: str = "") -> QPushButton:
+            button = QPushButton(title, self)
+            if tooltip:
+                button.setToolTip(tooltip)
+            return button
+
+        ok = make("ОК")
+        cancel = make("Отмена")
+        apply_button = make("Применить")
+        reset = make("Сбросить", "Вернуть значения по умолчанию")
+        import_button = make("Импорт…", "Прочитать настройки из файла")
+        export_button = make(
+            "Экспорт…", "Выгрузить настройки в файл (текущие значения применяются)"
+        )
         ok.clicked.connect(self._accept)
         apply_button.clicked.connect(self.apply)
         cancel.clicked.connect(self.reject)
         reset.clicked.connect(self.reset)
         import_button.clicked.connect(lambda: self.import_from())
         export_button.clicked.connect(lambda: self.export_to())
+        # `ОК` answers Enter and the dialog's `default` button is what the focus
+        # lands on when the dialog opens.
+        ok.setDefault(True)
+        ok.setAutoDefault(True)
+
+        row = QWidget(self)
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(0, 0, 0, 0)
+        for button in (reset, import_button, export_button):
+            layout.addWidget(button)
+        layout.addStretch(1)
+        for button in (ok, cancel, apply_button):
+            layout.addWidget(button)
+        self._buttons_row = row
         self._buttons = {
             "ok": ok,
             "apply": apply_button,
@@ -310,7 +379,20 @@ class SettingsDialog(QDialog):
             "import": import_button,
             "export": export_button,
         }
-        return self._box
+        return row
+
+    def button_order(self) -> list[str]:
+        """The buttons left to right, by name (what a test compares).
+
+        Read from the *layout*, not from `x()`: a widget that has not been shown
+        yet has no geometry, and a test must not depend on the window manager
+        having laid the dialog out already.
+        """
+        layout = self._buttons_row.layout()
+        return [
+            name
+            for name, _ in sorted(self._buttons.items(), key=lambda item: layout.indexOf(item[1]))
+        ]
 
     # -- what the widgets hold ---------------------------------------------
     def widgets(self) -> dict[str, QWidget]:

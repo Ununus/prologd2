@@ -549,6 +549,15 @@ with the dialog still open (the window behind a modal dialog is blocked for
 input but keeps painting).  «Применить» writes only the rows that actually
 differ, so a fresh file stays fresh.  «Отмена» closes without writing what was
 not applied; what *was* applied stays, the way `Применить` means everywhere.
+* The button row is built by hand, not by a `QDialogButtonBox`: that one lays its
+buttons out by *role* and by the current style, and here the order is a decision —
+«Сбросить», «Импорт…», «Экспорт…» on the left (they act on the whole file),
+«ОК», «Отмена», «Применить» on the right (they end or keep the dialog).
+* The pages share **one label column**: a `QFormLayout` sizes that column to the
+longest label *on its own page*, so the fields used to start at a different x on
+every section.  Every label is given the width of the widest one in the dialog
+(`QFormLayout` has no column width to set in PySide6) and every value fills its
+column, so the two columns line up wherever the user looks.
 * **Сбросить** puts the defaults into the widgets; they still have to be applied,
 so a reset can be looked at before it is kept.  It touches the preferences only —
 the recent list, the window geometry and the insert table are records the window

@@ -1165,3 +1165,13 @@ Added on 2026-10-02 while implementing task_31:
   `shortcuts/table` into the open buffers.  The window test now asserts the new
   font and the missing line numbers *inside* the dialog's own callback; 251/251
   ctest, 20 GUI scripts, five PDFs.
+* GUI round, part 36 (second follow-up): **the dialog's layout**.  The buttons are
+  built by hand now — «Сбросить», «Импорт…», «Экспорт…» on the left, «ОК»,
+  «Отмена», «Применить» on the right — because a `QDialogButtonBox` orders its
+  buttons by role and by the current style, which cannot express a decision.  And
+  the pages share one label column: a `QFormLayout` sizes that column to the
+  longest label *on its own page*, so the fields jumped sideways when the section
+  changed; every label now takes the width of the widest one in the dialog
+  (PySide6's `QFormLayout` has no column width to set) and the values fill their
+  column.  251/251 ctest, 20 GUI scripts, five PDFs; both are pinned by
+  `button_order()` and `label_column_width()` in `test_settingsdialog.py`.

@@ -243,6 +243,34 @@ def test_applying_announces_itself(directory: pathlib.Path) -> None:
     print("ok: «Применить», «ОК» and the built-in table announce themselves, «Отмена» does not")
 
 
+def test_the_button_row_and_the_shared_label_column(directory: pathlib.Path) -> None:
+    """Where the buttons sit, and that the fields line up on every page.
+
+    Both were asked for after the first hands-on run: the file's own buttons
+    («Сбросить», «Импорт…», «Экспорт…») on the left and the ones that end the
+    dialog («ОК», «Отмена», «Применить») on the right, and one label-column width
+    for the whole dialog — a `QFormLayout` sizes that column to the longest label
+    *on its own page*, so the fields used to jump sideways when the section
+    changed.
+    """
+    dialog = dialog_for(directory, "layout.ini")
+    assert dialog.button_order() == ["reset", "import", "export", "ok", "cancel", "apply"]
+
+    width = dialog.label_column_width()
+    assert width > 0, "the column width was never computed"
+    widest = max(label.sizeHint().width() for label in dialog._labels)
+    assert width >= widest, (width, widest)
+    for label in dialog._labels:
+        assert label.minimumWidth() == width and label.maximumWidth() == width, (
+            label.text(),
+            label.minimumWidth(),
+        )
+
+    labels = [label.text() for label in dialog._labels]
+    assert "Шрифт:" in labels and "Рабочая папка (ИМПОРТ):" in labels, labels[:4]
+    print(f"ok: the buttons are ordered as asked, and every page's labels take {width} px")
+
+
 def main(argv: list[str]) -> int:
     try:
         from PySide6.QtWidgets import QApplication
@@ -259,6 +287,7 @@ def main(argv: list[str]) -> int:
         test_import_stages_a_file_and_carries_unknown_keys(directory)
         test_export_writes_a_file_another_store_can_read(directory)
         test_the_folder_rows_and_the_insert_page(directory)
+        test_the_button_row_and_the_shared_label_column(directory)
         test_applying_announces_itself(directory)
     del application
     print("all settings-dialog checks passed")

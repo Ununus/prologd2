@@ -158,6 +158,15 @@ otherwise only visible after closing the box, which made «Применить» 
 look like the same button.  The same signal fixed a second gap it exposed: the
 insert table of task_31 is data in the same file, so «Вернуть встроенную
 таблицу» now reaches the editors of an open window too.
+* 2026-10-01, same run, the layout: the buttons are built by hand in the order
+«Сбросить», «Импорт…», «Экспорт…» | «ОК», «Отмена», «Применить» — a
+`QDialogButtonBox` orders its buttons by role and by the style, which cannot
+express that.  Every page also shares one label column now: a `QFormLayout`
+sizes its first column to the longest label *on its own page*, so the fields
+started at a different x on every section; the labels get the width of the widest
+one in the dialog (PySide6's `QFormLayout` has no column width to set) and the
+values fill their column.  Both are checked in `test_settingsdialog.py`
+(`button_order`, `label_column_width`).
 * New keys of this round: `output/font_size` (unset = follow the editor, exactly
 as before), `output/line_limit` (applied at once: a smaller limit trims),
 `editor/completion_match_case`, `editor/current_line`,
