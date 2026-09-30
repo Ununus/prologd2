@@ -78,6 +78,77 @@ TEST_CASE("a disjunction leaves only the first solution of the first goal") {
   REQUIRE(generator.output == "X=1\n");
 }
 
+TEST_CASE("a disjunction tries both branches and yields all their solutions") {
+  // `;` is the backtrackable disjunction (task_41), unlike `ИЛИ/2`, which
+  // commits to the first solution of its first goal.
+  const auto result = runProgram(
+      "a(1).\n"
+      "a(2).\n"
+      "b(3).\n"
+      "?a(X) ; b(X).\n");
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "X=1\nX=2\nX=3\n");
+
+  // The right branch is entered only after the whole left one.
+  const auto two = runProgram("?РАВНО(X, 1) ; РАВНО(X, 2).\n");
+  REQUIRE(two.loaded);
+  REQUIRE(two.output == "X=1\nX=2\n");
+
+  // Both branches failing is a plain failure.
+  const auto none = runProgram("?ЛОЖЬ ; ЛОЖЬ.\n");
+  REQUIRE(none.loaded);
+  REQUIRE(none.output == "НЕТ\n");
+}
+
+TEST_CASE("a disjunction is a goal in a rule, under negation, call and findall") {
+  const auto rule = runProgram(
+      "a(1).\n"
+      "a(2).\n"
+      "b(3).\n"
+      "p(X) :- a(X) ; b(X).\n"
+      "?p(X).\n");
+  REQUIRE(rule.loaded);
+  REQUIRE(rule.output == "X=1\nX=2\nX=3\n");
+
+  const auto negation =
+      runProgram("?НЕ((ЛОЖЬ ; ЛОЖЬ)).\n?НЕ((ЛОЖЬ ; РАВНО(X, 1))).\n");
+  REQUIRE(negation.loaded);
+  REQUIRE(negation.output == "ДА\nНЕТ\n");
+
+  const auto meta = runProgram("?ВЫП((РАВНО(X, 1) ; РАВНО(X, 2))).\n");
+  REQUIRE(meta.loaded);
+  REQUIRE(meta.output == "X=1\nX=2\n");
+
+  const auto findall = runProgram("?НАЙТИВСЁ(X, (РАВНО(X, 1) ; РАВНО(X, 2)), L).\n");
+  REQUIRE(findall.loaded);
+  REQUIRE(findall.output == "X=_1\nL=[1,2]\n");
+}
+
+TEST_CASE("the comma binds tighter than the disjunction") {
+  const auto left = runProgram("?РАВНО(X, 1), ЛОЖЬ ; РАВНО(X, 2).\n");
+  REQUIRE(left.loaded);
+  REQUIRE(left.output == "X=2\n");
+
+  const auto both = runProgram(
+      "?РАВНО(X, 1), РАВНО(Y, 1) ; РАВНО(X, 2), РАВНО(Y, 2).\n");
+  REQUIRE(both.loaded);
+  REQUIRE(both.output == "X=1\nY=1\nX=2\nY=2\n");
+}
+
+TEST_CASE("a cut inside a branch is local to that branch") {
+  // The branch runs in a frame of its own whose cut barrier sits above the
+  // alternative, so `!` prunes what the branch created and leaves the other one
+  // alone — the ISO rule, and the reason `ИЛИ/2` is kept for the committed
+  // form.
+  const auto after = runProgram("?РАВНО(X, 1), ! ; РАВНО(X, 2).\n");
+  REQUIRE(after.loaded);
+  REQUIRE(after.output == "X=1\nX=2\n");
+
+  const auto first = runProgram("?!, ЛОЖЬ ; РАВНО(X, 1).\n");
+  REQUIRE(first.loaded);
+  REQUIRE(first.output == "X=1\n");
+}
+
 TEST_CASE("a disjunction answers a goal that is not a predicate with an error") {
   for (const std::string& goal : {"ИЛИ(5, НЕ(ЛОЖЬ))", "ИЛИ(ЛОЖЬ, 5)", "ИЛИ(X, НЕ(ЛОЖЬ))"}) {
     const auto result = runProgram("? " + goal + ".\n");

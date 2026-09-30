@@ -9,7 +9,7 @@ session.
   started (protocol + skeleton).
 * Build: the `windows-msvc` preset (Visual Studio 18 2026, MSVC 19.51) build is
   green locally; the Linux presets, including `-Werror`, build cleanly.
-* Tests: 211/211 pass in about four seconds: 198 Catch2 cases plus 13 command-line
+* Tests: 219/219 pass in about four seconds: 206 Catch2 cases plus 13 command-line
   and integration tests (seven option tests, two `--list-keywords` tests, the
   import-search report, the JSON protocol session, the engine-limit cases and the
   diagnostics cases).
@@ -107,7 +107,7 @@ session.
 | task_38_engine_limits | done | recursion depth and long runs: the crash is gone (the chain and deep terms are released iteratively — the trigger was a *surviving* deep reference, a choice point whose base clause does not cut, or the solver's final environment), `maxDepth` turns runaway recursion into a diagnostic, the variable growth is documented instead of "fixed", and `tools/bench_engine.py` made the numbers reproducible |
 | task_39_english_aliases | done | every built-in has an English spelling in lower case (one `kEnglishNames` table in `builtins.cpp`, 47 pairs, is the only place a pair is written; `test_aliases.cpp` walks it and fails on a Russian name without a row); the manual gained appendix 17 with the whole table, `prologd-diff.typ` §15 and `conventions.md` the rule; doing it showed that `int`/`float` were *checks*, not conversions (`integer`/`float` are the ISO type tests, `is_whole`/`is_number` the old ones, and the planned `to_int`/`to_float` were dropped) and `ДЛИНА` became `strlen`; 108 reserved names, one list for CLI, protocol and GUI; renamed on review: `number` → `is_number`, `num_to_float` → `int_to_float` |
 | task_40_diagnostics | done | severity (an error stops a load or a query and keeps exit codes 2/3; a warning never changes either, and `--no-warnings` drops them) with `severity` on the wire (protocol 4) and amber warnings counted in the GUI; positions name what to fix (the opening bracket and its line, the end of a clause without its dot, the goal); a reserved name with an arity that exists nowhere is an error, an undefined predicate or a missing arity is a warning with a suggestion; singleton variables with separate advice for facts, rules and bodies |
-| task_41_semicolon_disjunction | approved | `;` as a real backtrackable disjunction (ISO precedence with `,`), the `;` sentence terminator retired with a diagnostic, `ИЛИ/2` left as the committed form and cross-referenced; the user gave the go-ahead on 2026-09-30, work not started |
+| task_41_semicolon_disjunction | done | `;` is the backtrackable disjunction of ISO, `,` binds tighter, and a branch runs in a frame whose cut barrier sits above the alternative (a cut in a branch is local to it; `ИЛИ/2` stays the committed form, and lesson 4 shows both side by side); the sentence terminator is the dot alone, and a `;` written as one is an error that says what changed; `examples/factorial.pld` was the only file to convert; parse shapes, solver semantics and diagnostics are all pinned |
 | task_42_engine_hot_path | not started | the constant tax: no string per built-in call, no `"name/arity"` key per predicate call, clause indexing and atom interning only where the benchmark justifies them |
 | task_43_language_surface | not started | `ВЫП/2..N` (`call/N`), a warning when two imported files define the same predicate, and the removal of the seven library clauses that every built-in already shadows (`?СКОЛЬКО(НЕ, А)` answers 2 today) |
 
@@ -832,3 +832,20 @@ Resolved on 2026-09-29 (GUI planning):
   `drawing.pld`, lessons 6 and 7 and monk/monkd were found and fixed.  198 Catch2
   cases (3 182 assertions), 211 ctest tests, all green; the course is silent
   except the debug appendix, which shows the unknown-name warning on purpose.
+- **2026-09-30 — task_41: `;` is a disjunction.**  The sentence terminator is now
+  the dot alone; `;` between goals is the backtrackable disjunction of ISO, with
+  `,` binding tighter (`A, B ; C, D` is `(A, B) ; (C, D)`).  The solver expands a
+  `;`/2 goal in place and pushes the right operand as an alternative choice point
+  (`ChoicePoint::Kind::Alternative`), and a branch runs in a frame whose cut
+  barrier sits above the alternative — a cut inside a branch prunes only what the
+  branch created, which is the ISO rule and the reason `ИЛИ/2` stays the
+  committed form.  Lesson 4's section about `ИЛИ` became «Дизъюнкция: точка с
+  запятой и ИЛИ» and shows the two answers of `;` beside the single answer of
+  `ИЛИ`.  A `;` where the dialect used to end a sentence is an error with the
+  position of the `;` and a message that says what changed («;» — дизъюнкция;
+  предложение не заканчивается точкой), while a `;` in a list or in an
+  unparenthesised argument list has a message of its own.  `examples/factorial.pld`
+  — the only file in the repository that used the old terminator — was converted;
+  `help.typ` §1.1, the new §4.5 (§4.6/§4.7 renumbered), `prologd-diff.typ` §16
+  with a row in its summary table, and `ai/porting_notes.md` follow.  206 Catch2
+  cases (3 247 assertions), 219 ctest tests, all green.

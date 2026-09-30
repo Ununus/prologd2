@@ -179,3 +179,28 @@ TEST_CASE("a program that defines what it calls is silent") {
       "?ТИХО, чёт(2).\n");
   REQUIRE(diagnostics.empty());
 }
+
+TEST_CASE("both branches of a disjunction are checked") {
+  const std::vector<PrologError> diagnostics =
+      diagnosticsOf("член(а, [а]).\n?(член(а, [а]) ; члеен(а, [а])).\n");
+  const std::vector<const PrologError*> warnings =
+      withSeverity(diagnostics, Severity::Warning);
+  REQUIRE(warnings.size() == 1);
+  REQUIRE(warnings.front()->message == "не найдено: члеен/2; возможно, член/2");
+  REQUIRE(warnings.front()->location.line == 2);
+}
+
+TEST_CASE("a `;` where a sentence ends says what changed") {
+  // The terminator of the original dialect, retired by task_41: the position is
+  // the `;` itself, and the message names the new meaning.
+  const std::vector<PrologError> diagnostics = diagnosticsOf("прим(1);\n");
+  REQUIRE(diagnostics.size() == 1);
+  const PrologError& error = diagnostics.front();
+  REQUIRE(error.severity == Severity::Error);
+  REQUIRE(error.code == ErrorCode::InvalidSentence);
+  REQUIRE(error.location.line == 1);
+  // Byte columns: `прим` is four letters of two bytes each, so the `;` sits in
+  // the twelfth column.
+  REQUIRE(error.location.column == 12);
+  REQUIRE(error.message == "«;» — дизъюнкция; предложение не заканчивается точкой");
+}

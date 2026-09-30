@@ -169,6 +169,11 @@ void walkGoal(const Term& goal, const SourceLocation& location,
     walkGoal(args[1], location, visit);
     return;
   }
+  if (name == ";" && arity == 2) {
+    walkGoal(args[0], location, visit);
+    walkGoal(args[1], location, visit);
+    return;
+  }
   if ((name == "ВЫП" || name == "call") && arity == 1) {
     walkGoal(args[0], location, visit);
     visit(name, 1, location);

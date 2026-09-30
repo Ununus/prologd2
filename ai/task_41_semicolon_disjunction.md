@@ -1,7 +1,6 @@
 # task_41 — `;` as disjunction
 
-**Status:** approved by the user on 2026-09-30 (asked whether `;` could be a
-disjunction, answered yes) — not started
+**Status:** done (2026-09-30)
 **Depends on:** task_40 (the diagnostic for a `;` written as a sentence
 terminator is what makes the change safe to land)
 **Milestone:** M14
@@ -58,31 +57,36 @@ second *sentence terminator* (`.`, `;`), inherited from the original PrologD.
 
 ## Deliverables
 
-- [ ] Parser: the `;` level, with the same `InvalidGoal` checks the conjunction
+- [x] Parser: the `;` level, with the same `InvalidGoal` checks the conjunction
       has; `(A ; B)` inside argument lists stays what it is today (an error, as
       in ISO).
-- [ ] Solver: the alternative choice point, with cut-barrier semantics and the
+- [x] Solver: the alternative choice point, with cut-barrier semantics and the
       step/trace hooks firing for both branches (`step(Redo, …)` on the second).
-- [ ] `examples/factorial.pld`: terminators changed to `.`; `ai/porting_notes.md`
+- [x] `examples/factorial.pld`: terminators changed to `.`; `ai/porting_notes.md`
       records it; `doc/prologd-diff.typ` gets the entry with a before/after
       example.
-- [ ] `doc/help.typ`: §1.1 rewritten (the terminator is `.`), a new §4.x for `;`
+- [x] `doc/help.typ`: §1.1 rewritten (the terminator is `.`), a new §4.x for `;`
       with the precedence, three examples (both branches, all solutions, a cut
       inside a branch), and the cross-reference from §4.5.
-- [ ] `ai/conventions.md` if any style follows from it (nothing expected).
-- [ ] Tests: `src/tests/test_parser.cpp` — `a ; b`, `a, b ; c`, `a ; b, c`,
+- [x] `ai/conventions.md` if any style follows from it (nothing expected —
+      nothing followed).
+- [x] Tests: `src/tests/test_parser.cpp` — `a ; b`, `a, b ; c`, `a ; b, c`,
       `(a ; b), c`, a `;` inside a list (an error), a `;` at the end of a clause
       (the diagnostic from task_40); `src/tests/test_engine.cpp` — all solutions
       of both branches in order, failure of both branches, backtracking *into*
       the second branch, a `!` inside one branch not cutting the other, `;`
       under `НЕ` and inside `ВЫП`, and the whole thing through a lesson-style
-      query with `%!` expectations.
-- [ ] The GUI needs nothing: `;` is a token it already highlights, and the
+      query with `%!` expectations.  (The solver cases live in
+      `test_builtins_control.cpp`, next to the `ИЛИ` ones, and the two
+      diagnostics in `test_diagnostics.cpp`.)
+- [x] The GUI needs nothing: `;` is a token it already highlights, and the
       lexer's token kind does not change.
-- [ ] If the user wants a *runnable* demonstration in the course: a short section
+- [x] If the user wants a *runnable* demonstration in the course: a short section
       in an existing lesson (5, lists, or 4, control) rather than a new lesson —
       the course's numbering and the check's list are stable, and adding a query
-      to a lesson is a one-line change plus its `%!` lines.
+      to a lesson is a one-line change plus its `%!` lines.  (Lesson 4's section
+      on `ИЛИ` became «Дизъюнкция: точка с запятой и ИЛИ» and shows the two
+      answers of `;` beside the one answer of `ИЛИ`.)
 
 ## Acceptance criteria
 
@@ -104,3 +108,35 @@ second *sentence terminator* (`.`, `;`), inherited from the original PrologD.
   already distinguish the two with `EnvNode::goalFrame`).
 * Out of scope: `->` (if-then-else) and `*->`.  `ИЛИ/2` covers the committed
   form, and a second operator would need its own decision.
+
+## Result
+
+The syntax change landed as planned, with one deviation and two notes.
+
+* The parser gained a `;` level that swallows the conjunction collected so far
+  (`A, B ; C ; D` builds a left-nested `;`/2), and the parenthesised group now
+  parses `(A ; B)` the way it already parsed `(A, B)`.  **Deviation:** the plan
+  said a `;` inside an argument list stays an error; a *parenthesised*
+  `(A ; B)` is allowed there after all, because `ВЫП` and `НАЙТИВСЁ` take their
+  goals as arguments and the parser cannot tell a goal argument from data — the
+  same line `,`/2 already crosses.  A bare `;` in an argument list is still an
+  error, with its own message (`заключите её в скобки: (A ; B)`), as is a `;`
+  inside a list (`элементы списка разделяются запятой`).
+* The solver expands `;`/2 in place and pushes the right operand as an
+  `Alternative` choice point (the struct gained a `Kind`).  A branch runs in a
+  frame of its own whose cut barrier sits *above* the alternative, so a cut in a
+  branch prunes only what the branch created, and `step(Redo, …)` fires when the
+  right branch is entered.
+* A `;` where the dialect used to end a sentence is an error with the message
+  from task_40's machinery, at the `;` itself.
+* `examples/factorial.pld` was the only file in the repository that used the old
+  terminator; it now ends its three statements with `.`.
+* `doc/help.typ` §1.1, a new §4.5 (`;`) with §4.6/§4.7 renumbered, §4.6's own
+  text now calling `ИЛИ` the «если-то» form, lesson 4's section 5 rewritten
+  around both forms, `doc/prologd-diff.typ` §16 and the summary table, and
+  `ai/porting_notes.md`.
+* Tests: six parse shapes, the solver's semantics (both branches and all their
+  solutions, the right branch entered only after the left one, both failing,
+  the local cut, `;` under `НЕ`, `ВЫП` and `НАЙТИВСЁ`, the comma precedence) and
+  two diagnostics (the retired terminator with its position, both branches of a
+  disjunction checked for undefined predicates).

@@ -84,6 +84,10 @@ EnvRef advanceEnv(const EnvRef& env) {
 }
 
 struct ChoicePoint {
+  /// What the alternative is: the next clause of a predicate, or the right
+  /// operand of a disjunction (where `clauses` is unused).
+  enum class Kind { Clause, Alternative };
+  Kind kind = Kind::Clause;
   Database::ClauseListPtr clauses;
   std::size_t next = 0;
   std::size_t goal_index = 0;
@@ -279,6 +283,18 @@ bool Solver::backtrack() {
     ChoicePoint cp = std::move(cps_.back());
     cps_.pop_back();
     engine_.bindings().unwind(cp.trail_mark);
+    if (cp.kind == ChoicePoint::Kind::Alternative) {
+      // The right branch of a disjunction: the continuation is the goal that
+      // follows the `;` goal, and the cut barrier sits where the alternative was,
+      // so a cut inside this branch prunes only what the branch itself creates.
+      setEnv(advanceEnv(cp.env));
+      if (engine_.traceEnabled()) {
+        traceText("Переделка. Цель " + engine_.format(cp.goal));
+      }
+      step(StepAction::Redo, &cp.goal, env_->location, env_->depth);
+      pushMeta(cp.goal.compound->args[1], cps_.size());
+      return true;
+    }
     setEnv(cp.env);
     if (engine_.traceEnabled()) {
       traceText("Переделка. Цель " + engine_.format(cp.goal));
@@ -319,6 +335,24 @@ bool Solver::resolveGoal(const Term& goal) {
     goals[index] = goal.compound->args[0];
     goals.insert(goals.begin() + static_cast<std::ptrdiff_t>(index) + 1,
                  goal.compound->args[1]);
+    return true;
+  }
+  if (name == ";" && arity == 2) {
+    // A disjunction: the right operand becomes an alternative, and the left one
+    // runs in a frame of its own.  That frame's cut barrier sits *above* the
+    // alternative, so a cut inside a branch prunes what the branch itself
+    // created and leaves the other branch alone (the ISO rule: a cut in a
+    // disjunct is local to that disjunct).
+    ChoicePoint cp;
+    cp.kind = ChoicePoint::Kind::Alternative;
+    cp.goal = goal;
+    cp.trail_mark = engine_.bindings().trailMark();
+    cp.barrier = cps_.size();
+    cp.env = env_;
+    cps_.push_back(std::move(cp));
+    const std::size_t barrier = cps_.size();
+    setEnv(advanceEnv(env_));
+    pushMeta(goal.compound->args[0], barrier);
     return true;
   }
   if ((name == "ВЫП" || name == "call") && arity == 1) {
