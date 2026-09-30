@@ -132,7 +132,9 @@ Removed from PrologD:
 | M8 | Documentation | 18 |
 | M9 | Examples port and typical-task tests | 19 |
 | M10 | Windows portability and CI | 20 |
-| M11 | GUI front-end (PySide6) | 21–32 |
+| M11 | GUI front-end (PySide6) | 21–33 |
+| M12 | Built-in coverage and the lesson course | 34, 35 |
+| M13 | Editor aids: run one query, look one up | 36, 37 |
 
 ## 6. Risks and mitigations
 

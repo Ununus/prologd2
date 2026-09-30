@@ -9,7 +9,7 @@ session.
   started (protocol + skeleton).
 * Build: the `windows-msvc` preset (Visual Studio 18 2026, MSVC 19.51) build is
   green locally; the Linux presets, including `-Werror`, build cleanly.
-* Tests: 197/197 pass in about two seconds: 186 Catch2 cases plus 11 command-line
+* Tests: 193/193 pass in about two seconds: 182 Catch2 cases plus 11 command-line
   and integration tests (seven option tests, two `--list-keywords` tests, the
   import-search report and the JSON protocol session).
 * CLI: `build/windows-msvc/src/cli/Release/prologd` runs files (positional, `-s`
@@ -101,10 +101,12 @@ session.
 | task_33_gui_search_replace | done | `search.py` (plain-text, Qt-free) + the find bar: question from the selection or the word at the caret, `F3`/`Shift+F3` with the wrap reported, three switches, «Заменить всё» as one undo step, the matches lit in every view; `test_search.py` has 16 checks |
 | task_34_builtin_branches | done | every built-in branch-tested in Catch2 (186 cases); the sweep found and fixed five defects: two in the float built-ins (`nan` instead of a failure), the integer/real comparison, the cyclic term that ended the process, the ignored read prompt, the unchecked graphics arguments and the code points that were written as invalid UTF-8 |
 | task_35_lessons_rework | done | the course in `examples/lessons` is rewritten for the current dialect, one commit per lesson, from the plan in `ai/task_35_lessons_rework.md`; `test_lessons.cpp` runs every lesson (12 + the debug appendix) and compares its whole output with the `%!` lines the lesson itself carries, so a lesson cannot drift again; the old files are in `lessons/_old/`; the index is `examples/lessons/README.md` and the fifth Typst document `doc/lessons.typ` (the `docs` target builds it); writing the expectations found and fixed mistakes in the source material (a non-terminating `нод/3`, descending sorts, a hanging `?длина(Х, 2)`, a failed read that leaves the rest of its line) and taught the check two tricks: input files for lesson 7 and include paths for lesson 11 |
+| task_36_gui_query_markers | not started | run one question from the editor margin: a marker next to `?Goal.` and `% ?Goal.`, the `%?` colour, and a `questions: false` load so the clicked query answers *alone*; the task file carries the rule for what counts as a statement (a lesson's commented query often has prose after the goal) and the finding that no lesson file has to change |
+| task_37_gui_builtin_reference | not started | `doc/builtins.json` as the one machine-readable source for the built-in reference, a checker keeping it in step with `--list-keywords` and the sections of `help.typ`, a summary line under the completion popup and `Shift+F1` on the word under the caret (the English-alias work of `ai/maybe/english_aliases.md` would land in the same file) |
 
 ## Test suite
 
-197 tests, about two seconds: 186 Catch2 cases plus 11 command-line and
+193 tests, about two seconds: 182 Catch2 cases plus 11 command-line and
 integration tests (seven option tests, two `--list-keywords` tests, the
 import-search report and the JSON protocol session). Groups:
 BigInt, lexer, keywords, parser, unification, engine, every built-in group,
@@ -685,3 +687,34 @@ Resolved on 2026-09-29 (GUI planning):
   (`examples/lessons/README.md`) and its place in the documentation
   (`doc/lessons.typ`, built by the `docs` target).  181 Catch2 cases, 2761
   assertions, 192 ctest tests, all green.
+* Lessons session, part 3: the diamond `ИМПОРТ` example and the look of the
+  documentation.  `examples/diamond/` shows a module reachable by three paths
+  (`main` → `left`/`right` → `base`, plus a direct import) and proves it is loaded
+  once — the shared predicate still has two clauses, not four.  It is pinned by
+  `test_module_loader.cpp`, and lesson 11, the course index, `doc/lessons.typ`,
+  `doc/help.typ` §8 and `import_demo.pld` all point at it.  The five Typst
+  documents then got one shared look for listings (`doc/style.typ`): a fenced
+  block becomes a panel whose left bar says what it is (prolog, cpp, shell
+  commands, untagged text), picked up with `#import "style.typ": apply` and
+  `#show: apply` — not `#include`, where the rules never reach the document.  Two
+  real defects were fixed on the way: `**bold**` in `gui.typ` was a Markdown habit
+  that Typst reads as an empty emphasis plus italics, and `lessons.typ` carried a
+  «нужно знать» column that only repeated the order of the lessons.  182 Catch2
+  cases, 2769 assertions, 193 ctest tests, all green.
+* Planning round, part 24: three requests from the user were answered as analysis
+  rather than code.  (1) English aliases for the built-ins: the mechanism is cheap
+  (one registration call site, plus the lexer's reserved set, and the tests already
+  enforce that the two agree) but the naming is not — `ДЛИНА` is a *string* length
+  where ISO `length/2` is a list, `int`/`float` are already the conversions where
+  ISO spells the *tests* that way, and a built-in shadows a user clause of the same
+  name (`engine.cpp:282`).  The user's decision is that backward compatibility is
+  not a blocker here, so the idea is parked with a full draft mapping in
+  `ai/maybe/english_aliases.md`.  (2) A marker in the editor margin that runs one
+  question, and (3) a built-in reference inside the window, are written up as
+  `ai/task_36_gui_query_markers.md` and `ai/task_37_gui_builtin_reference.md`.
+  Two findings from the analysis are already worth their lines: `%?` needs no
+  lesson rewrite at all (a comment is ignored by the interpreter and
+  `test_lessons.cpp` compares only the `%!` lines, so the thirteen commented
+  queries become clickable as they are), and a single query needs the load to be
+  *quiet* — `questions: false`, or the clicked answer arrives after the whole
+  lesson's output; the seam is `ModuleLoader::setQueryRunner`.
