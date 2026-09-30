@@ -95,10 +95,16 @@ TEST_CASE("keyword arities come from the dispatch table") {
   REQUIRE(output->variadic);
   REQUIRE(output->arities.empty());
 
-  // A latin name that is both a type word and a unary predicate.
-  const prologd::KeywordInfo* toInt = findKeyword(keywords, "int");
-  REQUIRE(toInt != nullptr);
-  REQUIRE(toInt->arities == std::vector<std::size_t>{1});
+  // A latin name that is both a type word and a unary predicate.  The dialect
+  // has two such checks: `integer` is the strict type test (a whole-valued real
+  // is not an integer), `is_whole` asks whether a value *can* be taken as one.
+  const prologd::KeywordInfo* integer = findKeyword(keywords, "integer");
+  REQUIRE(integer != nullptr);
+  REQUIRE(integer->arities == std::vector<std::size_t>{1});
+
+  const prologd::KeywordInfo* isWhole = findKeyword(keywords, "is_whole");
+  REQUIRE(isWhole != nullptr);
+  REQUIRE(isWhole->arities == std::vector<std::size_t>{1});
 
   const prologd::KeywordInfo* modulus = findKeyword(keywords, "mod");
   REQUIRE(modulus != nullptr);

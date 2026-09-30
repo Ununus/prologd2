@@ -9,7 +9,7 @@ session.
   started (protocol + skeleton).
 * Build: the `windows-msvc` preset (Visual Studio 18 2026, MSVC 19.51) build is
   green locally; the Linux presets, including `-Werror`, build cleanly.
-* Tests: 195/195 pass in about four seconds: 183 Catch2 cases plus 12 command-line
+* Tests: 199/199 pass in about four seconds: 187 Catch2 cases plus 12 command-line
   and integration tests (seven option tests, two `--list-keywords` tests, the
   import-search report, the JSON protocol session and the engine-limit cases).
 * CLI: `build/windows-msvc/src/cli/Release/prologd` runs files (positional, `-s`
@@ -35,9 +35,10 @@ session.
   points, standard cut, transparent `ВЫП/1`, `НЕ/1`, `ИЛИ/2`, `РАВНО/2`,
   `ЛОЖЬ`, `ТРАССА`/`НЕТ_ТРАССЫ`, `ТИХО`, `ВЕРСИЯ`, `ПС`, `ЖДИ`.
 * Arithmetic: hand-written `BigInt`, `#expr#`, `БОЛЬШЕ`/`МЕНЬШЕ`, `СЛОЖЕНИЕ`,
-  `УМНОЖЕНИЕ/3,4`, `ABS`, `SQRT`, `SIN`, `COS`, `TAN`, `EXP`, `int`, `float`,
-  `СЛУЧ`, `ЦЕЛВЕЩ`, `СТРЦЕЛ`, `СТРВЕЩ`, `СТРСПИС`.
-* Strings (code-point based): `БУКВА`, `ЦИФРА`, `СЦЕП`, `КОПИЯ`, `ДЛИНА`.
+  `УМНОЖЕНИЕ/3,4`, `abs`, `sqrt`, `sin`, `cos`, `tan`, `exp`, `is_whole`,
+  `number`, `СЛУЧ`, `ЦЕЛВЕЩ`, `СТРЦЕЛ`, `СТРВЕЩ`, `СТРСПИС`.
+* Strings (code-point based): `БУКВА`, `ЦИФРА`, `СЦЕП`, `КОПИЯ`, `ДЛИНА` (each
+  with an English name too — appendix 17 of the manual).
 * I/O: `ВЫВОД`, `ВВКОД`, `ВВОДЦЕЛ`, `ВВОДВЕЩ`, `ВВОДСИМВ`, `ВВОДСТР`,
   `ЧТЕНИЕ_ИЗ`, `ЗАПИСЬ_В`, preloaded `$...` input lines.
 * Program database: `СКОЛЬКО`, `ПРЕДЛ`, `ТЕРМ`, `ДОБ`, `УДАЛЕНИЕ`.
@@ -104,7 +105,7 @@ session.
 | task_36_gui_query_markers | not started | run one question from the editor margin: a marker next to `?Goal.` and `% ?Goal.`, the `%?` colour, and a `questions: false` load so the clicked query answers *alone*; the task file carries the rule for what counts as a statement (a lesson's commented query often has prose after the goal) and the finding that no lesson file has to change |
 | task_37_gui_builtin_reference | not started | `doc/builtins.json` as the one machine-readable source for the built-in reference, a checker keeping it in step with `--list-keywords` and the sections of `help.typ`, a summary line under the completion popup and `Shift+F1` on the word under the caret (the English-alias work of task_39 would land in the same file) |
 | task_38_engine_limits | done | recursion depth and long runs: the crash is gone (the chain and deep terms are released iteratively — the trigger was a *surviving* deep reference, a choice point whose base clause does not cut, or the solver's final environment), `maxDepth` turns runaway recursion into a diagnostic, the variable growth is documented instead of "fixed", and `tools/bench_engine.py` made the numbers reproducible |
-| task_39_english_aliases | not started | every built-in gets an English spelling (the parked note, now a task, with the user's decisions: `integer`/`float` are the tests and `to_int`/`to_float` the conversions, `strlen` for the string length, all English lowercase, the course stays Russian and the pair is documented in an appendix) |
+| task_39_english_aliases | done | every built-in has an English spelling in lower case (one `kEnglishNames` table in `builtins.cpp`, 47 pairs, is the only place a pair is written; `test_aliases.cpp` walks it and fails on a Russian name without a row); the manual gained appendix 17 with the whole table, `prologd-diff.typ` §15 and `conventions.md` the rule; doing it showed that `int`/`float` were *checks*, not conversions (`integer`/`float` are the ISO type tests, `is_whole`/`number` the old ones, and the planned `to_int`/`to_float` were dropped) and `ДЛИНА` became `strlen`; 108 reserved names, one list for CLI, protocol and GUI |
 | task_40_diagnostics | not started | severity (warnings that never change an exit code), positions that point at the opening bracket, a stated missing final dot, a warning for a variable written where a constant was meant, singleton variables, and call-site hints (unknown name with a suggestion, known name with the wrong arity) |
 | task_41_semicolon_disjunction | approved | `;` as a real backtrackable disjunction (ISO precedence with `,`), the `;` sentence terminator retired with a diagnostic, `ИЛИ/2` left as the committed form and cross-referenced; the user gave the go-ahead on 2026-09-30, work not started |
 | task_42_engine_hot_path | not started | the constant tax: no string per built-in call, no `"name/arity"` key per predicate call, clause indexing and atom interning only where the benchmark justifies them |
@@ -112,7 +113,7 @@ session.
 
 ## Test suite
 
-195 tests, about four seconds: 183 Catch2 cases plus 12 command-line and
+199 tests, about four seconds: 187 Catch2 cases plus 12 command-line and
 integration tests (seven option tests, two `--list-keywords` tests, the
 import-search report, the JSON protocol session and the engine-limit cases). Groups:
 BigInt, lexer, keywords, parser, unification, engine, every built-in group,
@@ -782,3 +783,22 @@ Resolved on 2026-09-29 (GUI planning):
   clauses.  It is a documented ceiling now (`doc/technical.typ` §6.6, `doc/help.typ`
   §15) and visible in the bench; the weight of a term is task_42's business.  183
   Catch2 cases, 2 774 assertions, 195 ctest tests, all green.
+- **2026-09-30 — task_39: an English spelling for every built-in.**  One table
+  (`kEnglishNames`, 47 rows) is the only place a pair is written: the dispatch
+  registration, `--list-keywords`, the lexer's reserved set and the GUI's
+  completion all follow from it, so a name cannot be added in one place and
+  forgotten in another (`test_aliases.cpp` walks the table and fails on a
+  Russian built-in without a row).  The user's decisions: only lower case
+  (`ABS`...`EXP` are `abs`...`exp` now, the old spellings are gone), the course
+  stays Russian, the pairs live in an appendix.  Doing it turned up that
+  `int/1` and `float/1` were never conversions — they *check* whether a value
+  can be read as an integer or as any number (`is_whole(4.0)`, `number(4)`),
+  while ISO's `integer/1`/`float/1` are the type tests — so they are
+  `is_whole`/`number` now and the planned `to_int`/`to_float` were dropped: an
+  actual conversion is `ЦЕЛВЕЩ`/`num_to_float`, and inventing a second one
+  without a caller would have been a name without a use.  `ДЛИНА` is `strlen`
+  (not `length`, which ISO keeps for lists).  The manual gained appendix 17 with
+  the whole table, `prologd-diff.typ` §15 and `conventions.md` gained the rule;
+  the reserved-name list grew from 57 to 108 and `test_keywords.py` confirms
+  that the CLI, the protocol and the GUI see the same names.  187 Catch2 cases,
+  3 131 assertions, 199 ctest tests, all green.

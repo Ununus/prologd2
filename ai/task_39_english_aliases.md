@@ -1,6 +1,6 @@
 # task_39 — English aliases for the built-ins
 
-**Status:** not started
+**Status:** done (2026-09-30)
 **Depends on:** nothing; it *changes* the data of task_37 (the reference), so the
 two are best done in that order, or the `aliases` field is added to
 `doc/builtins.json` in the same pass
@@ -19,18 +19,24 @@ registered alias appears everywhere by itself.
 
 ## Decisions taken by the user on 2026-09-30
 
-1. **Type tests and conversions are split by spelling**: `integer/1` and
-   `float/1` are the *tests* (aliases of `ЦЕЛ`/`ВЕЩ`), `to_int/1` and
-   `to_float/1` are the *conversions*.  This is the one place where a name
-   changes meaning: today `int(X)`/`float(X)` convert, and after this task they
-   are gone — `int/1` too, for symmetry with `float/1`, which *cannot* stay a
-   conversion because the test takes the name.
+1. **Type tests and conversions were split by spelling — and the split changed
+   the plan**: `integer/1` and `float/1` are the *tests* (aliases of `ЦЕЛ`/`ВЕЩ`,
+   so they answer about a *type*: `integer(5.0)` is false).  The plan then
+   assumed that `int(X)`/`float(X)` convert and that `to_int/1`/`to_float/1`
+   should take their place; reading the implementation showed that they never
+   converted — they *check* whether a value can be read as an integer or as any
+   number (`is_whole(4.0)` is true, `is_whole(4.5)` is false, `number(4)` is
+   true).  A conversion already exists and is `ЦЕЛВЕЩ/num_to_float`, so the two
+   are `is_whole(X)` and `number(X)` now, and the planned `to_int`/`to_float`
+   were dropped: a second conversion with no caller would be a name without a
+   use.  `int/1` and `float/1` are gone.
 2. `ДЛИНА/2` becomes `strlen/2` — **not** `length/2`, which in ISO is the length
    of a *list* while this one measures a string in characters.
 3. **All English names are lowercase**, including the ones that are uppercase
    today: `ABS`, `SQRT`, `SIN`, `COS`, `TAN`, `EXP` become `abs`, `sqrt`, `sin`,
-   `cos`, `tan`, `exp`.  The old uppercase spellings stay as aliases, because the
-   programs ported from the original PrologD use them and they cost nothing.
+   `cos`, `tan`, `exp`.  The upper-case spellings were *not* kept (the user
+   settled this on 2026-09-30): one spelling per name, and the lessons, the
+   examples and the manual were updated in the same change.
 4. **The course stays Russian.**  The English surface is documented in an
    appendix, not in the lessons.
 
@@ -90,6 +96,40 @@ than a matter of remembering.
 | `УДАЛЕНИЕ` | 2 | `retract` | |
 | `ТОЧКА`/`ЛИНИЯ`/`ОКРУЖНОСТЬ`/`ЗАКРАСКА` | 3/5/4/3 | `point`/`line`/`circle`/`fill` | graphics |
 | `ИМПОРТ` | directive | `import` | lexer + `keywords.cpp` + `parser.cpp` |
+
+## Result
+
+The table is `constexpr std::pair<std::string_view, std::string_view>
+kEnglishNames[]` in `builtins.cpp` (47 rows) with two helpers, `englishName()` and
+`isVariadicBuiltin()`.  Everything else follows from it: `registerOne`/`add`
+register both spellings, `builtinAliases()` exposes the pairs, `findBuiltin`,
+`builtinArities` and `builtinNames` treat `ВЫВОД`/`write` as the variadic one, the
+lexer's reserved set lists the English names section by section, and `ВЫП`/`call`
+plus `ИМПОРТ`/`import` are handled where they live (the engine's meta-call check,
+`kEngineCallables`, `kReservedDirectives`, `isImportName()` in the parser).  The
+GUI needed nothing: it reads the reserved names from the `ready` event, and
+`test_keywords.py` shows 108 names agreed on by the CLI and the protocol.
+
+Tests: `test_aliases.cpp` (four cases) walks the table — every alias reaches the
+same function as its Russian original, the variadic built-in is variadic under
+both names, every Russian built-in has a row, and one program is run in English
+and compared with its whole output.  The renamed arithmetic is pinned in
+`test_builtins_arith.cpp` and `test_keywords.cpp`; `lesson_03.pld` was rewritten
+for `is_whole`/`number` (the lesson checker runs every lesson's output, so the
+rename could not pass unnoticed).
+
+Documentation: `doc/help.typ` §5.5/5.6/5.7 use the new spellings, §9 points at
+the English type tests and warns that `ЦЕЛ(5.0)` is false where `is_whole(5.0)`
+is true, and appendix 17 carries the whole table (generated from
+`kEnglishNames`, so it cannot disagree with the interpreter).  `prologd-diff.typ`
+§15 explains the aliases and the two renames in the «что перенести» form, and
+`ai/conventions.md` gained the rule that the table is the one place a pair is
+written.
+
+Left for a follow-up: the course appendix file (`examples/lessons/appendix_english.pld`
+and its registration in `test_lessons.cpp`, `examples/lessons/README.md` and
+`doc/lessons.typ`) — the manual's appendix covers the reference meanwhile, and
+the lessons themselves stay Russian as decided.
 
 ## What a name does not buy
 

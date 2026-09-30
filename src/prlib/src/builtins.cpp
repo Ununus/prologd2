@@ -1,8 +1,10 @@
 #include <algorithm>
 #include <chrono>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "builtins_internal.hpp"
@@ -237,11 +239,79 @@ struct BuiltinKeyHash {
 
 using BuiltinTable = std::unordered_map<BuiltinKey, BuiltinFn, BuiltinKeyHash>;
 
+/// The English spelling of every built-in that has a Russian name.
+///
+/// The Russian name is the one the course teaches and stays first; the alias is
+/// what a reader of ordinary Prolog expects (`НАЙТИВСЁ`/`findall`), and it is
+/// lowercase, like the two names that were always English in this dialect
+/// (`mod`, `div`) and like `to_int`/`to_float`.  The table is *data* on purpose:
+/// a name cannot be registered without its Russian original, and the alias is
+/// registered by the same `add` call, so a new built-in cannot be added to the
+/// dispatch table and forgotten here.
+///
+/// Names that are not listed are already English (`abs`, `sqrt`, `sin`, `cos`,
+/// `tan`, `exp`, `mod`, `div`) or are answered outside the dispatch table
+/// (`ВЫП`/`call`, handled by the solver; `ИМПОРТ`/`import`, handled by the
+/// parser) — see `keywords.cpp` and `parser.cpp`.
+constexpr std::pair<std::string_view, std::string_view> kEnglishNames[] = {
+    {"ЛОЖЬ", "fail"},         {"ТРАССА", "trace"},
+    {"НЕТ_ТРАССЫ", "no_trace"}, {"ТИХО", "quiet"},
+    {"ВЕРСИЯ", "version"},      {"НЕ", "not"},
+    {"ИЛИ", "or"},            {"РАВНО", "equal"},
+    {"ПС", "nl"},            {"ЖДИ", "wait"},
+    {"ПЕР", "var"},           {"ЦЕЛ", "integer"},
+    {"ВЕЩ", "float"},         {"СИМВ", "is_text"},
+    {"СПИСОК", "is_list"},      {"НАЙТИВСЁ", "findall"},
+    {"БОЛЬШЕ", "greater"},      {"МЕНЬШЕ", "less"},
+    {"СЛОЖЕНИЕ", "plus"},       {"УМНОЖЕНИЕ", "mul"},
+    {"СЛУЧ", "random"},       {"ЦЕЛВЕЩ", "num_to_float"},
+    {"СТРЦЕЛ", "str_to_int"},    {"СТРВЕЩ", "str_to_float"},
+    {"СТРСПИС", "str_to_list"},   {"БУКВА", "is_letter"},
+    {"ЦИФРА", "is_digit"},      {"СЦЕП", "concat"},
+    {"КОПИЯ", "substring"},     {"ДЛИНА", "strlen"},
+    {"ВЫВОД", "write"},        {"ВВКОД", "put_code"},
+    {"ВВОДЦЕЛ", "read_int"},     {"ВВОДВЕЩ", "read_float"},
+    {"ВВОДСИМВ", "read_char"},   {"ВВОДСТР", "read_string"},
+    {"ЧТЕНИЕ_ИЗ", "see"},       {"ЗАПИСЬ_В", "tell"},
+    {"СКОЛЬКО", "clause_count"},  {"ПРЕДЛ", "clause_at"},
+    {"ТЕРМ", "univ"},         {"ДОБ", "assert"},
+    {"УДАЛЕНИЕ", "retract"},    {"ТОЧКА", "point"},
+    {"ЛИНИЯ", "line"},         {"ОКРУЖНОСТЬ", "circle"},
+    {"ЗАКРАСКА", "fill"},
+};
+
+/// English spelling of `name`, empty when it has none (already English, or
+/// answered outside the dispatch table).
+std::string_view englishName(std::string_view name) {
+  for (const auto& [russian, english] : kEnglishNames) {
+    if (russian == name) {
+      return english;
+    }
+  }
+  return {};
+}
+
+/// `ВЫВОД` accepts any positive arity and has no table entry to enumerate; its
+/// English spelling is `write`.
+bool isVariadicBuiltin(std::string_view name) {
+  return name == "ВЫВОД" || name == "write";
+}
+
 const BuiltinTable& builtinTable() {
   static const BuiltinTable table = [] {
     BuiltinTable result;
-    auto add = [&result](std::string_view name, std::size_t arity, BuiltinFn function) {
-      result.emplace(BuiltinKey{std::string(name), arity}, function);
+    // Registers the Russian name and, when it has one, its English spelling:
+    // both are callable afterwards, which is what `--list-keywords`, the GUI
+    // completion and the highlighter pick up from here.
+    auto registerOne = [&result](std::string_view name, std::size_t arity,
+                                 BuiltinFn function) {
+      result.insert_or_assign(BuiltinKey{std::string(name), arity}, function);
+    };
+    auto add = [&registerOne](std::string_view name, std::size_t arity, BuiltinFn function) {
+      registerOne(name, arity, function);
+      if (const std::string_view english = englishName(name); !english.empty()) {
+        registerOne(english, arity, function);
+      }
     };
 
     // Control and logic.
@@ -272,21 +342,24 @@ const BuiltinTable& builtinTable() {
     add("СЛОЖЕНИЕ", 3, builtinAdd);
     add("УМНОЖЕНИЕ", 3, builtinMul3);
     add("УМНОЖЕНИЕ", 4, builtinMul4);
-    add("ABS", 2, builtinAbs);
-    add("SQRT", 2, builtinSqrt);
-    add("SIN", 2, builtinSin);
-    add("COS", 2, builtinCos);
-    add("TAN", 2, builtinTan);
-    add("EXP", 2, builtinExp);
-    add("int", 1, builtinToInt);
-    add("float", 1, builtinToFloat);
+    add("abs", 2, builtinAbs);
+    add("sqrt", 2, builtinSqrt);
+    add("sin", 2, builtinSin);
+    add("cos", 2, builtinCos);
+    add("tan", 2, builtinTan);
+    add("exp", 2, builtinExp);
+    // `int` and `float` were never conversions: they *check* that a value can be
+    // taken as a whole number, or as any number at all (`int(4.0)` holds,
+    // `int(4.5)` does not, `float(4)` does).  The strict type tests take the ISO
+    // names (`integer`, `float`), so these two got names that say what they do.
+    add("is_whole", 1, builtinToInt);
+    add("number", 1, builtinToFloat);
     add("СЛУЧ", 1, builtinRandom);
     add("СЛУЧ", 3, builtinRandom);
     add("ЦЕЛВЕЩ", 2, builtinConvertIntFloat);
     add("СТРЦЕЛ", 2, builtinStringToInt);
     add("СТРВЕЩ", 2, builtinStringToFloat);
     add("СТРСПИС", 2, builtinStringToList);
-
     // Strings.
     add("БУКВА", 2, builtinIsLetter);
     add("ЦИФРА", 2, builtinIsDigit);
@@ -328,7 +401,7 @@ const BuiltinTable& builtinTable() {
 
 BuiltinFn findBuiltin(std::string_view name, std::size_t arity) {
   // `ВЫВОД` accepts any positive arity.
-  if (name == "ВЫВОД" && arity >= 1) {
+  if (isVariadicBuiltin(name) && arity >= 1) {
     return builtinWrite;
   }
   const auto& table = builtinTable();
@@ -339,10 +412,12 @@ BuiltinFn findBuiltin(std::string_view name, std::size_t arity) {
   return it->second;
 }
 
+std::span<const BuiltinAlias> builtinAliases() { return kEnglishNames; }
+
 BuiltinArities builtinArities(std::string_view name) {
   // `ВЫВОД` has no table entry to enumerate: `findBuiltin` accepts any positive
   // arity for it.
-  if (name == "ВЫВОД") {
+  if (isVariadicBuiltin(name)) {
     return BuiltinArities{{}, true};
   }
   BuiltinArities result;
@@ -357,11 +432,12 @@ BuiltinArities builtinArities(std::string_view name) {
 
 std::vector<std::string> builtinNames() {
   std::vector<std::string> result;
-  result.reserve(builtinTable().size() + 1);
+  result.reserve(builtinTable().size() + 2);
   for (const auto& entry : builtinTable()) {
     result.push_back(entry.first.name);
   }
   result.emplace_back("ВЫВОД");  // variadic, the one name without a table entry
+  result.emplace_back("write");   // and its English spelling
   std::sort(result.begin(), result.end());
   result.erase(std::unique(result.begin(), result.end()), result.end());
   return result;

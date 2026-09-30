@@ -3,6 +3,7 @@ add_executable(prlib_tests
   test_big_int.cpp
   test_lexer.cpp
   test_keywords.cpp
+  test_aliases.cpp
   test_parser.cpp
   test_unify.cpp
   test_engine.cpp

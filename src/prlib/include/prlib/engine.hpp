@@ -118,6 +118,15 @@ using BuiltinFn = BuiltinResult (*)(Engine&, std::span<const Term>);
 /// Look up a built-in by name and arity; nullptr when none.
 BuiltinFn findBuiltin(std::string_view name, std::size_t arity);
 
+/// Russian name and its English spelling, one row per built-in that has both.
+///
+/// The table lives in `builtins.cpp` and is exactly what the registration uses,
+/// so a test can check that the two spellings reach the same function and that
+/// every Russian name has one.  Names answered outside the dispatch table
+/// (`ВЫП`/`call` by the solver, `ИМПОРТ`/`import` by the parser) are not here.
+using BuiltinAlias = std::pair<std::string_view, std::string_view>;
+[[nodiscard]] std::span<const BuiltinAlias> builtinAliases();
+
 /// Arity information for a registered built-in.  Both fields are empty/false
 /// when the name is not in the dispatch table.  `ВЫВОД` accepts any positive
 /// arity, so it reports `variadic` instead of enumerating arities.

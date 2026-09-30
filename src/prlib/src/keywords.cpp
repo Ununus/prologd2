@@ -16,7 +16,7 @@ namespace {
 /// Reserved names that are not predicates: the infix arithmetic operators have
 /// no dispatch entry, and `ИМПОРТ` is a statement form the loader handles.
 const std::unordered_set<std::string> kReservedOperators = {"mod", "div"};
-const std::unordered_set<std::string> kReservedDirectives = {"ИМПОРТ"};
+const std::unordered_set<std::string> kReservedDirectives = {"ИМПОРТ", "import"};
 
 /// Callable names the *engine* answers before it consults the dispatch table
 /// (see `Solver::unifyGoal`): they are reserved and callable, but `findBuiltin`
@@ -25,6 +25,7 @@ const std::unordered_set<std::string> kReservedDirectives = {"ИМПОРТ"};
 /// reserved name, so it is not listed here.
 const std::unordered_map<std::string, std::vector<std::size_t>> kEngineCallables = {
     {"ВЫП", {1}},
+    {"call", {1}},
 };
 
 }  // namespace

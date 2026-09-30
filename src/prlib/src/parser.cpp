@@ -7,7 +7,18 @@ namespace prologd {
 
 namespace {
 constexpr std::string_view kExpressionWrapper = "$expr";
-constexpr std::string_view kImportName = "ИМПОРТ";
+/// The import directive has two spellings: the Russian name the original
+/// dialect used, and its English alias (task_39).
+constexpr std::string_view kImportNames[] = {"ИМПОРТ", "import"};
+
+bool isImportName(std::string_view name) {
+  for (const std::string_view candidate : kImportNames) {
+    if (candidate == name) {
+      return true;
+    }
+  }
+  return false;
+}
 }  // namespace
 
 Parser::Parser(std::vector<Token> tokens, VarAllocator allocator, DiagnosticSink* sink)
@@ -442,7 +453,7 @@ bool Parser::parseQueryOrDirective(ParsedProgram& out) {
 
   // `ИМПОРТ("file")` is a directive, not a runtime goal.
   if (goals.size() == 1 && goals[0].kind == TermKind::Compound &&
-      goals[0].compound != nullptr && goals[0].compound->name == kImportName &&
+      goals[0].compound != nullptr && isImportName(goals[0].compound->name) &&
       goals[0].compound->args.size() == 1) {
     const Term& argument = goals[0].compound->args[0];
     if (argument.kind == TermKind::String || argument.kind == TermKind::Atom) {

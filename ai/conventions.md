@@ -23,7 +23,13 @@
 | File | `snake_case.hpp` / `snake_case.cpp` | `term_store.hpp` |
 
 Built-in predicate names are Russian and must be written with UTF-8 in string
-literals. Never split a multi-byte character.
+literals. Never split a multi-byte character.  Every built-in with a Russian name
+also has an English spelling in lower case (`НАЙТИВСЁ`/`findall`), registered from
+the one table in `builtins.cpp`; `test_aliases.cpp` fails if a Russian name has no
+row there, and the correspondence table in `doc/help.typ` (appendix 17) must be
+regenerated when the table changes.  Names the engine or the parser answers
+(`ВЫП`/`call`, `ИМПОРТ`/`import`) are listed in `keywords.cpp`/`parser.cpp`
+instead.
 
 ## File layout
 

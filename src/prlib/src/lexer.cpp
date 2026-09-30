@@ -9,26 +9,36 @@ namespace prologd {
 namespace {
 
 const std::unordered_set<std::string> kReservedBuiltins = {
-    // Control / logic
+    // Control / logic, with the English spelling of each name (task_39).
     "ЛОЖЬ", "ТРАССА", "НЕТ_ТРАССЫ", "ВЫП", "НЕ", "ИЛИ", "РАВНО", "ТИХО",
     "ВЕРСИЯ", "ПС",
+    "fail", "trace", "no_trace", "call", "not", "or", "equal", "quiet",
+    "version", "nl",
     // Arithmetic
-    "БОЛЬШЕ", "МЕНЬШЕ", "СЛОЖЕНИЕ", "УМНОЖЕНИЕ", "СЛУЧ", "ABS", "SQRT",
-    "SIN", "COS", "TAN", "EXP", "int", "float", "mod", "div",
+    "БОЛЬШЕ", "МЕНЬШЕ", "СЛОЖЕНИЕ", "УМНОЖЕНИЕ", "СЛУЧ", "float", "mod", "div",
+    "greater", "less", "plus", "mul", "random", "abs", "sqrt", "sin",
+    "cos", "tan", "exp", "is_whole", "number",
     // I/O
     "ЧТЕНИЕ_ИЗ", "ЗАПИСЬ_В", "ВВКОД", "ВВОДЦЕЛ", "ВВОДВЕЩ", "ВВОДСИМВ",
     "ВВОДСТР", "ВЫВОД", "ЖДИ",
+    "see", "tell", "put_code", "read_int", "read_float", "read_char",
+    "read_string", "write", "wait",
     // Strings
     "БУКВА", "ЦИФРА", "СЦЕП", "КОПИЯ", "ДЛИНА",
+    "is_letter", "is_digit", "concat", "substring", "strlen",
     // Type tests and conversions
     "ПЕР", "ЦЕЛ", "ВЕЩ", "СИМВ", "СПИСОК", "СТРСПИС", "СТРЦЕЛ", "СТРВЕЩ",
     "ЦЕЛВЕЩ",
+    "var", "integer", "is_text", "is_list", "str_to_list", "str_to_int",
+    "str_to_float", "num_to_float",
     // Database
     "СКОЛЬКО", "ПРЕДЛ", "ТЕРМ", "ДОБ", "УДАЛЕНИЕ",
+    "clause_count", "clause_at", "univ", "assert", "retract",
     // Graphics
     "ТОЧКА", "ЛИНИЯ", "ОКРУЖНОСТЬ", "ЗАКРАСКА",
+    "point", "line", "circle", "fill",
     // Newcomers
-    "НАЙТИВСЁ", "ИМПОРТ",
+    "НАЙТИВСЁ", "ИМПОРТ", "findall", "import",
 };
 
 }  // namespace

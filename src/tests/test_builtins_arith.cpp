@@ -66,57 +66,57 @@ TEST_CASE("ABS and SQRT") {
   // root of a negative number has none either — that one used to answer 0 for an
   // integer and `nan` for a float, because `BigInt::fromDouble(nan)` is zero.
   const auto result = runProgram(
-      "?ABS(-5, X).\n"
-      "?ABS(-5.5, X).\n"
-      "?ABS(X, 5).\n"
-      "?ABS(X, 0).\n"
-      "?ABS(X, -5).\n"
-      "?ABS(5, 5).\n"
-      "?ABS(-5, 5).\n"
-      "?ABS(5, -5).\n"
-      "?SQRT(9, X).\n"
-      "?SQRT(2, X).\n"
-      "?SQRT(2.25, X).\n"
-      "?SQRT(0, X).\n"
-      "?SQRT(X, 4).\n"
-      "?SQRT(X, -4).\n"
-      "?SQRT(X, 0).\n"
-      "?SQRT(9, 3).\n"
-      "?SQRT(2, 1).\n"
-      "?SQRT(-4, X).\n"
-      "?SQRT(-4.0, X).\n"
-      "?SQRT(-4, 0).\n");
+      "?abs(-5, X).\n"
+      "?abs(-5.5, X).\n"
+      "?abs(X, 5).\n"
+      "?abs(X, 0).\n"
+      "?abs(X, -5).\n"
+      "?abs(5, 5).\n"
+      "?abs(-5, 5).\n"
+      "?abs(5, -5).\n"
+      "?sqrt(9, X).\n"
+      "?sqrt(2, X).\n"
+      "?sqrt(2.25, X).\n"
+      "?sqrt(0, X).\n"
+      "?sqrt(X, 4).\n"
+      "?sqrt(X, -4).\n"
+      "?sqrt(X, 0).\n"
+      "?sqrt(9, 3).\n"
+      "?sqrt(2, 1).\n"
+      "?sqrt(-4, X).\n"
+      "?sqrt(-4.0, X).\n"
+      "?sqrt(-4, 0).\n");
   REQUIRE(result.loaded);
   REQUIRE(result.output == "X=5\nX=5.5\nX=5\nX=0\nНЕТ\nДА\nДА\nНЕТ\n"
                             "X=3\nX=1\nX=1.5\nX=0\nX=16\nX=16\nX=0\nДА\nНЕТ\n"
                             "НЕТ\nНЕТ\nНЕТ\n");
 }
 
-TEST_CASE("SIN, COS, TAN and EXP: forward, inverse, and the check") {
+TEST_CASE("sin, cos, tan and exp: forward, inverse, and the check") {
   // The three branches of the whole family, plus the edges of the domains: a
   // value the function does not have is a *failure*, never a `nan` unified with
   // the argument — `ln` of a negative number, `ln` of zero, `asin` of 2, and a
-  // forward value that overflows (`EXP(1000.0, X)`).
+  // forward value that overflows (`exp(1000.0, X)`).
   const auto result = runProgram(
-      "?SIN(0.0, X).\n"
-      "?COS(0.0, X).\n"
-      "?TAN(0.0, X).\n"
-      "?EXP(0.0, X).\n"
-      "?SIN(X, 0.0).\n"
-      "?COS(X, 1.0).\n"
-      "?TAN(X, 0.0).\n"
-      "?EXP(X, 1.0).\n"
-      "?SIN(0.0, 0.0).\n"
-      "?COS(0.0, 1.0).\n"
-      "?TAN(0.0, 0.0).\n"
-      "?EXP(0.0, 1.0).\n"
-      "?COS(0.0, 0.0).\n"
-      "?EXP(1.0, 0.0).\n"
-      "?EXP(X, -1.0).\n"
-      "?EXP(X, 0.0).\n"
-      "?EXP(1000.0, X).\n"
-      "?SIN(X, 2.0).\n"
-      "?COS(X, 2.0).\n");
+      "?sin(0.0, X).\n"
+      "?cos(0.0, X).\n"
+      "?tan(0.0, X).\n"
+      "?exp(0.0, X).\n"
+      "?sin(X, 0.0).\n"
+      "?cos(X, 1.0).\n"
+      "?tan(X, 0.0).\n"
+      "?exp(X, 1.0).\n"
+      "?sin(0.0, 0.0).\n"
+      "?cos(0.0, 1.0).\n"
+      "?tan(0.0, 0.0).\n"
+      "?exp(0.0, 1.0).\n"
+      "?cos(0.0, 0.0).\n"
+      "?exp(1.0, 0.0).\n"
+      "?exp(X, -1.0).\n"
+      "?exp(X, 0.0).\n"
+      "?exp(1000.0, X).\n"
+      "?sin(X, 2.0).\n"
+      "?cos(X, 2.0).\n");
   REQUIRE(result.loaded);
   REQUIRE(result.output == "X=0.0\nX=1.0\nX=0.0\nX=1.0\nX=0.0\nX=0.0\nX=0.0\nX=0.0\n"
                             "ДА\nДА\nДА\nДА\nНЕТ\nНЕТ\nНЕТ\nНЕТ\nНЕТ\nНЕТ\nНЕТ\n");
@@ -185,15 +185,15 @@ TEST_CASE("addition: all three modes, integers and floats") {
                             "X=100000000000000000001\nX=-5\n");
 }
 
-TEST_CASE("int, float and the truncating conversion take what they are given") {
+TEST_CASE("is_whole, number and the truncating conversion take what they are given") {
   const auto result = runProgram(
-      "?int(4).\n"
-      "?int(4.0).\n"
-      "?int(4.5).\n"
-      "?int(-4.5).\n"
-      "?float(4).\n"
-      "?float(4.0).\n"
-      "?float(4.5).\n"
+      "?is_whole(4).\n"
+      "?is_whole(4.0).\n"
+      "?is_whole(4.5).\n"
+      "?is_whole(-4.5).\n"
+      "?number(4).\n"
+      "?number(4.0).\n"
+      "?number(4.5).\n"
       "?ЦЕЛВЕЩ(5, X).\n"
       "?ЦЕЛВЕЩ(X, 5.0).\n"
       "?ЦЕЛВЕЩ(5.5, X).\n"
@@ -249,9 +249,9 @@ TEST_CASE("the arithmetic built-ins report a wrong type as an error") {
       "СЛОЖЕНИЕ(2, X, Y)",        // fewer than two arguments known
       "СЛОЖЕНИЕ(\"а\", 1, X)",
       "УМНОЖЕНИЕ(2, X, Y)",
-      "ABS(\"а\", X)",
-      "SQRT(\"а\", X)",
-      "SIN(\"а\", X)",
+      "abs(\"а\", X)",
+      "sqrt(\"а\", X)",
+      "sin(\"а\", X)",
       "ЦЕЛВЕЩ(\"а\", X)",
       "СЛУЧ(1.5)",                 // seeding needs an integer
   };
@@ -262,9 +262,9 @@ TEST_CASE("the arithmetic built-ins report a wrong type as an error") {
     REQUIRE(result.error.find("Недопустимый тип аргументов") != std::string::npos);
   }
 
-  // `int` and `float` have an error of their own: the argument is a number or it
-  // is nothing, and «ошибка преобразования типа» says which.
-  for (const std::string& goal : {"int(\"4\")", "float(\"4\")", "int(X)", "float(X)"}) {
+  // `is_whole` and `number` have an error of their own: the argument is a number
+  // or it is nothing, and «ошибка преобразования типа» says which.
+  for (const std::string& goal : {"is_whole(\"4\")", "number(\"4\")", "is_whole(X)", "number(X)"}) {
     const auto result = runProgram("?" + goal + ".\n");
     REQUIRE(result.loaded);
     REQUIRE(result.runtimeError);

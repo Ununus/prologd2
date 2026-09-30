@@ -320,8 +320,10 @@ bool Solver::resolveGoal(const Term& goal) {
                  goal.compound->args[1]);
     return true;
   }
-  if (name == "ВЫП" && arity == 1) {
-    // Meta-call: solve the argument in the caller's cut scope.
+  if ((name == "ВЫП" || name == "call") && arity == 1) {
+    // Meta-call: solve the argument in the caller's cut scope.  `call` is the
+    // English spelling of `ВЫП` and reaches the same place: the engine answers
+    // this one, not the dispatch table, so the alias has to be matched here.
     const std::size_t barrier = env_->cp_barrier;
     setEnv(advanceEnv(env_));
     pushMeta(goal.compound->args[0], barrier);
