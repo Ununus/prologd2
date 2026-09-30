@@ -135,21 +135,27 @@ exact names as variables (acceptable). Documented as an extension in
 
 ---
 
-## ADR-006: `;` remains a clause terminator, not disjunction
+## ADR-006: `;` is the disjunction; the terminator is `.`
 
 **Context.** Standard Prolog uses `;` for disjunction and `.` as the clause
-terminator. PrologD uses both `;` and `.` as terminators and has no disjunction
-operator (disjunction is expressed with separate clauses or `ИЛИ/2`).
+terminator.  PrologD used both `;` and `.` as terminators and had no disjunction
+operator; disjunction was expressed with separate clauses or with `ИЛИ/2` — a
+predicate that in fact takes the first solution of its first goal and so was not
+a disjunction at all.  This ADR first decided to keep the old behaviour.
 
-**Decision.** Keep `;` and `.` as terminators. Do not implement `;` disjunction.
-Document the deviation.
+**Decision.** `;` between goals *is* the backtrackable disjunction (`,` binds
+tighter), the sentence terminator is `.` alone, and the committed «take the
+first» form is the built-in `ПЕРВОЕ/2` (renamed from `ИЛИ/2`).  A `;` written
+where a sentence used to end is an error that says what changed.
 
-**Consequences.** Existing PrologD programs keep working. Programs written for
-standard Prolog that rely on `;` disjunction must be rewritten with `ИЛИ/2` or
-multiple clauses. A future option could add a disjunction operator inside
-`#`-free goal lists, but that is out of scope.
+**Consequences.** Standard-Prolog programs read naturally; a ported program that
+used the old `;` terminator must replace it with `.` (one file in this
+repository did), and a program calling `ИЛИ` must rename the call — the
+interpreter answers both with a message.  Documented in `prologd-diff.typ`
+§6 and §16–§18.
 
-**Status.** Accepted.
+**Status.** Accepted; revised by task_41 (the `;` terminator) and task_44 (the
+rename) — the original "keep `;` as a terminator" decision misled on both counts.
 
 ---
 
@@ -435,3 +441,38 @@ case *names* must be ASCII, because Catch2 discovery reads the test binary's
 `ctest` double encoded.
 
 **Status.** Accepted.
+
+## ADR-017: No clause indexing yet
+
+**Context.** `Database::clausesFor` hands the solver one clause list per
+predicate and the solver tries the clauses in order (`selectClause`).  A
+first-argument index (SWI-style, built just in time) would skip the clauses whose
+first argument cannot match a goal that arrives with a bound first argument.
+task_42 measured what the absent index costs, with `tools/bench_engine.py` on the
+Release build (this machine, 2026-09-30):
+
+* 100 000 integer facts — query on the first clause 0.31 s, on the last 0.33 s: a
+  full scan of ~100 000 failed head attempts costs ≈ 20 ms (repeated runs put it
+  between 10 and 30 ms), i.e. ≈ 0.1–0.3 µs per attempt (each attempt creates an
+  environment and unifies the head);
+* 50 000 facts with a compound head (`ф(к(N))`), where each failed attempt also
+  compares a structure: first 0.25 s, last 0.25 s — the scan hides inside the
+  spread;
+* the queens search (8 queens; 14 clauses, heavy bodies, head matching by
+  structure): 0.29 s, and an index cannot prune it at all — every clause head
+  matches shallowly and the work is inside the bodies.
+
+**Decision.** Do not build the index yet.  Its saving is at most one scan per
+*call*, and the predicates this interpreter runs — lessons, puzzles, typical
+tasks — have a handful of clauses; the index would have to live inside the
+copy-on-write snapshot (`ClauseList`), because a choice point keeps the list it
+saw and a running enumeration must keep a consistent view, which is real
+complexity for a microsecond.
+
+**Consequences.** The clause list stays a plain `std::vector<Clause>` inside the
+snapshot; the benchmark knows the workload that would justify an index.
+
+**Status.** Accepted — measured and deferred, to be revisited when a real program
+calls a predicate with thousands of clauses *repeatedly* with a bound first
+argument, or when clause heads become expensive to unify (then the per-attempt
+cost and the scan length both matter).
