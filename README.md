@@ -75,6 +75,18 @@ See `doc/help.typ` for the full reference and `doc/prologd-diff.typ` for the
 differences from the original PrologD (most importantly: single-letter
 variables are gone, and CP1251 was replaced by UTF-8).
 
+## Lessons
+
+`examples/lessons` holds the course: twelve lessons, from facts and queries to
+graphics, plus an appendix about debugging.  A lesson is a runnable program whose
+comments carry its own expected output (lines starting with `%!`), and the check in
+`src/tests/test_lessons.cpp` runs every lesson and compares - so a lesson cannot
+drift away from the interpreter unnoticed.
+
+Start with `examples/lessons/README.md` (the index) or `doc/lessons.typ`; two
+lessons need a little more than a plain run, and the index says which.  The
+superseded originals are kept in `examples/lessons/_old/`.
+
 ## Command line
 
 ```

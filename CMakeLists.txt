@@ -148,7 +148,7 @@ find_program(TYPST_EXECUTABLE typst)
 add_custom_target(prologd_docs
   COMMENT "Building Typst documentation")
 if(TYPST_EXECUTABLE)
-  foreach(doc IN ITEMS help technical prologd-diff gui)
+  foreach(doc IN ITEMS help technical prologd-diff gui lessons)
     add_custom_command(TARGET prologd_docs POST_BUILD
       COMMAND ${TYPST_EXECUTABLE} compile
               "${CMAKE_SOURCE_DIR}/doc/${doc}.typ"

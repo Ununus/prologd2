@@ -100,7 +100,7 @@ session.
 | task_32_import_search_report | done | `ИМПОРТ` failure names the directories tried, with reasons |
 | task_33_gui_search_replace | done | `search.py` (plain-text, Qt-free) + the find bar: question from the selection or the word at the caret, `F3`/`Shift+F3` with the wrap reported, three switches, «Заменить всё» as one undo step, the matches lit in every view; `test_search.py` has 16 checks |
 | task_34_builtin_branches | done | every built-in branch-tested in Catch2 (186 cases); the sweep found and fixed five defects: two in the float built-ins (`nan` instead of a failure), the integer/real comparison, the cyclic term that ended the process, the ignored read prompt, the unchecked graphics arguments and the code points that were written as invalid UTF-8 |
-| task_35_lessons_rework | in progress | the course in `examples/lessons` is rewritten for the current dialect, one commit per lesson, from the plan in `ai/task_35_lessons_rework.md`; `test_lessons.cpp` runs every listed lesson and compares its output with the `%!` lines the lesson itself carries, so a lesson cannot drift again; lessons 1--7 are done and machine-checked (facts and queries, rules and backtracking, arithmetic, recursion and cut, lists, strings, input/output with `lesson_07.input.txt`); lessons 8--12 and the debug appendix remain, then the index and `doc/lessons.typ` |
+| task_35_lessons_rework | done | the course in `examples/lessons` is rewritten for the current dialect, one commit per lesson, from the plan in `ai/task_35_lessons_rework.md`; `test_lessons.cpp` runs every lesson (12 + the debug appendix) and compares its whole output with the `%!` lines the lesson itself carries, so a lesson cannot drift again; the old files are in `lessons/_old/`; the index is `examples/lessons/README.md` and the fifth Typst document `doc/lessons.typ` (the `docs` target builds it); writing the expectations found and fixed mistakes in the source material (a non-terminating `нод/3`, descending sorts, a hanging `?длина(Х, 2)`, a failed read that leaves the rest of its line) and taught the check two tricks: input files for lesson 7 and include paths for lesson 11 |
 
 ## Test suite
 
@@ -672,3 +672,16 @@ Resolved on 2026-09-29 (GUI planning):
   CLI and in the test harness, so the lesson keeps that read last.  Lessons 1--7
   are done, `ctest` stays green (183 Catch2 cases, 194 tests); 8--12, the debug
   appendix, the index and `doc/lessons.typ` remain.
+* Lessons session, part 2: the rest of the course is written - mathematics of
+  lesson 3, recursion and the cut, lists, strings, input and output (the topic the
+  old set never had), state search, constraint puzzles, metapredicates, modules and
+  graphics - plus `appendix_debug.pld`.  Every lesson is now executed by ctest
+  against the output its own comments promise, which is how the mistakes in the
+  source material were found: a `нод/3` that never terminates, two sorts that came
+  out descending, a `?длина(Х, 2)` trap, a failed number read that leaves the rest
+  of its line, and my own slips (a trunk built as `линия/4` when the drawing rule
+  wants `линия/5`; the board in `расставить/4` built two ways at once).  The check
+  learned about input files and about include paths, and the course got its index
+  (`examples/lessons/README.md`) and its place in the documentation
+  (`doc/lessons.typ`, built by the `docs` target).  181 Catch2 cases, 2761
+  assertions, 192 ctest tests, all green.
