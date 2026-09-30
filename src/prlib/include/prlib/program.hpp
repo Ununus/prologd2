@@ -2,11 +2,11 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -80,11 +80,19 @@ class Database {
   void clear();
 
  private:
-  static std::string key(std::string_view name, std::size_t arity);
+  /// One predicate: its arities in the order their lists were first created
+  /// (the order `ДОБ`/`УДАЛЕНИЕ` number clauses by), each with the copy-on-write
+  /// clause list the engine looks up per goal.
+  struct Predicate {
+    std::vector<std::pair<std::size_t, std::shared_ptr<ClauseList>>> by_arity;
+  };
+
   std::shared_ptr<ClauseList> mutableListFor(std::string_view name, std::size_t arity);
 
-  std::unordered_map<std::string, std::shared_ptr<ClauseList>> table_;
-  std::vector<std::string> key_order_;
+  /// Keyed by name alone, and with `std::less<>` so `clausesFor(name, arity)`
+  /// can look a name up without building a string: this is the per-goal path
+  /// (task_42).
+  std::map<std::string, Predicate, std::less<>> table_;
   std::uint64_t next_id_ = 1;
 };
 

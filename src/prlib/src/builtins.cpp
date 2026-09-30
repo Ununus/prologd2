@@ -226,15 +226,19 @@ BuiltinResult builtinFindAll(Engine& engine, std::span<const Term> args) {
 namespace {
 
 struct BuiltinKey {
-  std::string name;
-  std::size_t arity;
+  // A view, not an owned string: every name in the table is a string literal
+  // (`add` is never called with anything else — `englishName` returns a view
+  // into the same literal table), so building a `std::string` per lookup is
+  // pure tax on the per-goal path (task_42).
+  std::string_view name;
+  std::size_t arity = 0;
 
   friend bool operator==(const BuiltinKey&, const BuiltinKey&) = default;
 };
 
 struct BuiltinKeyHash {
   std::size_t operator()(const BuiltinKey& key) const {
-    return std::hash<std::string>{}(key.name) ^ (key.arity * 1099511628211ULL);
+    return std::hash<std::string_view>{}(key.name) ^ (key.arity * 1099511628211ULL);
   }
 };
 
@@ -306,7 +310,7 @@ const BuiltinTable& builtinTable() {
     // completion and the highlighter pick up from here.
     auto registerOne = [&result](std::string_view name, std::size_t arity,
                                  BuiltinFn function) {
-      result.insert_or_assign(BuiltinKey{std::string(name), arity}, function);
+      result.insert_or_assign(BuiltinKey{name, arity}, function);
     };
     auto add = [&registerOne](std::string_view name, std::size_t arity, BuiltinFn function) {
       registerOne(name, arity, function);
@@ -408,7 +412,7 @@ BuiltinFn findBuiltin(std::string_view name, std::size_t arity) {
     return builtinWrite;
   }
   const auto& table = builtinTable();
-  const auto it = table.find(BuiltinKey{std::string(name), arity});
+  const auto it = table.find(BuiltinKey{name, arity});
   if (it == table.end()) {
     return nullptr;
   }
@@ -437,7 +441,7 @@ std::vector<std::string> builtinNames() {
   std::vector<std::string> result;
   result.reserve(builtinTable().size() + 2);
   for (const auto& entry : builtinTable()) {
-    result.push_back(entry.first.name);
+    result.emplace_back(entry.first.name);
   }
   result.emplace_back("ВЫВОД");  // variadic, the one name without a table entry
   result.emplace_back("write");   // and its English spelling

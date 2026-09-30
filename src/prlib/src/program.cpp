@@ -14,27 +14,31 @@ std::optional<Functor> functorOf(const Term& term) {
   return std::nullopt;
 }
 
-std::string Database::key(std::string_view name, std::size_t arity) {
-  return std::string(name) + '/' + std::to_string(arity);
-}
-
 std::shared_ptr<Database::ClauseList> Database::mutableListFor(std::string_view name,
                                                                std::size_t arity) {
-  const std::string k = key(name, arity);
-  auto it = table_.find(k);
+  auto it = table_.find(name);
   if (it == table_.end()) {
     auto fresh = std::make_shared<ClauseList>();
-    table_.emplace(k, fresh);
-    key_order_.push_back(k);
+    Predicate entry;
+    entry.by_arity.emplace_back(arity, fresh);
+    table_.emplace(std::string(name), std::move(entry));
     return fresh;
   }
-  if (it->second.use_count() == 1) {
-    return it->second;
+  for (auto& [list_arity, list] : it->second.by_arity) {
+    if (list_arity != arity) {
+      continue;
+    }
+    if (list.use_count() == 1) {
+      return list;
+    }
+    // Copy-on-write: a snapshot may still be referenced by a running enumeration.
+    auto copy = std::make_shared<ClauseList>(*list);
+    list = copy;
+    return copy;
   }
-  // Copy-on-write: a snapshot may still be referenced by a running enumeration.
-  auto copy = std::make_shared<ClauseList>(*it->second);
-  it->second = copy;
-  return copy;
+  auto fresh = std::make_shared<ClauseList>();
+  it->second.by_arity.emplace_back(arity, fresh);
+  return fresh;
 }
 
 void Database::addClause(Clause clause) {
@@ -86,15 +90,29 @@ bool Database::retractClause(std::string_view name, std::size_t arity, std::int6
 
 Database::ClauseListPtr Database::clausesFor(std::string_view name, std::size_t arity) const {
   static const auto kEmpty = std::make_shared<const ClauseList>();
-  auto it = table_.find(key(name, arity));
+  auto it = table_.find(name);
   if (it == table_.end()) {
     return kEmpty;
   }
-  return it->second;
+  for (const auto& [list_arity, list] : it->second.by_arity) {
+    if (list_arity == arity) {
+      return list;
+    }
+  }
+  return kEmpty;
 }
 
 bool Database::hasPredicate(std::string_view name, std::size_t arity) const {
-  return table_.find(key(name, arity)) != table_.end();
+  auto it = table_.find(name);
+  if (it == table_.end()) {
+    return false;
+  }
+  for (const auto& [list_arity, list] : it->second.by_arity) {
+    if (list_arity == arity) {
+      return true;
+    }
+  }
+  return false;
 }
 
 std::size_t Database::clauseCount(std::string_view name, std::size_t arity) const {
@@ -103,16 +121,10 @@ std::size_t Database::clauseCount(std::string_view name, std::size_t arity) cons
 
 std::vector<Functor> Database::predicates() const {
   std::vector<Functor> result;
-  result.reserve(table_.size());
-  for (const auto& [k, list] : table_) {
-    const auto slash = k.rfind('/');
-    if (slash == std::string::npos) {
-      continue;
+  for (const auto& [name, entry] : table_) {
+    for (const auto& [arity, list] : entry.by_arity) {
+      result.push_back(Functor{name, arity});
     }
-    Functor functor;
-    functor.name = k.substr(0, slash);
-    functor.arity = static_cast<std::size_t>(std::stoull(k.substr(slash + 1)));
-    result.push_back(std::move(functor));
   }
   std::sort(result.begin(), result.end(), [](const Functor& lhs, const Functor& rhs) {
     if (lhs.name != rhs.name) {
@@ -125,31 +137,24 @@ std::vector<Functor> Database::predicates() const {
 
 std::vector<Clause> Database::clausesByName(std::string_view name) const {
   std::vector<Clause> merged;
-  const std::string prefix = std::string(name) + '/';
-  for (const std::string& k : key_order_) {
-    if (k.size() < prefix.size() || k.compare(0, prefix.size(), prefix) != 0) {
-      continue;
-    }
-    auto it = table_.find(k);
-    if (it == table_.end()) {
-      continue;
-    }
-    merged.insert(merged.end(), it->second->begin(), it->second->end());
+  auto it = table_.find(name);
+  if (it == table_.end()) {
+    return merged;
+  }
+  for (const auto& [arity, list] : it->second.by_arity) {
+    merged.insert(merged.end(), list->begin(), list->end());
   }
   return merged;
 }
 
 std::size_t Database::clauseCountByName(std::string_view name) const {
   std::size_t total = 0;
-  const std::string prefix = std::string(name) + '/';
-  for (const std::string& k : key_order_) {
-    if (k.size() < prefix.size() || k.compare(0, prefix.size(), prefix) != 0) {
-      continue;
-    }
-    auto it = table_.find(k);
-    if (it != table_.end()) {
-      total += it->second->size();
-    }
+  auto it = table_.find(name);
+  if (it == table_.end()) {
+    return total;
+  }
+  for (const auto& [arity, list] : it->second.by_arity) {
+    total += list->size();
   }
   return total;
 }
@@ -215,7 +220,6 @@ void Database::insertByNamePosition(Clause clause, std::int64_t position) {
 
 void Database::clear() {
   table_.clear();
-  key_order_.clear();
   next_id_ = 1;
 }
 
