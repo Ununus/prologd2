@@ -39,9 +39,10 @@ the size task_41 has.
       pattern — decide whether that is a warning or a note) → pinned behaviour.
       Docs: `doc/help.typ` §8 (modules) and `src/gui/README.md` is untouched
       (diagnostics travel as `error` events with a severity).
-- [ ] **Remove the dead library.**  `Engine::initialize()` loads seven clauses
-      into the database (`НЕ`, `ИЛИ`, `РАВНО`, `МЕНЬШЕ`, `СЛОЖЕНИЕ`, `ПС`,
-      `ДЛИНА`), and *every* one of those names is also in the dispatch table.
+- [ ] **Remove the dead library.**  `Engine::initialize()` loads six clauses
+      into the database (`НЕ`, `РАВНО`, `МЕНЬШЕ`, `СЛОЖЕНИЕ`, `ПС`, `ДЛИНА`; the
+      two `ИЛИ` clauses left with the rename, task_44), and *every* one of those
+      names is also in the dispatch table.
       `Solver::resolveGoal` consults `findBuiltin` first, so they can never be
       selected: they only show up where the database is read directly.  Measured:
       `?СКОЛЬКО(НЕ, А)` answers `А=2` and `?СКОЛЬКО(ДЛИНА, В)` answers `В=1`,
@@ -52,10 +53,11 @@ the size task_41 has.
       `ai/decisions.md` records the one-line reason.  If a bootstrap is wanted
       for a future build without a dispatch table, it belongs in a file with a
       comment saying exactly that and must not be loaded by default.
-- [ ] Optional, if the three above go quickly: a `ТРАССА`-visible name for the
-      two halves of `ИЛИ` in the trace (the same request as task_41's cross
-      reference) and a `-q`-friendly note in `doc/help.typ` §13 that the
-      disjunction `;` reports as `ИЛИ` under `ТРАССА` — decide with task_41.
+- [ ] Optional, if the three above go quickly: what `ТРАССА` should call the
+      frame a `;` branch runs in (a redo across the disjunction prints the whole
+      `(A ; B)` as the goal today) --- decide together with task_41's cross
+      reference.  The library halves of the old `ИЛИ` left with task_44, so
+      nothing in the trace says `ИЛИ` any more.
 
 ## Acceptance criteria
 

@@ -55,7 +55,7 @@ than a matter of remembering.
 | `ТИХО` | 0 | `quiet` | |
 | `ВЕРСИЯ` | 0 | `version` | |
 | `НЕ` | 1 | `not` | |
-| `ИЛИ` | 2 | `or` | keeps its documented committed behaviour (see task_41) |
+| `ПЕРВОЕ` | 2 | `first` | renamed from `ИЛИ` in task_44: commits to the first solution of its first goal; the disjunction is `;` (task_41) |
 | `РАВНО` | 2 | `equal` | **not** `=`, not `==`: it compares, it does not unify |
 | `ПС` | 0 | `nl` | |
 | `ЖДИ` | 1 | `wait` | |

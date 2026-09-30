@@ -54,32 +54,32 @@ TEST_CASE("negation answers a goal that is not a predicate with an error") {
   REQUIRE(arity.error.find("НЕ не имеет арности 2 (есть 1)") != std::string::npos);
 }
 
-TEST_CASE("a disjunction is true when either side is") {
+TEST_CASE("the choice form succeeds when either goal does") {
   const auto result = runProgram(
-      "?ИЛИ(ЛОЖЬ, НЕ(ЛОЖЬ)).\n"
-      "?ИЛИ(НЕ(ЛОЖЬ), ЛОЖЬ).\n"
-      "?ИЛИ(ЛОЖЬ, ЛОЖЬ).\n"
-      "?ИЛИ(РАВНО(X, 1), РАВНО(X, 2)).\n"
-      "?ИЛИ(ЛОЖЬ, РАВНО(Y, 2)).\n"
-      "?ИЛИ(РАВНО(A, 1), РАВНО(B, 2)), РАВНО(A, 1).\n");
+      "?ПЕРВОЕ(ЛОЖЬ, НЕ(ЛОЖЬ)).\n"
+      "?ПЕРВОЕ(НЕ(ЛОЖЬ), ЛОЖЬ).\n"
+      "?ПЕРВОЕ(ЛОЖЬ, ЛОЖЬ).\n"
+      "?ПЕРВОЕ(РАВНО(X, 1), РАВНО(X, 2)).\n"
+      "?ПЕРВОЕ(ЛОЖЬ, РАВНО(Y, 2)).\n"
+      "?ПЕРВОЕ(РАВНО(A, 1), РАВНО(B, 2)), РАВНО(A, 1).\n");
   REQUIRE(result.loaded);
   REQUIRE(result.output == "ДА\nДА\nНЕТ\nX=1\nY=2\nA=1\nB=_1\n");
 }
 
-TEST_CASE("a disjunction leaves only the first solution of the first goal") {
+TEST_CASE("the choice form commits to the first solution of its first goal") {
   // Once the first goal has succeeded the second is out of reach, and a
   // generator in the first position yields a single solution.
-  const auto both = runProgram("?ИЛИ(РАВНО(X, 1), РАВНО(X, 2)), РАВНО(X, 2).\n");
+  const auto both = runProgram("?ПЕРВОЕ(РАВНО(X, 1), РАВНО(X, 2)), РАВНО(X, 2).\n");
   REQUIRE(both.loaded);
   REQUIRE(both.output == "НЕТ\n");
 
-  const auto generator = runProgram("п(1).\nп(2).\n?ИЛИ(п(X), ЛОЖЬ).\n");
+  const auto generator = runProgram("п(1).\nп(2).\n?ПЕРВОЕ(п(X), ЛОЖЬ).\n");
   REQUIRE(generator.loaded);
   REQUIRE(generator.output == "X=1\n");
 }
 
 TEST_CASE("a disjunction tries both branches and yields all their solutions") {
-  // `;` is the backtrackable disjunction (task_41), unlike `ИЛИ/2`, which
+  // `;` is the backtrackable disjunction (task_41), unlike `ПЕРВОЕ/2`, which
   // commits to the first solution of its first goal.
   const auto result = runProgram(
       "a(1).\n"
@@ -138,7 +138,7 @@ TEST_CASE("the comma binds tighter than the disjunction") {
 TEST_CASE("a cut inside a branch is local to that branch") {
   // The branch runs in a frame of its own whose cut barrier sits above the
   // alternative, so `!` prunes what the branch created and leaves the other one
-  // alone — the ISO rule, and the reason `ИЛИ/2` is kept for the committed
+  // alone — the ISO rule, and the reason `ПЕРВОЕ/2` is kept for the committed
   // form.
   const auto after = runProgram("?РАВНО(X, 1), ! ; РАВНО(X, 2).\n");
   REQUIRE(after.loaded);
@@ -149,22 +149,22 @@ TEST_CASE("a cut inside a branch is local to that branch") {
   REQUIRE(first.output == "X=1\n");
 }
 
-TEST_CASE("a disjunction answers a goal that is not a predicate with an error") {
-  for (const std::string& goal : {"ИЛИ(5, НЕ(ЛОЖЬ))", "ИЛИ(ЛОЖЬ, 5)", "ИЛИ(X, НЕ(ЛОЖЬ))"}) {
+TEST_CASE("the choice form answers a goal that is not a predicate with an error") {
+  for (const std::string& goal : {"ПЕРВОЕ(5, НЕ(ЛОЖЬ))", "ПЕРВОЕ(ЛОЖЬ, 5)", "ПЕРВОЕ(X, НЕ(ЛОЖЬ))"}) {
     const auto result = runProgram("? " + goal + ".\n");
     REQUIRE(result.loaded);
     REQUIRE(result.runtimeError);
     REQUIRE(result.error.find("Цель должна быть предикатом") != std::string::npos);
   }
 
-  const auto atom = runProgram("?ИЛИ(a, НЕ(ЛОЖЬ)).\n");
+  const auto atom = runProgram("?ПЕРВОЕ(a, НЕ(ЛОЖЬ)).\n");
   REQUIRE(atom.loaded);
   REQUIRE_FALSE(atom.runtimeError);
   REQUIRE(atom.output == "ДА\n");
 
-  const auto arity = runProgram("?ИЛИ(ЛОЖЬ, ЛОЖЬ, ЛОЖЬ).\n");
+  const auto arity = runProgram("?ПЕРВОЕ(ЛОЖЬ, ЛОЖЬ, ЛОЖЬ).\n");
   REQUIRE_FALSE(arity.loaded);
-  REQUIRE(arity.error.find("ИЛИ не имеет арности 3 (есть 2)") != std::string::npos);
+  REQUIRE(arity.error.find("ПЕРВОЕ не имеет арности 3 (есть 2)") != std::string::npos);
 }
 
 TEST_CASE("quiet silences the query it appears in") {

@@ -122,3 +122,20 @@ TEST_CASE("an unknown name carries no arity information") {
   REQUIRE(prologd::findBuiltin("такого_нет", 1) == nullptr);
   REQUIRE(findKeyword(prologd::reservedKeywords(), "такого_нет") == nullptr);
 }
+
+TEST_CASE("a retired name is not offered, its replacement is") {
+  const std::vector<prologd::KeywordInfo> keywords = prologd::reservedKeywords();
+  const prologd::KeywordInfo* first = findKeyword(keywords, "ПЕРВОЕ");
+  REQUIRE(first != nullptr);
+  REQUIRE(first->kind == prologd::KeywordKind::Predicate);
+  REQUIRE(first->arities == std::vector<std::size_t>{2});
+
+  // The spellings the language has retired stay reserved for the lexer (so an
+  // old call gets a message instead of becoming a variable), but the keyword
+  // table — completion, colouring, `--list-keywords` — must not show them.
+  REQUIRE(findKeyword(keywords, "ИЛИ") == nullptr);
+  REQUIRE(findKeyword(keywords, "or") == nullptr);
+  REQUIRE(findKeyword(keywords, "НАЙТИВСЁ") == nullptr);
+  REQUIRE(prologd::isReservedBuiltinName("ИЛИ"));
+  REQUIRE(prologd::isReservedBuiltinName("НАЙТИВСЁ"));
+}

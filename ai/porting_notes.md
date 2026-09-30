@@ -15,6 +15,7 @@ this file records the rules and the manual checks.
 | multi-letter name starting with an upper-case letter, used as a predicate (`XOR(...)`, `Фиб(...)`) | lower-cased (`xor`, `фиб`) | predicate names start lower-case |
 | multi-letter name starting with an upper-case letter, used as a constant (`Россия`, `Stelle`, `CPM`) | quoted (`'Россия'`, `'Stelle'`, `'CPM'`) | upper-case start means variable |
 | reserved built-in names (`БОЛЬШЕ`, `НАЙТИВСЕ`, …) | unchanged | reserved atoms |
+| `ИЛИ(...)` / `or(...)` | `ПЕРВОЕ(...)` / `first(...)` | the name was renamed (task_44): the predicate takes the first solution of its first goal, and the disjunction is `;` |
 | comments, strings, quoted atoms | unchanged | copied verbatim |
 
 ## Automatic mapping

@@ -69,7 +69,7 @@ TEST_CASE("disjunction") {
   const auto result = runProgram(
       "a(1).\n"
       "b(2).\n"
-      "c(X) :- ИЛИ(a(X), b(X)).\n"
+      "c(X) :- ПЕРВОЕ(a(X), b(X)).\n"
       "?c(X).\n");
   REQUIRE(result.loaded);
   REQUIRE(result.output == "X=1\n");

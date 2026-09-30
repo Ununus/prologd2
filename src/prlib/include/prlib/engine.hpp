@@ -206,7 +206,7 @@ class Engine {
   // ---- nested solving ----
   bool hasSolution(const Term& goal);
   /// Solve `goal` once and keep the bindings of the first solution on success
-  /// (undoing them on failure).  Used by `ИЛИ`.
+  /// (undoing them on failure).  Used by `ПЕРВОЕ`.
   bool callOnce(const Term& goal);
   std::vector<Term> collectAll(const Term& goal, const Term& templ,
                                std::size_t limit);

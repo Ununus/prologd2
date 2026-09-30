@@ -10,9 +10,9 @@ namespace {
 
 const std::unordered_set<std::string> kReservedBuiltins = {
     // Control / logic, with the English spelling of each name (task_39).
-    "ЛОЖЬ", "ТРАССА", "НЕТ_ТРАССЫ", "ВЫП", "НЕ", "ИЛИ", "РАВНО", "ТИХО",
+    "ЛОЖЬ", "ТРАССА", "НЕТ_ТРАССЫ", "ВЫП", "НЕ", "ПЕРВОЕ", "РАВНО", "ТИХО",
     "ВЕРСИЯ", "ПС",
-    "fail", "trace", "no_trace", "call", "not", "or", "equal", "quiet",
+    "fail", "trace", "no_trace", "call", "not", "first", "equal", "quiet",
     "version", "nl",
     // Arithmetic
     "БОЛЬШЕ", "МЕНЬШЕ", "СЛОЖЕНИЕ", "УМНОЖЕНИЕ", "СЛУЧ", "float", "mod", "div",
@@ -49,6 +49,9 @@ const std::unordered_set<std::string> kRetiredBuiltinNames = {
     // The ported help spelled findall with ё for a while; the original manual
     // and the task spelled it without.
     "НАЙТИВСЁ",
+    // `ИЛИ` reads like a disjunction, which it never was: it commits to the
+    // first solution of its first goal.  Renamed to `ПЕРВОЕ` (task_44).
+    "ИЛИ",
 };
 
 }  // namespace

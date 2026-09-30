@@ -181,7 +181,7 @@ class Solver {
 };
 
 /// Puts the engine's current location back when a query ends, however it ends.
-/// A nested query (`НАЙТИВСЕ`, `НЕ`, `ИЛИ`) runs its own solver over its own
+/// A nested query (`НАЙТИВСЕ`, `НЕ`, `ПЕРВОЕ`) runs its own solver over its own
 /// environment chain, and the outer one has to keep its own idea of where it is.
 class LocationGuard {
  public:
@@ -891,11 +891,11 @@ bool Engine::runQuery(const Query& query, const std::function<bool()>& onSolutio
 }
 
 void Engine::initialize() {
+  // No `ПЕРВОЕ/2` clause here: it is a built-in (task_44), and a library copy
+  // would keep answering the retired `ИЛИ` spelling it was renamed from.
   static constexpr std::string_view kLibrary = R"PLD(
 НЕ(X) :- ВЫП(X), !, ЛОЖЬ.
 НЕ(_).
-ИЛИ(X, _) :- ВЫП(X), !.
-ИЛИ(_, X) :- ВЫП(X).
 РАВНО(X, X).
 МЕНЬШЕ(X, Y) :- БОЛЬШЕ(Y, X).
 СЛОЖЕНИЕ(X, Y, Z) :- УМНОЖЕНИЕ(1, X, Y, Z).

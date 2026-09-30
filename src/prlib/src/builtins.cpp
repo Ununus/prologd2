@@ -146,8 +146,8 @@ BuiltinResult builtinNot(Engine& engine, std::span<const Term> args) {
 }
 
 BuiltinResult builtinOr(Engine& engine, std::span<const Term> args) {
-  // `ИЛИ` commits to the first solution of its first goal, exactly like the
-  // library clause `ИЛИ(X,_) <- ВЫП(X), !`.
+  // `ПЕРВОЕ` (renamed from "ИЛИ", task_44) commits to the first solution of its
+  // first goal; the full disjunction is `A ; B` (task_41).
   if (engine.callOnce(args[0]) || engine.callOnce(args[1])) {
     return BuiltinResult::Continue;
   }
@@ -258,7 +258,7 @@ constexpr std::pair<std::string_view, std::string_view> kEnglishNames[] = {
     {"ЛОЖЬ", "fail"},         {"ТРАССА", "trace"},
     {"НЕТ_ТРАССЫ", "no_trace"}, {"ТИХО", "quiet"},
     {"ВЕРСИЯ", "version"},      {"НЕ", "not"},
-    {"ИЛИ", "or"},            {"РАВНО", "equal"},
+    {"ПЕРВОЕ", "first"},      {"РАВНО", "equal"},
     {"ПС", "nl"},            {"ЖДИ", "wait"},
     {"ПЕР", "var"},           {"ЦЕЛ", "integer"},
     {"ВЕЩ", "float"},         {"СИМВ", "is_text"},
@@ -322,7 +322,7 @@ const BuiltinTable& builtinTable() {
     add("ТИХО", 0, builtinQuiet);
     add("ВЕРСИЯ", 0, builtinVersion);
     add("НЕ", 1, builtinNot);
-    add("ИЛИ", 2, builtinOr);
+    add("ПЕРВОЕ", 2, builtinOr);
     add("РАВНО", 2, builtinEqual);
     add("ПС", 0, builtinNewline);
     add("ЖДИ", 1, builtinWait);

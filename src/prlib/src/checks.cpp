@@ -140,6 +140,34 @@ std::string suggestName(std::string_view name, std::size_t arity,
   return best + "/" + std::to_string(arity);
 }
 
+/// Names the language has retired, with what to write instead.  A call to one
+/// can never work, so it is an error — unlike a name that was never in the
+/// language at all, which is a warning (the reader may have meant a name of
+/// their own).  The lexer keeps these spellings reserved for the same reason
+/// (`kRetiredBuiltinNames` in `lexer.cpp`): they must reach this table rather
+/// than being read as variables.
+struct RetiredName {
+  std::string_view name;
+  std::size_t arity;
+  const char* message;
+};
+
+constexpr RetiredName kRetiredNames[] = {
+    {"ИЛИ", 2,
+     "«ИЛИ» переименовано: теперь это «ПЕРВОЕ(Ц1, Ц2)», а дизъюнкция — «A ; B»"},
+    {"or", 2,
+     "«or» переименовано: теперь это «first(Ц1, Ц2)», а дизъюнкция — «A ; B»"},
+};
+
+const char* retiredNameMessage(std::string_view name, std::size_t arity) {
+  for (const RetiredName& retired : kRetiredNames) {
+    if (retired.name == name && retired.arity == arity) {
+      return retired.message;
+    }
+  }
+  return nullptr;
+}
+
 /// Visit every goal written in the unit as `(name, arity, location)`.
 ///
 /// The meta-predicates whose arguments are *goals* are opened up, so
@@ -184,7 +212,7 @@ void walkGoal(const Term& goal, const SourceLocation& location,
     visit(name, 1, location);
     return;
   }
-  if ((name == "ИЛИ" || name == "or") && arity == 2) {
+  if ((name == "ПЕРВОЕ" || name == "first") && arity == 2) {
     walkGoal(args[0], location, visit);
     walkGoal(args[1], location, visit);
     visit(name, 2, location);
@@ -226,6 +254,16 @@ void checkReservedCalls(const ParsedProgram& program, const Database& database,
   const std::map<std::string, NameInfo> known = knownNames(program, database);
   forEachGoal(program, [&](std::string_view name, std::size_t arity,
                            const SourceLocation& location) {
+    if (const char* message = retiredNameMessage(name, arity); message != nullptr) {
+      PrologError error;
+      error.code = ErrorCode::UnknownPredicate;
+      error.severity = Severity::Error;
+      error.message = message;
+      error.location = location;
+      error.isParseError = true;
+      sink.report(std::move(error));
+      return;
+    }
     const auto it = known.find(std::string(name));
     if (it == known.end() || !it->second.reserved) {
       return;  // unknown names are warnings, and they wait for the whole load

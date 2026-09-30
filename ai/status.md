@@ -32,7 +32,7 @@ session.
 * Unification with an undo trail; atoms and strings are interchangeable;
   arithmetic expressions are evaluated eagerly on binding.
 * Resolution engine over a *persistent environment chain* (ADR-004): O(1) choice
-  points, standard cut, transparent `ВЫП/1`, `НЕ/1`, `ИЛИ/2`, `РАВНО/2`,
+  points, standard cut, transparent `ВЫП/1`, `НЕ/1`, `ПЕРВОЕ/2`, `РАВНО/2`,
   `ЛОЖЬ`, `ТРАССА`/`НЕТ_ТРАССЫ`, `ТИХО`, `ВЕРСИЯ`, `ПС`, `ЖДИ`.
 * Arithmetic: hand-written `BigInt`, `#expr#`, `БОЛЬШЕ`/`МЕНЬШЕ`, `СЛОЖЕНИЕ`,
   `УМНОЖЕНИЕ/3,4`, `abs`, `sqrt`, `sin`, `cos`, `tan`, `exp`, `is_whole`,
@@ -107,13 +107,14 @@ session.
 | task_38_engine_limits | done | recursion depth and long runs: the crash is gone (the chain and deep terms are released iteratively — the trigger was a *surviving* deep reference, a choice point whose base clause does not cut, or the solver's final environment), `maxDepth` turns runaway recursion into a diagnostic, the variable growth is documented instead of "fixed", and `tools/bench_engine.py` made the numbers reproducible |
 | task_39_english_aliases | done | every built-in has an English spelling in lower case (one `kEnglishNames` table in `builtins.cpp`, 47 pairs, is the only place a pair is written; `test_aliases.cpp` walks it and fails on a Russian name without a row); the manual gained appendix 17 with the whole table, `prologd-diff.typ` §15 and `conventions.md` the rule; doing it showed that `int`/`float` were *checks*, not conversions (`integer`/`float` are the ISO type tests, `is_whole`/`is_number` the old ones, and the planned `to_int`/`to_float` were dropped) and `ДЛИНА` became `strlen`; 108 reserved names, one list for CLI, protocol and GUI; renamed on review: `number` → `is_number`, `num_to_float` → `int_to_float` |
 | task_40_diagnostics | done | severity (an error stops a load or a query and keeps exit codes 2/3; a warning never changes either, and `--no-warnings` drops them) with `severity` on the wire (protocol 4) and amber warnings counted in the GUI; positions name what to fix (the opening bracket and its line, the end of a clause without its dot, the goal); a reserved name with an arity that exists nowhere is an error, an undefined predicate or a missing arity is a warning with a suggestion; singleton variables with separate advice for facts, rules and bodies |
-| task_41_semicolon_disjunction | done | `;` is the backtrackable disjunction of ISO, `,` binds tighter, and a branch runs in a frame whose cut barrier sits above the alternative (a cut in a branch is local to it; `ИЛИ/2` stays the committed form, and lesson 4 shows both side by side); the sentence terminator is the dot alone, and a `;` written as one is an error that says what changed; `examples/factorial.pld` was the only file to convert; parse shapes, solver semantics and diagnostics are all pinned |
+| task_41_semicolon_disjunction | done | `;` is the backtrackable disjunction of ISO, `,` binds tighter, and a branch runs in a frame whose cut barrier sits above the alternative (a cut in a branch is local to it; `ПЕРВОЕ/2` — then still named `ИЛИ/2`, renamed in task_44 — stays the committed form, and lesson 4 shows both side by side); the sentence terminator is the dot alone, and a `;` written as one is an error that says what changed; `examples/factorial.pld` was the only file to convert; parse shapes, solver semantics and diagnostics are all pinned |
 | task_42_engine_hot_path | not started | the constant tax: no string per built-in call, no `"name/arity"` key per predicate call, clause indexing and atom interning only where the benchmark justifies them |
 | task_43_language_surface | not started | `ВЫП/2..N` (`call/N`), a warning when two imported files define the same predicate, and the removal of the seven library clauses that every built-in already shadows (`?СКОЛЬКО(НЕ, А)` answers 2 today) |
+| task_44_names | done | the two names that promised something else: `ИЛИ/2` → `ПЕРВОЕ/2` (`or` → `first`) with the retired spelling removed from the language (a call is a load error naming the replacement), `НАЙТИВСЁ` → `НАЙТИВСЕ` (the spelling of the task and of the reference notes) with the retired spelling kept reserved, so its call is the ordinary suggestion «возможно, НАЙТИВСЕ/3»; the two `ИЛИ` library clauses removed so the old name cannot answer through the database; `doc/help.typ` §4.6, `prologd-diff.typ` §17/§18, lesson 4's section 5 |
 
 ## Test suite
 
-211 tests, about four seconds: 198 Catch2 cases plus 13 command-line and
+223 tests, about four seconds: 210 Catch2 cases plus 13 command-line and
 integration tests (seven option tests, two `--list-keywords` tests, the
 import-search report, the JSON protocol session and the engine-limit cases). Groups:
 BigInt, lexer, keywords, parser, unification, engine, every built-in group,
@@ -851,3 +852,25 @@ Resolved on 2026-09-29 (GUI planning):
   commit made `,`/2 and `;`/2 print infix — `(A ; B)` — which is what a query
   echo, a trace line and a step point carry.  206 Catch2
   cases (3 247 assertions), 219 ctest tests, all green.
+* Naming round, part 25: **the two names that lied**.  `ИЛИ/2` was honest in the
+  original dialect (there was no disjunction to contrast with), but after task_41
+  the disjunction is `;`, and `ИЛИ` is the "take only the first" form — the name
+  promised a choice the predicate never makes.  The user picked the full rename
+  over a synonym, so `ПЕРВОЕ/2` / `first` replace `ИЛИ` / `or` outright.
+  `НАЙТИВСЁ` had drifted from the source as well: `ai/task_13_findall.md` and
+  `ai/reference_notes.md` spell it without ё (`?НАЙТИВСЕ(И,студент(И,Ф),А).`), so
+  the name went back to `НАЙТИВСЕ`.  The retired spellings are handled by one new
+  lexer set (`kRetiredBuiltinNames`: reserved, so an old call is still parsed as a
+  goal, but *not* in `reservedBuiltinNames()`, so the keyword table, completion,
+  syntax colouring and `--list-keywords` never offer them) plus, for a full
+  rename, a `kRetiredNames` table in `checks.cpp` that turns the call into a load
+  error before the unknown-name path: «`«ИЛИ» переименовано: теперь это
+  «ПЕРВОЕ(Ц1, Ц2)», а дизъюнкция — «A ; B»`».  The retired `НАЙТИВСЁ` needs no
+  table at all — it is one code point from `НАЙТИВСЕ`, so the ordinary suggestion
+  machinery already answers «возможно, НАЙТИВСЕ/3» (verified by hand and pinned in
+  `test_diagnostics.cpp`).  The two `ИЛИ` clauses left `Engine::initialize`'s
+  library (they would have answered the retired name through the database);
+  `prologd-diff.typ` gained §17 (the ё spelling) and §18 (the rename), and its §6
+  lost the "the behaviour is preserved" sentence that task_41 had made false.
+  223 ctest tests (2 new), 210 Catch2 cases (3 276 assertions), the GUI headless
+  suite and all five Typst documents, all green.

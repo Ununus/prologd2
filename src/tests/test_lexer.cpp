@@ -57,16 +57,19 @@ TEST_CASE("lexer distinguishes atoms, variables and reserved names") {
 }
 
 TEST_CASE("a retired spelling is still a predicate name, not a variable") {
-  // `НАЙТИВСЁ` (with ё) left the language in favour of `НАЙТИВСЕ`; the lexer
-  // keeps it reserved so the call reaches the checks and gets a message
-  // instead of failing as an upper-case variable.
-  DiagnosticSink sink;
-  const auto tokens = lex("НАЙТИВСЁ", sink);
-  REQUIRE_FALSE(sink.hasErrors());
-  REQUIRE(tokens[0].kind == TokenKind::Identifier);
-  REQUIRE(isReservedBuiltinName("НАЙТИВСЁ"));
-  // ... but it is not one of the names the keyword table is built from.
-  REQUIRE(reservedBuiltinNames().count("НАЙТИВСЁ") == 0);
+  // `НАЙТИВСЁ` (with ё) and `ИЛИ` left the language (task_44); the lexer keeps
+  // them reserved so a call reaches the checks and gets a message instead of
+  // failing as an upper-case variable.
+  for (const std::string& spelling : {"НАЙТИВСЁ", "ИЛИ"}) {
+    INFO("spelling: " << spelling);
+    DiagnosticSink sink;
+    const auto tokens = lex(spelling, sink);
+    REQUIRE_FALSE(sink.hasErrors());
+    REQUIRE(tokens[0].kind == TokenKind::Identifier);
+    REQUIRE(isReservedBuiltinName(spelling));
+    // ... but they are not among the names the keyword table is built from.
+    REQUIRE(reservedBuiltinNames().count(spelling) == 0);
+  }
 }
 
 TEST_CASE("lexer handles numbers") {

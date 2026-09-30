@@ -168,6 +168,23 @@ TEST_CASE("the retired findall spelling suggests the current one") {
   REQUIRE(warning.message == "не найдено: НАЙТИВСЁ/3; возможно, НАЙТИВСЕ/3");
 }
 
+TEST_CASE("a retired name says what to write instead") {
+  // `ИЛИ` was renamed to `ПЕРВОЕ` (task_44): the name is gone, so the load
+  // fails with a message that names the replacement — the same kind of break as
+  // the `;` terminator (task_41), and for the same reason: the old spelling
+  // reads like something it never was.
+  const std::vector<PrologError> diagnostics = diagnosticsOf("?ИЛИ(ЛОЖЬ, ЛОЖЬ).\n");
+  REQUIRE(diagnostics.size() == 1);
+  const PrologError& error = diagnostics.front();
+  REQUIRE(error.code == ErrorCode::UnknownPredicate);
+  REQUIRE(error.severity == Severity::Error);
+  REQUIRE(error.isParseError);
+  REQUIRE(error.location.line == 1);
+  REQUIRE(error.location.column == 2);  // the goal, not the `?`
+  REQUIRE(error.message ==
+          "«ИЛИ» переименовано: теперь это «ПЕРВОЕ(Ц1, Ц2)», а дизъюнкция — «A ; B»");
+}
+
 TEST_CASE("an arity a user predicate does not have lists the ones it has") {
   const std::vector<PrologError> diagnostics = diagnosticsOf("дв(1, 2).\n?дв(1).\n");
   REQUIRE(diagnostics.size() == 1);

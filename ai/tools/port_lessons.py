@@ -12,7 +12,8 @@ Rules (see ai/reference_notes.md and doc/prologd-diff.typ):
   a predicate (lower-cased) when it is immediately followed by ``(``, otherwise
   it is quoted;
 * reserved built-in names, comments, strings and quoted atoms are copied
-  verbatim.
+  verbatim, except the reserved names the new dialect spells differently:
+  ``ИЛИ`` → ``ПЕРВОЕ``, ``or`` → ``first``, ``НАЙТИВСЁ`` → ``НАЙТИВСЕ``.
 
 Usage:  python3 ai/tools/port_lessons.py <src-dir> <dst-dir>
 """
@@ -23,13 +24,16 @@ import os
 import sys
 
 RESERVED = set(
-    """ЛОЖЬ ТРАССА НЕТ_ТРАССЫ ВЫП НЕ ИЛИ РАВНО ТИХО ВЕРСИЯ ПС
+    """ЛОЖЬ ТРАССА НЕТ_ТРАССЫ ВЫП НЕ ИЛИ ПЕРВОЕ РАВНО ТИХО ВЕРСИЯ ПС
     БОЛЬШЕ МЕНЬШЕ СЛОЖЕНИЕ УМНОЖЕНИЕ СЛУЧ ABS SQRT SIN COS TAN EXP
     int float mod div ЧТЕНИЕ_ИЗ ЗАПИСЬ_В ВВКОД ВВОДЦЕЛ ВВОДВЕЩ ВВОДСИМВ
     ВВОДСТР ВЫВОД ЖДИ БУКВА ЦИФРА СЦЕП КОПИЯ ДЛИНА ПЕР ЦЕЛ ВЕЩ СИМВ СПИСОК
     СТРСПИС СТРЦЕЛ СТРВЕЩ ЦЕЛВЕЩ СКОЛЬКО ПРЕДЛ ТЕРМ ДОБ УДАЛЕНИЕ ТОЧКА
-    ЛИНИЯ ОКРУЖНОСТЬ ЗАКРАСКА НАЙТИВСЕ ИМПОРТ""".split()
+    ЛИНИЯ ОКРУЖНОСТЬ ЗАКРАСКА НАЙТИВСЕ НАЙТИВСЁ ИМПОРТ first""".split()
 )
+
+# The names the current dialect spells differently from the reference sources.
+RENAMED = {"ИЛИ": "ПЕРВОЕ", "or": "first", "НАЙТИВСЁ": "НАЙТИВСЕ"}
 
 
 def is_lower(ch: str) -> bool:
@@ -127,7 +131,7 @@ def convert(source: str) -> str:
             if has_apostrophe:
                 j += 1
             if name in RESERVED:
-                out.append(name)
+                out.append(RENAMED.get(name, name))
             elif name == "_":
                 out.append("_")
             elif len(name) == 1 or has_apostrophe:
@@ -141,7 +145,7 @@ def convert(source: str) -> str:
                 else:
                     out.append("'" + name.replace("'", "''") + "'")
             else:
-                out.append(name)
+                out.append(RENAMED.get(name, name))
             i = j
             continue
         out.append(ch)

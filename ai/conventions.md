@@ -97,7 +97,7 @@ Tests are written **together with** the feature, never after.
 * A feature is not done until it has tests. Required test groups:
   * parser: one test per error category;
   * unification: variables, atoms, numbers, structures, lists, occurs cases;
-  * engine: backtracking order, cut, failure, deep recursion, `ВЫП`, `НЕ`, `ИЛИ`;
+  * engine: backtracking order, cut, failure, deep recursion, `ВЫП`, `НЕ`, `ПЕРВОЕ`;
   * arithmetic: each operator, mixed int/float, division by zero, big values;
   * one test file per built-in predicate group;
   * `НАЙТИВСЕ/3` with the exact examples from the requirements;
