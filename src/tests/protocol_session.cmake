@@ -168,6 +168,28 @@ if(NOT exit_code EQUAL 3)
   message(FATAL_ERROR "Expected exit code 3 after a stopped step, got ${exit_code}")
 endif()
 
+# --- `interrupt` at a paused step point ends the pause -------------------------
+# The window's «Остановить» relies on it: the pause is the one state the solver's
+# own stop flag cannot reach, because nothing is solving there.
+file(WRITE "${session}"
+  "{\"cmd\":\"load\",\"text\":\"факт(1).\\n?факт(X).\\n\",\"name\":\"pause.pld\",\"step\":true}\n"
+  "{\"cmd\":\"interrupt\"}\n"
+  "{\"cmd\":\"quit\"}\n")
+
+execute_process(
+  COMMAND "${PROLOGD_EXE}" --protocol json
+  INPUT_FILE "${session}"
+  OUTPUT_VARIABLE events
+  RESULT_VARIABLE exit_code)
+
+string(FIND "${events}" "\"kind\":\"runtime\"" position)
+if(position EQUAL -1)
+  message(FATAL_ERROR "An interrupted pause did not report a runtime error\n--- got ---\n${events}")
+endif()
+if(NOT exit_code EQUAL 3)
+  message(FATAL_ERROR "Expected exit code 3 after an interrupted pause, got ${exit_code}")
+endif()
+
 # --- a runtime error names the clause it happened in --------------------------
 file(WRITE "${session}"
   "{\"cmd\":\"load\",\"text\":\"дели(Х):-БОЛЬШЕ(1,#1/0#).\\n?дели(1).\\n\",\"name\":\"boom.pld\"}\n"

@@ -234,7 +234,10 @@ machinery, a different paint) and the caret follows it while that tab is showing
 `Shift+F10` steps out of the current goal: the interpreter stops sending the points
 *inside* it, so a long recursion is walked over in one key rather than hundreds.
 `F5` (**Продолжить**) runs on to the end, and `Shift+F5` ends the query, as it does
-for a runaway run.
+for a runaway run.  The strip carries three of the toolbar's pictures — продолжить,
+шаг, стоп — with the words and their keys in the tooltips, and its whole row is set
+in the editor's monospace font: a monospace goal between proportional labels reads
+as a defect, and zooming used to move only half of the strip.
 
 A paused step is a *usable* state, not a busy one: «Шаг», «Шаг с обходом» and
 «Запустить» (= продолжить) are enabled while the panel is up, because a disabled
@@ -263,12 +266,15 @@ status bar and in the pane (`path:line:column: message`).  A diagnostic from an
 `ИМПОРТ`ed file names *that* file: the window looks for the tab, then next to the
 file that imported it, then on disk — where it is opened in a tab of its own,
 because marking a line in whatever tab happens to be showing would be worse than
-marking none.  A name in angle brackets is not a path, and *which* text it names decides whether
-a line is marked at all: `<buffer>` is the program the window sent, so a diagnostic
-in it belongs to the showing tab and is marked where it came from; `<library>` is
-the interpreter's own preloaded text and `<query>` is the one statement of a
-`query` request (typed in the query line or clicked in the margin) — neither has a
-line in any tab, so they are shown in the pane and the caret is left alone.
+marking none.  A diagnostic names the text it came from, and *which* of the window's own names it
+is decides whether a line is marked at all: a text load is named after its tab — a
+saved file by its path, an unnamed buffer by its title («Без имени 2», the name on
+the tab) — so a diagnostic in it belongs to that buffer and is marked there;
+`<buffer>` is the protocol's default for a load that named nothing, and the window
+still reads it as «the showing tab».  `<library>` is the interpreter's own
+preloaded text and `<query>` is the one statement of a `query` request (typed in
+the query line or clicked in the margin) — neither has a line in any tab, so they
+are shown in the pane and the caret is left alone.
 Marking line 1 of the program for a failed query is exactly what that rule fixed:
 the error is in the statement, not in the first line of the program.  A line past
 the end of the file (where `непарные скобки` is reported) is clamped to the last
@@ -311,7 +317,11 @@ flight is not started twice, and the answer frees the button so that the next
 press restarts the whole file — while «Остановить» needs the first, because a live
 interpreter holds a knowledge base and unloading it is a stop of its own (the note
 says `--- база знаний выгружена ---`; a computation that was interrupted gets
-`--- остановлено ---`).  A window the user has only opened starts **no**
+`--- остановлено ---`).  Stopping a *run* is polite first: the session is asked to
+end the query (`interrupt`), and the process is taken down only if the interpreter
+has not finished on its own within `STOP_GRACE_MS` (500 ms) — so an interrupted run
+leaves the interpreter idle *with* its base, and the next press unloads it.  A
+window the user has only opened starts **no**
 interpreter: the session comes up with the first run or with a goal typed into the
 query line, which is also what makes «Остановить» dead until then.  The right-hand
 side of the status bar says which of the three it is (`выполняется`, `база знаний
@@ -419,7 +429,10 @@ A tab carries its state as a picture: `file` for a buffer that was never saved,
 `file-saved` once it has a file on disk, and `file-modified` while there are
 unsaved changes — saved or not.  The title bar carries the **whole path**, so two
 files with one name are told apart without opening anything; the tab keeps the
-short name, because a tab bar full of paths cannot be read.  The «Последние»
+short name, because a tab bar full of paths cannot be read, and the status bar
+shortens what it says about a file to the last two components
+(`…\lessons\lesson_04.pld`, see `documents.short_path`) — one line, where a full
+path would push everything else out.  The «Последние»
 submenu shows the file picture for the entries that are programs, and the window
 itself carries the application icon (`prologd2.png`), which «О программе» shows
 as well.
@@ -525,10 +538,13 @@ failure (for example an interrupted query).
   protocol mode all diagnostics travel as `error` events.
 * The answer to an `input_request` is one string; embedded newlines stay inside
   that string.
-* `interrupt` is handled between commands and while the interpreter waits for
-  input.  A query that neither waits for input nor finishes **cannot** be
-  interrupted politely — terminate the process and start a new session, which is
-  what the **Остановить** button does.
+* `interrupt` reaches the solver at every step of its loop, and a paused step
+  point answers it by ending the pause — a running query, a runaway and a read
+  waiting for input all end on the request with the runtime error of the
+  interrupted query.  **Остановить** asks first and terminates the process only
+  when the request is not answered within `STOP_GRACE_MS` (500 ms); a polite stop
+  leaves the session idle *with* its knowledge base, and stopping that idle
+  session is what unloads it.
 * `-i`, `-o` and `-e` are refused together with `--protocol json`: the protocol
   owns stdin and stdout.
 

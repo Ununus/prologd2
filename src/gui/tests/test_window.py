@@ -763,14 +763,52 @@ def test_the_run_state_drives_the_buttons(executable: str) -> None:
         assert window._actions["stop"].isEnabled() is False
         assert "--- база знаний выгружена ---" in window.output_text(), window.output_text()
 
-        # ... while stopping a computation in flight is just a stop.
+        # ... while stopping a computation in flight is asked politely first and
+        # ends on the deadline when nobody is reading (a load runs to its end
+        # before the request can be read — see the window test below for the case
+        # where the request *is* read: a read waiting for input).
         window._actions["run"].trigger()
         assert window._actions["stop"].isEnabled() is True
         window._actions["stop"].trigger()
-        assert "--- остановлено ---" in window.output_text(), window.output_text()
+        assert pump(window, lambda: "--- остановлено ---" in window.output_text()), (
+            window.output_text()
+        )
         print("ok: run and stop follow the two states of the interpreter")
     finally:
         discard_changes(window)
+
+
+def test_stopping_a_query_asks_first_and_keeps_the_base(executable: str) -> None:
+    """«Остановить» asks before it ends the process (task_28, the Stop block).
+
+    The solver reads the interrupt at every step of its loop, so a query that
+    *waits* — for input, the clearest case — ends on the request: the pane says
+    `--- остановлено ---`, and the interpreter is left idle with its knowledge
+    base.  Stopping that idle session is a different act and unloads it; the
+    deadline (`STOP_GRACE_MS`) covers the one state a request cannot reach.
+    """
+    window = empty_window(executable)
+    try:
+        window.editor().setPlainText("?ВВОДСТР(С).\n")
+        window.run_program()
+        assert pump(window, lambda: window._input_console.waiting()), window.status_text()
+        assert window.session.is_running()
+
+        window._actions["stop"].trigger()
+        assert pump(window, lambda: "--- остановлено ---" in window.output_text()), (
+            window.output_text()
+        )
+        assert window.session.is_running() is True, "the session survives a polite stop"
+        assert "база знаний загружена" in window._details.text(), window._details.text()
+        assert window._input_console.waiting() is False, "the pending request is dismissed"
+
+        # The idle interpreter with its base is unloaded by the same command.
+        window._actions["stop"].trigger()
+        assert "--- база знаний выгружена ---" in window.output_text(), window.output_text()
+        assert window.session.is_running() is False
+    finally:
+        discard_changes(window)
+    print("ok: «Остановить» asks first, keeps the base, and unloads it on the next press")
 
 
 def test_the_wrap_switch_reaches_every_editor(executable: str) -> None:
@@ -1336,8 +1374,8 @@ def test_a_runtime_error_marks_its_line(executable: str) -> None:
         view = window.editor()
         assert view.error_line() == 1, view.error_line()
         assert view.textCursor().blockNumber() == 0, "the caret is not on the line"
-        assert "ошибка: <buffer>:1:1" in window.status_text(), window.status_text()
-        assert "<buffer>:1:1: деление на ноль" in window.output_text(), ascii(
+        assert "ошибка: Без имени:1:1" in window.status_text(), window.status_text()
+        assert "Без имени:1:1: деление на ноль" in window.output_text(), ascii(
             window.output_text()
         )
 
@@ -1658,6 +1696,44 @@ def test_f1_shows_the_record_of_the_word_under_the_caret(executable: str) -> Non
     print("ok: F1 shows the record of the word under the caret, and says «нет справки»")
 
 
+def test_the_step_strip_is_one_font_and_three_pictures(executable: str) -> None:
+    """The strip's buttons are the toolbar's pictures; the strip is one font.
+
+    Reported from a run: «Продолжить» and «Стоп» were words in the interface font
+    between monospace labels — a paragraph of prose in the middle of a program —
+    and there was no way to step from the strip itself.
+    """
+    from PySide6.QtWidgets import QLabel
+
+    window = empty_window(executable)
+    try:
+        window.editor().setPlainText("факт(1).\nсчёт(X) :- факт(X).\n?счёт(X).\n")
+        window._actions["step"].trigger()
+        assert pump(window, lambda: window.stepping()), "the step panel never appeared"
+        pane = window.step_pane()
+
+        for button in (pane.resume_button(), pane.step_button(), pane.stop_button()):
+            assert button.text() == "", "the strip's buttons show pictures now"
+            assert button.icon().isNull() is False, "the picture is missing"
+            assert button.toolTip(), "the words moved into the tooltip"
+        assert "F5" in pane.resume_button().toolTip()
+        assert "F10" in pane.step_button().toolTip()
+
+        # One font for the whole strip, and the zoom moves all of it.
+        pane.set_font_size(15.0)
+        sizes = {round(label.font().pointSizeF(), 1) for label in pane.findChildren(QLabel)}
+        assert sizes == {15.0}, sizes
+
+        # The picture acts: «Шаг» goes one point further in, like `F10`.
+        pane.step_button().click()
+        assert pump(window, lambda: pane.goal_text().startswith("факт")), ascii(
+            pane.goal_text()
+        )
+    finally:
+        discard_changes(window)
+    print("ok: the step strip is one font, and its buttons are the toolbar's pictures")
+
+
 def main(argv: list[str]) -> int:
     if QApplication is None:
         print("skipped: PySide6 is not installed")
@@ -1719,7 +1795,9 @@ def main(argv: list[str]) -> int:
         test_a_question_parked_in_a_comment_runs_from_the_margin(executable)
         test_a_marker_while_a_step_is_paused_starts_a_fresh_quiet_run(executable)
         test_a_failed_query_marks_no_line_and_moves_no_caret(executable)
+        test_stopping_a_query_asks_first_and_keeps_the_base(executable)
         test_copy_takes_the_selection_where_the_focus_is(executable)
+        test_the_step_strip_is_one_font_and_three_pictures(executable)
         test_f1_shows_the_record_of_the_word_under_the_caret(executable)
         test_the_output_can_be_saved(executable, files)
         test_the_context_menu_reuses_the_shared_actions(executable)

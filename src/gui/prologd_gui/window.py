@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pathlib
 
-from PySide6.QtCore import QSize, Qt, QUrl
+from PySide6.QtCore import QSize, Qt, QTimer, QUrl
 from PySide6.QtGui import QAction, QDesktopServices, QIntValidator, QKeySequence, QTextCursor
 from PySide6.QtWidgets import (
     QApplication,
@@ -34,6 +34,10 @@ from .editor import CodeEditor, ZoomablePlainTextEdit
 from .panes import Pane
 from .session import PrologSession
 from .settings import Settings
+
+#: How long «Остановить» waits for the interpreter to end its query by itself
+#: before the process is taken down (`stop_program`).
+STOP_GRACE_MS = 500
 
 WELCOME = """% PrologD — пример программы
 студент(вова, корчагин).
@@ -102,6 +106,11 @@ class MainWindow(QMainWindow):
         #: True while a stop of our own is in flight, so the exit code it produces
         #: (a termination status, not an exit code) is not reported as one.
         self._stopping = False
+        #: The deadline of a polite stop: the interpreter is asked to end its
+        #: query first, and the process goes only if it does not (`stop_program`).
+        self._stop_grace = QTimer(self)
+        self._stop_grace.setSingleShot(True)
+        self._stop_grace.timeout.connect(self._stop_expired)
         #: Two states, not one: the interpreter is a process that can be *up* and
         #: idle, and a computation can be *in flight* in it.  `Запустить` needs the
         #: second (there is nothing to start while one is running) and `Остановить`
@@ -186,6 +195,7 @@ class MainWindow(QMainWindow):
             font_size=self._settings.font_size,
         )
         self._step_pane.resumed.connect(self.step_continue)
+        self._step_pane.stepped.connect(self.step_into)
         self._step_pane.stopped.connect(self.stop_program)
 
         # The reference of a predicate (task_37, `F1`): a dock, not a modal box —
@@ -518,13 +528,16 @@ class MainWindow(QMainWindow):
         altogether.  `Остановить` is for a live process: stopping an idle one is
         how the knowledge base is unloaded, which is what its message says.
         """
-        self._actions["run"].setEnabled(not self._busy)
-        self._actions["stop"].setEnabled(self._session.is_running())
-        # A *paused* step is a usable state, not a busy one: «Шаг», «Шаг с обходом»
-        # and «Запустить» (which then means «продолжить») have to be live, or their
-        # keys are dead exactly when the user needs them — a disabled `QAction`
-        # fires no shortcut.  A run actually in flight is the blocked state.
+        # A *paused* step is a usable state, not a busy one: «Запустить» then
+        # means «продолжить», and «Шаг», «Шаг с обходом» and the traced run have
+        # to be live, or their keys are dead exactly when the user needs them — a
+        # disabled `QAction` fires no shortcut.  A run actually in flight is the
+        # blocked state.  (The paused case is written out here on purpose: it
+        # used to work only because the status of a *restart* cleared the busy
+        # flag, which the flag ordering of `run_program` then fixed.)
         free = not self._busy or self._session.paused()
+        self._actions["run"].setEnabled(free)
+        self._actions["stop"].setEnabled(self._session.is_running())
         self._actions["run_trace"].setEnabled(free)
         self._actions["step"].setEnabled(free)
         self._actions["step_over"].setEnabled(free)
@@ -890,7 +903,7 @@ class MainWindow(QMainWindow):
         buffer = self.current_buffer()
         where = f" — панель {self._active_pane + 1} из {len(self._panes)}" if len(self._panes) > 1 else ""
         if buffer is not None and buffer.model.path:
-            self._status.setText(f"открыт {buffer.model.path}{where}")
+            self._status.setText(f"открыт {documents.short_path(buffer.model.path)}{where}")
         elif where:
             self._status.setText(f"активна левая панель{where}" if self._active_pane == 0 else f"активна правая панель{where}")
 
@@ -927,6 +940,13 @@ class MainWindow(QMainWindow):
         The result is True when the load was sent; a caller that wants to add a
         query of its own (`_on_query_requested`) must not do it otherwise.
         """
+        # A new run cancels the deadline of a polite stop that is still pending:
+        # the old process goes either way (`session.start` stops a live one).  The
+        # `_stopping` flag itself is *not* cleared here: the terminated process's
+        # `ended` event consumes it, and that event is delivered before this load
+        # reaches the new interpreter — clearing it early would report the
+        # termination status as an exit code.
+        self._stop_grace.stop()
         if self._session.paused() and not (trace or step):
             # `F5` while a step is paused means «продолжить»: starting the file over
             # would throw away the run the user is walking through.
@@ -954,9 +974,13 @@ class MainWindow(QMainWindow):
         # value — and a cancelled question applies to this run only.
         self._stopped_input = False
         self._queued_input = self._input_lines()
+        self._session.start()
+        # After `start()`, not before: it stops a live session first, and the
+        # `ended` event of that old process (delivered inside the stop) would
+        # clear the flags just set — a restart is not an unload, and the new
+        # interpreter has the program loaded from here on.
         self._busy = True
         self._loaded = True
-        self._session.start()
         # At once, not when `ready` arrives: the user pressed the button, and it
         # must not be pressable again while the interpreter is coming up.
         self._sync_run_actions()
@@ -975,9 +999,13 @@ class MainWindow(QMainWindow):
             # status line says which case is running, so a failing `ИМПОРТ` is
             # not a mystery: without a path it searches only the working
             # directory and the `-I` directories.
-            self._session.load_text(buffer.text(), path or "<buffer>", step=step, trace=trace,
-                                    questions=questions)
-            name = pathlib.Path(path).name if path else "буфер без имени"
+            # The text comes from the editor, but the identity comes from the tab:
+            # a saved file is named by its path (so `ИМПОРТ` and the diagnostics
+            # point at the real file), an unnamed buffer by its title — the name
+            # the user sees in the tab and in the status bar of a diagnostic.
+            self._session.load_text(buffer.text(), path or buffer.title(), step=step,
+                                    trace=trace, questions=questions)
+            name = pathlib.Path(path).name if path else buffer.title()
             self._status.setText(f"выполняется {name} (есть несохранённые правки)")
         return True
 
@@ -1013,8 +1041,12 @@ class MainWindow(QMainWindow):
             return
         if self._busy or self._session.paused():
             # «Остановить», then the clicked query: a runaway is ended by ending
-            # its process, and the pane's last word is the answer asked for.
-            self.stop_program()
+            # its process.  Immediate, not the polite ask of `stop_program`: the
+            # clicked query follows at once, and the stopped run's own events must
+            # not arrive in the middle of it (the marker is «stop this and answer
+            # that», and nobody waits for the runaway to agree).
+            if self._session.is_running():
+                self._stop_now("остановлено")
         self._query_line.setText(statement)
         if not self.run_program(questions=False):
             return
@@ -1060,7 +1092,7 @@ class MainWindow(QMainWindow):
         else:
             self._add_buffer(model)
         self._remember(path)
-        self._status.setText(f"открыт {path}")
+        self._status.setText(f"открыт {documents.short_path(path)}")
         return True
 
     def save_buffer(self, buffer: Buffer | None = None, path: str | None = None) -> bool:
@@ -1099,7 +1131,7 @@ class MainWindow(QMainWindow):
         buffer.mark_saved()
         self._refresh_titles()
         self._remember(written)
-        self._status.setText(f"сохранён {written}")
+        self._status.setText(f"сохранён {documents.short_path(written)}")
         return True
 
     def reload_buffer(self) -> bool:
@@ -1123,7 +1155,7 @@ class MainWindow(QMainWindow):
         buffer.model.eol = model.eol
         buffer.mark_saved()
         self._refresh_titles()
-        self._status.setText(f"перечитан {buffer.model.path}")
+        self._status.setText(f"перечитан {documents.short_path(buffer.model.path)}")
         return True
 
     def close_buffer(self, buffer: Buffer) -> bool:
@@ -1263,17 +1295,51 @@ class MainWindow(QMainWindow):
                 return
 
     def stop_program(self) -> None:
+        """Ends the run — politely first, and the base is not lost on the way.
+
+        The solver reads the interrupt at every step of its loop, so a query
+        that is running (a runaway included), waiting for input or paused at a
+        step point all end on the request: the session answers with the runtime
+        error of the interrupted query (`Interrupted`) and is then idle *with
+        its knowledge base*, which is the difference between stopping a run and
+        stopping the interpreter.  The deadline covers what the request cannot
+        reach — a front-end that never reads, say — and then the process goes as
+        it always did.
+
+        An idle interpreter with a base loaded is the other meaning: stopping
+        *it* unloads the base, and that is the one case that is immediate.
+        """
         if not self._session.is_running():
             self._status.setText("интерпретатор уже остановлен")
             return
-        # What the stop *means* depends on what it interrupts: a computation that is
-        # in flight is stopped, an idle interpreter with a base loaded is unloaded.
         unloading = self._loaded and not self._busy
+        if self._closing:
+            # Closing the window must not wait for a timer: the child goes at once,
+            # even if a polite stop is still on its way.
+            self._stop_now("база знаний выгружена" if unloading else "остановлено")
+            return
+        if self._stopping:
+            return  # a polite stop is already on its way; do not restart the clock
+        if unloading:
+            self._stop_now("база знаний выгружена")
+            return
+        self._stopping = True
+        self._status.setText("останавливаю…")
+        self._session.interrupt()
+        self._stop_grace.start(STOP_GRACE_MS)
+
+    def _stop_expired(self) -> None:
+        """The polite stop's deadline: the process goes, as it always did."""
+        if self._stopping:
+            self._stop_now("остановлено")
+
+    def _stop_now(self, message: str) -> None:
+        """Ends the session at once (terminate, grace, kill) and says why."""
+        self._stop_grace.stop()
         self._stopping = True
         self._busy = False
         self._loaded = False
         self._session.stop()
-        message = "база знаний выгружена" if unloading else "остановлено"
         self._input_console.idle()
         self._step_pane.idle()
         self._step_stack.clear()
@@ -1281,6 +1347,19 @@ class MainWindow(QMainWindow):
         self._append_note(f"--- {message} ---\n")
         # The process is gone, so the buttons change at once — waiting for `ended`
         # would leave «Остановить» enabled on a session that is already dead.
+        self._sync_run_actions()
+        self._update_details()
+
+    def _finish_polite_stop(self) -> None:
+        """The interrupted query ended by itself: the session stays, the base too."""
+        self._stop_grace.stop()
+        self._stopping = False
+        self._busy = False
+        self._input_console.idle()
+        self._step_pane.idle()
+        self._step_stack.clear()
+        self._status.setText("остановлено")
+        self._append_note("--- остановлено ---\n")
         self._sync_run_actions()
         self._update_details()
 
@@ -1961,6 +2040,7 @@ class MainWindow(QMainWindow):
         self._input_pane.set_font_size(size)
         self._input_console.set_font_size(size)
         self._step_pane.set_font_size(size)
+        self._reference_pane.set_font_size(size)
         self._query_line.setFont(self._output.font())
         self._show_font_size(size)
         self._status.setText(f"шрифт {size:.0f} pt")
@@ -1975,6 +2055,13 @@ class MainWindow(QMainWindow):
         The query being over is what frees `Запустить`: the run is finished, the
         knowledge base is still loaded, and the next run restarts the file.
         """
+        if self._stopping:
+            # The query we asked to stop has concluded.  A read that was waiting
+            # for input ends as a *failure* (`НЕТ`), not as an error — the
+            # interpreter calls the cut-off read the end of input — so the stop
+            # has to finish here as well as in `_on_failed`.
+            self._finish_polite_stop()
+            return
         self._busy = False
         text = "решение найдено" if found else "решения нет"
         if self._warning_count:
@@ -1998,6 +2085,13 @@ class MainWindow(QMainWindow):
         why the rest of this handler only runs for an error.
         """
         where = position.where() if position is not None else ""
+        if self._stopping and self._session.is_running() and severity != "warning":
+            # This is the error of the query *we* stopped: the run is over — the
+            # note of the stop says so — and a user's own stop marks no line.
+            # (After a terminated process there is nothing to finish: the events
+            # that were already in flight are shown as they always were.)
+            self._finish_polite_stop()
+            return
         if severity == "warning":
             self._output.feed(
                 f"*** предупреждение: {where + ': ' if where else ''}{message}\n",
@@ -2108,6 +2202,11 @@ class MainWindow(QMainWindow):
             # text.  Neither has a line in any tab: marking the current one would
             # say the program broke where it did not.
             return None
+        # An unnamed buffer is named by its tab title («Без имени 2»): the text is
+        # the window's own, and its lines are that buffer's lines.
+        for buffer in self._buffers:
+            if buffer.model.path is None and buffer.title() == name:
+                return buffer
         wanted = pathlib.Path(name)
         candidates = [wanted]
         current = self.current_buffer()

@@ -18,7 +18,7 @@ from __future__ import annotations
 import pathlib
 from dataclasses import dataclass
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QTextCharFormat, QTextCursor
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -31,7 +31,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from . import theme
+from . import assets, theme
 from .editor import ZoomablePlainTextEdit
 
 #: What a line is, which is what decides its colour.  The window knows the kind —
@@ -413,6 +413,28 @@ STEP_TITLES = {
 STACK_FRAMES = 6
 
 
+def _tool_button(icon_name: str, tooltip: str, signal) -> QPushButton:
+    """A picture button for the step strip, with its words in the tooltip.
+
+    The strip lives in the editor's monospace world, where three text buttons read
+    as a paragraph of prose in the middle of a program — and the toolbar already
+    has the pictures (`execution-execute`, `execution-step-into`,
+    `execution-abort`).  A checkout without `assets/` falls back to the first word
+    of the tooltip rather than to an empty square.
+    """
+    button = QPushButton()
+    picture = assets.icon(icon_name)
+    if picture is None or picture.isNull():
+        button.setText(tooltip.split(" (")[0].split(" —")[0])
+    else:
+        button.setIcon(picture)
+        button.setIconSize(QSize(16, 16))
+    button.setToolTip(tooltip)
+    button.setAutoDefault(False)
+    button.clicked.connect(signal)
+    return button
+
+
 class StepPane(QWidget):
     """The strip that shows where a stepped run stands.
 
@@ -428,6 +450,8 @@ class StepPane(QWidget):
 
     #: «Продолжить»: run on to the end without stopping at the next point.
     resumed = Signal()
+    #: «Шаг»: one point further in — the panel's own `F10`.
+    stepped = Signal()
     #: «Стоп»: end the query, like «Остановить» does.
     stopped = Signal()
 
@@ -450,10 +474,15 @@ class StepPane(QWidget):
         self._where.setToolTip("Где эта цель стоит в файле")
         self._stack = QLabel("")
         self._stack.setTextFormat(Qt.TextFormat.PlainText)
-        self._resume = QPushButton("Продолжить")
-        self._resume.clicked.connect(self.resumed)
-        self._stop_button = QPushButton("Стоп")
-        self._stop_button.clicked.connect(self.stopped)
+        self._resume = _tool_button(
+            "execution-execute", "Продолжить (F5) — до конца без остановок", self.resumed
+        )
+        self._step_button = _tool_button(
+            "execution-step-into", "Шаг (F10) — на одну точку дальше", self.stepped
+        )
+        self._stop_button = _tool_button(
+            "execution-abort", "Стоп — закончить прогон", self.stopped
+        )
 
         row = QHBoxLayout()
         row.setContentsMargins(0, 0, 0, 0)
@@ -462,6 +491,7 @@ class StepPane(QWidget):
         row.addWidget(self._depth)
         row.addWidget(self._where)
         row.addWidget(self._resume)
+        row.addWidget(self._step_button)
         row.addWidget(self._stop_button)
 
         layout = QVBoxLayout(self)
@@ -521,12 +551,20 @@ class StepPane(QWidget):
     def resume_button(self) -> QPushButton:
         return self._resume
 
+    def step_button(self) -> QPushButton:
+        return self._step_button
+
     def stop_button(self) -> QPushButton:
         return self._stop_button
 
     def set_font_size(self, size: float) -> None:
-        """The goal and the stack are code: the editor's own font."""
+        """One font for the whole strip — the editor's own.
+
+        The goal and the stack are code and were monospace from the start; the
+        labels beside them («вызов», «глубина 0», the position) were not, so the
+        strip mixed two fonts at two sizes, and zooming moved only half of it.
+        """
         font = QFont(self._family)
         font.setPointSizeF(float(size))
-        self._goal.setFont(font)
-        self._stack.setFont(font)
+        for label in (self._action, self._goal, self._depth, self._where, self._stack):
+            label.setFont(font)

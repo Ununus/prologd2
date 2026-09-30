@@ -100,6 +100,21 @@ def untitled_name(used: Iterable[str]) -> str:
     return f"{UNTITLED} {number}"
 
 
+def short_path(path: str | os.PathLike[str], parts: int = 2) -> str:
+    """A path as a *place* one can read: the last `parts` components, `…` before.
+
+    The status bar is one line the user scans while working, and a full
+    `C:\\Users\\…\\examples\\lessons\\lesson_04.pld` in it pushes everything else
+    out of sight.  The window title keeps the whole path — two files of one name
+    have to be told apart — the status line only has to say *where*.
+    """
+    text = str(path)
+    pieces = pathlib.Path(text).parts
+    if len(pieces) <= parts:
+        return text
+    return "…" + os.sep + os.sep.join(pieces[-parts:])
+
+
 @dataclass
 class Document:
     """One open buffer, and what is known about the file behind it.
@@ -160,7 +175,6 @@ class Document:
         if self.path:
             return str(pathlib.Path(self.path).parent)
         return ""
-
     def rename(self, path: str | os.PathLike[str]) -> None:
         self.path = str(path)
         self.name = pathlib.Path(path).name

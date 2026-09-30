@@ -172,8 +172,11 @@ class Session {
       return;
     }
     if (command == "interrupt") {
-      // Effective between commands and while the interpreter waits for input;
-      // a runaway query has to be stopped by ending the process.
+      // The solver reads the stop flag at every step of its loop, so a query
+      // that is *solving* — a runaway included — ends with `Interrupted`; a
+      // paused step point answers the same request by ending the pause.  What
+      // the request cannot reach is a front-end that never reads, and there the
+      // process has to go.
       engine_.requestStop();
       return;
     }

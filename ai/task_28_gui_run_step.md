@@ -2,7 +2,9 @@
 
 **Status:** done — running, stepping (`F10`/`Shift+F10`/`F5`), the trace, the error
 line with its position, and input were already partly in from task_27 and are now
-complete; the engine seam, the protocol additions and the tests are in.
+complete; the engine seam, the protocol additions and the tests are in.  The one
+item left open on 2026-09-29 — «Остановить» ask-first — landed on 2026-10-01
+(`interrupt`, `STOP_GRACE_MS`, the run-vs-unload split); see the note at the end.
 **Depends on:** task_22, task_25, task_27
 **Milestone:** M11
 
@@ -16,7 +18,7 @@ interpreter's questions.
 
 Run
 
-- [ ] **Запуск** `F5`: push the current buffer into the session and run its
+- [x] **Запуск** `F5`: push the current buffer into the session and run its
       queries and directives; output goes to the output pane with the query echo
       (task_27).  *How* the buffer is loaded decides what `ИМПОРТ` sees, and that
       is not obvious, so it is spelled out here:
@@ -37,11 +39,11 @@ Run
       saving an untitled buffer.  When an import is not found at all, the
       interpreter names the directories it tried (task_32) and the GUI shows that
       text verbatim.
-- [ ] "Сохранять перед запуском" stays available as an option (the reference GUI
+- [x] "Сохранять перед запуском" stays available as an option (the reference GUI
       had it), but it is no longer needed for imports to resolve.
-- [ ] **Запуск с трассировкой**: the same with the trace enabled, so the
+- [x] **Запуск с трассировкой**: the same with the trace enabled, so the
       reference-style trace text appears in the pane (grey).
-- [ ] Restart policy: **every run starts a fresh interpreter process** and clears
+- [x] Restart policy: **every run starts a fresh interpreter process** and clears
       the output pane.  The clause database, the RNG seed, file redirection and
       the preloaded input lines all live in the process, so a reused session
       accumulates clauses and prints every solution twice — found by hand in the
@@ -53,78 +55,78 @@ Run
 
 Stop
 
-- [ ] **Остановить** `Shift+F5`: send `interrupt` first (it works while the
+- [x] **Остановить** `Shift+F5`: send `interrupt` first (it works while the
       interpreter waits for input and between commands), and if the query is
       still running after a short grace period, terminate the child and start a
       new session — exactly the note in `src/gui/README.md`, which is why the
       button cannot be a polite signal alone.
-- [ ] The editor must stay responsive while a query runs: all interpreter I/O
+- [x] The editor must stay responsive while a query runs: all interpreter I/O
       happens on the `QProcess` signals, never in a blocking call from the UI
       thread.
 
 Error line
 
-- [ ] Protocol v2: `error` events carry structured position fields
+- [x] Protocol v2: `error` events carry structured position fields
       (`file`, `line`, `column`) next to the human `message`, so the GUI does
       not parse `file:line:column:` out of the text.  Parse diagnostics already
       have the location; **verify that runtime errors carry one too** — a
       runtime error is raised through `raiseAt(code, location, …)` and clauses
       keep their `SourceLocation`, so if any runtime path loses the position,
       fix it there and cover it with a test.
-- [ ] The editor marks the reported line: red background plus a marker in the
+- [x] The editor marks the reported line: red background plus a marker in the
       line-number area, the caret moves there, and the mark is cleared on the
       next run or on edit.  A parse error marks the line too (the offset *is*
       the column).
-- [ ] Diagnostics from `ИМПОРТ`ed files carry that file's name; the GUI opens
+- [x] Diagnostics from `ИМПОРТ`ed files carry that file's name; the GUI opens
       the file in a tab if it is not open yet (or says where it is, if the path
       is outside the project).
 
 Step by step
 
-- [ ] `prlib`: `EngineOptions::stepHook`, the same shape as `externalStop`:
+- [x] `prlib`: `EngineOptions::stepHook`, the same shape as `externalStop`:
       a `std::function` called by the solver at the four points it already
       traces (call, exit, redo, fail) with a `StepInfo {action, goal text,
       depth, location}` and returning `continue / pause / stop`.  Null by
       default, so the cost when not stepping is one branch.  It must be safe to
       call from the solver's own loop and must not be a signal handler.
-- [ ] Protocol v2: `{"event":"step","action":"call","goal":"…","depth":2,"file":…,"line":…,"column":…}`
+- [x] Protocol v2: `{"event":"step","action":"call","goal":"…","depth":2,"file":…,"line":…,"column":…}`
       emitted when the hook pauses, answered by
       `{"cmd":"step","action":"into|over|continue|stop"}`.  Reuse the
       re-entrant request loop that `answerInputRequest` already uses — the
       session reads requests while the engine is inside a query, so no new
       threading model is needed.
-- [ ] GUI: **Шаг** `F10` (into), `Shift+F10` (over), `F5`/**Продолжить**
+- [x] GUI: **Шаг** `F10` (into), `Shift+F10` (over), `F5`/**Продолжить**
       (continue), a step panel showing the current goal, depth and the call
       stack, and the traced line highlighted in the editor like an error line
       but in a neutral colour.  While stepping, output is flushed line by line
       so the picture in the editor matches the step just reported.
-- [ ] Stepping must not be implemented by parsing the textual trace: the text
+- [x] Stepping must not be implemented by parsing the textual trace: the text
       format is for humans and changes with `ВЕРСИЯ`.  If the structured hook is
       not worth its cost later, the fallback is to grep the trace text — record
       that as a deliberate fallback in `decisions.md`, not as the design.
 
 Input
 
-- [ ] `input_request` is answered from the input pane (task_27) or a dialog,
+- [x] `input_request` is answered from the input pane (task_27) or a dialog,
       depending on the setting; the three kinds map to the three widgets, and
       an unanswered request is visible in the status bar and can be cancelled
       (which answers with an empty string, as `std::nullopt` means end of
       input).
-- [ ] **Стоп** while the interpreter waits for input aborts the query; the
+- [x] **Стоп** while the interpreter waits for input aborts the query; the
       pending request is dismissed.
 
 ## Tests
 
-- [ ] Catch2: a step hook that records the sequence of actions for a small
+- [x] Catch2: a step hook that records the sequence of actions for a small
       program and stops at the N-th step; a hook that returns `stop` makes the
       query end with the same error code as `interrupt`.
-- [ ] CTest: a protocol session that runs a query with stepping on, checks the
+- [x] CTest: a protocol session that runs a query with stepping on, checks the
       `step` events and that `{"cmd":"step","action":"stop"}` ends the query.
-- [ ] CTest: a parse *and* a runtime error both produce `error` events with
+- [x] CTest: a parse *and* a runtime error both produce `error` events with
       `line` and `column` fields.
-- [ ] Python: Qt-free step-client test (`src/gui/tests/test_stepping.py`) against
+- [x] Python: Qt-free step-client test (`src/gui/tests/test_stepping.py`) against
       the built interpreter, like `protocol_smoke.py`.
-- [ ] Manual checklist: error line highlighted, Stop on `ПС <- ПС` (or an
+- [x] Manual checklist: error line highlighted, Stop on `ПС <- ПС` (or an
       infinite loop), step-by-step on a small recursive program.
 
 ## Acceptance
@@ -172,12 +174,30 @@ Two decisions worth keeping (both in `ai/decisions.md`):
    for humans and changes with the version; the structured hook is what the panel,
    the stack and the highlighted line are built on.
 
-One thing the task asked for and this round did **not** do: «Остановить» still
-terminates the child rather than sending `interrupt` first and waiting out a grace
-period.  A query that is listening — waiting for input, or paused at a step — would
-end on the request alone and leave the session alive, but then «Остановить» would
-sometimes end the run and sometimes unload the knowledge base, and the run/stop
-buttons would have to be right in both cases.  The window was taught one meaning
-(`--- остановлено ---`, the process goes) in an earlier round and the tests pin it;
-a polite-first stop is a change of its own, worth its own task, and the acceptance
-criteria here are met without it.
+One thing the task asked for and the 2026-09-29 round did **not** do — the polite
+stop — was finished on 2026-10-01:
+
+* `interrupt` reaches the solver at every step of its loop, so a query that is
+  solving (a runaway included) ends on the request — the old comment «a runaway
+  query has to be stopped by ending the process» was simply stale.  A *paused step
+  point* answers `interrupt` by ending the pause (the step loop maps it to
+  `StepDecision::Stop`; pinned by a ctest case now), and a read waiting for input
+  answers it by ending the wait.
+* «Остановить» asks first: `interrupt`, then `STOP_GRACE_MS` (500 ms), and only
+  then terminate + kill.  A polite stop leaves the session **idle with its
+  knowledge base** — that is what makes the two outcomes differ cleanly at last:
+  stopping a *run* keeps the interpreter, stopping an *idle* interpreter unloads
+  the base, and both say so in the pane and in the status bar.  Closing the window
+  skips the request and takes the process down at once.
+* The error event of the interrupted query is the stop's own: the window answers
+  it with the `--- остановлено ---` note and marks no line.
+* Tests: `test_stopping_a_query_asks_first_and_keeps_the_base` (run a read that
+  waits for input, stop, the base stays and the pending request is dismissed; the
+  next press unloads), the in-flight stop of `test_the_run_state_drives_the_buttons`
+  now waits for the note instead of assuming it, and the protocol session gained
+  the `interrupt`-at-a-pause case.
+* One naming point from the Run table was finished in the same pass: a text load is
+  named after its tab — a saved file by its path, an unnamed buffer by its title
+  («Без имени 2») — instead of the protocol's `<buffer>`, so a diagnostic in an
+  unnamed buffer reads «Без имени 2:1:1».  `<buffer>` stays the protocol's default
+  for a load that names nothing, and the window still reads it as the showing tab.

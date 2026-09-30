@@ -9,14 +9,14 @@ session.
   started (protocol + skeleton).
 * Build: the `windows-msvc` preset (Visual Studio 18 2026, MSVC 19.51) build is
   green locally; the Linux presets, including `-Werror`, build cleanly.
-* Tests: 219/219 pass in about four seconds: 206 Catch2 cases plus 13 command-line
+* Tests: 231/231 pass in about four seconds: 218 Catch2 cases plus 13 command-line
   and integration tests (seven option tests, two `--list-keywords` tests, the
   import-search report, the JSON protocol session, the engine-limit cases and the
   diagnostics cases).
   or `--source`), stdin, the REPL and the `--protocol json` session for
   front-ends.
 * GUI: `src/gui` (PySide6) drives the executable through the JSON protocol; the
-  window, the protocol and the stepping are covered by fifteen offscreen scripts
+  window, the protocol and the stepping are covered by seventeen offscreen scripts
   (`src/gui/tests/`), which need no display.
 * Documentation: `doc/help.typ`, `doc/technical.typ`, `doc/prologd-diff.typ`
   written (Russian); `cmake --build build --target docs` compiles them when
@@ -114,7 +114,7 @@ session.
 
 ## Test suite
 
-229 tests, about four seconds: 216 Catch2 cases plus 13 command-line and
+231 tests, about four seconds: 218 Catch2 cases plus 13 command-line and
 integration tests (seven option tests, two `--list-keywords` tests, the
 import-search report, the JSON protocol session and the engine-limit cases). Groups:
 BigInt, lexer, keywords, parser, unification, engine, every built-in group,
@@ -960,3 +960,50 @@ Resolved on 2026-09-29 (GUI planning):
   popup has no descriptions and `F1` says the reference is unavailable.  New
   rule in `ai/conventions.md`: a built-in is added to `builtins.cpp`, to the
   lexer's reserved set *and* to `doc/builtins.json`.
+* GUI round, part 30: **task_28 closed for good — the polite stop**.  The one item
+  left open in 2026-09-29 — «Остановить» terminating the child instead of asking
+  first — turned out to rest on a stale premise: the solver reads the stop flag at
+  every step of its loop, the step pause answers `interrupt` by ending the pause,
+  and a read waiting for input answers it by failing.  What the request *cannot*
+  reach is a command that is already executing (the session reads between
+  commands), so «Остановить» now asks first and takes the process down only after
+  `STOP_GRACE_MS` (500 ms) — and the two outcomes of the button finally differ
+  cleanly: stopping a *run* leaves the interpreter idle **with its base**, stopping
+  an *idle* interpreter unloads it.  Interrupted queries end either as an error
+  (solving) or as a failed read (input wait — «НЕТ»), and both conclusions are the
+  stop's own: the window answers them with `--- остановлено ---` and marks no line.
+  The marker click still stops immediately — the clicked query follows at once,
+  and the stopped run's events must not land in the middle of it.  Two smaller
+  truths fell out of the same pass: `run_program` sets its flags *after*
+  `session.start()`, because the old process's `ended` event (delivered inside the
+  stop that a restart performs) cleared them; and a text load is named after its
+  tab — a saved file by its path, an unnamed buffer by its title («Без имени 2») —
+  so a diagnostic in an unnamed buffer reads «Без имени 2:1:1» instead of
+  «<buffer>:1:1», with the protocol's `<buffer>` still meaning «the showing tab»
+  for a load that named nothing.  Tests: a new window case (stop at an input wait:
+  the base stays, the pending request is dismissed, the next press unloads it), the
+  in-flight stop now waits for its note, and the protocol session gained the
+  `interrupt`-at-a-pause case.  All boxes of `ai/task_28_gui_run_step.md` are
+  ticked.
+* GUI round, part 31: **the strip, the pictures and the short path** — three things
+  the user found by using the window.  (1) The step strip mixed two fonts:
+  `set_font_size` reached only the goal and the stack, so the action, the depth and
+  the position — and the buttons between them — stayed in the interface font, which
+  reads as a defect the moment the zoom is used; the whole strip is the editor's
+  monospace font now, and the test asks every `QLabel` of the strip for one size.
+  (2) The two text buttons became the toolbar's own pictures
+  (`execution-execute`, `execution-step-into`, `execution-abort`) through one small
+  `_tool_button` helper that keeps the words and their keys in the tooltip
+  («Продолжить (F5)», «Шаг (F10)», «Стоп»), because three words in a row of a
+  program's own text read as a paragraph of prose; the same pass *added* the
+  «Шаг» the strip never had (`stepped` → `step_into`), so a paused run can be
+  driven on from the strip itself.  (3) A full path in the one-line status bar
+  pushed everything else out of it: `documents.short_path` keeps the last two
+  components («…\lessons\lesson_04.pld») for the four messages that name a file,
+  while the window title keeps the whole path, which is where two files of one
+  name are told apart; `test_documents.py` pins the helper.  The same look at the
+  zoom found that the task_37 reference dock never followed the font size at all
+  (`_on_zoom_changed` did not reach it) — fixed with the rest.  Sixteen
+  `test_*.py` scripts (and the protocol smoke) green, 231/231 ctest, the `docs`
+  target compiles the six PDFs; `doc/gui.typ` §2 and §6.2 and
+  `src/gui/README.md` say all of it.

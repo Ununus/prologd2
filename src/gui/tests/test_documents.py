@@ -161,6 +161,19 @@ def test_the_recent_list_is_ordered_bounded_and_pruned(directory: pathlib.Path) 
     print("ok: recent files: newest first, at most ten, pruned and deduplicated")
 
 
+def test_short_path_keeps_the_place_and_drops_the_prefix() -> None:
+    """The status bar shows where a file is, not the whole of `C:\\Users\\…`."""
+    import os
+
+    plain = os.path.join("examples", "lesson_01.pld")
+    assert documents.short_path(plain) == plain, "two parts are already short"
+    assert documents.short_path("файл.pld") == "файл.pld"
+    deep = os.path.join("C:\\", "Users", "vasla", "projects", "examples", "lessons", "lesson_04.pld")
+    assert documents.short_path(deep) == os.path.join("…", "lessons", "lesson_04.pld")
+    assert documents.short_path(deep, parts=1) == os.path.join("…", "lesson_04.pld")
+    print("ok: a long path in the status bar keeps its last two parts")
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory(prefix="prologd_documents_") as name:
         directory = pathlib.Path(name)
@@ -173,6 +186,7 @@ def main() -> int:
         test_save_as_moves_the_buffer_to_the_new_file(directory)
         test_untitled_names_reuse_a_freed_number()
         test_titles_carry_the_modified_marker()
+        test_short_path_keeps_the_place_and_drops_the_prefix()
         test_the_recent_list_is_ordered_bounded_and_pruned(directory)
     print("all document checks passed")
     return 0
