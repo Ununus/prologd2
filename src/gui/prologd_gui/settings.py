@@ -44,6 +44,10 @@ FORMAT_WIDTH = "format/width"
 FORMAT_INDENT = "format/indent"
 FORMAT_UNIT = "format/unit"
 FORMAT_SELECTION = "format/selection"
+#: The `Ctrl`+key insertions (task_31), as the JSON the window parses.  Kept as
+#: a string rather than a parsed table: a file a human edited may hold nonsense,
+#: and turning nonsense into the built-in table is `Shortcuts.from_json`'s job.
+SHORTCUTS_TABLE = "shortcuts/table"
 
 DEFAULT_FONT_FAMILY = "Cascadia Mono"
 DEFAULT_FONT_SIZE = 11.0
@@ -441,3 +445,18 @@ class Settings:
     @format_selection.setter
     def format_selection(self, value: bool) -> None:
         self._write(FORMAT_SELECTION, bool(value))
+
+    # -- editor keys --------------------------------------------------------
+    @property
+    def shortcuts_table(self) -> str:
+        """The insert table as JSON; "" when the file has none yet.
+
+        The window writes the built-in table here the first time it runs, which
+        is what makes the table readable — and remappable — from the file at
+        all.
+        """
+        return self._text(SHORTCUTS_TABLE, "").strip()
+
+    @shortcuts_table.setter
+    def shortcuts_table(self, value: str) -> None:
+        self._write(SHORTCUTS_TABLE, str(value))

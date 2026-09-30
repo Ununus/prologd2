@@ -24,7 +24,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import QCompleter, QLabel, QPlainTextEdit, QTextEdit, QWidget
 
-from . import completion, queries, search, tokens
+from . import completion, queries, search, shortcuts as shortcuts_module, tokens
 from .settings import DEFAULT_FONT_SIZE, MAXIMUM_FONT_SIZE, MINIMUM_FONT_SIZE
 
 #: The comment character of the language: `%` to the end of the line.
@@ -283,6 +283,9 @@ class CodeEditor(ZoomablePlainTextEdit):
         #: The built-in descriptions (`doc/builtins.json`), for the label under
         #: the popup; may be absent (task_37).
         self._reference: object | None = None
+        #: `Ctrl`+physics-key insertions (task_31); the table lives in the
+        #: settings file, so every view gets the one the window read.
+        self._shortcuts: shortcuts_module.Shortcuts | None = None
         self._detail: QLabel | None = None
         #: The runnable questions of the text by line, for the margin's markers
         #: (task_36); the rule that fills this lives in `queries.py`.
@@ -753,6 +756,10 @@ class CodeEditor(ZoomablePlainTextEdit):
         """The built-in descriptions (`doc/builtins.json`); may be absent."""
         self._reference = reference
 
+    def set_shortcuts(self, table) -> None:
+        """The `Ctrl`+key insertions of task_31 (a `Shortcuts` table)."""
+        self._shortcuts = table
+
     def completion_detail(self) -> str:
         """What the label under the popup is showing; empty when it is hidden."""
         if self._detail is None or not self._detail.isVisible():
@@ -893,6 +900,9 @@ class CodeEditor(ZoomablePlainTextEdit):
         key = event.key()
         modifiers = event.modifiers()
 
+        if self._insert_shortcut(event):
+            return
+
         if self._completer is not None:
             if key == Qt.Key.Key_Space and modifiers == Qt.KeyboardModifier.ControlModifier:
                 self._maybe_complete(force=True)
@@ -944,6 +954,48 @@ class CodeEditor(ZoomablePlainTextEdit):
         # name, and only when the model has something to say.
         if self._completer is not None and event.text() and tokens.is_name_character(event.text()[-1]):
             self._maybe_complete()
+
+    def _insert_shortcut(self, event: QKeyEvent) -> bool:
+        """`Ctrl`+physical key inserts punctuation (task_31), or nothing.
+
+        Matched on `nativeScanCode()`, never on `event.text()`: the character a
+        layout produces is exactly what differs between layouts.  Only `Ctrl`
+        (plus the `Shift` a chord asks for) is accepted — `Alt` alone reaches
+        the menu bar and `Ctrl+Alt` is `AltGr` on many layouts, so neither may
+        be swallowed here.  One `beginEditBlock` makes the insert one undo step,
+        exactly like typing the text by hand.
+        """
+        if self._shortcuts is None:
+            return False
+        modifiers = event.modifiers()
+        if not (modifiers & Qt.KeyboardModifier.ControlModifier):
+            return False
+        if modifiers & (
+            Qt.KeyboardModifier.AltModifier | Qt.KeyboardModifier.MetaModifier
+        ):
+            return False
+        shift = bool(modifiers & Qt.KeyboardModifier.ShiftModifier)
+        cursor = self.textCursor()
+        selection = ""
+        if cursor.hasSelection():
+            # `selectedText()` spells a paragraph break as U+2029, which is not
+            # what the document holds.
+            selection = cursor.selectedText().replace("\u2029", "\n")
+        insert = self._shortcuts.insert_for(event.nativeScanCode(), shift, selection)
+        if insert is None:
+            return False
+        cursor.beginEditBlock()
+        cursor.insertText(insert.text)
+        cursor.endEditBlock()
+        begin = cursor.position() - len(insert.text)
+        cursor.setPosition(begin + insert.start)
+        if insert.end != insert.start:
+            # A wrapped selection stays selected: it is still the text the user
+            # chose, only now it has brackets around it.
+            cursor.setPosition(begin + insert.end, QTextCursor.MoveMode.KeepAnchor)
+        self.setTextCursor(cursor)
+        event.accept()
+        return True
 
     def _insert_newline_with_indent(self) -> None:
         cursor = self.textCursor()

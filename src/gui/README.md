@@ -87,11 +87,67 @@ key, stored as `editor/wrap`): a program line is read as a whole, and a wrapped 
 hides where the line really ends.  The output pane never wraps, whatever the
 switch says.
 
-Neither list is final: the rest of the combinations is task_31.  Zoom uses the
-*keypad* keys — `Ctrl+Num+` and `Ctrl+Num-`, which Qt spells `Num++` and `Num+-`
-(the keypad modifier is part of the sequence) — so that `Ctrl+=`, `Ctrl++` and
-`Ctrl+-` on the main row stay free for the `РАВНО(…)`, `СЛОЖЕНИЕ(…)` and
-`ВЫЧИТАНИЕ(…)` skeletons.
+Zoom uses the *keypad* keys — `Ctrl+Num+` and `Ctrl+Num-`, which Qt spells `Num++`
+and `Num+-` (the keypad modifier is part of the sequence) — because the main row
+belongs to the insert table below.
+
+## Ctrl plus a physical key
+
+The punctuation a Prolog program needs is not where the Russian layout puts it:
+`:-` is `Ctrl+;`, `?` is `Ctrl+/`, `[` is a letter.  Instead of switching the
+layout, `Ctrl` plus the **physical** key inserts the symbol that key carries in
+*either* layout.  The list is in **Справка → Шпаргалка по вставкам**.
+
+| `Ctrl` + key | Inserts | Where the caret lands |
+| --- | --- | --- |
+| `;` or `6` | `:-.` | between `-` and `.` |
+| `9` | `()` | inside |
+| `[` | `[]` | inside |
+| `3` | `#` | after |
+| `Shift+/` or `7` | `?` | after |
+| `=` | `РАВНО(,)` | after the `(` |
+| `Shift+.` | `БОЛЬШЕ(,)` | after the `(` |
+| `Shift+,` | `МЕНЬШЕ(,)` | after the `(` |
+| `Shift+=` | `СЛОЖЕНИЕ(,,)` | after the `(` |
+| `8` | `УМНОЖЕНИЕ(,,)` | after the `(` |
+| `/` | `/` | after |
+| `-` / `Shift+-` | `-` / `_` | after |
+| `1` | `!` | after |
+| `'` / `Shift+'` | `''` / `""` | inside the quotes |
+
+The second column is the *same physical key* in a Russian and in an English
+layout, and that is the whole point: the pair `Задача :- Цель.` is two chords with
+the Russian layout on, and they produce exactly the same text with the English one
+on.  Two symbols have a second chord because the layouts disagree about where they
+live: the Russian `:` is `Shift+6` and the Russian `?` is `Shift+7`.
+
+* **Matching is by scan code** (`QKeyEvent.nativeScanCode()`), never by
+  `event.text()` — the character is the one thing the layouts differ in.
+* **Only `Ctrl`** (plus the `Shift` a chord asks for) is accepted: `Alt` alone
+  hands the focus to the menu bar, and `Ctrl+Alt` is `AltGr` on many layouts, so
+  neither may be swallowed.  Both fall through to the window untouched.
+* **One undo step** per insert, and with a selection the bracket-like entries
+  *wrap* it: `(выделение)`, `[выделение]`, `#выделение#`, `?выделение`; the rest
+  replace it, as typing the character would.
+* **The table is data.**  It lives in the settings file under `shortcuts/table` as
+  JSON, and the window writes the built-in table there the first time it runs, so
+  a symbol that sits elsewhere — or a keyboard without that key — is remapped in
+  the file.  An entry is `{"insert": "…", "chords": [{"scan": …, "shift": …}]}`,
+  `|` marks the caret and `{}` marks the selection a `wrap` surrounds; a file that
+  cannot be read falls back to the built-in table instead of taking the window
+  down.  Each entry can carry **several chords**, which is what the `6` and `7` rows
+  above are.
+* **No chord steals a window command.**  `Ctrl+\` and `Ctrl+Shift+\` are split and
+  merge, so `|` has no chord, and the zoom moved to the keypad.  Two symbols are
+  therefore reachable only on their US positions, and the test says so out loud:
+  the Russian `/` is `Shift+\` (= merge) and the Russian `"` is `Shift+2`, which is
+  why `Ctrl+/` and `Ctrl+Shift+'` are the chords for them.
+
+The mapping, the wrapping and the settings round trip are checked without Qt in
+`src/gui/tests/test_shortcuts.py`; the same file asks Windows where each symbol
+actually sits in the US and the Russian layouts (`VkKeyScanExW`, `MapVirtualKeyW`),
+which is the part that cannot be reasoned about.  With a Russian layout on, walk
+the table once by hand — that is the one check no test replaces.
 
 ## Questions in the margin
 
@@ -160,7 +216,8 @@ The menus are **Файл** (Новый, Открыть…, Последние, �
 ориентацию сплита, Номера строк, Увеличить/Уменьшить/Обычный размер шрифта,
 Системная тема, Полный экран), **Выполнение** (Запустить, Запустить с
 трассировкой, Шаг, Остановить, Сохранять перед запуском, Графическое окно) and
-**Справка** (Руководство пользователя, Справка по окну, О программе).
+**Справка** (Справка по предикату, Шпаргалка по вставкам, Руководство
+пользователя, Справка по окну, О программе).
 
 An entry that does not exist yet stays in its menu but is **disabled**, and its
 tooltip names what it waits for: «Настройки…» — task_29; «Графическое окно» has

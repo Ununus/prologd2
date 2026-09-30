@@ -97,7 +97,7 @@ session.
 | task_28_gui_run_step | done | `EngineOptions::stepHook` + `StepInfo`, protocol 3 (`step`/`trace` events, `step` request, positions on `error`), the step strip with the call stack, the trace line in the editor, `F10`/`Shift+F10`/`F5`, error and trace lines from structured positions |
 | task_29_gui_settings | not started | settings dialog and persistence |
 | task_30_gui_formatter | done | `prlib/formatter.cpp` (whitespace-only, everything else copied byte for byte); three modes — **в одну строку**, **мягкое** (строки строятся заново: цели собираются до ширины) and **жёсткое** — chosen in «Правка → Формат»; `prologd --format[=soft|hard|line]` with `--format-width`, `--format-indent` and `--format-unit`; protocol **7**+**8** (`format` → `formatted`/`error`, answerable between queries; `loaded` when a run is over); the window's `Ctrl+I` with one undo step and the caret and selection mapped onto the new text; a source that does not parse is never rewritten |
-| task_31_gui_shortcuts | not started | layout-independent `Ctrl`+ key combinations |
+| task_31_gui_shortcuts | done | `shortcuts.py` — a Qt-free table of `Ctrl`+**physical key** insertions, matched on `nativeScanCode()`: `:-.`, `()`, `[]`, `#`, `?`, `РАВНО(,)`, `БОЛЬШЕ(,)`, `МЕНЬШЕ(,)`, `СЛОЖЕНИЕ(,,)`, `УМНОЖЕНИЕ(,,)` and the simple symbols `/ - _ ! '' ""`; `:` and `?` carry two chords each (Russian `Shift+6`/`Shift+7`), a selection is *wrapped* by the bracket-like rows, every insert is one undo step, only `Ctrl` (plus `Shift`) is accepted — `Alt` and `Ctrl+Alt` are left to the window; the table is data in the settings file (`shortcuts/table`, JSON, one entry per insert with a list of chords) and «Справка → Шпаргалка по вставкам» lists it from the same object; zoom stays on the keypad, `|` has no chord (merge keeps `Ctrl+Shift+\`) |
 | task_32_import_search_report | done | `ИМПОРТ` failure names the directories tried, with reasons |
 | task_33_gui_search_replace | done | `search.py` (plain-text, Qt-free) + the find bar: question from the selection or the word at the caret, `F3`/`Shift+F3` with the wrap reported, three switches, «Заменить всё» as one undo step, the matches lit in every view; `test_search.py` has 16 checks |
 | task_34_builtin_branches | done | every built-in branch-tested in Catch2 (186 cases); the sweep found and fixed five defects: two in the float built-ins (`nan` instead of a failure), the integer/real comparison, the cyclic term that ended the process, the ignored read prompt, the unchecked graphics arguments and the code points that were written as invalid UTF-8 |
@@ -185,6 +185,16 @@ Resolved on 2026-09-29 (GUI planning):
 * shortcuts (task_31): the modifier is `Ctrl`, not `Alt` (which focuses the menu
   bar), and `?`/`:` get both physical keys --- `Ctrl+/` + `Ctrl+7` and `Ctrl+;` +
   `Ctrl+6`;
+
+Added on 2026-10-02 while implementing task_31:
+
+* `Ctrl+Shift+\` stays «Объединить редакторы», so `|` gets **no** chord at all
+  (the user's decision: the window command wins over the row);
+* the extra combinations are the simple symbols (`/`, `-`, `_`, `!`, `''`,
+  `""`) — no clause skeletons: `ФАКТ.`, `Правило(…) :- …` and the rest of the
+  proposed shapes were dropped as writing the program for the user;
+* the table is written into the settings file on the first run, which is what
+  makes it readable and remappable *there* rather than in the code.
 * split editor (task_25): two independent panes, each with its own tab bar;
 * running a buffer (task_28): a modified buffer is loaded as text whose `name`
   is the file's path, so `ИМПОРТ` resolves exactly as it does for the saved
@@ -1095,3 +1105,26 @@ Resolved on 2026-09-29 (GUI planning):
   its query as before.  Two new window checks (the names before the first run; an
   empty program and a facts-only program both finish), plus the keyword and
   round-trip additions; 251/251 ctest, the 17 GUI scripts, the six PDFs.
+* GUI round, part 35: **task_31 — the insert table**, and the interesting part was
+  what a *physical* key means.  Matched on `nativeScanCode()`, never on
+  `event.text()`: the character is exactly what the two layouts disagree about, so
+  the table works in any layout --- including the symbols ЙЦУКЕН has no key for
+  (`[` is a letter there, `#` is `№`), because the chord is the key the *English*
+  layout carries the symbol on, which is a position both layouts have.  `:` and
+  `?` are the exceptions that prove it and therefore carry two chords each (the
+  Russian `Shift+6`/`Shift+7`).  A selection is *wrapped* by the bracket-like rows
+  and stays selected, everything is one undo step, and only `Ctrl` (plus the
+  `Shift` a chord asks for) is accepted: `Alt` alone focuses the menu bar and
+  `Ctrl+Alt` is `AltGr`, so both are left to the window.  The table is *data*
+  (`shortcuts/table` in the ini, one entry per insert with a *list* of chords) and
+  is written there on the first run; «Справка → Шпаргалка по вставкам» lists the
+  same object, so a remapped chord cannot be described wrongly.  Two collisions
+  decided the shape: `Ctrl+Shift+\` stays «Объединить редакторы» (the user's
+  answer), so `|` has no chord, and the zoom stays on the keypad because the main
+  row is the table.  Testing this found the one thing that could not be guessed:
+  `VkKeyScanExW` says the Russian `/` is `Shift+\` (that very merge chord) and the
+  Russian `"` is `Shift+2`, so those two symbols are reachable on their English
+  positions only — the check writes both exceptions out with the reason instead of
+  hiding them.  `test_shortcuts.py` (Qt-free plus an offscreen editor group and
+  the Windows layout check) and two new window checks; 251/251 ctest, the 18 GUI
+  scripts, the six PDFs.

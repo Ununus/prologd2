@@ -181,6 +181,9 @@ ACTIONS: tuple[Action, ...] = (
     # reading a program*; the manual keeps `Shift+F1`.
     Action("reference", "Справка по предикату", "help", ("F1",)),
     Action("help_doc", "Руководство пользователя", "help", ("Shift+F1",)),
+    # What `Ctrl`+key inserts, listed from the table itself (task_31): the table
+    # is data in the settings file, so the list has to be read from it.
+    Action("shortcuts", "Шпаргалка по вставкам", None),
     Action("help_gui", "Справка по окну", None),
     Action("about", "О программе", "help-about"),
 )
@@ -277,7 +280,7 @@ MENUS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "graphics",
         ),
     ),
-    ("Справка", ("reference", SEPARATOR, "help_doc", "help_gui", "about")),
+    ("Справка", ("reference", SEPARATOR, "shortcuts", SEPARATOR, "help_doc", "help_gui", "about")),
 )
 
 #: The toolbar, grouped as the reference front-end had it: files, run/stop/step,

@@ -1698,6 +1698,97 @@ def test_f1_shows_the_record_of_the_word_under_the_caret(executable: str) -> Non
     print("ok: F1 shows the record of the word under the caret, and says «нет справки»")
 
 
+def press_ctrl_key(window, scan: int) -> bool:
+    """`Ctrl` plus a **physical** key, the way `task_31` matches them.
+
+    `QKeyEvent` has two constructors and only the second carries a native scan
+    code; the offscreen platform has no keyboard to ask, so the code is handed in.
+    The virtual key and the native modifiers stay zero: nothing reads them.
+    """
+    from PySide6.QtCore import QEvent, Qt
+    from PySide6.QtGui import QKeyEvent
+    from PySide6.QtWidgets import QApplication
+
+    event = QKeyEvent(
+        QEvent.Type.KeyPress,
+        Qt.Key.Key_unknown,
+        Qt.KeyboardModifier.ControlModifier,
+        scan,
+        0,
+        0,
+    )
+    QApplication.sendEvent(window.editor(), event)
+    return event.isAccepted()
+
+
+def test_the_cheat_sheet_lists_the_insert_table(executable: str) -> None:
+    """task_31: «Справка → Шпаргалка по вставкам» lists the chords that are live.
+
+    The table is *data*: the window writes the built-in one into its own settings
+    file the first time it runs, so a symbol that sits on another physical key —
+    or a keyboard that has no such key — is remapped in that file without a code
+    change.  The cheat sheet is built from the same object the editors insert
+    with, which is why a remapped chord cannot be listed wrongly.
+    """
+    from prologd_gui.shortcuts import Shortcuts
+
+    window = empty_window(executable)
+    try:
+        assert window.shortcut_text() == "", "the dock is filled before it is asked for"
+        window._actions["shortcuts"].trigger()
+        text = window.shortcut_text()
+        for chord in ("Ctrl+;", "Ctrl+6", "Ctrl+Shift+/", "Ctrl+7", "Ctrl+Shift+.",
+                      "Ctrl+Shift+=", "Ctrl+8", "Ctrl+["):
+            assert chord in text, (chord, ascii(text))
+        assert "выделение" in text, ascii(text)
+        assert "Шпаргалка" in window._shortcut_dock.windowTitle()
+        assert not window._shortcut_dock.isHidden()
+
+        # The table is in the settings file, which is what makes it remappable.
+        stored = window._settings.path.read_text(encoding="utf-8")
+        assert "table=" in stored, stored
+        built_in = Shortcuts.default().keys()
+        assert Shortcuts.from_json(window._settings.shortcuts_table).keys() == built_in
+    finally:
+        discard_changes(window)
+    print("ok: the cheat sheet lists the table the window keeps in its settings file")
+
+
+def test_a_remapped_table_decides_what_ctrl_key_inserts(executable: str) -> None:
+    """A file that moves a symbol is honoured: that is what «the table is data» means.
+
+    On this machine `Ctrl+[` inserts `€`, and nothing in the code knows about
+    either: the single entry came out of the settings file, and the window must
+    not overwrite a table it found there.
+    """
+    from prologd_gui.settings import Settings
+    from prologd_gui.window import MainWindow
+
+    remapped = '[{"insert": "|€", "chords": [{"scan": 26, "shift": null, "key": "["}]}]'
+    directory = tempfile.TemporaryDirectory(prefix="prologd_gui_test_")
+    _SETTINGS_DIRECTORIES.append(directory)
+    settings = Settings(pathlib.Path(directory.name) / "gui.ini")
+    settings.shortcuts_table = remapped
+
+    window = MainWindow(executable, [], settings)
+    window.session.start()
+    assert pump(window, lambda: bool(window.session.keywords)), "the session never said ready"
+    try:
+        # The welcome program has to go, or the insert lands in front of it.
+        window.editor().setPlainText("")
+        assert press_ctrl_key(window, 0x1A), "the remapped chord was not taken"
+        assert window.editor_text() == "€", ascii(window.editor_text())
+        assert window._settings.shortcuts_table == remapped, "the window overwrote the table"
+
+        window._actions["shortcuts"].trigger()
+        text = window.shortcut_text()
+        assert "Ctrl+[" in text and "€" in text, ascii(text)
+        assert "[]" not in text, "the built-in table was listed instead"
+    finally:
+        discard_changes(window)
+    print("ok: a remapped table from the settings file decides what the editor inserts")
+
+
 def test_the_step_strip_is_one_font_and_three_pictures(executable: str) -> None:
     """The strip's buttons are the toolbar's pictures; the strip is one font.
 
@@ -2011,6 +2102,8 @@ def main(argv: list[str]) -> int:
         test_the_reserved_names_are_there_before_the_first_run(executable)
         test_running_programs_without_questions_finishes(executable)
         test_f1_shows_the_record_of_the_word_under_the_caret(executable)
+        test_the_cheat_sheet_lists_the_insert_table(executable)
+        test_a_remapped_table_decides_what_ctrl_key_inserts(executable)
         test_the_output_can_be_saved(executable, files)
         test_the_context_menu_reuses_the_shared_actions(executable)
         test_the_font_control_and_the_wheel_are_one_setting(executable)

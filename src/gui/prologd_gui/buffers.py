@@ -36,6 +36,8 @@ class Buffer(QObject):
         self._views: list[CodeEditor] = []
         #: The built-in descriptions, shared by every view's popup (task_37).
         self._reference = None
+        #: The `Ctrl`+key insertions (task_31), shared by every view.
+        self._shortcuts = None
 
         # The layout is not optional.  A `QPlainTextEdit` refuses a document that
         # does not use `QPlainTextDocumentLayout` — Qt prints one warning and the
@@ -66,6 +68,7 @@ class Buffer(QObject):
         editor.setDocument(self.document)
         editor.set_completion_keywords(self.highlighter.keywords)
         editor.set_reference(self._reference)
+        editor.set_shortcuts(self._shortcuts)
         editor.set_wrap(self._settings.wrap)
         self._views.append(editor)
         return editor
@@ -127,6 +130,12 @@ class Buffer(QObject):
         self._reference = reference
         for view in self._views:
             view.set_reference(reference)
+
+    def set_shortcuts(self, table) -> None:
+        """The `Ctrl`+key insertions (task_31); one table for every view."""
+        self._shortcuts = table
+        for view in self._views:
+            view.set_shortcuts(table)
 
     def set_font_size(self, size: float) -> None:
         for view in self._views:

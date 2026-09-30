@@ -46,6 +46,7 @@ from . import (
     panels,
     reference,
     search,
+    shortcuts,
 )
 from .buffers import Buffer
 from .editor import CodeEditor, ZoomablePlainTextEdit
@@ -88,6 +89,14 @@ class MainWindow(QMainWindow):
         #: window: the popup's detail label and `F1` read the same object, and a
         #: checkout without the file is an empty reference, not a failure.
         self._reference = reference.Reference.load()
+        #: The `Ctrl`+key insertions (task_31).  The table is *data*: it is kept
+        #: in the settings file (`shortcuts/table`), so a symbol on another
+        #: physical key — or a keyboard without that key — is remapped without a
+        #: code change.  A file that has no table gets the default written into
+        #: it, which is what makes the table readable and editable at all.
+        if not self._settings.shortcuts_table:
+            self._settings.shortcuts_table = shortcuts.Shortcuts.default().to_json()
+        self._shortcuts = shortcuts.Shortcuts.from_json(self._settings.shortcuts_table)
 
         self._session = PrologSession(executable, includes, self)
         # Completion, colouring and the cheat sheet need the reserved names
@@ -254,6 +263,21 @@ class MainWindow(QMainWindow):
         self._reference_dock.setVisible(False)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self._reference_dock)
 
+        # The cheat sheet of the insert chords (task_31): the same shape as the
+        # reference dock, and it zooms with everything else.
+        self._shortcut_pane = ZoomablePlainTextEdit(
+            font_family=self._settings.font_family,
+            font_size=self._settings.font_size,
+        )
+        self._shortcut_pane.setReadOnly(True)
+        self._shortcut_pane.setPlaceholderText("Шпаргалка: Справка → Шпаргалка по вставкам")
+        self._shortcut_pane.zoomChanged.connect(self._on_zoom_changed)
+        self._shortcut_dock = QDockWidget("Шпаргалка по вставкам", self)
+        self._shortcut_dock.setObjectName("shortcutDock")
+        self._shortcut_dock.setWidget(self._shortcut_pane)
+        self._shortcut_dock.setVisible(False)
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self._shortcut_dock)
+
         # The find bar (task_33): a strip above the editor, hidden until `Ctrl+F`.
         # Not a dialog — a modal box covers the text being searched and cannot be
         # driven from a headless test.
@@ -392,6 +416,7 @@ class MainWindow(QMainWindow):
             "comment": self._comment,
             "uncomment": self._uncomment,
             "format": self.format_document,
+            "shortcuts": self.show_shortcuts,
             "reference": self.show_reference,
             "clear_output": self.clear_output,
             "find": lambda: self.show_find(),
@@ -1603,6 +1628,7 @@ class MainWindow(QMainWindow):
         # them here, and a buffer created before it is served by `_on_ready`.
         buffer.set_keywords(self._session.keywords)
         buffer.set_reference(self._reference)
+        buffer.set_shortcuts(self._shortcuts)
         self._buffers.append(buffer)
         for pane in self._panes:
             pane.set_buffers(self._buffers)
@@ -2210,6 +2236,23 @@ class MainWindow(QMainWindow):
         """What the reference dock is showing ("" while it was never filled)."""
         return self._reference_pane.toPlainText()
 
+    # -- the cheat sheet of the insert chords ------------------------------
+    def show_shortcuts(self) -> None:
+        """«Справка → Шпаргалка по вставкам»: what `Ctrl`+key inserts (task_31).
+
+        The list is built from the table itself, so a remapped chord shows up
+        here without a second place to edit — and a dock, not a modal box, for
+        the same reason as the reference: it is read *next to* the code, and a
+        modal cannot be driven from a headless test.
+        """
+        self._shortcut_pane.setPlainText("\n".join(self._shortcuts.cheatsheet()))
+        self._shortcut_dock.setVisible(True)
+        self._shortcut_dock.raise_()
+
+    def shortcut_text(self) -> str:
+        """What the cheat-sheet dock is showing ("" while it was never filled)."""
+        return self._shortcut_pane.toPlainText()
+
     # -- session events ----------------------------------------------------
     def _on_ready(self, version: str) -> None:
         # The reserved names reach every open buffer, including the ones opened
@@ -2241,6 +2284,7 @@ class MainWindow(QMainWindow):
         self._input_console.set_font_size(size)
         self._step_pane.set_font_size(size)
         self._reference_pane.set_font_size(size)
+        self._shortcut_pane.set_font_size(size)
         self._query_line.setFont(self._output.font())
         self._show_font_size(size)
         self._status.setText(f"шрифт {size:.0f} pt")
