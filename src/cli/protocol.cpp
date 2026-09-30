@@ -25,7 +25,9 @@ using Json = nlohmann::json;
 ///    `column` on `error` events (a front-end no longer parses them out of the
 ///    message), plus `step`/`trace` flags on `load` and `query`.
 /// 4: `error` events carry `severity` (`error` or `warning`).
-constexpr int kProtocolVersion = 4;
+/// 5: `load` takes `questions` — `false` loads a program without running its
+///    own `?`-statements (the editor's margin runs one query alone, task_36).
+constexpr int kProtocolVersion = 5;
 
 [[nodiscard]] std::string stepActionName(StepAction action) {
   switch (action) {
@@ -195,12 +197,23 @@ class Session {
       armStepping();
     }
     reported_diagnostics_ = false;
+    // A single query asked for from the editor's margin is loaded *quietly*: a
+    // run loads the program *and* runs its own `?`-statements (that is what
+    // `Запустить` must keep doing), but for one clicked query that would fill
+    // the pane with the whole lesson before the answer asked for (task_36).
+    const bool questions = request.value("questions", true);
+    if (!questions) {
+      loader_.setQueryRunner(nullptr);
+    }
     bool ok = false;
     if (has_path) {
       ok = loader_.loadFile(fromUtf8Path(request.at("path").get<std::string>()), &error);
     } else {
       const std::string name = request.value("name", std::string("<buffer>"));
       ok = loader_.loadSource(request.at("text").get<std::string>(), name, &error);
+    }
+    if (!questions) {
+      loader_.setQueryRunner([this](const Query& query) { runQuery(query); });
     }
     if (stepping) {
       disarmStepping();

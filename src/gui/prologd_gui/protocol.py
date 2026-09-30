@@ -17,7 +17,9 @@ from typing import Any, Iterator
 #: 2: the `ready` event carries `keywords` (the reserved names and their arities).
 #: 3: `step` events and the `step` request, `trace` events, positions on `error`,
 #:    and the `step`/`trace` flags of `load` and `query`.
-PROTOCOL_VERSION = 4
+#: 5: `load` takes `questions` — `false` loads a program without running its own
+#:    `?`-statements (the editor's margin runs one query alone, task_36).
+PROTOCOL_VERSION = 5
 
 #: Event names the interpreter emits.
 EVENTS = ("ready", "output", "result", "input_request", "step", "trace", "error", "bye")
@@ -78,20 +80,28 @@ def encode_request(**fields: Any) -> bytes:
 
 
 def load_text(text: str, name: str = "<buffer>", *, step: bool = False,
-              trace: bool = False) -> bytes:
+              trace: bool = False, questions: bool = True) -> bytes:
     """Loads program text (the editor buffer).
 
     `step` makes the run stop at its first step point and wait for a `step`
     request; `trace` turns `ТРАССА` on, so the trace arrives as `trace` events.
-    The flags are left off the wire when they are false, which keeps a plain run
-    looking exactly as it did before protocol 3.
+    `questions=False` loads the program *without* running its own
+    `?`-statements: what the editor's margin needs to answer one clicked query
+    alone (task_36).  The flags are left off the wire when they are false, which
+    keeps a plain run looking exactly as it did before protocol 3.
     """
-    return encode_request(cmd="load", text=text, name=name, **_flags(step=step, trace=trace))
+    return encode_request(
+        cmd="load", text=text, name=name,
+        **_flags(step=step, trace=trace, questions=questions),
+    )
 
 
-def load_file(path: str, *, step: bool = False, trace: bool = False) -> bytes:
+def load_file(path: str, *, step: bool = False, trace: bool = False,
+              questions: bool = True) -> bytes:
     """Loads a program from disk; imports resolve against `-I` directories."""
-    return encode_request(cmd="load", path=path, **_flags(step=step, trace=trace))
+    return encode_request(
+        cmd="load", path=path, **_flags(step=step, trace=trace, questions=questions)
+    )
 
 
 def query(text: str, *, step: bool = False, trace: bool = False) -> bytes:
@@ -106,13 +116,15 @@ def step_answer(action: str) -> bytes:
     return encode_request(cmd="step", action=action)
 
 
-def _flags(*, step: bool = False, trace: bool = False) -> dict:
+def _flags(*, step: bool = False, trace: bool = False, questions: bool = True) -> dict:
     """Only the flags that are on: a false one would be noise on the wire."""
     flags: dict[str, bool] = {}
     if step:
         flags["step"] = True
     if trace:
         flags["trace"] = True
+    if not questions:
+        flags["questions"] = False
     return flags
 
 

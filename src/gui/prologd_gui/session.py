@@ -110,11 +110,13 @@ class PrologSession(QObject):
 
     # -- requests ----------------------------------------------------------
     def load_text(self, text: str, name: str = "<buffer>", *, step: bool = False,
-                  trace: bool = False) -> None:
-        self._send(protocol.load_text(text, name, step=step, trace=trace))
+                  trace: bool = False, questions: bool = True) -> None:
+        self._send(protocol.load_text(text, name, step=step, trace=trace,
+                                      questions=questions))
 
-    def load_file(self, path: str, *, step: bool = False, trace: bool = False) -> None:
-        self._send(protocol.load_file(path, step=step, trace=trace))
+    def load_file(self, path: str, *, step: bool = False, trace: bool = False,
+                  questions: bool = True) -> None:
+        self._send(protocol.load_file(path, step=step, trace=trace, questions=questions))
 
     def run_query(self, text: str, *, step: bool = False, trace: bool = False) -> None:
         self._send(protocol.query(text, step=step, trace=trace))

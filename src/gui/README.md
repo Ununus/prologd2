@@ -375,7 +375,7 @@ Headless check of the protocol, without PySide6 installed:
 python src/gui/tests/protocol_smoke.py
 ```
 
-## Protocol contract (version 4)
+## Protocol contract (version 5)
 
 One JSON object per line in both directions; the interpreter writes nothing else
 to stdout.  The C++ side lives in `src/cli/protocol.cpp`, the Python side in
@@ -383,9 +383,11 @@ to stdout.  The C++ side lives in `src/cli/protocol.cpp`, the Python side in
 3 added stepping (`step` events and the `step` request), the `trace` events, the
 `step`/`trace` flags of `load` and `query`, and the `file`/`line`/`column` fields
 of `error`; version 4 adds `severity` to `error` (`error` or `warning` — a warning
-is advice and never ends the run).  Version 1 sessions are still understood by
-the Python client (the table is then empty and completion falls back to the
-document's own predicates).
+is advice and never ends the run); version 5 adds the `questions` flag of `load`
+(`false` loads a program without running its own `?`-statements — the editor's
+margin uses it to answer one clicked query alone, task_36).  Version 1 sessions
+are still understood by the Python client (the table is then empty and completion
+falls back to the document's own predicates).
 
 ### Requests
 
@@ -401,13 +403,16 @@ document's own predicates).
 
 `load` and `query` take two optional flags: `"trace":true` turns `ТРАССА` on for
 that run, and `"step":true` arms the step hook, so the run stops at its first
-step point and waits for a `step` request.  A false flag is left off the wire.
+step point and waits for a `step` request.  `load` also takes `"questions":false`:
+the program is then loaded for its clauses only, and its own `?`-statements are
+not run (what the margin's single query needs).  A false `step`/`trace` flag is
+left off the wire.
 
 ### Events
 
 | Event | Meaning |
 |-------|---------|
-| `{"event":"ready","protocol":4,"version":"2.0.0","keywords":[…]}` | the session is up |
+| `{"event":"ready","protocol":5,"version":"2.0.0","keywords":[…]} `| the session is up |
 | `{"event":"output","text":"…"}` | program output (`ВЫВОД`, query results) |
 | `{"event":"result","found":true}` | one query finished; `found` is false when nothing matched |
 | `{"event":"input_request","kind":"line"}` | `ВВОДСТР`/`ВВОДСИМВ`/`ВВКОД` waits for an answer; `kind` is `token`, `line` or `codepoint` |

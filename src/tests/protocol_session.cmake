@@ -37,7 +37,7 @@ execute_process(
 
 set(expected_events
   "{\"event\":\"ready\","
-  "\"protocol\":4"
+  "\"protocol\":5"
   "\"keywords\":"
   "{\"event\":\"result\",\"found\":true}"
   "{\"event\":\"output\",\"text\":\"X=1\\nX=2\\n\"}"
@@ -54,6 +54,36 @@ endforeach()
 
 if(NOT exit_code EQUAL 0)
   message(FATAL_ERROR "Session exit code ${exit_code}, stderr: ${cli_errors}")
+endif()
+
+# --- a quiet load: the program's own `?`-statements do not run ----------------
+# This is how the editor's margin answers one clicked query alone (task_36): the
+# program is loaded for its clauses, and only the query that was asked for runs.
+file(WRITE "${session}"
+  "{\"cmd\":\"load\",\"text\":\"факт(1).\\n?факт(X).\\n\",\"questions\":false}\n"
+  "{\"cmd\":\"query\",\"text\":\"?факт(X).\"}\n"
+  "{\"cmd\":\"quit\"}\n")
+
+execute_process(
+  COMMAND "${PROLOGD_EXE}" --protocol json
+  INPUT_FILE "${session}"
+  OUTPUT_VARIABLE events
+  RESULT_VARIABLE exit_code)
+
+# Exactly one answer and one result may appear: the quiet load's own `?факт(X).`
+# would have added an `X=1` of its own.
+string(REGEX MATCHALL "\\{\"event\":\"output\",\"text\":\"X=1" answers "${events}")
+list(LENGTH answers answer_count)
+if(NOT answer_count EQUAL 1)
+  message(FATAL_ERROR "Expected exactly one answer from a quiet load, got ${answer_count}\n--- got ---\n${events}")
+endif()
+string(REGEX MATCHALL "\\{\"event\":\"result\",\"found\":true\\}" results "${events}")
+list(LENGTH results result_count)
+if(NOT result_count EQUAL 1)
+  message(FATAL_ERROR "Expected exactly one result event from a quiet load, got ${result_count}\n--- got ---\n${events}")
+endif()
+if(NOT exit_code EQUAL 0)
+  message(FATAL_ERROR "Quiet-load session exit code ${exit_code}")
 endif()
 
 # --- a program that does not parse must be reported and set exit code 2 -------
