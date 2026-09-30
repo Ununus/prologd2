@@ -32,6 +32,13 @@ except ImportError:  # pragma: no cover - main() reports it
 EXAMPLE = pathlib.Path(__file__).resolve().parents[3] / "examples" / "factorial.pld"
 ANSWER = "Ф=720\n"
 
+#: task_36's files: the lesson whose `?сумма(5, С).` must answer `С=15` alone,
+#: and the appendix whose questions only run if someone asks for one.
+LESSON_04 = pathlib.Path(__file__).resolve().parents[3] / "examples" / "lessons" / "lesson_04.pld"
+APPENDIX_DEBUG = (
+    pathlib.Path(__file__).resolve().parents[3] / "examples" / "lessons" / "appendix_debug.pld"
+)
+
 #: A failing ground query: the interpreter answers `НЕТ` itself, so the window
 #: must not answer a second time.  Kept as the user wrote it.
 PRIMES = """\
@@ -1481,6 +1488,72 @@ def test_the_trace_is_coloured_apart_from_the_output(executable: str) -> None:
     print("ok: the trace is coloured apart from the program's own output")
 
 
+def test_a_marker_answers_one_question_alone(executable: str) -> None:
+    """task_36: lesson_04's `?сумма(5, С).` answers `С=15` and nothing else.
+
+    The file's other questions are loaded but *not* run (the load is quiet), so
+    the pane holds the one answer that was asked for.  `Запустить` still runs
+    the whole lesson — that is what a lesson is for.
+    """
+    window = empty_window(executable)
+    try:
+        assert window.open_path(str(LESSON_04))
+        view = window.editor()
+        line = next(
+            number
+            for number, content in enumerate(view.toPlainText().splitlines(), 1)
+            if content.strip() == "?сумма(5, С)."
+        )
+        statement = view.query_statements().get(line)
+        assert statement == "?сумма(5, С).", (line, statement)
+
+        view.queryRequested.emit(statement)
+        wait_for_result(window)
+        assert printed_lines(window) == ["С=15"], ascii(window.output_text())
+        assert window._query_line.text() == "?сумма(5, С).", "the question stays visible"
+    finally:
+        discard_changes(window)
+    print("ok: a marker answers one question alone (С=15 from lesson_04)")
+
+
+def test_a_question_parked_in_a_comment_runs_from_the_margin(executable: str) -> None:
+    """`%   ?ВЕРСИЯ.` in the appendix: the file never runs it, a click does."""
+    window = empty_window(executable)
+    try:
+        assert window.open_path(str(APPENDIX_DEBUG))
+        view = window.editor()
+        assert "?ВЕРСИЯ." in view.query_statements().values()
+        view.queryRequested.emit("?ВЕРСИЯ.")
+        wait_for_result(window)
+        printed = printed_lines(window)
+        assert any(line.startswith("PrologD ") for line in printed), ascii(window.output_text())
+    finally:
+        discard_changes(window)
+    print("ok: a question parked in a comment answers from the margin (appendix)")
+
+
+def test_a_marker_while_a_step_is_paused_starts_a_fresh_quiet_run(executable: str) -> None:
+    """The click is «stop this and answer that», even in the paused state.
+
+    Without the stop, `run_program` would read the click as «продолжить» (what
+    F5 means while paused) and the pane would fill with the stepped run's
+    answers instead of the one the marker asked for.
+    """
+    window = empty_window(executable)
+    try:
+        window.editor().setPlainText("факт(1).\n?факт(X).\n")
+        window._actions["step"].trigger()
+        assert pump(window, lambda: window.session.paused()), window.status_text()
+        view = window.editor()
+        view.queryRequested.emit("?факт(1).")
+        wait_for_result(window)
+        assert not window.session.paused()
+        assert printed_lines(window) == ["ДА"], ascii(window.output_text())
+    finally:
+        discard_changes(window)
+    print("ok: a marker click during a paused step stops it and answers the click")
+
+
 def main(argv: list[str]) -> int:
     if QApplication is None:
         print("skipped: PySide6 is not installed")
@@ -1538,6 +1611,9 @@ def main(argv: list[str]) -> int:
         test_a_diagnostic_from_an_imported_file_opens_it(executable, files)
         test_stepping_shows_the_goal_the_stack_and_the_line(executable)
         test_the_trace_is_coloured_apart_from_the_output(executable)
+        test_a_marker_answers_one_question_alone(executable)
+        test_a_question_parked_in_a_comment_runs_from_the_margin(executable)
+        test_a_marker_while_a_step_is_paused_starts_a_fresh_quiet_run(executable)
         test_the_output_can_be_saved(executable, files)
         test_the_context_menu_reuses_the_shared_actions(executable)
         test_the_font_control_and_the_wheel_are_one_setting(executable)

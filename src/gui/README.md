@@ -91,6 +91,30 @@ Neither list is final: the rest of the combinations is task_31.  Zoom uses the
 `Ctrl+-` on the main row stay free for the `РАВНО(…)`, `СЛОЖЕНИЕ(…)` and
 `ВЫЧИТАНИЕ(…)` skeletons.
 
+## Questions in the margin
+
+Every question of a lesson — a `?Цель.` line, and also a query parked in a
+comment (`%   ?ВЕРСИЯ.`) — is marked with a blue triangle in the margin, left of
+the line numbers; a click runs exactly that statement.  The statement goes into
+the query line and stays visible there, the program is loaded *quietly*
+(`"questions":false`), and the pane holds the one answer that was clicked.
+
+Which lines are questions is decided by `queries.py` and checked without Qt in
+`test_queries.py`: the first non-blank characters of the line are `?` or `%`
+followed by blanks and `?`, the sentence ends at the first `.` outside `"..."`,
+`'...'`, `#...#` and every bracket, and each bare word inside must be a variable,
+a reserved name, or a name the document itself uses.  The last clause is what
+refuses prose like `% ?длина(Х, 2) не завершится.` — the rule is deliberately not
+a parser, and a line it cannot read gets no marker: no marker is a small loss, a
+marker that runs the wrong text is a wrong program.  The sweep over `examples/`
+pins the number of statements per file, and that no live `?`-line anywhere is
+left without a marker.
+
+A click during a run stops it first (`Остановить`) and then runs the clicked
+question in a fresh interpreter: the marker is the way out of a runaway query as
+much as a way to ask one.  The click leaves the caret, the selection and the
+document untouched — a run is not an edit.
+
 ## Menus, toolbar and icons
 
 One table describes every command (`prologd_gui/actions.py`), and the menu bar,

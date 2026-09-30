@@ -710,6 +710,7 @@ class MainWindow(QMainWindow):
         pane.newFileRequested.connect(lambda: self.new_buffer())
         pane.zoomChanged.connect(self._on_zoom_changed)
         pane.fileDropped.connect(self.open_path)
+        pane.queryRequested.connect(self._on_query_requested)
         # Which tab is showing decides the window title and the undo state.
         pane.currentChanged.connect(self._on_tab_changed)
         pane.cursorMoved.connect(self._update_details)
@@ -867,7 +868,8 @@ class MainWindow(QMainWindow):
             pane.set_buffers(self._buffers)
 
     # -- actions -----------------------------------------------------------
-    def run_program(self, *, trace: bool = False, step: bool = False) -> None:
+    def run_program(self, *, trace: bool = False, step: bool = False,
+                    questions: bool = True) -> bool:
         """Runs the current buffer in a fresh interpreter.
 
         A run starts from a clean slate: a fresh interpreter (no clauses, RNG
@@ -882,15 +884,22 @@ class MainWindow(QMainWindow):
         the step hook, so the run stops at its first step point and waits for
         `Шаг`/`Продолжить` — and, like `trace`, it goes on the *load*, because a
         program's own `?`-statements and directives run there.
+
+        `questions=False` loads the program without running its own `?`-statements:
+        that is what the editor's margin needs, so one clicked question is
+        answered *alone* instead of after the whole lesson (task_36).
+
+        The result is True when the load was sent; a caller that wants to add a
+        query of its own (`_on_query_requested`) must not do it otherwise.
         """
         if self._session.paused() and not (trace or step):
             # `F5` while a step is paused means «продолжить»: starting the file over
             # would throw away the run the user is walking through.
             self.step_continue()
-            return
+            return False
         buffer = self.current_buffer()
         if buffer is None:
-            return
+            return False
         path = buffer.model.path
         if self._settings.save_before_run and buffer.is_modified():
             # The switch of the «Выполнение» menu: a run is then always of what is
@@ -898,7 +907,7 @@ class MainWindow(QMainWindow):
             # with the editor about the file's own path.
             if not self.save_buffer(buffer):
                 self._status.setText("запуск отменён: сохранить не удалось")
-                return
+                return False
         self._output.clear()
         # A new run starts clean: the red line of the last failure and the line a
         # step was standing on are both about a run that is over.
@@ -923,7 +932,7 @@ class MainWindow(QMainWindow):
         if path is not None and not buffer.is_modified():
             # A saved, unmodified buffer is loaded by path: `ИМПОРТ` resolves
             # against the file's own directory and diagnostics name the file.
-            self._session.load_file(path, step=step, trace=trace)
+            self._session.load_file(path, step=step, trace=trace, questions=questions)
             self._status.setText(f"выполняется {pathlib.Path(path).name}")
         else:
             # Otherwise the text comes from the editor, and the path, when there
@@ -931,9 +940,11 @@ class MainWindow(QMainWindow):
             # status line says which case is running, so a failing `ИМПОРТ` is
             # not a mystery: without a path it searches only the working
             # directory and the `-I` directories.
-            self._session.load_text(buffer.text(), path or "<buffer>", step=step, trace=trace)
+            self._session.load_text(buffer.text(), path or "<buffer>", step=step, trace=trace,
+                                    questions=questions)
             name = pathlib.Path(path).name if path else "буфер без имени"
             self._status.setText(f"выполняется {name} (есть несохранённые правки)")
+        return True
 
     def _run_query(self) -> None:
         text = self._query_line.text().strip()
@@ -950,6 +961,29 @@ class MainWindow(QMainWindow):
         self._session.run_query(text)
         self._sync_run_actions()
         self._update_details()
+
+    def _on_query_requested(self, statement: str) -> None:
+        """Runs one question from the editor's margin — and the answer alone.
+
+        The statement goes into the query line first, so what is running stays
+        visible while the answer arrives, and the program is loaded *quietly*
+        (`questions=False`): running its own `?`-statements would fill the pane
+        with the whole lesson before the clicked question's answer.
+
+        A click during a run stops that run first.  The margin marker is the way
+        out of a runaway query as much as it is a way to ask one, and after the
+        stop the clicked question is the one that answers (task_36).
+        """
+        if not statement:
+            return
+        if self._busy or self._session.paused():
+            # «Остановить», then the clicked query: a runaway is ended by ending
+            # its process, and the pane's last word is the answer asked for.
+            self.stop_program()
+        self._query_line.setText(statement)
+        if not self.run_program(questions=False):
+            return
+        self._session.run_query(statement)
 
     # -- files -------------------------------------------------------------
     def new_buffer(self, name: str | None = None) -> Buffer:

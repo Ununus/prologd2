@@ -9,12 +9,13 @@ undo that takes two presses, an indent that eats a selection.
 
 from __future__ import annotations
 
-from PySide6.QtCore import QRect, QSize, QStringListModel, Qt, Signal
+from PySide6.QtCore import QPoint, QRect, QSize, QStringListModel, Qt, Signal
 from PySide6.QtGui import (
     QColor,
     QFont,
     QKeyEvent,
     QPainter,
+    QPolygon,
     QTextCursor,
     QTextDocument,
     QTextFormat,
@@ -22,7 +23,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import QCompleter, QPlainTextEdit, QTextEdit, QWidget
 
-from . import completion, search, tokens
+from . import completion, queries, search, tokens
 from .settings import DEFAULT_FONT_SIZE, MAXIMUM_FONT_SIZE, MINIMUM_FONT_SIZE
 
 #: The comment character of the language: `%` to the end of the line.
@@ -50,6 +51,16 @@ _MARGIN_BACKGROUND = "#f0f0f0"
 _MARGIN_TEXT = "#8a8a8a"
 _MARGIN_CURRENT = "#0a22d6"
 
+#: The margin's icon column: a run marker for every line that is a question
+#: (task_36), and the hit box of the click that runs it.  It sits left of the
+#: numbers, so a marker is never hit while aiming at a digit, and a click on
+#: the numbers themselves does nothing.
+QUERY_MARKER_WIDTH = 14
+
+#: The same blue as a query and as the current line's number: this is the
+#: editor's colour for «a question, and something will run it».
+_QUERY_MARKER = "#0a22d6"
+
 _MIN_FONT_SIZE = MINIMUM_FONT_SIZE
 _MAX_FONT_SIZE = MAXIMUM_FONT_SIZE
 
@@ -69,17 +80,30 @@ _POPUP_CLOSE_KEYS = (Qt.Key.Key_Left, Qt.Key.Key_Right, Qt.Key.Key_Home, Qt.Key.
 
 
 class LineNumberArea(QWidget):
-    """The margin the editor paints line numbers into."""
+    """The margin the editor paints line numbers and run markers into."""
 
     def __init__(self, editor: "CodeEditor") -> None:
         super().__init__(editor)
         self._editor = editor
+        # The margin is clickable: the marker of a question runs it (task_36),
+        # and the hand cursor says so before the click.
+        self.setMouseTracking(True)
 
     def sizeHint(self) -> QSize:  # noqa: N802 - Qt spelling
         return QSize(self._editor.line_number_area_width(), 0)
 
     def paintEvent(self, event) -> None:  # noqa: N802 - Qt spelling
         self._editor.paint_line_numbers(event)
+
+    def mousePressEvent(self, event) -> None:  # noqa: N802 - Qt spelling
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._editor.margin_pressed(event.position().toPoint())
+
+    def mouseMoveEvent(self, event) -> None:  # noqa: N802 - Qt spelling
+        over = self._editor.statement_at_margin_point(event.position().toPoint()) is not None
+        self.setCursor(
+            Qt.CursorShape.PointingHandCursor if over else Qt.CursorShape.ArrowCursor
+        )
 
 
 class ZoomablePlainTextEdit(QPlainTextEdit):
@@ -223,6 +247,10 @@ class ZoomablePlainTextEdit(QPlainTextEdit):
 class CodeEditor(ZoomablePlainTextEdit):
     """A `QPlainTextEdit` with what writing PrologD needs."""
 
+    #: A question's marker was clicked in the margin; carries the statement as
+    #: written (from the `?` to the closing `.`), ready to run (task_36).
+    queryRequested = Signal(str)
+
     def __init__(
         self,
         parent: QWidget | None = None,
@@ -251,6 +279,9 @@ class CodeEditor(ZoomablePlainTextEdit):
         self._offers: list[completion.Candidate] = []
         self._completer: QCompleter | None = None
         self._offer_list: QStringListModel | None = None
+        #: The runnable questions of the text by line, for the margin's markers
+        #: (task_36); the rule that fills this lives in `queries.py`.
+        self._statements: dict[int, str] = {}
 
         self._margin = LineNumberArea(self)
         self.blockCountChanged.connect(self._update_margin_width)
@@ -263,6 +294,10 @@ class CodeEditor(ZoomablePlainTextEdit):
         # A mark that outlives the text it pointed at is a lie: an edit clears
         # both the error line and the step line.
         self.textChanged.connect(self.clear_marks)
+        # Which lines are questions is a property of the text, so an edit changes
+        # it.  The scan rejects a line at its first characters and collects the
+        # document's names once, so doing this per keystroke is cheap.
+        self.textChanged.connect(self._refresh_statements)
         self._update_margin_width()
         if completion:
             self.enable_completion(True)
@@ -278,6 +313,7 @@ class CodeEditor(ZoomablePlainTextEdit):
     def set_line_numbers(self, enabled: bool) -> None:
         self._line_numbers = enabled
         self._update_margin_width()
+        self._margin.update()
 
     def line_numbers(self) -> bool:
         return self._line_numbers
@@ -286,7 +322,7 @@ class CodeEditor(ZoomablePlainTextEdit):
         if not self._line_numbers:
             return 0
         digits = len(str(max(1, self.blockCount())))
-        return 12 + self.fontMetrics().horizontalAdvance("9") * digits
+        return QUERY_MARKER_WIDTH + 12 + self.fontMetrics().horizontalAdvance("9") * digits
 
     def _update_margin_width(self, _count: int = 0) -> None:
         self.setViewportMargins(self.line_number_area_width(), 0, 0, 0)
@@ -335,10 +371,70 @@ class CodeEditor(ZoomablePlainTextEdit):
                     int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter),
                     str(number + 1),
                 )
+                if number + 1 in self._statements:
+                    self._paint_query_marker(painter, top, height)
             block = block.next()
             top = bottom
             bottom = top + round(self.blockBoundingRect(block).height())
             number += 1
+
+    def _paint_query_marker(self, painter: QPainter, top: int, height: int) -> None:
+        """A right-pointing triangle in the icon column: «this line is a question»."""
+        centre = top + height // 2
+        painter.save()
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(_QUERY_MARKER))
+        painter.drawPolygon(
+            QPolygon([QPoint(4, centre - 4), QPoint(4, centre + 4), QPoint(11, centre)])
+        )
+        painter.restore()
+
+    def margin_line_at(self, point) -> int | None:
+        """The 1-based line of the margin under `point`, or None.
+
+        The same arithmetic `paint_line_numbers` walks: a block's top edge and
+        height, starting from the first visible block.  Only the icon column
+        counts — a click on the numbers is not a run.
+        """
+        if point.x() >= QUERY_MARKER_WIDTH:
+            return None
+        block = self.firstVisibleBlock()
+        offset = self.contentOffset()
+        top = round(self.blockBoundingGeometry(block).translated(offset).top())
+        while block.isValid() and top <= point.y():
+            bottom = top + round(self.blockBoundingRect(block).height())
+            if point.y() < bottom:
+                return block.blockNumber() + 1
+            block = block.next()
+            top = bottom
+        return None
+
+    def statement_at_margin_point(self, point) -> str | None:
+        """The question the margin's `point` stands on — None when there is none."""
+        if not self._line_numbers:
+            return None
+        line = self.margin_line_at(point)
+        return self._statements.get(line) if line is not None else None
+
+    def margin_pressed(self, point) -> None:
+        """A click in the margin: run the question under it, if there is one.
+
+        A click anywhere else — on a number, on the blank margin beside prose —
+        does nothing, and nothing happens beside the run either: the caret and
+        the selection stay where they were and the document is not modified.
+        """
+        statement = self.statement_at_margin_point(point)
+        if statement is not None:
+            self.queryRequested.emit(statement)
+
+    def _refresh_statements(self) -> None:
+        """Recomputes which lines carry a runnable question (task_36)."""
+        self._statements = dict(queries.find_statements(self.toPlainText(), self._keywords))
+        self._margin.update()
+
+    def query_statements(self) -> dict[int, str]:
+        """The runnable questions by line — what the margin draws markers for."""
+        return dict(self._statements)
 
     # -- diagnostics, search and occurrences --------------------------------
     def _existing_line(self, line: int | None) -> int | None:
@@ -623,6 +719,9 @@ class CodeEditor(ZoomablePlainTextEdit):
         self._keywords = keywords
         if self._completion is not None:
             self._completion.set_keywords(keywords)
+        # The same names decide what the margin accepts as a question: «?длина(Х, 2)
+        # не завершится.» is prose only because nothing knows the word `не`.
+        self._refresh_statements()
 
     def set_auto_complete_after(self, letters: int) -> None:
         self._auto_complete_after = max(1, int(letters))

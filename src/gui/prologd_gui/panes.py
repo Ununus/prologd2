@@ -35,6 +35,9 @@ class Pane(QTabWidget):
     zoomChanged = Signal(float)
     #: A program file was dropped on a view; the window opens it in a tab.
     fileDropped = Signal(str)
+    #: A question's marker was clicked in a view's margin; the window runs that
+    #: statement alone (task_36).
+    queryRequested = Signal(str)
     #: A tab's close button was pressed; the window asks about unsaved changes.
     closeRequested = Signal(object)
     #: The empty part of the tab bar was double clicked: start a new file.
@@ -115,6 +118,7 @@ class Pane(QTabWidget):
         view.zoomChanged.connect(self.zoomChanged)
         view.fileDropped.connect(self.fileDropped)
         view.activated.connect(self.activated)
+        view.queryRequested.connect(self.queryRequested)
         # The status bar wants the caret's position, and the views come and go with
         # the tabs, so the pane forwards the signal instead of the window chasing
         # the current view.

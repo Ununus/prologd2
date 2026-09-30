@@ -17,18 +17,47 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-from PySide6.QtCore import Qt  # noqa: E402
+from PySide6.QtCore import QPoint, Qt  # noqa: E402
 from PySide6.QtGui import QTextCursor  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
-from prologd_gui.editor import CodeEditor  # noqa: E402
+from prologd_gui.editor import QUERY_MARKER_WIDTH, CodeEditor  # noqa: E402
+from prologd_gui.keywords import Keywords  # noqa: E402
+
+
+#: The reserved names the margin checks need; the rule itself is checked without
+#: Qt in `test_queries.py`.
+MARGIN_TABLE = Keywords(
+    [
+        {"name": "факт", "kind": "predicate", "arities": [1]},
+        {"name": "сумма", "kind": "predicate", "arities": [2]},
+    ]
+)
 
 
 def make_editor(text: str = "") -> CodeEditor:
     editor = CodeEditor()
     editor.setPlainText(text)
     return editor
+
+
+def margin_editor(text: str) -> CodeEditor:
+    """An editor with a real geometry: a margin click needs laid-out blocks."""
+    editor = CodeEditor()
+    editor.resize(500, 300)
+    editor.show()
+    editor.set_completion_keywords(MARGIN_TABLE)
+    editor.setPlainText(text)
+    QTest.qWait(1)
+    return editor
+
+
+def marker_point(editor: CodeEditor, line: int) -> QPoint:
+    """A point inside the marker column of a 1-based line, in margin coordinates."""
+    block = editor.document().findBlockByNumber(line - 1)
+    geometry = editor.blockBoundingGeometry(block).translated(editor.contentOffset())
+    return QPoint(4, int(geometry.top() + geometry.height() / 2))
 
 
 def select_all(editor: CodeEditor) -> None:
@@ -205,6 +234,71 @@ def test_a_document_made_outside_takes_the_pane_font() -> None:
     print(f"ok: a document given to the editor is measured at its size ({heights[0]}px, {heights[1]}px)")
 
 
+def test_the_margin_marks_questions_and_nothing_else() -> None:
+    """The icon column exists only for questions (task_36)."""
+    editor = margin_editor("?факт(1).\n% ?сумма(5, С).\nфакт(2).\n%! С=15\n")
+    assert editor.query_statements() == {1: "?факт(1).", 2: "?сумма(5, С)."}
+
+    # The mark column is an addition to the numbers, and there is no margin at
+    # all without line numbers.
+    with_numbers = editor.line_number_area_width()
+    expected = QUERY_MARKER_WIDTH + 12 + editor.fontMetrics().horizontalAdvance("9")
+    assert with_numbers == expected, (with_numbers, expected)
+    editor.set_line_numbers(False)
+    assert editor.line_number_area_width() == 0
+    assert editor.statement_at_margin_point(marker_point(editor, 1)) is None
+    editor.set_line_numbers(True)
+    assert editor.line_number_area_width() == with_numbers
+    print("ok: the margin marks ?-lines and is exactly the marker column wider")
+
+
+def test_a_click_on_a_marker_runs_the_question_and_changes_nothing_else() -> None:
+    """The mark is clicked with a real mouse event, and the run is a signal.
+
+    A caret that moved or a document that turned modified when a *run* was
+    asked for would be an edit the user never made.
+    """
+    editor = margin_editor("?факт(1).\nфакт(2).\n")
+    requested: list[str] = []
+    editor.queryRequested.connect(requested.append)
+
+    assert editor.statement_at_margin_point(marker_point(editor, 1)) == "?факт(1)."
+    QTest.mouseClick(editor._margin, Qt.MouseButton.LeftButton, pos=marker_point(editor, 1))
+    assert requested == ["?факт(1)."], requested
+
+    # A click where there is no marker does nothing at all.
+    QTest.mouseClick(editor._margin, Qt.MouseButton.LeftButton, pos=marker_point(editor, 2))
+    assert requested == ["?факт(1)."], requested
+
+    # The caret is put somewhere of the user's own, then the mark is clicked:
+    # nothing of that state may change.
+    cursor = editor.textCursor()
+    cursor.setPosition(editor.document().findBlockByNumber(1).position() + 2)
+    editor.setTextCursor(cursor)
+    editor.document().setModified(False)
+    before = editor.textCursor().position()
+    QTest.mouseClick(editor._margin, Qt.MouseButton.LeftButton, pos=marker_point(editor, 1))
+    assert requested == ["?факт(1).", "?факт(1)."]
+    assert editor.textCursor().position() == before, "the caret moved"
+    assert not editor.textCursor().hasSelection(), "the selection changed"
+    assert not editor.document().isModified(), "the document was marked modified"
+    print("ok: a margin click asks for the statement and leaves the editing state alone")
+
+
+def test_a_click_on_the_numbers_is_not_a_run() -> None:
+    editor = margin_editor("?факт(1).\n")
+    requested: list[str] = []
+    editor.queryRequested.connect(requested.append)
+    point = marker_point(editor, 1)
+    QTest.mouseClick(
+        editor._margin,
+        Qt.MouseButton.LeftButton,
+        pos=QPoint(point.x() + QUERY_MARKER_WIDTH, point.y()),
+    )
+    assert requested == [], requested
+    print("ok: a click on the numbers is not a run")
+
+
 def main() -> int:
     application = QApplication(sys.argv[:1])
     test_commenting_a_selection_is_one_undo_step()
@@ -217,6 +311,9 @@ def main() -> int:
     test_line_number_width_grows_with_the_document()
     test_the_error_line_is_marked_and_cleared()
     test_a_document_made_outside_takes_the_pane_font()
+    test_the_margin_marks_questions_and_nothing_else()
+    test_a_click_on_a_marker_runs_the_question_and_changes_nothing_else()
+    test_a_click_on_the_numbers_is_not_a_run()
     print("all editor checks passed")
     del application
     return 0
