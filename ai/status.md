@@ -102,7 +102,13 @@ session.
 | task_34_builtin_branches | done | every built-in branch-tested in Catch2 (186 cases); the sweep found and fixed five defects: two in the float built-ins (`nan` instead of a failure), the integer/real comparison, the cyclic term that ended the process, the ignored read prompt, the unchecked graphics arguments and the code points that were written as invalid UTF-8 |
 | task_35_lessons_rework | done | the course in `examples/lessons` is rewritten for the current dialect, one commit per lesson, from the plan in `ai/task_35_lessons_rework.md`; `test_lessons.cpp` runs every lesson (12 + the debug appendix) and compares its whole output with the `%!` lines the lesson itself carries, so a lesson cannot drift again; the old files are in `lessons/_old/`; the index is `examples/lessons/README.md` and the fifth Typst document `doc/lessons.typ` (the `docs` target builds it); writing the expectations found and fixed mistakes in the source material (a non-terminating `нод/3`, descending sorts, a hanging `?длина(Х, 2)`, a failed read that leaves the rest of its line) and taught the check two tricks: input files for lesson 7 and include paths for lesson 11 |
 | task_36_gui_query_markers | not started | run one question from the editor margin: a marker next to `?Goal.` and `% ?Goal.`, the `%?` colour, and a `questions: false` load so the clicked query answers *alone*; the task file carries the rule for what counts as a statement (a lesson's commented query often has prose after the goal) and the finding that no lesson file has to change |
-| task_37_gui_builtin_reference | not started | `doc/builtins.json` as the one machine-readable source for the built-in reference, a checker keeping it in step with `--list-keywords` and the sections of `help.typ`, a summary line under the completion popup and `Shift+F1` on the word under the caret (the English-alias work of `ai/maybe/english_aliases.md` would land in the same file) |
+| task_37_gui_builtin_reference | not started | `doc/builtins.json` as the one machine-readable source for the built-in reference, a checker keeping it in step with `--list-keywords` and the sections of `help.typ`, a summary line under the completion popup and `Shift+F1` on the word under the caret (the English-alias work of task_39 would land in the same file) |
+| task_38_engine_limits | not started | recursion depth and long runs: the measured crash (0xC00000FD at ~32 000 levels, answer already printed) becomes a diagnostic, the deep chain and deep terms are released iteratively, variable growth is either fixed or documented, and `tools/bench_engine.py` makes the numbers reproducible |
+| task_39_english_aliases | not started | every built-in gets an English spelling (the parked note, now a task, with the user's decisions: `integer`/`float` are the tests and `to_int`/`to_float` the conversions, `strlen` for the string length, all English lowercase, the course stays Russian and the pair is documented in an appendix) |
+| task_40_diagnostics | not started | severity (warnings that never change an exit code), positions that point at the opening bracket, a stated missing final dot, a warning for a variable written where a constant was meant, singleton variables, and call-site hints (unknown name with a suggestion, known name with the wrong arity) |
+| task_41_semicolon_disjunction | not started | `;` as a real backtrackable disjunction (ISO precedence with `,`), the `;` sentence terminator retired with a diagnostic, `ИЛИ/2` left as the committed form and cross-referenced; awaits the user's go-ahead |
+| task_42_engine_hot_path | not started | the constant tax: no string per built-in call, no `"name/arity"` key per predicate call, clause indexing and atom interning only where the benchmark justifies them |
+| task_43_language_surface | not started | `ВЫП/2..N` (`call/N`), a warning when two imported files define the same predicate, and the removal of the seven library clauses that every built-in already shadows (`?СКОЛЬКО(НЕ, А)` answers 2 today) |
 
 ## Test suite
 
@@ -718,3 +724,27 @@ Resolved on 2026-09-29 (GUI planning):
   queries become clickable as they are), and a single query needs the load to be
   *quiet* — `questions: false`, or the clicked answer arrives after the whole
   lesson's output; the seam is `ModuleLoader::setQueryRunner`.
+* Engine review round, part 25: the user asked how the engine differs from other
+  Prologs, where the shortcomings are and what can be improved.  The answer was
+  read out of the code and measured with the built interpreter, and it found
+  **one real defect**: a correct program that recurses ~32 000 deep prints its
+  answer and then dies with `0xC00000FD` (`STATUS_STACK_OVERFLOW`) — the deep
+  environment chain is released *recursively*, each `EnvNode` holding a
+  `shared_ptr` to its parent, so the destructors walk the whole chain when the
+  last reference to a deep frame goes (a popped choice point or the solver's own
+  environment).  Threshold measured between 16 000 (fine) and 32 000 (dead), the
+  same with a cut after the guard and with a 32 000-element list.  Memory was
+  measured too: ≈ 2.8 KB per step, 280 MB at depth 100 000 and 1.24 GB at
+  400 000, because `Bindings::freshVar` only appends (`clear()` has no caller) —
+  while the *time* is fine (~5 µs per step, 400 000 steps in 2.05 s).  Also
+  measured: `?СКОЛЬКО(НЕ, А)` answers 2 while `НЕ/1` is answered by a built-in,
+  i.e. `Engine::initialize()`'s seven library clauses are unreachable; 100 000
+  facts are scanned in 0.31 s against 0.26 s for the first one, so clause
+  indexing is a constant, not a crisis; and `ИЛИ(p(X), q(X))` answers `X=1`,
+  committing to the first goal instead of being a disjunction.  Six task files
+  came out of it: 38 (limits), 39 (English aliases — the parked note became a
+  task with the user's decisions: `integer`/`float` as tests, `to_int`/`to_float`
+  as conversions, `strlen`, everything lowercase, the course Russian with an
+  English appendix), 40 (diagnostics), 41 (`;` as disjunction, awaiting a
+  go-ahead), 42 (the hot path) and 43 (`call/N`, module collisions, the dead
+  library).  `ai/maybe/english_aliases.md` is gone — it is task_39 now.

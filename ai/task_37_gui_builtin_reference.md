@@ -5,7 +5,7 @@
 list), task_24 (the completion popup), task_26 (the action table, where the new
 command is declared)
 **Milestone:** M13
-**Note:** the English-alias idea in `ai/maybe/english_aliases.md` is *not* a
+**Note:** the English-alias idea in `ai/task_39_english_aliases.md` is *not* a
 dependency, but if it is ever scheduled, the aliases belong in the same data file
 this task introduces (one record per predicate, an `aliases` list), otherwise the
 reference would grow a second copy of every entry.

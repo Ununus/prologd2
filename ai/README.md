@@ -15,7 +15,7 @@ original conversation lives here.
 | `decisions.md` | Architecture decision records (ADR) with rationale. |
 | `status.md` | Living progress tracker (updated after each work session). |
 | `task_*.md` | One file per task: scope, deliverables, tests, acceptance criteria. |
-| `maybe/*.md` | Ideas that are researched but not scheduled: the analysis, the decision taken so far, and what a task file would have to say. |
+| `maybe/*.md` | Ideas that are researched but not scheduled: the analysis, the decision taken so far, and what a task file would have to say.  Empty at the moment — the English-alias idea lived here and became `task_39_english_aliases.md`; the next parked idea goes in the same place. |
 
 The folder itself is under version control, like the rest of the repository: only
 `ai/_ref/` (the local reference copy) and `ai/_venv/` are ignored.  Notes are
