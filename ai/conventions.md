@@ -26,8 +26,12 @@ Built-in predicate names are Russian and must be written with UTF-8 in string
 literals. Never split a multi-byte character.  Every built-in with a Russian name
 also has an English spelling in lower case (`НАЙТИВСЕ`/`findall`), registered from
 the one table in `builtins.cpp`; `test_aliases.cpp` fails if a Russian name has no
-row there, and the correspondence table in `doc/help.typ` (appendix 17) must be
-regenerated when the table changes.  Names the engine or the parser answers
+row there.  A built-in is described **in `doc/builtins.json`** (one record: summary,
+argument modes, the `help.typ` section, the English spelling) — so a new built-in is
+added to `builtins.cpp`, to the lexer's reserved set *and* to `doc/builtins.json`,
+and `src/gui/tests/test_reference.py` fails when the three disagree.  The
+correspondence table in `doc/help.typ` (appendix 17) is built from that file, not
+edited by hand.  Names the engine or the parser answers
 (`ВЫП`/`call`, `ИМПОРТ`/`import`) are listed in `keywords.cpp`/`parser.cpp`
 instead.  An English name that no Russian name owns follows one rule: bare only
 where the standard means the same thing (`var`, `integer`, `float`), `is_` for a
