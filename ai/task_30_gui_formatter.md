@@ -9,9 +9,14 @@
 A **Форматировать** action with two modes, chosen in the settings, plus
 formatting of the selection only:
 
-* **мягкое** — keep the author's line breaks, but move the goals that overflow
-  the width to a continuation line, indented;
-* **жёсткое** — one goal of a clause body per line, continuation lines indented.
+* **soft** — the lines are built again: goals are packed up to the width and
+  moved to a continuation line, indented, when they do not fit (2026-10-01, on
+  request: this is what lets a hard layout come back to soft — a break the
+  formatter wrote cannot be told apart from one the author made);
+* **hard** — one goal of a clause body per line, continuation lines indented;
+* **line** — the goals of a body share one line, whatever the width
+  (2026-10-01: replaced «не менять»; the command not being pressed is «не
+  менять»).
 
 Indent is configurable (default: 1 tab stop, tabs or spaces) and trailing
 whitespace is always removed.
@@ -157,6 +162,10 @@ rewritten, and the formatted `examples/` still pass their golden tests.
 * Canonical spacing the formatter writes: clause `голова:-тело` (glued), a
   directive `:- цель.` (one space), a query `?цель.` (glued), goal separator
   `, ` and ` ; `, and no space before the final dot.
+* 2026-10-01, follow-up round: the mode control moved from the toolbar into
+  «Правка → Формат», «не менять» became «в одну строку», and the soft mode turned
+  canonical so that hard → soft works; the wire went to protocol **7** (`format`
+  takes `line` instead of `none`).
 * `FormatOptions::indent_unit == Spaces` means **four** spaces per step.
 * Selection formatting drops the fragment's own parse errors when it found a
   parsable cut: they are about the part that is deliberately left alone, and a

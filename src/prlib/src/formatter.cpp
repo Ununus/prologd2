@@ -53,6 +53,39 @@ bool isBlankLine(std::string_view text) {
   return true;
 }
 
+/// True when a gap holds a blank line of its own.  The first line of a gap
+/// continues the line the previous token ended on, and the last one is the
+/// indentation in front of the next token — neither is a blank line the author
+/// left between two goals.
+bool hasInteriorBlank(std::string_view gap) {
+  std::size_t line_count = 1;
+  for (const char ch : gap) {
+    if (ch == '\n') {
+      ++line_count;
+    }
+  }
+  if (line_count < 3) {
+    return false;
+  }
+  std::size_t line_start = 0;
+  std::size_t line_number = 0;
+  for (std::size_t i = 0; i <= gap.size(); ++i) {
+    if (i != gap.size() && gap[i] != '\n') {
+      continue;
+    }
+    const std::string_view line = gap.substr(line_start, i - line_start);
+    line_start = i + 1;
+    ++line_number;
+    if (line_number == 1 || line_number == line_count) {
+      continue;
+    }
+    if (isBlankLine(line)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /// The comment of a gap line, from its `%` to the end of the line.  Empty when
 /// the line has none.  Between two tokens there is nothing but whitespace and
 /// comments, so the first `%` of such a line starts a comment.
@@ -515,7 +548,9 @@ class Formatter {
 
   /// The gap between `:-`/`?` and the first goal.  The corpus writes a clause
   /// glued (`голова:-тело`), a query glued (`?цель`), and a directive with one
-  /// space (`:- ИМПОРТ(...)`) — and a break the author made is kept.
+  /// space (`:- ИМПОРТ(...)`).  «Мягкое» joins here too, breaking only when the
+  /// line would not fit; a comment and a blank line the author left force the
+  /// break in every mode but «в одну строку».
   void emitFirstBodyGap(const Statement& statement) {
     const std::size_t body_end = statement.terminated ? statement.last : tokens_->size();
     if (statement.body_begin == kNone || statement.body_begin >= body_end) {
@@ -524,11 +559,15 @@ class Formatter {
     const std::size_t after = statement.body_begin - 1;
     const std::string join = statement.directive ? " " : "";
     const std::string_view gap = gapBetween(after, statement.body_begin);
-    bool broken = gap.find('\n') != std::string_view::npos ||
-                  gap.find('%') != std::string_view::npos;
-    if (!broken && options_.mode == FormatMode::Soft &&
-        !goalFits(statement.body_begin, goalEnd(statement, 0), builder_.column(),
-                  join.size())) {
+    const bool has_comment = gap.find('%') != std::string_view::npos;
+    const bool has_blank = hasInteriorBlank(gap);
+    bool broken = has_comment;
+    if (options_.mode == FormatMode::Soft &&
+        (has_blank || !goalFits(statement.body_begin, goalEnd(statement, 0),
+                                builder_.column(), join.size()))) {
+      broken = true;
+    }
+    if (options_.mode == FormatMode::Hard && has_blank) {
       broken = true;
     }
     if (!broken) {
@@ -585,15 +624,33 @@ class Formatter {
     }
   }
 
-  /// The gap after a separator.  This is where the two modes part: soft keeps
-  /// the author's breaks and adds one when the goal does not fit, hard breaks
-  /// at every separator.  A comment forces a break either way.
+  /// The gap after a separator.  This is where the modes part: «жёсткое»
+  /// breaks at every separator, «в одну строку» joins whatever it can and lets
+  /// the line be as long as it wants, and «мягкое» builds the line again —
+  /// goals are packed up to the width, and only a comment, a blank line the
+  /// author left or the width itself forces a break.
+  ///
+  /// The author's own single newlines are *not* kept in the soft mode: they
+  /// cannot be told apart from the ones this formatter wrote itself, and keeping
+  /// them is exactly what used to make «из жёсткого обратно в мягкое» impossible.
+  /// Rebuilding the lines makes the soft shape canonical, so formatting a hard
+  /// layout with it converts the program back.
   void emitGoalGap(std::size_t separator, std::size_t next_goal, bool fits) {
     const std::string_view gap = gapBetween(separator, next_goal);
-    const bool has_newline = gap.find('\n') != std::string_view::npos;
     const bool has_comment = gap.find('%') != std::string_view::npos;
-    const bool broken =
-        options_.mode == FormatMode::Hard || has_newline || has_comment || !fits;
+    bool broken = false;
+    switch (options_.mode) {
+      case FormatMode::Hard:
+        broken = true;
+        break;
+      case FormatMode::Line:
+        broken = has_comment;
+        break;
+      case FormatMode::None:
+      case FormatMode::Soft:
+        broken = has_comment || hasInteriorBlank(gap) || !fits;
+        break;
+    }
     if (!broken) {
       builder_.append(' ');
       return;

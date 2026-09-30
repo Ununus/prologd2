@@ -224,6 +224,47 @@ TEST_CASE("a fragment with nothing complete in it is left alone") {
   REQUIRE_FALSE(result.changed);
 }
 
+TEST_CASE("the soft mode turns a hard layout back into the soft shape") {
+  const std::string source =
+      "правило(а,б,с):-функция1(а,б,с), функция2(а,б,с), функция3(а,б,с),\n"
+      "функция4(а,б,с), функция5(а,б,с), функция6(а,б,с).\n";
+  const FormatResult soft = format(source);
+  const FormatResult hard_once = format(source, hard());
+  REQUIRE(soft.ok());
+  REQUIRE(hard_once.ok());
+  const FormatResult back = format(hard_once.text);
+  REQUIRE(back.ok());
+  REQUIRE(back.text == soft.text);
+  REQUIRE(back.changed);
+}
+
+TEST_CASE("soft does not keep an author break that fits on one line") {
+  // The lines are built again rather than kept: a break the author made cannot
+  // be told apart from one the hard mode wrote, and keeping them is what made
+  // «из жёсткого обратно в мягкое» impossible.
+  const std::string source = "счёт(Х):-часть(Х),\n    ещё(Х).\n";
+  const FormatResult result = format(source);
+  REQUIRE(result.ok());
+  REQUIRE(result.text == "счёт(Х):-часть(Х), ещё(Х).\n");
+}
+
+TEST_CASE("the one-line mode joins the body whatever the width") {
+  FormatOptions options;
+  options.mode = FormatMode::Line;
+  options.width = 20;  // not consulted: «в одну строку» means one line
+  const std::string source =
+      "правило(а,б,с):-функция1(а,б,с), функция2(а,б,с),\n"
+      "\tфункция3(а,б,с).\n";
+  const FormatResult result = format(source, options);
+  REQUIRE(result.ok());
+  REQUIRE(result.text ==
+          "правило(а,б,с):-функция1(а,б,с), функция2(а,б,с), функция3(а,б,с).\n");
+  // A comment still owns its line: a line cannot hold one and go on.
+  FormatResult commented = format("счёт(Х):-часть(Х),\n\t% пояснение\n\tещё(Х).\n", options);
+  REQUIRE(commented.ok());
+  REQUIRE(commented.text == "счёт(Х):-часть(Х),\n\t% пояснение\n\tещё(Х).\n");
+}
+
 TEST_CASE("none mode touches nothing at all") {
   FormatOptions options;
   options.mode = FormatMode::None;

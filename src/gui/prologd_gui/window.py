@@ -32,7 +32,6 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QSplitter,
     QToolBar,
-    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -422,37 +421,31 @@ class MainWindow(QMainWindow):
                 self._toolbar.addSeparator()
             elif key == actions.FONT_SIZE:
                 self._toolbar.addWidget(self._build_font_size_box())
-            elif key == actions.FORMAT_MODE:
-                self._toolbar.addWidget(self._build_format_mode_button())
             else:
                 self._toolbar.addAction(self._actions[key])
         self._toolbar.setVisible(self._settings.toolbar_visible)
         self.addToolBar(self._toolbar)
 
-    def _build_format_mode_button(self) -> QWidget:
-        """The formatter's mode, beside its action (task_30).
+    def _build_format_menu(self, title: str) -> QMenu:
+        """The formatter's mode, under its action in «Правка» (task_30).
 
         The modes themselves are a preference (task_29's dialog will edit the
         same keys), and «только выделенное» is the switch the task asked for — so
-        the button is a *view* of those values and the menu is where they are
-        changed until the dialog exists.
+        the submenu is a *view* of those values and the place they are changed
+        until the dialog exists.  It used to be a toolbar button; a menu that
+        belongs to one command sits under that command.
         """
-        self._format_mode_button = QToolButton()
-        self._format_mode_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        self._format_mode_button.setToolTip(
-            "Как форматировать (Ctrl+I): режим и «только выделенное»"
-        )
-        menu = QMenu(self._format_mode_button)
+        menu = QMenu(title, self)
         self._format_menu = menu
         group = QActionGroup(self)
         group.setExclusive(True)
         self._format_mode_actions: dict[str, QAction] = {}
-        for value, title in (
-            ("none", "Не менять"),
-            ("soft", "Мягкое — переносить, что не влезло"),
+        for value, entry_title in (
+            ("line", "В одну строку — цели тела собираются в строку"),
+            ("soft", "Мягкое — переносить то, что не влезло"),
             ("hard", "Жёсткое — по цели на строку"),
         ):
-            entry = menu.addAction(title)
+            entry = menu.addAction(entry_title)
             entry.setCheckable(True)
             entry.setActionGroup(group)
             entry.triggered.connect(
@@ -463,17 +456,14 @@ class MainWindow(QMainWindow):
         self._format_selection_action = menu.addAction("Только выделенное")
         self._format_selection_action.setCheckable(True)
         self._format_selection_action.toggled.connect(self._set_format_selection)
-        self._format_mode_button.setMenu(menu)
-        self._sync_format_button()
-        return self._format_mode_button
+        self._sync_format_menu()
+        return menu
 
-    def _sync_format_button(self) -> None:
+    def _sync_format_menu(self) -> None:
         """Shows the stored mode without answering for it."""
-        if not hasattr(self, "_format_mode_button"):
+        if not hasattr(self, "_format_menu"):
             return
         mode = self._settings.format_mode
-        titles = {"none": "Формат: не менять", "soft": "Формат: мягко", "hard": "Формат: жёстко"}
-        self._format_mode_button.setText(titles.get(mode, titles["soft"]))
         for value, entry in self._format_mode_actions.items():
             entry.blockSignals(True)
             entry.setChecked(value == mode)
@@ -484,11 +474,11 @@ class MainWindow(QMainWindow):
 
     def _set_format_mode(self, mode: str) -> None:
         self._settings.format_mode = mode
-        self._sync_format_button()
+        self._sync_format_menu()
 
     def _set_format_selection(self, flag: bool) -> None:
         self._settings.format_selection = bool(flag)
-        self._sync_format_button()
+        self._sync_format_menu()
 
     def _build_font_size_box(self) -> QWidget:
         """The font-size control: the same preference `Ctrl`+wheel writes.
@@ -560,6 +550,8 @@ class MainWindow(QMainWindow):
                         else menu.addMenu("Последние файлы")
                     )
                     self._recent_menu.aboutToShow.connect(self._fill_recent_menu)
+                elif key == actions.FORMAT_MODE:
+                    menu.addMenu(self._build_format_menu("Формат"))
                 else:
                     menu.addAction(self._actions[key])
 
@@ -1110,9 +1102,6 @@ class MainWindow(QMainWindow):
         lost.
         """
         mode = self._settings.format_mode
-        if mode == "none":
-            self._status.setText("форматирование выключено: режим «не менять»")
-            return
         view = self.active_pane().current_view()
         if view is None or self._format_pending is not None:
             return

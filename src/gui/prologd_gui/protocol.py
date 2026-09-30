@@ -20,7 +20,8 @@ from typing import Any, Iterator
 #: 5: `load` takes `questions` — `false` loads a program without running its own
 #:    `?`-statements (the editor's margin runs one query alone, task_36).
 #: 6: `format` for the formatter; the answer is a `formatted` event (task_30).
-PROTOCOL_VERSION = 6
+#: 7: the modes of `format` are `line`, `soft` and `hard`.
+PROTOCOL_VERSION = 7
 
 #: Event names the interpreter emits.
 EVENTS = ("ready", "output", "result", "input_request", "step", "trace", "error", "bye")
@@ -135,7 +136,7 @@ def format_text(
     comes back formatted up to its last complete goal, the rest untouched
     (task_30).  Flags that are the defaults are left off the wire.
     """
-    if mode not in ("soft", "hard", "none"):
+    if mode not in ("line", "soft", "hard"):
         raise ValueError(f"unknown format mode: {mode!r}")
     fields: dict[str, Any] = {"cmd": "format", "text": text, "mode": mode}
     if width != 80:

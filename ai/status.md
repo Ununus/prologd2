@@ -96,7 +96,7 @@ session.
 | task_27_gui_panels | done | movable panel (`F4`, `Ctrl+F4`), output pane (colour by kind, visible half-lines, bounded history, auto-scroll, save to a file), input console with the queue switch, status-bar details and the two-state run/stop |
 | task_28_gui_run_step | done | `EngineOptions::stepHook` + `StepInfo`, protocol 3 (`step`/`trace` events, `step` request, positions on `error`), the step strip with the call stack, the trace line in the editor, `F10`/`Shift+F10`/`F5`, error and trace lines from structured positions |
 | task_29_gui_settings | not started | settings dialog and persistence |
-| task_30_gui_formatter | done | `prlib/formatter.cpp` (whitespace-only, everything else copied byte for byte); `prologd --format[=soft|hard]` with `--format-width`, `--format-indent` and `--format-unit`; protocol **6** (`format` → `formatted`/`error`, answerable between queries); the window's `Ctrl+I` with a mode menu («не менять»/«мягкое»/«жёсткое» and «только выделенное»), one undo step, the caret and the selection mapped onto the new text; a source that does not parse is never rewritten |
+| task_30_gui_formatter | done | `prlib/formatter.cpp` (whitespace-only, everything else copied byte for byte); three modes — **в одну строку**, **мягкое** (строки строятся заново: цели собираются до ширины) and **жёсткое** — chosen in «Правка → Формат»; `prologd --format[=soft|hard|line]` with `--format-width`, `--format-indent` and `--format-unit`; protocol **7** (`format` → `formatted`/`error`, answerable between queries); the window's `Ctrl+I` with one undo step and the caret and selection mapped onto the new text; a source that does not parse is never rewritten |
 | task_31_gui_shortcuts | not started | layout-independent `Ctrl`+ key combinations |
 | task_32_import_search_report | done | `ИМПОРТ` failure names the directories tried, with reasons |
 | task_33_gui_search_replace | done | `search.py` (plain-text, Qt-free) + the find bar: question from the selection or the word at the caret, `F3`/`Shift+F3` with the wrap reported, three switches, «Заменить всё» as one undo step, the matches lit in every view; `test_search.py` has 16 checks |
@@ -1052,3 +1052,23 @@ Resolved on 2026-09-29 (GUI planning):
   wire test bring the suite to 248/248 (234 Catch2 + 14 integration), the GUI
   scripts to seventeen `test_*.py`, and the manual gained §15 `--format` and
   `gui.typ` its §4.3.
+* Formatter round, part 33: **the first look at the feature by the user**, and it
+  found the one thing the task file could not state: the soft mode kept the
+  author's line breaks, so `hard → soft` was impossible — after the hard mode
+  there are no author breaks left, only hard ones, and soft faithfully kept those.
+  The mode control also sat on the toolbar, where one command's setting does not
+  belong.  Three changes, one of them a semantic one: soft now **builds the lines
+  again** — goals are packed up to the width, and only the width, a comment or a
+  blank line the author left forces a break — which makes the soft shape
+  canonical and makes each format convert into any other (the way back from hard
+  is `Ctrl+I` in the soft mode; pinned by a Catch2 round-trip and a wire test).
+  «Не менять» left the surface (the command not being pressed *is* «не менять»)
+  and «в одну строку» took its place: the goals of a body on one line, whatever
+  the width, comments still owning their lines.  The mode selector moved from the
+  toolbar into **Правка → Формат**, the submenu right under the command it belongs
+  to; `actions.FORMAT_MODE` is a menu placeholder now, like `RECENT`, and the
+  window builds the submenu where the menu is built.  The wire caught the change
+  of the accepted modes (`line` in, `none` out) — protocol **7** — and a settings
+  file written by the previous build reads its old `none` as the soft mode.  251
+  ctest tests (237 Catch2 + 14), the 17 GUI scripts, the six PDFs; `gui.typ`
+  §4.3/§9.1/§9.2, the README and `help.typ` §15 tell the same story.

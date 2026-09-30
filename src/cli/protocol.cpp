@@ -30,7 +30,9 @@ using Json = nlohmann::json;
 ///    own `?`-statements (the editor's margin runs one query alone, task_36).
 /// 6: `format` — the formatter, answerable at any time; the answer is a
 ///    `formatted` event (task_30).
-constexpr int kProtocolVersion = 6;
+/// 7: the modes of `format` are `line`, `soft` and `hard` — «не менять» left
+///    the surface and «в одну строку» joined it.
+constexpr int kProtocolVersion = 7;
 
 [[nodiscard]] std::string stepActionName(StepAction action) {
   switch (action) {
@@ -272,10 +274,10 @@ class Session {
       options.mode = FormatMode::Soft;
     } else if (mode == "hard") {
       options.mode = FormatMode::Hard;
-    } else if (mode == "none") {
-      options.mode = FormatMode::None;
+    } else if (mode == "line") {
+      options.mode = FormatMode::Line;
     } else {
-      fail("format", "format: режим должен быть soft, hard или none, не " + mode);
+      fail("format", "format: режим должен быть line, soft или hard, не " + mode);
       return;
     }
     options.width = request.value("width", std::size_t{80});

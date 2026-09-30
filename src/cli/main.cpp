@@ -123,7 +123,7 @@ int main(int argc, char** argv) {
                "Print the reserved names as name/arity and exit");
   CLI::Option* formatOption = app.add_option(
       "--format", formatMode,
-      "Print the source formatted to stdout and exit: soft (default) or hard")
+      "Print the source formatted to stdout and exit: soft (default), hard or line")
                                    ->expected(0, 1);
   app.add_option("--format-width", formatWidth,
                  "Soft formatting: what has to fit on one line (default 80)");
@@ -173,8 +173,10 @@ int main(int argc, char** argv) {
       formatOptions.mode = prologd::FormatMode::Soft;
     } else if (formatMode == "hard") {
       formatOptions.mode = prologd::FormatMode::Hard;
+    } else if (formatMode == "line") {
+      formatOptions.mode = prologd::FormatMode::Line;
     } else {
-      std::cerr << "error: --format expects soft or hard, not " << formatMode << '\n';
+      std::cerr << "error: --format expects soft, hard or line, not " << formatMode << '\n';
       return 1;
     }
     formatOptions.width = formatWidth;

@@ -890,6 +890,8 @@ def test_the_menus_come_from_the_action_table(executable: str) -> None:
                     expected.append("")
                 elif key == actions.RECENT:
                     expected.append("Последние файлы")
+                elif key == actions.FORMAT_MODE:
+                    expected.append("Формат")
                 else:
                     expected.append(actions.BY_KEY[key].title)
             assert [entry.text() for entry in menus[title].actions()] == expected, title
@@ -1851,21 +1853,55 @@ def test_a_broken_program_is_reported_and_not_rewritten(executable: str) -> None
 def test_the_mode_menu_stores_the_mode_and_the_hard_mode_reaches_the_wire(
     executable: str,
 ) -> None:
+    """The mode submenu sits under «Форматировать», and each mode reaches the wire."""
     window = empty_window(executable)
     try:
-        assert window._format_mode_button.text() == "Формат: мягко"
+        # «Правка» keeps the submenu right under the command it belongs to.
+        editing = {
+            entry.text(): entry.menu() for entry in window.menuBar().actions()
+        }["Правка"]
+        titles = [entry.text() for entry in editing.actions() if entry.text()]
+        assert titles.index("Формат") == titles.index("Форматировать") + 1, titles
+        assert [entry.text() for entry in window._format_menu.actions() if entry.text()] == [
+            "В одну строку — цели тела собираются в строку",
+            "Мягкое — переносить то, что не влезло",
+            "Жёсткое — по цели на строку",
+            "Только выделенное",
+        ]
+
         window._format_mode_actions["hard"].trigger()
         assert window._settings.format_mode == "hard"
-        assert window._format_mode_button.text() == "Формат: жёстко"
         window.editor().setPlainText("факт(1).\nцель(Х):-часть(Х), ещё(Х).\n")
         window._actions["format"].trigger()
-        expected = "факт(1).\nцель(Х):-часть(Х),\n\tещё(Х).\n"
-        assert pump(window, lambda: window.editor().toPlainText() == expected), ascii(
+        hard = "факт(1).\nцель(Х):-часть(Х),\n\tещё(Х).\n"
+        assert pump(window, lambda: window.editor().toPlainText() == hard), ascii(
+            window.editor().toPlainText()
+        )
+
+        # And back: the soft mode builds the lines again, so a hard layout is
+        # converted instead of kept.
+        window._format_mode_actions["soft"].trigger()
+        assert window._settings.format_mode == "soft"
+        window._actions["format"].trigger()
+        soft = "факт(1).\nцель(Х):-часть(Х), ещё(Х).\n"
+        assert pump(window, lambda: window.editor().toPlainText() == soft), ascii(
+            window.editor().toPlainText()
+        )
+
+        # «В одну строку» joins the body regardless of the width.
+        window._format_mode_actions["line"].trigger()
+        assert window._settings.format_mode == "line"
+        window.editor().setPlainText(
+            "факт(1).\nцель(Х):-часть(Х),\n\tещё(Х),\n\tтретья(Х).\n"
+        )
+        window._actions["format"].trigger()
+        line = "факт(1).\nцель(Х):-часть(Х), ещё(Х), третья(Х).\n"
+        assert pump(window, lambda: window.editor().toPlainText() == line), ascii(
             window.editor().toPlainText()
         )
     finally:
         discard_changes(window)
-    print("ok: the mode menu stores the mode, and the hard mode breaks through the wire")
+    print("ok: «Формат» keeps the modes, and hard, soft and one-line reach the wire")
 
 
 def main(argv: list[str]) -> int:

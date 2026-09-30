@@ -39,8 +39,10 @@ RECENT = "recent"
 #: The font-size control, not an action either: the window puts it here.
 FONT_SIZE = "#font"
 
-#: The formatter's mode control (task_30): a small menu button, not an action —
-#: it carries the mode and the «только выделенное» switch the action reads.
+#: The formatter's mode (task_30): a submenu of «Правка», right under
+#: «Форматировать» — it carries the mode and the «только выделенное» switch the
+#: action reads.  It used to sit on the toolbar; the menu is where a command that
+#: belongs to one action is looked for.
 FORMAT_MODE = "#format-mode"
 
 
@@ -230,6 +232,7 @@ MENUS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "comment",
             "uncomment",
             "format",
+            FORMAT_MODE,
             SEPARATOR,
             "settings",
         ),
@@ -293,7 +296,6 @@ TOOLBAR: tuple[str, ...] = (
     "comment",
     "uncomment",
     "format",
-    FORMAT_MODE,
     SEPARATOR,
     FONT_SIZE,
     SEPARATOR,

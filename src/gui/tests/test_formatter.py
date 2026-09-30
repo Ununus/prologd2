@@ -141,12 +141,41 @@ def test_a_broken_source_answers_with_an_error_and_the_session_lives_on(
     print("ok: a broken source is reported, and the next request is answered")
 
 
+def test_a_hard_layout_is_turned_back_by_the_soft_mode(executable: str) -> None:
+    """«Из жёсткого обратно в мягкое»: the soft shape is rebuilt, not kept."""
+    line_text = (
+        "правило(а,б,с):-функция1(а,б,с), функция2(а,б,с), функция3(а,б,с), "
+        "функция4(а,б,с), функция5(а,б,с), функция6(а,б,с).\n"
+    )
+    code, events = run_session(
+        executable,
+        [
+            protocol.format_text(EXAMPLE, mode="hard"),
+            protocol.format_text(EXAMPLE, mode="line"),
+        ],
+    )
+    assert code == 0, f"exit code {code}"
+    formatted = [event for event in events if event.get("event") == "formatted"]
+    assert len(formatted) == 2
+    hard_text = formatted[0]["text"]
+    assert formatted[1]["text"] == line_text, ascii(formatted[1]["text"])
+    # The hard layout laid out again with soft is the soft shape, not the hard one.
+    code, events = run_session(executable, [protocol.format_text(hard_text, mode="soft")])
+    assert code == 0, f"exit code {code}"
+    back = find(events, "formatted")["text"]
+    assert back == (
+        "правило(а,б,с):-функция1(а,б,с), функция2(а,б,с), функция3(а,б,с),\n"
+        "\tфункция4(а,б,с), функция5(а,б,с), функция6(а,б,с).\n"
+    ), ascii(back)
+    print("ok: hard and line formats convert back through the soft mode")
+
+
 def test_ready_names_the_new_version(executable: str) -> None:
     code, events = run_session(executable, [])
     assert code == 0, f"exit code {code}"
     ready = find(events, "ready")
-    assert ready["protocol"] == protocol.PROTOCOL_VERSION == 6
-    print("ok: ready announces protocol 6")
+    assert ready["protocol"] == protocol.PROTOCOL_VERSION == 7
+    print("ok: ready announces protocol 7")
 
 
 def test_the_caret_carries_over_from_the_old_text_to_the_new() -> None:
@@ -171,6 +200,7 @@ def main(argv: list[str]) -> int:
     test_the_hard_shape_and_its_settings(executable)
     test_a_selection_is_formatted_up_to_its_last_complete_goal(executable)
     test_a_broken_source_answers_with_an_error_and_the_session_lives_on(executable)
+    test_a_hard_layout_is_turned_back_by_the_soft_mode(executable)
     test_ready_names_the_new_version(executable)
     print("all formatter checks passed")
     return 0

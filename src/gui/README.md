@@ -153,7 +153,8 @@ optional last argument is wired through a lambda (`"find": lambda: self.show_fin
 The menus are **Файл** (Новый, Открыть…, Последние, Сохранить, Сохранить как…,
 Сохранить все, Перечитать с диска, Закрыть вкладку, Закрыть все, Выход),
 **Правка** (Отменить … Удалить, Выделить всё, Закомментировать,
-Раскомментировать, Форматировать, Настройки…), **Поиск** (Поиск и замена…,
+Раскомментировать, Форматировать, Формат (подменю: режим и «только выделенное»),
+Настройки…), **Поиск** (Поиск и замена…,
 Далее, Назад, Найти выделенное, Найти выделенное назад), **Вид** (Панель
 инструментов, Панель вывода, Разделить редактор, Объединить редакторы, Сменить
 ориентацию сплита, Номера строк, Увеличить/Уменьшить/Обычный размер шрифта,
@@ -170,8 +171,7 @@ says so.  «Поиск» left that list in task_33, the «Выполнение»
 «Форматировать» in task_30.  The toolbar is
 grouped as
 the reference front-end had it: file | run/stop/step | editing (comment,
-uncomment, format and its mode button) | font size | tools (graphics, settings,
-help), and at the far
+uncomment, format) | font size | tools (graphics, settings, help), and at the far
 right **Очистить вывод**, which acts on the output rather than on the program;
 `QToolBar.setIconSize(QSize(24, 24))` is set explicitly so the layout does not
 depend on the style.
@@ -422,16 +422,27 @@ puts the answer back.  The grammar's copy of that request is `prologd --format`;
 the protocol contract has the details, and `src/gui/tests/test_formatter.py`
 drives the wire headlessly.
 
-The mode is chosen next to the action on the toolbar (it is a preference, so
-task_29's dialog will edit the same keys): **мягкое** keeps the author's line
-breaks and moves a goal that does not fit the width (80 columns by default) to a
-continuation line; **жёсткое** puts each goal of a body on a line of its own;
-«не менять» turns the action into a note.  The same menu carries «только
-выделенное»: with it, only the selected fragment is sent, and a fragment that
-breaks off in the middle of a body is formatted up to its last complete goal —
-the rest is copied as it stands.  Trailing whitespace never survives, runs of
-blank lines between statements collapse into one (inside a statement they stay),
-and a `%` comment stays on the line it was written on.
+The mode lives in **Правка → Формат**, the submenu right under the command it
+belongs to (it is a preference, so task_29's dialog will edit the same keys — it
+used to be a toolbar button): **в одну строку** joins the goals of a body
+whatever the line costs; **мягкое** builds the lines again — goals are packed up
+to the width (80 columns by default) and moved to a continuation line when they
+do not fit; **жёсткое** puts each goal of a body on a line of its own.  The same
+submenu carries «только выделенное»: with it, only the selected fragment is sent,
+and a fragment that breaks off in the middle of a body is formatted up to its
+last complete goal — the rest is copied as it stands.  Trailing whitespace never
+survives, runs of blank lines between statements collapse into one (inside a
+statement an author's blank line stays and forces a break), and a `%` comment
+stays on the line it was written on.
+
+The soft mode deliberately does **not** keep the author's line breaks between
+goals: a break written by the hard mode cannot be told apart from one the author
+made, and keeping them is exactly what used to make «из жёсткого обратно в
+мягкое» impossible.  Only three things break a soft line — the width, a comment
+(which owns its line) and a blank line the author left.  The soft shape is
+therefore canonical, and any format converts into any other: the way back from a
+hard layout is `Ctrl+I` with the soft mode.  There is no «не менять» entry any
+more: the command not being pressed is «не менять».
 
 What the window takes care of around the text: the replacement is **one undo
 step**, the **caret and the selection keep their places** (only whitespace moved,

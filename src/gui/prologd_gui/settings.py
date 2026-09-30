@@ -62,11 +62,12 @@ DEFAULT_AUTO_COMPLETE_AFTER = 2
 MINIMUM_AUTO_COMPLETE_AFTER = 1
 MAXIMUM_AUTO_COMPLETE_AFTER = 10
 
-#: The formatter (task_30): «не менять» turns the action into a note, the two
-#: modes are the ones the task file drew, and the width is the number of code
-#: points that must fit on one line in the soft mode.
+#: The formatter (task_30): the three shapes the «Правка → Формат» menu offers —
+#: «в одну строку», «мягкое» (цели собираются до ширины) и «жёсткое» (по цели
+#: на строку).  «Не менять» ушёл: ненажатая команда и есть «не менять», а
+#: из жёсткого обратно в мягкое теперь можно — мягкое строит строки заново.
 DEFAULT_FORMAT_MODE = "soft"
-FORMAT_MODES = ("none", "soft", "hard")
+FORMAT_MODES = ("line", "soft", "hard")
 DEFAULT_FORMAT_WIDTH = 80
 MINIMUM_FORMAT_WIDTH = 20
 MAXIMUM_FORMAT_WIDTH = 1000
@@ -384,7 +385,11 @@ class Settings:
     # -- the formatter (task_30) ---------------------------------------------
     @property
     def format_mode(self) -> str:
-        """`none`, `soft` or `hard`; anything else in the file reads as `soft`."""
+        """`line`, `soft` or `hard`; anything else in the file reads as `soft`.
+
+        An ini written by an earlier build may say `none` (the retired «не
+        менять»); the fallback turns that into the soft mode.
+        """
         value = self._text(FORMAT_MODE, DEFAULT_FORMAT_MODE).strip().lower()
         return value if value in FORMAT_MODES else DEFAULT_FORMAT_MODE
 

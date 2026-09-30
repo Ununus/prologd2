@@ -11,8 +11,9 @@ namespace prologd {
 
 /// How the formatter lays a program out.
 enum class FormatMode {
-  None,  ///< «не менять»: `formatSource` returns the text as it is.
-  Soft,  ///< the author's line breaks stay; goals that do not fit move on
+  None,  ///< «не форматировать»: `formatSource` returns the text as it is.
+  Line,  ///< «в одну строку»: the goals of a body share one line, whatever the width
+  Soft,  ///< the lines are built again: goals are packed up to the width
   Hard,  ///< one goal of a body per line
 };
 
