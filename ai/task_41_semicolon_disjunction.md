@@ -1,7 +1,7 @@
 # task_41 — `;` as disjunction
 
-**Status:** not started — the design is settled, the go-ahead is the user's (they
-asked "можно сделать `;` — дизъюнкцию?" on 2026-09-30)
+**Status:** approved by the user on 2026-09-30 (asked whether `;` could be a
+disjunction, answered yes) — not started
 **Depends on:** task_40 (the diagnostic for a `;` written as a sentence
 terminator is what makes the change safe to land)
 **Milestone:** M14
