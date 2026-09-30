@@ -8,6 +8,7 @@
 #include "test_helpers.hpp"
 
 using prologd::test::runProgram;
+using prologd::test::runProgramWithIncludes;
 
 namespace {
 
@@ -72,6 +73,7 @@ const std::vector<std::string>& checkedLessons() {
       "lesson_08.pld",
       "lesson_09.pld",
       "lesson_10.pld",
+      "lesson_11.pld",
   };
   return names;
 }
@@ -119,7 +121,13 @@ TEST_CASE("every lesson prints exactly what its comments promise") {
     // expected text and never match what the interpreter prints.
     REQUIRE(source.find('\r') == std::string::npos);
     const std::string stem = name.substr(0, name.rfind('.'));
-    const auto result = runProgram(source, readOptional("lessons/" + stem + ".input.txt"));
+    // Lesson 11 imports a library, so the check searches the same two places the
+    // CLI would reach with `-I examples/lib`: next to the lesson, then the library.
+    const auto result =
+        runProgramWithIncludes(source,
+                               readOptional("lessons/" + stem + ".input.txt"),
+                               {std::string(PROLOGD_TEST_DATA_DIR) + "/lessons",
+                                std::string(PROLOGD_TEST_DATA_DIR) + "/lib"});
     INFO("errors: " << result.error);
     REQUIRE(result.loaded);
     REQUIRE_FALSE(result.runtimeError);
