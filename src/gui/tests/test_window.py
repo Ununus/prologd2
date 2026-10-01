@@ -2670,7 +2670,7 @@ def test_an_untouched_unnamed_tab_comes_back_clean(executable: str) -> None:
 
 
 def test_the_questions_switch_decides_whether_a_run_answers(executable: str) -> None:
-    """task_29's «Выводить вопросы при запуске»: off, a lesson loads as rules.
+    """task_29's «Выполнять вопросы при запуске»: off, a lesson loads as rules.
 
     The margin's own click is none of this switch's business — it always answers
     the one question that was clicked (`test_a_marker_answers_one_question_alone`)
@@ -2691,7 +2691,28 @@ def test_the_questions_switch_decides_whether_a_run_answers(executable: str) -> 
         assert "ДА" in window.output_text(), ascii(window.output_text())
     finally:
         discard_changes(window)
-    print("ok: «выводить вопросы» decides whether a run answers the program's questions")
+    print("ok: «выполнять вопросы» decides whether a run answers the program's questions")
+
+
+def test_print_questions_echoes_the_question_line(executable: str) -> None:
+    """task_46: «Печатать вопросы» writes the `?цель.` line before its answer."""
+    window = empty_window(executable)
+    try:
+        window.editor().setPlainText("факт(1).\n?факт(1).\n")
+
+        window.run_program()
+        wait_for_result(window)
+        assert "?факт(1)." not in window.output_text(), ascii(window.output_text())
+
+        window._settings.print_questions = True
+        window.run_program()
+        wait_for_result(window)
+        text = window.output_text()
+        assert "?факт(1)." in text, ascii(text)
+        assert text.index("?факт(1).") < text.index("ДА"), ascii(text)
+    finally:
+        discard_changes(window)
+    print("ok: «печатать вопросы» writes the question line before its answer")
 
 
 def test_the_input_switch_chooses_where_to_ask(executable: str) -> None:
@@ -3081,6 +3102,7 @@ def main(argv: list[str]) -> int:
         test_the_console_answers_once_the_prepared_lines_run_out(executable)
         test_the_dialog_is_the_last_resort(executable)
         test_the_questions_switch_decides_whether_a_run_answers(executable)
+        test_print_questions_echoes_the_question_line(executable)
         test_the_input_switch_chooses_where_to_ask(executable)
         test_the_limits_stop_a_runaway_and_name_themselves(executable)
         test_the_console_appears_only_when_it_is_asked(executable)

@@ -174,11 +174,15 @@ the line numbers; a click runs exactly that statement.  The statement goes into
 the query line and stays visible there, the program is loaded *quietly*
 (`"questions":false`), and the pane holds the one answer that was clicked.
 
-That same flag is what «Выводить вопросы при запуске» in the settings dialog
+That same flag is what «Выполнять вопросы при запуске» in the settings dialog
 (`execution/run_questions`, on by default) puts on an ordinary run: unticked, a
 lesson is loaded for its clauses only — including through the step and trace
 commands, because a program's own `?`-statements and directives run during the
-load — and its questions wait for a click on their marker.
+load — and its questions wait for a click on their marker.  «Печатать вопросы
+при запуске» (`execution/print_questions`, off by default) is the other half of
+the old flag: a run question echoes itself (`?цель.`) into the output before its
+answer, the way `-q` does on the command line — so the pane reads like a
+transcript instead of a list of answers.
 
 Which lines are questions is decided by `queries.py` and checked without Qt in
 `test_queries.py`: the first non-blank characters of the line are `?` or `%`
@@ -827,7 +831,7 @@ is found — draws a program, asks for the finished bitmap and replays the very
 events the same session reported, so the two rasterisers (C++ and Python) cannot
 drift apart quietly.
 
-## Protocol contract (version 10)
+## Protocol contract (version 11)
 
 One JSON object per line in both directions; the interpreter writes nothing else
 to stdout.  The C++ side lives in `src/cli/protocol.cpp`, the Python side in
@@ -846,7 +850,9 @@ version 9 adds the `limits` object of `load` (the step, depth and НАЙТИВС
 the run, `0` for «без предела» — task_46) and answers a request whose field has
 the wrong *type* with an `error` event instead of ending the session; version 10
 adds the drawing: `graphics` events, one per primitive, and the `graphics` request
-with `snapshot`, answered with the whole `bitmap` (task_45).
+with `snapshot`, answered with the whole `bitmap` (task_45); version 11 adds
+`printQuestions` to `load` — a run question echoes itself (`?цель.`) before its
+answer, the way `-q` does (task_46 split `questions` into *run* and *print*).
 Version 1 sessions are still understood by the Python client (the table is then
 empty and completion falls back to the document's own predicates).
 

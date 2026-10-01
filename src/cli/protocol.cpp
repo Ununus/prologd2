@@ -40,7 +40,10 @@ using Json = nlohmann::json;
 /// 10: `graphics` events — every drawing primitive as the program calls it —
 ///    and the `graphics` request with `"snapshot":true`, answered with a
 ///    `bitmap` event (task_45).
-constexpr int kProtocolVersion = 10;
+/// 11: `load` takes `printQuestions` — a run question echoes itself
+///    (`?цель.`) before its answer, the way `-q` does on the command line
+///    (task_46: `questions` was split into *run* and *print*).
+constexpr int kProtocolVersion = 11;
 
 [[nodiscard]] std::string graphicsOpName(GraphicsOp op) {
   switch (op) {
@@ -363,6 +366,12 @@ class Session {
     // `Запустить` must keep doing), but for one clicked query that would fill
     // the pane with the whole lesson before the answer asked for (task_36).
     const bool questions = request.value("questions", true);
+    // The other half of the split (task_46): `questions` decides whether the
+    // program's own `?`-statements *run*; `printQuestions` decides whether a
+    // question that runs echoes itself (`?цель.`) before its answer, the way
+    // `-q` does on the command line.  Read before the load: the questions run
+    // during it, and the echo is emitted from the query runner.
+    print_questions_ = request.value("printQuestions", false);
     if (!questions) {
       loader_.setQueryRunner(nullptr);
     }
@@ -408,6 +417,10 @@ class Session {
 
   void runQuery(const Query& query) {
     try {
+      if (print_questions_ && !query.isDirective) {
+        emit(Json{{"event", "output"},
+                  {"text", engine_.queryText(query) + "\n"}});
+      }
       const bool found = engine_.runQuery(query);
       emit(Json{{"event", "result"}, {"found", found}});
     } catch (const PrologRuntimeError& runtime_error) {
@@ -674,6 +687,8 @@ class Session {
   /// True once a diagnostic was emitted for the current request, so the loader's
   /// summary is not printed on top of the diagnostics themselves.
   bool reported_diagnostics_ = false;
+  /// Whether a run question echoes itself before its answer (protocol 11).
+  bool print_questions_ = false;
   /// The state of stepping: stop at the next point, and whether the points
   /// *inside* the goal being stepped over are stops.
   bool pause_at_step_ = false;

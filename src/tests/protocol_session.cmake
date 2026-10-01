@@ -37,7 +37,7 @@ execute_process(
 
 set(expected_events
   "{\"event\":\"ready\","
-  "\"protocol\":10"
+  "\"protocol\":11"
   "\"keywords\":"
   "{\"event\":\"result\",\"found\":true}"
   "{\"event\":\"loaded\"}"
@@ -88,6 +88,31 @@ if(NOT result_count EQUAL 1)
 endif()
 if(NOT exit_code EQUAL 0)
   message(FATAL_ERROR "Quiet-load session exit code ${exit_code}")
+endif()
+
+# --- printQuestions: a run question echoes itself before its answer -----------
+# task_46's split: `questions` runs the program's own `?`-statements, and
+# `printQuestions` (protocol 11) makes each one print itself the way `-q` does.
+file(WRITE "${session}"
+  "{\"cmd\":\"load\",\"text\":\"факт(1).\\n?факт(X).\\n\",\"printQuestions\":true}\n"
+  "{\"cmd\":\"quit\"}\n")
+
+execute_process(
+  COMMAND "${PROLOGD_EXE}" --protocol json
+  INPUT_FILE "${session}"
+  OUTPUT_VARIABLE events
+  RESULT_VARIABLE exit_code)
+
+string(FIND "${events}" "{\"event\":\"output\",\"text\":\"?факт(X).\\n\"}" echoed)
+string(FIND "${events}" "{\"event\":\"output\",\"text\":\"X=1\\n\"}" answer)
+if(echoed EQUAL -1)
+  message(FATAL_ERROR "The question did not echo itself\n--- got ---\n${events}")
+endif()
+if(NOT echoed LESS answer)
+  message(FATAL_ERROR "The question echoed after its answer\n--- got ---\n${events}")
+endif()
+if(NOT exit_code EQUAL 0)
+  message(FATAL_ERROR "printQuestions session exit code ${exit_code}")
 endif()
 
 # --- format: layout only, and a broken source is reported, not rewritten ------

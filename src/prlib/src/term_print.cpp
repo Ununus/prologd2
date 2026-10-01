@@ -74,6 +74,16 @@ class TermWriter {
         const auto it = variable_names_.find(resolved.var);
         if (it != variable_names_.end()) {
           out += it->second;
+        } else if (options_.variableName) {
+          const std::string_view known = options_.variableName(resolved.var);
+          if (!known.empty()) {
+            variable_names_.emplace(resolved.var, std::string(known));
+            out += known;
+          } else {
+            const std::string name = "_" + std::to_string(++next_variable_);
+            variable_names_.emplace(resolved.var, name);
+            out += name;
+          }
         } else {
           const std::string name = "_" + std::to_string(++next_variable_);
           variable_names_.emplace(resolved.var, name);

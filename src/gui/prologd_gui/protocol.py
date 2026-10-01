@@ -31,7 +31,9 @@ from typing import Any, Iterator
 #:    a segment or a box — and the `graphics` request with `snapshot`, answered
 #:    with the whole `bitmap` (task_45), for a window that was not open while the
 #:    picture was made.
-PROTOCOL_VERSION = 10
+#: 11: `load` takes `printQuestions` — a run question echoes itself (`?цель.`)
+#:    before its answer, the way `-q` does on the command line (task_46).
+PROTOCOL_VERSION = 11
 
 #: Event names the interpreter emits.
 EVENTS = ("ready", "output", "result", "input_request", "step", "trace", "graphics",
@@ -94,6 +96,7 @@ def encode_request(**fields: Any) -> bytes:
 
 def load_text(text: str, name: str = "<buffer>", *, step: bool = False,
               trace: bool = False, questions: bool = True,
+              print_questions: bool = False,
               limits: dict | None = None) -> bytes:
     """Loads program text (the editor buffer).
 
@@ -101,8 +104,11 @@ def load_text(text: str, name: str = "<buffer>", *, step: bool = False,
     request; `trace` turns `ТРАССА` on, so the trace arrives as `trace` events.
     `questions=False` loads the program *without* running its own
     `?`-statements: what the editor's margin needs to answer one clicked query
-    alone (task_36).  The flags are left off the wire when they are false, which
-    keeps a plain run looking exactly as it did before protocol 3.
+    alone (task_36).  `print_questions` echoes each run question (`?цель.`) as an
+    `output` event before its answer (protocol 11) — the two flags are apart
+    because running the lesson and seeing the questions on the pane are two
+    choices.  The flags are left off the wire when they are false, which keeps a
+    plain run looking exactly as it did before protocol 3.
 
     `limits` are the guards of the run (protocol 9): `maxSteps`, `maxDepth`,
     `maxFindall`, each `0` for «без предела».  The *wall-clock* timeout is not
@@ -110,16 +116,20 @@ def load_text(text: str, name: str = "<buffer>", *, step: bool = False,
     """
     return encode_request(
         cmd="load", text=text, name=name,
-        **_flags(step=step, trace=trace, questions=questions),
+        **_flags(step=step, trace=trace, questions=questions,
+                 print_questions=print_questions),
         **_limits(limits),
     )
 
 
 def load_file(path: str, *, step: bool = False, trace: bool = False,
-              questions: bool = True, limits: dict | None = None) -> bytes:
+              questions: bool = True, print_questions: bool = False,
+              limits: dict | None = None) -> bytes:
     """Loads a program from disk; imports resolve against `-I` directories."""
     return encode_request(
-        cmd="load", path=path, **_flags(step=step, trace=trace, questions=questions),
+        cmd="load", path=path,
+        **_flags(step=step, trace=trace, questions=questions,
+                 print_questions=print_questions),
         **_limits(limits),
     )
 
@@ -180,7 +190,8 @@ def format_text(
     return encode_request(**fields)
 
 
-def _flags(*, step: bool = False, trace: bool = False, questions: bool = True) -> dict:
+def _flags(*, step: bool = False, trace: bool = False, questions: bool = True,
+           print_questions: bool = False) -> dict:
     """Only the flags that are on: a false one would be noise on the wire."""
     flags: dict[str, bool] = {}
     if step:
@@ -189,6 +200,8 @@ def _flags(*, step: bool = False, trace: bool = False, questions: bool = True) -
         flags["trace"] = True
     if not questions:
         flags["questions"] = False
+    if print_questions:
+        flags["printQuestions"] = True
     return flags
 
 

@@ -107,6 +107,10 @@ IMPORT_PATHS = "execution/import_paths"
 #: what a lecture wants; the margin's own marker click always answers its one
 #: question, whatever this says.
 RUN_QUESTIONS = "execution/run_questions"
+#: Whether a run question echoes itself (`?цель.`) before its answer — the
+#: `printQuestions` flag of `load` (protocol 11, task_46: the old `questions` was
+#: split into *run* and *print*).
+PRINT_QUESTIONS = "execution/print_questions"
 #: The guards of a run (task_46), sent with every `load` (protocol 9).  `0` means
 #: «без предела» for all of them.  The engine has no limits of its own and its
 #: message names a limit and its value only, so the answer to «where do I raise
@@ -313,8 +317,10 @@ SETTINGS: tuple[Setting, ...] = (
     # -- execution
     Setting(SAVE_BEFORE_RUN, "Сохранять перед запуском", "Выполнение", "bool", False,
             hint="Сохраняет текущий файл, если в нём есть несохранённые правки"),
-    Setting(RUN_QUESTIONS, "Выводить вопросы при запуске", "Выполнение", "bool", True,
-            hint="Строки «?цель.» программы отвечают сами; выключено — только правила"),
+    Setting(RUN_QUESTIONS, "Выполнять вопросы при запуске", "Выполнение", "bool", True,
+            hint="Строки «?цель.» программы выполняются сами; выключено — только правила"),
+    Setting(PRINT_QUESTIONS, "Печатать вопросы при запуске", "Выполнение", "bool", False,
+            hint="Каждый выполненный вопрос печатается сам (строка «?цель.») перед своим ответом"),
     Setting(MAX_STEPS, "Предел шагов", "Выполнение", "int", DEFAULT_MAX_STEPS, 0,
             MAXIMUM_MAX_STEPS,
             hint="Сколько шагов решателя на один запуск; 0 — без предела.  Останавливает бесконечный поиск"),
@@ -1020,6 +1026,15 @@ class Settings:
     @run_questions.setter
     def run_questions(self, value: bool) -> None:
         self._write(RUN_QUESTIONS, bool(value))
+
+    @property
+    def print_questions(self) -> bool:
+        """Whether a run question echoes itself before its answer (protocol 11)."""
+        return self._flag(PRINT_QUESTIONS, False)
+
+    @print_questions.setter
+    def print_questions(self, value: bool) -> None:
+        self._write(PRINT_QUESTIONS, bool(value))
 
     @property
     def max_steps(self) -> int:

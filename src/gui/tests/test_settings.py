@@ -282,6 +282,7 @@ def test_the_new_keys_have_the_documented_defaults(directory: pathlib.Path) -> N
     assert settings.follow_output is True, "the pane followed the end before the switch"
     assert settings.input_mode == settings_module.DEFAULT_INPUT_MODE == "panel"
     assert settings.run_questions is True, "a lesson is run to see its questions answered"
+    assert settings.print_questions is False, "the question line is not echoed until asked"
     # task_46's guards: the engine itself has no limits at all, and the window
     # ships numbers a lesson cannot notice but a runaway cannot outlive — no step
     # cap, a million frames, a million solutions and no clock.  A limit nobody

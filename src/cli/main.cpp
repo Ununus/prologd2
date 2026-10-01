@@ -62,18 +62,6 @@ bool consumeInterrupt() {
   return true;
 }
 
-std::string queryText(prologd::Engine& engine, const prologd::Query& query) {
-  std::string text = "?";
-  for (std::size_t i = 0; i < query.goals.size(); ++i) {
-    if (i != 0) {
-      text += ',';
-    }
-    text += engine.format(query.goals[i]);
-  }
-  text += '.';
-  return text;
-}
-
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -303,7 +291,7 @@ int main(int argc, char** argv) {
   int exit_code = 0;
   loader.setQueryRunner([&](const prologd::Query& query) {
     if (questions && !query.isDirective) {
-      engine.io().write(queryText(engine, query));
+      engine.io().write(engine.queryText(query));
       engine.io().newline();
     }
     try {

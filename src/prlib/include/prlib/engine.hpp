@@ -271,6 +271,11 @@ class Engine {
   /// Format a term using the current bindings and arithmetic evaluation.
   [[nodiscard]] std::string format(const Term& term) const;
 
+  /// The question as a program writes it: `?Goal, Goal.` — the `-q` echo of the
+  /// command line and the protocol's `printQuestions` (task_46, split out of
+  /// `questions` in 2026-10-02).
+  [[nodiscard]] std::string queryText(const Query& query) const;
+
   friend class Solver;
 
  private:

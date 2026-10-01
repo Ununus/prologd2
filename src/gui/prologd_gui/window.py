@@ -1272,7 +1272,7 @@ class MainWindow(QMainWindow):
         `questions=False` loads the program without running its own `?`-statements:
         that is what the editor's margin needs, so one clicked question is
         answered *alone* instead of after the whole lesson (task_36).  Left out, it
-        follows the «Выводить вопросы при запуске» switch (task_29), which is on
+        follows the «Выполнять вопросы при запуске» switch (task_29), which is on
         by default — a lesson is normally run to see its questions answered.
 
         The result is True when the load was sent; a caller that wants to add a
@@ -1359,6 +1359,7 @@ class MainWindow(QMainWindow):
             # A saved, unmodified buffer is loaded by path: `ИМПОРТ` resolves
             # against the file's own directory and diagnostics name the file.
             self._session.load_file(path, step=step, trace=trace, questions=questions,
+                                    print_questions=self._settings.print_questions,
                                     limits=limits)
             self._status.setText(f"выполняется {pathlib.Path(path).name}")
         else:
@@ -1372,7 +1373,9 @@ class MainWindow(QMainWindow):
             # point at the real file), an unnamed buffer by its title — the name
             # the user sees in the tab and in the status bar of a diagnostic.
             self._session.load_text(buffer.text(), path or buffer.title(), step=step,
-                                    trace=trace, questions=questions, limits=limits)
+                                    trace=trace, questions=questions,
+                                    print_questions=self._settings.print_questions,
+                                    limits=limits)
             name = pathlib.Path(path).name if path else buffer.title()
             self._status.setText(f"выполняется {name} (есть несохранённые правки)")
         return True

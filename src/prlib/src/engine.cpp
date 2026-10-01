@@ -908,6 +908,30 @@ std::string Engine::format(const Term& term) const {
   return formatTerm(term, bindings_, options);
 }
 
+std::string Engine::queryText(const Query& query) const {
+  std::unordered_map<VarId, std::string> names;
+  for (const auto& [name, var] : query.variables) {
+    names.emplace(var, name);
+  }
+  PrintOptions options;
+  options.evaluate = [this](const Term& expression) {
+    return const_cast<Engine*>(this)->evaluateToTerm(expression);
+  };
+  options.variableName = [&names](VarId id) -> std::string_view {
+    const auto it = names.find(id);
+    return it != names.end() ? std::string_view(it->second) : std::string_view{};
+  };
+  std::string text = "?";
+  for (std::size_t i = 0; i < query.goals.size(); ++i) {
+    if (i != 0) {
+      text += ',';
+    }
+    text += formatTerm(query.goals[i], bindings_, options);
+  }
+  text += '.';
+  return text;
+}
+
 bool Engine::runQuery(const Query& query, const std::function<bool()>& onSolution) {
   quiet_ = false;
   stop_requested_ = false;

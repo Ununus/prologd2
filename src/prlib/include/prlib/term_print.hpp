@@ -25,6 +25,10 @@ struct PrintOptions {
   /// which `РАВНО(X, f(X))` can build, since there is no occurs check — is
   /// stopped by the writer's own cycle detection, not by this number.
   std::size_t maxDepth = 2000;
+  /// Names for unbound variables, consulted before the `_N` fallback.  Empty
+  /// (the default) keeps the ordinary `_N` numbering; `Engine::queryText` sets
+  /// it so a question echo writes `X`, not `_1`.
+  std::function<std::string_view(VarId)> variableName;
 };
 
 /// Render a term in PrologD notation using `bindings` to resolve variables.
