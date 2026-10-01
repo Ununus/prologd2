@@ -120,6 +120,7 @@ where its files go).
 | task_47_lessons_and_formatting | done | the corpus in one style and the formatter's round of fixes: 21 of the 25 shipped programs reformatted by `prologd --format` (soft, 80, one tab) with a new check that every shipped program *is* the standard shape, so the style cannot drift again; the hard mode puts the head of a clause on a line of its own (the first goal was the one glued to the head); the format mode returns to the toolbar right after «Форматировать» (icon `edit-format-set`) and leaves «Правка»; lesson 12's animation is a click away (`%?`) with a two-frame version runs in the check; and the reformat taught the formatter a rule — a **query and a directive are never broken**, because the margin marker that runs them is line-local (the pinned question counts caught it) |
 | task_48_interface_cleanup | done | the round of small things the user asked for: five pictures left the tree (`help-about` — the same drawing as `prologd2`, the two `search-find-selected-*`, `view-toolbar`, `view-line-numbers`), `assets.MISSING` is down to four names, «Сохранить все» left the toolbar, the two «Найти выделенное» commands left «Поиск» with their icons; `Esc` now closes the graphics window → the find bar → the reference dock → the cheat sheet (one handler on the window, by *propagation*, so the completion popup and the find bar's field keep answering for themselves), and the graphics window opens itself on the **first primitive of a run** — once per run, so a window closed during an animation stays closed (task_45's window plus `_graphics_shown`) |
 | task_49_gui_defects | done | five defects found by using the window, all fixed.  `Шаг → Стоп → Запуск` no longer answers «нет шага, который ждёт ответа» (the paused flag is cleared by the events that conclude a run — including the *error* a «Стоп» turns into while a step waits); an untouched unnamed tab comes back clean (the session record carries the unsaved flag; JSON, because a fourth tab-separated field cannot be told apart from text with a tab in it); the format `Запустить с трассировкой` no longer takes the window (the output is handed over once per turn of the event loop, and the pane trims its history in bulks — 200 000 lines: 21.9 s → 3.0 s, a 16 000-line trace: 2.2 s → 0.6 s); the main window remembers its size and place (`view/window_geometry`), which the graphics window had done since task_45; and the **output arrives as it is written** — `IoContext::setOutputLineSink` fires at a line end and the session emits one `output` event per line, so a lesson's countdown counts 3, 2, 1 instead of arriving as one block when the program is over |
+| task_50_panel_tabs | done | the output panel is one `QTabWidget`: **Проблемы** (errors and warnings), **Вывод** (program output, the `>` echo, the trace), **Система** (the window's notes) and **Ввод** (the prepared answers with the per-request console under them).  Each title carries its count (`Вывод:5`, `Проблемы:0` …), «Проблемы» is painted by state (ordinary with none, orange warnings-only, red with an error), a run brings up «Вывод» and a diagnostic «Проблемы»; the panel defaults to the **bottom**; «Поле очереди ввода» is gone (the queue is a tab now); a full load writes `--- база знаний загружена (N мс) ---` into «Система», measured by the window's clock from «Запустить» to `loaded` |
 
 ## Test suite
 
@@ -1638,6 +1639,36 @@ Added on 2026-10-02 while implementing task_31:
   Проверки обновлены (`test_completion.py` — многострочный текст с алиасом,
   `test_window.py` — `F1` без «английское имя», с новыми именами).  `test_reference.py`,
   `test_completion.py`, `test_window.py` зелёные, пять PDF.
+
+* GUI round, part 53: **task_50 — панель вывода с вкладками**.  Пользователь
+  попросил превратить панель вывода в четыре вкладки: **Проблемы**, **Вывод**,
+  **Система**, **Ввод**.
+  **Вкладки.**  Панель — один `QTabWidget` (`_panel_tabs`); три read-only панели
+  это всё тот же `panels.OutputPane` (ограниченная история, цвета по роду, хвост
+  строки), а «Ввод» — очередь подготовленных ответов с консолью запроса под
+  ней.  Род строки решает вкладку: `OUTPUT`/`ECHO`/`TRACE` → Вывод, `NOTE` →
+  Система, `ERROR`/`WARNING` → Проблемы (`panels.KIND_TAB`, маршрутизация в
+  `_feed_pane`).  «Сохранить вывод…» пишет вкладку Вывод.
+  **Названия со счётом и цвет.**  В заголовке вкладки стоит счёт:
+  `Вывод:5`, `Проблемы:0`, `Система:3`, `Ввод:2` (Ввод считает непустые строки
+  очереди и обновляется по `textChanged`).  Слово «Проблемы» крашено по
+  состоянию: обычный цвет, когда пусто, оранжевый при одних предупреждениях,
+  красный, когда есть ошибка (`_error_count`/`_warning_count`, `tabTextColor`).
+  **Фокус.**  Запуск показывает Вывод, диагностика (и предупреждение, и ошибка)
+  переключает на Проблемы (`_show_panel_tab`); консоль запроса поднимает вкладку
+  Ввод, когда программа спрашивает.
+  **Убранное.**  Настройка «Поле очереди ввода» (`view/input_queue`) и её строка
+  меню удалены — очередь теперь вкладка; `view/output_sizes` исчез (внутреннего
+  сплиттера больше нет); панель по умолчанию **внизу**.
+  **Таймер загрузки.**  После полного выполнения файла в Систему пишется
+  `--- база знаний загружена (N мс) ---` — время меряет `QElapsedTimer` окна от
+  «Запустить» до события `loaded` (протокол 8).
+  Проверки: `test_window.py` — новая `test_the_panel_has_four_tabs_with_counts`
+  (вкладки, счёт, цвет, фокус по диагностике) и
+  `test_a_run_focuses_the_output_and_the_system_notes_the_time`; прежние прогоны
+  переведены на `system_text()`/`problems_text()` (заметки и диагностика больше не
+  в Выводе).  `test_settings.py`/`test_settingsdialog.py` — без `input_queue`,
+  умолчание `bottom`.  Все GUI-свиты зелёные.
 
 
 

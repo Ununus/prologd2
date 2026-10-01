@@ -57,8 +57,6 @@ WINDOW_GEOMETRY = "view/window_geometry"
 TOOLBAR = "view/toolbar"
 OUTPUT_POSITION = "view/output_position"
 OUTPUT_VISIBLE = "view/output_visible"
-INPUT_QUEUE = "view/input_queue"
-OUTPUT_SIZES = "view/output_sizes"
 PANEL_SIZES = "view/panel_sizes"
 SAVE_BEFORE_RUN = "execution/save_before_run"
 FORMAT_MODE = "format/mode"
@@ -142,9 +140,10 @@ DEFAULT_FONT_FAMILY = "Cascadia Mono"
 DEFAULT_FONT_SIZE = 11.0
 DEFAULT_THEME = "light"
 
-#: Where the output (with the input queue under it) sits: to the right of the
-#: editor or under it.  `Ctrl+F4` moves it, `F4` hides it.
-DEFAULT_OUTPUT_POSITION = "right"
+#: Where the output panel sits: to the right of the editor or under it.  `Ctrl+F4`
+#: moves it, `F4` hides it.  The bottom is the default (task_50): a log is read
+#: across the full width, and the editor keeps its tall column for the program.
+DEFAULT_OUTPUT_POSITION = "bottom"
 OUTPUT_POSITIONS = ("right", "bottom")
 
 #: How the program's input questions are answered: in the console under the
@@ -288,8 +287,6 @@ SETTINGS: tuple[Setting, ...] = (
     Setting(OUTPUT_POSITION, "Панель вывода", "Вид", "choice",
             DEFAULT_OUTPUT_POSITION,
             choices=(("right", "справа"), ("bottom", "снизу"))),
-    Setting(INPUT_QUEUE, "Поле очереди ввода", "Вид", "bool", True,
-            hint="Строки под панелью вывода, по одной на запрос программы"),
     Setting(OUTPUT_FONT_SIZE, "Размер шрифта вывода", "Вид", "float",
             DEFAULT_OUTPUT_FONT_SIZE, MINIMUM_FONT_SIZE, MAXIMUM_FONT_SIZE,
             suffix=" pt", hint="Отдельно от редактора: колесо над панелью меняет его"),
@@ -378,7 +375,6 @@ MACHINE_KEYS = (
     GRAPHICS_VISIBLE,
     GRAPHICS_GEOMETRY,
     WINDOW_GEOMETRY,
-    OUTPUT_SIZES,
     PANEL_SIZES,
     SHORTCUTS_TABLE,
     SESSION_TABS,
@@ -901,20 +897,6 @@ class Settings:
         self._write(OUTPUT_VISIBLE, bool(value))
 
     @property
-    def input_queue(self) -> bool:
-        """Whether the field of prepared answers is shown under the output.
-
-        Hidden, its lines are not used at all: the point of hiding it is to answer
-        from the console instead, and a field nobody can see must not decide what
-        the program is told.
-        """
-        return self._flag(INPUT_QUEUE, True)
-
-    @input_queue.setter
-    def input_queue(self, value: bool) -> None:
-        self._write(INPUT_QUEUE, bool(value))
-
-    @property
     def output_font_size(self) -> float:
         """The output panel's own size since task_29.
 
@@ -965,15 +947,6 @@ class Settings:
     @input_mode.setter
     def input_mode(self, value: str) -> None:
         self.set_value(_INPUT_MODE_SETTING, value)
-
-    @property
-    def output_sizes(self) -> list[int]:
-        """The heights of the output and of the input queue inside the panel."""
-        return self._sizes(OUTPUT_SIZES)
-
-    @output_sizes.setter
-    def output_sizes(self, sizes) -> None:
-        self._write(OUTPUT_SIZES, [int(size) for size in sizes])
 
     @property
     def panel_sizes(self) -> list[int]:

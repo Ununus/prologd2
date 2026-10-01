@@ -280,6 +280,7 @@ def test_the_new_keys_have_the_documented_defaults(directory: pathlib.Path) -> N
     assert settings.import_paths == []
     assert settings.auto_indent is True, "the editor indents until told otherwise"
     assert settings.follow_output is True, "the pane followed the end before the switch"
+    assert settings.output_position == "bottom", "the panel sits at the bottom since task_50"
     assert settings.input_mode == settings_module.DEFAULT_INPUT_MODE == "panel"
     assert settings.run_questions is True, "a lesson is run to see its questions answered"
     assert settings.print_questions is False, "the question line is not echoed until asked"

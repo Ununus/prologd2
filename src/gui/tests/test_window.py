@@ -380,7 +380,7 @@ def test_cancelling_the_encoding_question_opens_nothing(
         window._ask_encoding = lambda path: None  # the user closed the box
         assert window.open_path(str(target)) is False
         assert window.tab_count() == 1 and window.current_path() is None
-        assert target.name in window.output_text(), "the file that failed is named"
+        assert target.name in window.system_text(), "the file that failed is named"
         print("ok: a cancelled encoding question opens nothing and says why")
     finally:
         discard_changes(window)
@@ -496,24 +496,68 @@ def test_the_console_appears_only_when_it_is_asked(executable: str) -> None:
     print("ok: the console appears for a question and goes away with the answer")
 
 
-def test_the_queue_field_can_be_hidden(executable: str) -> None:
-    """Hidden, its lines are not used at all — the console answers instead."""
-    from prologd_gui.settings import Settings
+def test_the_panel_has_four_tabs_with_counts(executable: str) -> None:
+    """task_50: Проблемы, Вывод, Система, Ввод, each titled with its count.
 
+    The «Проблемы» word is painted by the state of the run: the ordinary colour
+    with nothing, orange with warnings only, red once an error has arrived.  The
+    «Ввод» count follows the prepared lines as they are typed, blank lines
+    dropped.
+    """
     window = empty_window(executable)
+    bar = window.panel_tabs().tabBar()
     try:
-        window.editor().setPlainText(READS_TWO)
-        window.input_pane().setPlainText("7\n9\n")
-        assert window._input_lines() == ["7", "9"]
+        assert window.panel_tabs().count() == 4, window.panel_tabs().count()
+        titles = [bar.tabText(i) for i in range(4)]
+        assert titles == ["Проблемы:0", "Вывод:0", "Система:0", "Ввод:0"], titles
+        problems = window.panel_tabs().indexOf(window._problems)
+        assert not bar.tabTextColor(problems).isValid(), "no problems, no colour"
 
-        window._actions["input_queue"].setChecked(False)
-        assert window.input_pane().isHidden() is True
-        assert window._input_lines() == [], "a hidden field still decided the answers"
+        # The «Ввод» count follows the prepared lines as they are typed.
+        window.input_pane().setPlainText("7\n\n9\n")
+        assert bar.tabText(window.panel_tabs().indexOf(window._input_tab)) == "Ввод:2", (
+            bar.tabText(window.panel_tabs().indexOf(window._input_tab))
+        )
+
+        # A warning alone is orange, an error turns it red — and each diagnostic
+        # brings the «Проблемы» tab up (task_50's focus rule).
+        window._on_failed("runtime", "warning", "совет", None)
+        window._flush_output()
+        assert window.panel_tabs().currentIndex() == problems, "a warning did not focus Проблемы"
+        assert bar.tabText(problems) == "Проблемы:1", bar.tabText(problems)
+        assert bar.tabTextColor(problems).name() == window._settings.palette.warning
+
+        window._on_failed("runtime", "error", "сбой", None)
+        window._flush_output()
+        assert bar.tabText(problems) == "Проблемы:2", bar.tabText(problems)
+        assert bar.tabTextColor(problems).name() == window._settings.palette.error
+
+        # «Очистить вывод» empties the problems and their colour with them.
+        window.clear_output()
+        assert bar.tabText(problems) == "Проблемы:0", bar.tabText(problems)
+        assert not bar.tabTextColor(problems).isValid(), "the colour outlived the clear"
     finally:
         discard_changes(window)
+    print("ok: four tabs, titled with counts, and «Проблемы» painted by its state")
 
-    assert Settings(window._settings.path).input_queue is False, "the switch was not stored"
-    print("ok: hiding the queue field takes its lines out of the run")
+
+def test_a_run_focuses_the_output_and_the_system_notes_the_time(executable: str) -> None:
+    """task_50: a run brings up Вывод, and Система says how long the load took."""
+    window = empty_window(executable)
+    try:
+        window.editor().setPlainText("факт(1).\n?факт(1).\n")
+        window.run_program()
+        assert (
+            window.panel_tabs().currentIndex()
+            == window.panel_tabs().indexOf(window._output)
+        ), "a run did not show the Вывод tab"
+        assert pump(window, lambda: "решени" in window.status_text()), window.status_text()
+        assert pump(window, lambda: "база знаний загружена (" in window.system_text()), (
+            ascii(window.system_text())
+        )
+    finally:
+        discard_changes(window)
+    print("ok: a run shows the output, and the system pane times the load")
 
 
 def test_cancelling_input_stops_the_run(executable: str) -> None:
@@ -529,7 +573,7 @@ def test_cancelling_input_stops_the_run(executable: str) -> None:
         assert pump(window, lambda: not window.session.is_running()), "the run was not stopped"
 
         assert len(asked) == 1, f"asked again after the cancellation: {asked}"
-        assert "ввод отменён" in window.output_text(), ascii(window.output_text())
+        assert "ввод отменён" in window.system_text(), ascii(window.system_text())
         assert "ввод отменён" in window.status_text(), window.status_text()
 
         # A new run starts a new session and may ask again.
@@ -564,10 +608,10 @@ def test_a_run_uses_the_tab_that_is_showing(executable: str) -> None:
 def test_the_output_panel_moves_and_hides(executable: str) -> None:
     """`Ctrl+F4` moves the output panel, `F4` hides it, and both are remembered.
 
-    The panel is *one* widget — the output with the input queue under it — inside a
-    single splitter whose **orientation** is what changes: side by side when it is
-    on the right, stacked when it is at the bottom.  The turn must not hide it and
-    must not leave a pane dragged away to nothing.
+    The panel is *one* widget — a tab widget with Проблемы, Вывод, Система and
+    Ввод — inside a single splitter whose **orientation** is what changes: side
+    by side when it is on the right, stacked when it is at the bottom.  The turn
+    must not hide it and must not leave a pane dragged away to nothing.
     """
     from PySide6.QtCore import Qt
 
@@ -577,22 +621,22 @@ def test_the_output_panel_moves_and_hides(executable: str) -> None:
     window = empty_window(executable)
     path = window._settings.path
     try:
-        assert window.output_position() == "right"
-        assert window._panel_splitter.orientation() == Qt.Orientation.Horizontal
+        assert window.output_position() == "bottom", "the panel defaults to the bottom"
+        assert window._panel_splitter.orientation() == Qt.Orientation.Vertical
         assert window.output_visible() is True
         assert window._actions["output"].isChecked() is True
 
         window._actions["split_orientation"].trigger()
-        assert window.output_position() == "bottom"
-        assert window._panel_splitter.orientation() == Qt.Orientation.Vertical
-        assert window._panel_splitter.widget(1) is window._sidebar, "the editor moved"
-        assert window._input_pane.parent() is window._sidebar, "the input queue did not travel"
-        assert window._sidebar.isHidden() is False, "the turn hid the panel"
+        assert window.output_position() == "right"
+        assert window._panel_splitter.orientation() == Qt.Orientation.Horizontal
+        assert window._panel_splitter.widget(1) is window._panel_tabs, "the editor moved"
+        assert window._input_pane.parent() is window._input_tab, "the input queue did not travel"
+        assert window._panel_tabs.isHidden() is False, "the turn hid the panel"
 
         # `F4`: checked means shown, and a hidden panel is *hidden*, not vanished.
         window._actions["output"].setChecked(False)
         assert window.output_visible() is False
-        assert window._sidebar.isHidden() is True
+        assert window._panel_tabs.isHidden() is True
         window._actions["output"].setChecked(True)
         assert window.output_visible() is True
 
@@ -604,19 +648,14 @@ def test_the_output_panel_moves_and_hides(executable: str) -> None:
         discard_changes(window)
 
     stored = Settings(path)
-    assert stored.output_position == "bottom", "the side of the panel was not remembered"
+    assert stored.output_position == "right", "the side of the panel was not remembered"
     assert len(stored.panel_sizes) == 2 and all(size > 0 for size in stored.panel_sizes)
-    # Three parts now: the output, the console and the prepared-lines field.  The
-    # console is hidden while nothing is asked, and a hidden splitter child has no
-    # size of its own — so only the sum has to make sense.
-    assert len(stored.output_sizes) == 3, stored.output_sizes
-    assert sum(stored.output_sizes) > 0, stored.output_sizes
     assert stored.output_visible is True
 
     reopened = MainWindow(executable, [], stored)
     try:
-        assert reopened.output_position() == "bottom", "the panel did not come back"
-        assert reopened._panel_splitter.orientation() == Qt.Orientation.Vertical
+        assert reopened.output_position() == "right", "the panel did not come back"
+        assert reopened._panel_splitter.orientation() == Qt.Orientation.Horizontal
         assert reopened._actions["output"].isChecked() is True
         print("ok: the panel moves with Ctrl+F4, hides with F4, and comes back")
     finally:
@@ -762,7 +801,7 @@ def test_the_run_state_drives_the_buttons(executable: str) -> None:
         assert window.session.is_running() is False
         assert window._actions["run"].isEnabled() is True
         assert window._actions["stop"].isEnabled() is False
-        assert "--- база знаний выгружена ---" in window.output_text(), window.output_text()
+        assert "--- база знаний выгружена ---" in window.system_text(), window.system_text()
 
         # ... while stopping a computation in flight is asked politely first and
         # ends on the deadline when nobody is reading (a load runs to its end
@@ -771,8 +810,8 @@ def test_the_run_state_drives_the_buttons(executable: str) -> None:
         window._actions["run"].trigger()
         assert window._actions["stop"].isEnabled() is True
         window._actions["stop"].trigger()
-        assert pump(window, lambda: "--- остановлено ---" in window.output_text()), (
-            window.output_text()
+        assert pump(window, lambda: "--- остановлено ---" in window.system_text()), (
+            window.system_text()
         )
         print("ok: run and stop follow the two states of the interpreter")
     finally:
@@ -796,8 +835,8 @@ def test_stopping_a_query_asks_first_and_keeps_the_base(executable: str) -> None
         assert window.session.is_running()
 
         window._actions["stop"].trigger()
-        assert pump(window, lambda: "--- остановлено ---" in window.output_text()), (
-            window.output_text()
+        assert pump(window, lambda: "--- остановлено ---" in window.system_text()), (
+            window.system_text()
         )
         assert window.session.is_running() is True, "the session survives a polite stop"
         assert "база знаний загружена" in window._details.text(), window._details.text()
@@ -805,7 +844,7 @@ def test_stopping_a_query_asks_first_and_keeps_the_base(executable: str) -> None
 
         # The idle interpreter with its base is unloaded by the same command.
         window._actions["stop"].trigger()
-        assert "--- база знаний выгружена ---" in window.output_text(), window.output_text()
+        assert "--- база знаний выгружена ---" in window.system_text(), window.system_text()
         assert window.session.is_running() is False
     finally:
         discard_changes(window)
@@ -1382,8 +1421,8 @@ def test_the_shared_folder_reaches_the_interpreter(executable: str) -> None:
 
         window.editor().setPlainText(':- ИМПОРТ("library.pld").\n')
         window.run_program()
-        assert pump(window, concluded), ascii(window.output_text())
-        assert "Не найден" in window.output_text(), ascii(window.output_text())
+        assert pump(window, concluded), ascii(window.problems_text())
+        assert "Не найден" in window.problems_text(), ascii(window.problems_text())
 
         window._settings.import_paths = [str(library)]
         window.apply_settings()
@@ -1392,7 +1431,7 @@ def test_the_shared_folder_reaches_the_interpreter(executable: str) -> None:
         window.run_program()
         assert pump(window, concluded), ascii(window.output_text())
         assert window.status_text() == "выполнено", ascii(window.output_text())
-        assert "Не найден" not in window.output_text(), ascii(window.output_text())
+        assert "Не найден" not in window.problems_text(), ascii(window.problems_text())
         print("ok: the import folder list is passed as -I, and an unnamed buffer imports from it")
     finally:
         discard_changes(window)
@@ -1780,15 +1819,15 @@ def test_a_runtime_error_marks_its_line(executable: str) -> None:
         typed = "дели(Х) :- БОЛЬШЕ(1, #1/0#).\n?дели(1).\n"
         window.editor().setPlainText(typed)
         window.run_program()
-        assert pump(window, lambda: "деление на ноль" in window.output_text()), ascii(
-            window.output_text()
+        assert pump(window, lambda: "деление на ноль" in window.problems_text()), ascii(
+            window.problems_text()
         )
         view = window.editor()
         assert view.error_line() == 1, view.error_line()
         assert view.textCursor().blockNumber() == 0, "the caret is not on the line"
         assert "ошибка: Без имени:1:1" in window.status_text(), window.status_text()
-        assert "Без имени:1:1: деление на ноль" in window.output_text(), ascii(
-            window.output_text()
+        assert "Без имени:1:1: деление на ноль" in window.problems_text(), ascii(
+            window.problems_text()
         )
 
         # An edit clears the mark: a red line over text it no longer describes is
@@ -1805,8 +1844,8 @@ def test_a_parse_error_marks_the_line_the_parser_stopped_at(executable: str) -> 
     try:
         window.editor().setPlainText("факт(1.\n")
         window.run_program()
-        assert pump(window, lambda: "непарные скобки" in window.output_text()), ascii(
-            window.output_text()
+        assert pump(window, lambda: "непарные скобки" in window.problems_text()), ascii(
+            window.problems_text()
         )
         view = window.editor()
         line = view.error_line()
@@ -1834,12 +1873,12 @@ def test_a_warning_is_amber_and_counted(executable: str) -> None:
         assert pump(window, lambda: "предупреждений: 2" in window.status_text()), (
             window.status_text()
         )
-        lines = window.output_text().splitlines()
+        lines = window.problems_text().splitlines()
         amber = [
             number for number, line in enumerate(lines) if line.startswith("*** предупреждение")
         ]
-        assert len(amber) == 2, ascii(window.output_text())
-        assert colour_of(window._output, amber[0]) == window._output.kind_colors()[panels.WARNING]
+        assert len(amber) == 2, ascii(window.problems_text())
+        assert colour_of(window._problems, amber[0]) == window._problems.kind_colors()[panels.WARNING]
         # The run was not disturbed: the query still answered.
         assert "Лена=_1" in window.output_text(), ascii(window.output_text())
     finally:
@@ -1862,8 +1901,8 @@ def test_a_diagnostic_from_an_imported_file_opens_it(executable: str, directory)
     try:
         assert window.open_path(str(main)), "the main file did not open"
         window.run_program()
-        assert pump(window, lambda: "непарные скобки" in window.output_text()), ascii(
-            window.output_text()
+        assert pump(window, lambda: "непарные скобки" in window.problems_text()), ascii(
+            window.problems_text()
         )
         buffer = window._buffer_for_path(str(module))
         assert buffer is not None, [item.model.path for item in window.buffers()]
@@ -1873,7 +1912,7 @@ def test_a_diagnostic_from_an_imported_file_opens_it(executable: str, directory)
         # what is looked for here rather than the platform's own spelling, and the
         # position is the opening bracket (task_40), not the token the parser
         # happened to stop at.
-        assert "модуль.pld:2:15" in window.output_text(), ascii(window.output_text())
+        assert "модуль.pld:2:15" in window.problems_text(), ascii(window.problems_text())
     finally:
         discard_changes(window)
     print("ok: a diagnostic from an imported file opens that file and marks its line")
@@ -2029,7 +2068,7 @@ def test_a_failed_query_marks_no_line_and_moves_no_caret(executable: str) -> Non
         assert pump(window, lambda: "ошибка" in window.status_text()), window.status_text()
 
         assert "ошибка: <query>:1:1" in window.status_text(), window.status_text()
-        assert "<query>:1:1" in window.output_text(), ascii(window.output_text())
+        assert "<query>:1:1" in window.problems_text(), ascii(window.problems_text())
         assert view.error_line() is None, view.error_line()
         assert view.textCursor().position() == 2, "the caret moved"
     finally:
@@ -2725,7 +2764,7 @@ def test_the_input_switch_chooses_where_to_ask(executable: str) -> None:
     """
     window = empty_window(executable)
     try:
-        assert window._sidebar.isHidden() is False, "both ways need the panel"
+        assert window._panel_tabs.isHidden() is False, "both ways need the panel"
         window.editor().setPlainText("?ВВОДЦЕЛ(А),ВЫВОД(А),ПС.\n")
         asked: list[str] = []
         window._ask_input = lambda kind: asked.append(kind) or "9"
@@ -2774,7 +2813,7 @@ def test_the_theme_switch_reaches_the_text_and_the_widgets(executable: str) -> N
         # The window hands its output over on the next turn of the event loop
         # (task_49), and this check reads the pane with no loop running.
         window._flush_output()
-        assert colour_of(window._output, 1) == panels.KIND_COLORS[panels.ERROR]
+        assert colour_of(window._problems, 0) == panels.KIND_COLORS[panels.ERROR]
 
         window._settings.theme = theme.DARK.name
         window.apply_settings()
@@ -2793,8 +2832,8 @@ def test_the_theme_switch_reaches_the_text_and_the_widgets(executable: str) -> N
         assert theme.DARK.current_line in current_line, current_line
 
         # The output: the colour of new lines *and* of the lines already there.
-        assert window._output.kind_colors()[panels.ERROR] == theme.DARK.error
-        assert colour_of(window._output, 1) == theme.DARK.error, "the history kept its colours"
+        assert window._problems.kind_colors()[panels.ERROR] == theme.DARK.error
+        assert colour_of(window._problems, 0) == theme.DARK.error, "the history kept its colours"
 
         # Stored, and the menu says which one is on.
         assert Settings(settings_path).theme == "dark"
@@ -2810,7 +2849,7 @@ def test_the_theme_switch_reaches_the_text_and_the_widgets(executable: str) -> N
         expected = appearance.theme_palette(appearance.SYSTEM)
         assert window.buffers()[0].highlighter.theme is expected.syntax
         assert window.editor().palette() is expected
-        assert window._output.kind_colors()[panels.ERROR] == expected.error
+        assert window._problems.kind_colors()[panels.ERROR] == expected.error
     finally:
         discard_changes(window)
     print("ok: the dark theme reaches the widgets, the syntax, the bands and the output")
@@ -2839,14 +2878,14 @@ def test_the_limits_stop_a_runaway_and_name_themselves(executable: str) -> None:
         window._settings.timeout_milliseconds = 2000
         window._actions["run"].trigger()
 
-        notes = window.output_text()
+        notes = window.system_text()
         assert "пределы: «Предел шагов» 5000" in notes, notes
         # A limit left at the shipped number is not a choice the user made.
         assert "Предел глубины» 1000000" not in notes, notes
         assert window._timeout.isActive() is True, "the deadline was not armed"
-        said = pump(window, lambda: "предел шагов" in window.output_text())
-        assert said, f"the run never stopped: {ascii(window.output_text())}"
-        text = window.output_text()
+        said = pump(window, lambda: "предел шагов" in window.problems_text())
+        assert said, f"the run never stopped: {ascii(window.problems_text())}"
+        text = window.problems_text()
         assert "Превышен предел шагов выполнения: 5000" in text, ascii(text)
         assert window._timeout.isActive() is False, "the deadline outlived its run"
 
@@ -2859,7 +2898,7 @@ def test_the_limits_stop_a_runaway_and_name_themselves(executable: str) -> None:
         assert window._timeout.isActive() is True
         window._on_timeout()
         assert "остановлено по времени" in window.status_text(), window.status_text()
-        assert "предел времени: 1000 мс" in window.output_text(), ascii(window.output_text())
+        assert "предел времени: 1000 мс" in window.system_text(), ascii(window.system_text())
         window.stop_program()
     finally:
         discard_changes(window)
@@ -3018,8 +3057,8 @@ def test_a_missing_interpreter_is_reported_not_half_started(
         window.editor().setPlainText('?ВЫВОД("ок"),ПС.\n')
         assert window.run_program() is False
         assert (
-            "не удалось запустить интерпретатор" in window.output_text()
-        ), ascii(window.output_text())
+            "не удалось запустить интерпретатор" in window.problems_text()
+        ), ascii(window.problems_text())
         assert window.session.is_running() is False, "a missing binary must not start a session"
         print("ok: a missing interpreter is reported in the pane, and no session starts")
     finally:
@@ -3107,7 +3146,8 @@ def main(argv: list[str]) -> int:
         test_the_input_switch_chooses_where_to_ask(executable)
         test_the_limits_stop_a_runaway_and_name_themselves(executable)
         test_the_console_appears_only_when_it_is_asked(executable)
-        test_the_queue_field_can_be_hidden(executable)
+        test_the_panel_has_four_tabs_with_counts(executable)
+        test_a_run_focuses_the_output_and_the_system_notes_the_time(executable)
         test_cancelling_input_stops_the_run(executable)
         test_a_run_uses_the_tab_that_is_showing(executable)
         test_the_split_editor_shares_one_document(executable)

@@ -10,10 +10,11 @@ from __future__ import annotations
 
 import pathlib
 
-from PySide6.QtCore import QSize, Qt, QTimer, QUrl
+from PySide6.QtCore import QElapsedTimer, QSize, Qt, QTimer, QUrl
 from PySide6.QtGui import (
     QAction,
     QActionGroup,
+    QColor,
     QDesktopServices,
     QFont,
     QIntValidator,
@@ -32,6 +33,7 @@ from PySide6.QtWidgets import (
     QMenu,
     QMessageBox,
     QSplitter,
+    QTabWidget,
     QToolBar,
     QToolButton,
     QVBoxLayout,
@@ -138,6 +140,13 @@ class MainWindow(QMainWindow):
         #: Warnings seen in the current run, shown beside the answer; reset when
         #: the interpreter comes up, because every run starts a fresh one.
         self._warning_count = 0
+        #: Errors seen in the current run (task_50).  Together with
+        #: `_warning_count` they decide what the «Проблемы» tab says and how its
+        #: title is painted — orange for warnings only, red once an error arrived.
+        self._error_count = 0
+        #: The clock of a run, started by «Запустить» and read by `_on_loaded`
+        #: for the «база знаний загружена (N мс)» line (task_50).
+        self._run_clock = QElapsedTimer()
 
         #: The open documents, in the order every pane shows them.  A pane has its
         #: own *current* tab, but the set and the order are shared: a tab dragged in
@@ -270,17 +279,26 @@ class MainWindow(QMainWindow):
         self._active_pane = 0
         self._editor_splitter = QSplitter(Qt.Orientation.Horizontal)
 
-        # The output is read-only, but it is monospace and it zooms with the
-        # editor: one stored size covers both, so what the user set is still
-        # there next time in every pane.  (task_29 can split them.)  The pane
-        # itself — colours per kind, the bounded history, the tail it holds between
-        # chunks — lives in `panels.py`.
+        # The output panel (task_50): three read-only panes — Проблемы, Вывод,
+        # Система — and the Ввод tab with the prepared answers and, under them,
+        # the per-request console.  All three are `OutputPane`, so the bounded
+        # history, the colours per kind and the tail they hold reach every tab
+        # the same way.
+        self._problems = panels.OutputPane(
+            font_family=self._settings.font_family,
+            font_size=self._settings.output_font_size,
+            line_limit=self._settings.output_line_limit,
+        )
+        self._problems.set_palette(self._settings.palette)
+        self._problems.setPlaceholderText("ошибки и предупреждения интерпретатора")
+        self._problems.zoomChanged.connect(self._on_output_zoom)
+        self._problems.fileDropped.connect(self.open_path)
+
         self._output = panels.OutputPane(
             font_family=self._settings.font_family,
             font_size=self._settings.output_font_size,
             line_limit=self._settings.output_line_limit,
         )
-        self._output.set_follow_output(self._settings.follow_output)
         self._output.set_follow_output(self._settings.follow_output)
         self._output.set_palette(self._settings.palette)
         self._output.setPlaceholderText("вывод интерпретатора")
@@ -288,8 +306,19 @@ class MainWindow(QMainWindow):
         # A dropped program opens in a tab wherever it lands (see `dropEvent`).
         self._output.fileDropped.connect(self.open_path)
 
-        # The input queue lives under the output: one line per answer the program
-        # will ask for, fed automatically until the list runs out (`_input_lines`).
+        self._system = panels.OutputPane(
+            font_family=self._settings.font_family,
+            font_size=self._settings.output_font_size,
+            line_limit=self._settings.output_line_limit,
+        )
+        self._system.set_palette(self._settings.palette)
+        self._system.setPlaceholderText("сообщения окна: загрузка, пределы, остановка")
+        self._system.zoomChanged.connect(self._on_output_zoom)
+        self._system.fileDropped.connect(self.open_path)
+
+        # The input queue: one line per answer the program will ask for, fed
+        # automatically until the list runs out (`_input_lines`).  It is user
+        # data, so a run never clears it — only its copy is consumed.
         self._input_pane = ZoomablePlainTextEdit(
             font_family=self._settings.font_family,
             font_size=self._settings.output_font_size,
@@ -301,10 +330,12 @@ class MainWindow(QMainWindow):
         )
         self._input_pane.zoomChanged.connect(self._on_output_zoom)
         self._input_pane.fileDropped.connect(self.open_path)
+        # The «Ввод:N» tab title follows the prepared lines as they are typed.
+        self._input_pane.textChanged.connect(self._refresh_panel_tabs)
 
-        # The console: what the program asks once the prepared lines under it run
-        # out (or when that field is hidden).  `Ctrl+Enter` sends; «Остановить» is
-        # how a run that waits for an answer is abandoned.
+        # The console: what the program asks once the prepared lines run out.
+        # It sits under the queue, in the same tab.  `Ctrl+Enter` sends;
+        # «Остановить» is how a run that waits for an answer is abandoned.
         self._input_console = panels.InputPane(
             font_family=self._settings.font_family,
             font_size=self._settings.output_font_size,
@@ -393,34 +424,41 @@ class MainWindow(QMainWindow):
         editor_layout.addWidget(self._step_pane)
         editor_layout.addWidget(self._query_line)
 
-        # The output on top, the input queue under it.  The two travel together:
-        # the panel is one widget that `F4` hides and `Ctrl+F4` moves — the pair of
-        # commands the reference front-end had, but arranged as "one splitter with
-        # two orientations" rather than two nested splitters being flipped.
+        # The tabbed output panel (task_50): one `QTabWidget` with the three
+        # read-only panes and the Ввод tab.  `F4` hides the whole panel, `Ctrl+F4`
+        # moves it — the pair of commands the reference front-end had, now arranged
+        # as "one splitter with two orientations" around a tab widget.
         self._editor_area = editor_area
-        self._sidebar = QSplitter(Qt.Orientation.Vertical)
-        self._sidebar.addWidget(self._output)
-        self._sidebar.addWidget(self._input_console)
-        self._sidebar.addWidget(self._input_pane)
-        stored = [size for size in self._settings.output_sizes if size > 0]
-        self._sidebar.setSizes(stored if len(stored) == 3 else [360, 140, 90])
-        self._input_pane.setVisible(self._settings.input_queue)
+        self._input_tab = QWidget()
+        input_layout = QVBoxLayout(self._input_tab)
+        input_layout.setContentsMargins(0, 0, 0, 0)
+        input_layout.setSpacing(2)
+        input_layout.addWidget(self._input_pane, 1)
+        input_layout.addWidget(self._input_console)
+
+        self._panel_tabs = QTabWidget()
+        self._panel_tabs.setDocumentMode(True)
+        self._panel_tabs.addTab(self._problems, "Проблемы")
+        self._panel_tabs.addTab(self._output, "Вывод")
+        self._panel_tabs.addTab(self._system, "Система")
+        self._panel_tabs.addTab(self._input_tab, "Ввод")
+        self._refresh_panel_tabs()
 
         # One splitter, two orientations: side by side when the panel is on the
         # right, stacked when it is at the bottom.  The order (editor first) is the
         # same either way, so the turn is only an orientation change.
         self._panel_splitter = QSplitter(Qt.Orientation.Horizontal)
         self._panel_splitter.addWidget(self._editor_area)
-        self._panel_splitter.addWidget(self._sidebar)
+        self._panel_splitter.addWidget(self._panel_tabs)
         # A pane may not be dragged away to nothing: an output panel squeezed to
         # zero pixels looks like a lost window rather than a hidden one.
         self._panel_splitter.setChildrenCollapsible(False)
         self._editor_area.setMinimumWidth(240)
-        self._sidebar.setMinimumWidth(200)
-        self._sidebar.setMinimumHeight(120)
+        self._panel_tabs.setMinimumWidth(200)
+        self._panel_tabs.setMinimumHeight(120)
         self.setCentralWidget(self._panel_splitter)
         self._apply_output_position(remember=False)
-        self._sidebar.setVisible(self._settings.output_visible)
+        self._panel_tabs.setVisible(self._settings.output_visible)
         # The application picture: the title bar and the taskbar, and the icon any
         # Qt-made dialog asks for (the about box sets its own).
         picture = assets.icon(actions.APPLICATION_ICON)
@@ -555,7 +593,6 @@ class MainWindow(QMainWindow):
             "find_prev": lambda: self.find_step(True),
             "toolbar": self._toggle_toolbar,
             "output": self._toggle_output,
-            "input_queue": self._toggle_input_queue,
             "graphics": self.show_graphics_window,
             "split": self.split_editor,
             "merge": self.merge_editor,
@@ -921,7 +958,6 @@ class MainWindow(QMainWindow):
         self._actions["save_before_run"].setChecked(self._settings.save_before_run)
         self._actions["full_screen"].setChecked(self.isFullScreen())
         self._actions["output"].setChecked(self.output_visible())
-        self._actions["input_queue"].setChecked(self._settings.input_queue)
         self._actions["graphics"].setChecked(self._settings.graphics_visible)
         self._sync_pane_actions()
         self._sync_undo_actions()
@@ -1141,7 +1177,7 @@ class MainWindow(QMainWindow):
     def output_visible(self) -> bool:
         """Whether the panel is shown (`isHidden`, so a window that was never
         shown reads as visible — the same trap the toolbar switch has)."""
-        return not self._sidebar.isHidden()
+        return not self._panel_tabs.isHidden()
 
     def _apply_output_position(self, remember: bool = True) -> None:
         """Puts the panel on the side the settings name, with its sizes."""
@@ -1172,20 +1208,73 @@ class MainWindow(QMainWindow):
     def _toggle_output(self, visible: bool) -> None:
         """`F4`: show or hide the output panel."""
         self._settings.output_visible = bool(visible)
-        self._sidebar.setVisible(bool(visible))
+        self._panel_tabs.setVisible(bool(visible))
         self._status.setText("панель вывода показана" if visible else "панель вывода скрыта")
 
-    def _toggle_input_queue(self, checked: bool) -> None:
-        """Hides the prepared answers, and stops taking anything from them."""
-        self._settings.input_queue = bool(checked)
-        self._input_pane.setVisible(bool(checked))
-        self._status.setText("поле очереди ввода: " + ("показано" if checked else "скрыто"))
-
     def _save_panel_state(self) -> None:
-        """Remembers the side of the panel and the sizes inside both splitters."""
+        """Remembers the side of the panel and the splitter's two sizes."""
         self._settings.output_position = self.output_position()
         self._settings.panel_sizes = list(self._panel_splitter.sizes())
-        self._settings.output_sizes = list(self._sidebar.sizes())
+
+    # -- the panel tabs (task_50) ------------------------------------------
+    def panel_tabs(self) -> QTabWidget:
+        """The tab widget that carries Проблемы, Вывод, Система and Ввод."""
+        return self._panel_tabs
+
+    def _tab_index(self, tab: str) -> int:
+        """The position of a tab in the bar, by the pane (or widget) it shows."""
+        widget = {
+            panels.TAB_PROBLEMS: self._problems,
+            panels.TAB_OUTPUT: self._output,
+            panels.TAB_SYSTEM: self._system,
+            panels.TAB_INPUT: self._input_tab,
+        }[tab]
+        return self._panel_tabs.indexOf(widget)
+
+    def _show_panel_tab(self, tab: str) -> None:
+        """Brings one tab of the panel to the front."""
+        index = self._tab_index(tab)
+        if index >= 0:
+            self._panel_tabs.setCurrentIndex(index)
+
+    @staticmethod
+    def _line_count(pane) -> int:
+        """How many complete lines a read-only pane holds (0 while empty)."""
+        return max(0, pane.document().blockCount() - 1)
+
+    def _input_count(self) -> int:
+        """The prepared answers: non-blank lines of the queue (task_50)."""
+        return sum(1 for line in self._input_pane.toPlainText().split("\n") if line.strip())
+
+    def _problem_count(self) -> int:
+        """The errors and warnings of the current run, for the tab title."""
+        return self._error_count + self._warning_count
+
+    def _refresh_panel_tabs(self) -> None:
+        """Names the tabs with their counts, and paints «Проблемы» by its state.
+
+        `Вывод:5`, `Проблемы:0`, `Система:3`, `Ввод:2` — the title is the pane's
+        contents in one word.  «Проблемы» is the ordinary colour with none,
+        orange with warnings only, red once an error has arrived (task_50).
+        """
+        bar = self._panel_tabs.tabBar()
+        bar.setTabText(self._tab_index(panels.TAB_PROBLEMS),
+                       f"Проблемы:{self._problem_count()}")
+        bar.setTabText(self._tab_index(panels.TAB_OUTPUT),
+                       f"Вывод:{self._line_count(self._output)}")
+        bar.setTabText(self._tab_index(panels.TAB_SYSTEM),
+                       f"Система:{self._line_count(self._system)}")
+        bar.setTabText(self._tab_index(panels.TAB_INPUT),
+                       f"Ввод:{self._input_count()}")
+        if self._error_count:
+            colour = self._settings.palette.error
+        elif self._warning_count:
+            colour = self._settings.palette.warning
+        else:
+            colour = None
+        bar.setTabTextColor(
+            self._tab_index(panels.TAB_PROBLEMS), QColor(colour) if colour else QColor()
+        )
 
     def active_pane(self) -> Pane:
         return self._panes[self._active_pane]
@@ -1304,10 +1393,16 @@ class MainWindow(QMainWindow):
             if not self.save_buffer(buffer):
                 self._status.setText("запуск отменён: сохранить не удалось")
                 return False
-        # The pane starts empty, and so does what has not reached it yet: a run
+        # The panes start empty, and so does what has not reached them yet: a run
         # begins with its own output, never with the tail of the previous one.
         self._discard_output()
-        self._output.reset()
+        self._reset_panels()
+        # The panel shows the program's output while the run is going (task_50);
+        # a diagnostic switches it to «Проблемы» later.
+        self._show_panel_tab(panels.TAB_OUTPUT)
+        # The clock of the run, read by `_on_loaded` for the
+        # «база знаний загружена (N мс)» line.
+        self._run_clock.restart()
         # A new run starts clean: the red line of the last failure and the line a
         # step was standing on are both about a run that is over.
         self._clear_marks()
@@ -1967,9 +2062,18 @@ class MainWindow(QMainWindow):
         self._update_details()
 
     def clear_output(self) -> None:
-        """Empties the pane, including the half-line it was holding."""
+        """Empties the three read-only panes; the input queue is user data.
+
+        «Очистить вывод» clears what a run produced — the program's output, the
+        diagnostics and the window's own notes — but never the prepared answers.
+        """
         self._discard_output()
         self._output.reset()
+        self._problems.reset()
+        self._system.reset()
+        self._error_count = 0
+        self._warning_count = 0
+        self._refresh_panel_tabs()
 
     def _save_output(self) -> None:
         """Writes the output pane to a file of the user's choosing."""
@@ -2573,8 +2677,11 @@ class MainWindow(QMainWindow):
             self._session.answer_input(line)
             self._status.setText(f"ввод из поля, осталось строк — {len(self._queued_input)}")
             return
-        if not self._sidebar.isHidden() and self._settings.input_mode == "panel":
+        if not self._panel_tabs.isHidden() and self._settings.input_mode == "panel":
             self._input_console.ask(kind)
+            # The console lives in the Ввод tab (task_50): bring it up so the
+            # question is actually seen.
+            self._show_panel_tab(panels.TAB_INPUT)
             self._status.setText(f"ждёт ввода: {panels.INPUT_PROMPTS.get(kind, 'значение')}")
             return
         answer = self._ask_input(kind)
@@ -2603,11 +2710,9 @@ class MainWindow(QMainWindow):
 
         A line is taken as written — leading spaces can matter for a string — but
         a line that is empty or only spaces is an answer to nothing, and skipping
-        it is what keeps the field easy to read.  A *hidden* field contributes
-        nothing: hiding it is how the console below takes over for good.
+        it is what keeps the field easy to read.  The field is a tab of its own
+        since task_50, so its lines feed every run, whichever tab is showing.
         """
-        if self._input_pane.isHidden():
-            return []
         return [line for line in self._input_pane.toPlainText().split("\n") if line.strip()]
 
     def _ask_input(self, kind: str) -> str | None:
@@ -2678,7 +2783,7 @@ class MainWindow(QMainWindow):
         return self._status.text()
 
     def output_text(self) -> str:
-        """What the pane holds — the batch that is still in flight goes in first.
+        """What the Вывод pane holds — the batch still in flight goes in first.
 
         The window hands output over on the next turn of the event loop (task_49),
         so a caller that reads the pane has to be the one who ends that turn: a test
@@ -2686,6 +2791,16 @@ class MainWindow(QMainWindow):
         """
         self._flush_output()
         return self._output.toPlainText()
+
+    def problems_text(self) -> str:
+        """What the Проблемы pane holds: the run's errors and warnings."""
+        self._flush_output()
+        return self._problems.toPlainText()
+
+    def system_text(self) -> str:
+        """What the Система pane holds: the window's own notes."""
+        self._flush_output()
+        return self._system.toPlainText()
 
     def current_path(self) -> str | None:
         buffer = self.current_buffer()
@@ -2803,9 +2918,11 @@ class MainWindow(QMainWindow):
         self._status.setText(f"шрифт вывода: {size:.0f} pt")
 
     def _apply_output_font(self) -> None:
-        """Pushes the output's size into the three widgets on that side."""
+        """Pushes the output's size into the panes and the input widgets."""
         size = self._settings.output_font_size
         self._output.set_font_size(size)
+        self._problems.set_font_size(size)
+        self._system.set_font_size(size)
         self._input_pane.set_font_size(size)
         self._input_console.set_font_size(size)
 
@@ -2869,18 +2986,19 @@ class MainWindow(QMainWindow):
                 self._settings.completion_match_case,
             )
         self._apply_output_font()
-        self._output.set_line_limit(self._settings.output_line_limit)
+        for pane in (self._output, self._problems, self._system):
+            pane.set_line_limit(self._settings.output_line_limit)
+            pane.set_palette(self._settings.palette)
         self._output.set_follow_output(self._settings.follow_output)
-        self._output.set_palette(self._settings.palette)
         self._sync_query_line_font()
         self._step_pane.set_font_size(self._settings.font_size)
         self._reference_pane.set_font_size(self._settings.font_size)
         self._shortcut_pane.set_font_size(self._settings.font_size)
 
         self._toolbar.setVisible(self._settings.toolbar_visible)
-        self._sidebar.setVisible(self._settings.output_visible)
+        self._panel_tabs.setVisible(self._settings.output_visible)
         self._apply_output_position(remember=False)
-        self._input_pane.setVisible(self._settings.input_queue)
+        self._refresh_panel_tabs()
         appearance.apply_theme(QApplication.instance(), self._settings.theme)
 
         # The insert table is data in the same file, and «Вернуть встроенную
@@ -3039,6 +3157,12 @@ class MainWindow(QMainWindow):
             # our own is in flight; both conclude with their own event.
             return
         self._busy = False
+        if not self._failed_in_load:
+            # The whole file ran to the end (protocol 8): one system line says how
+            # long the load took, measured by the window's own clock (task_50).
+            self._append_note(
+                f"--- база знаний загружена ({self._run_clock.elapsed()} мс) ---\n"
+            )
         if self._results_in_load == 0 and not self._failed_in_load:
             self._status.setText("выполнено")
         self._sync_run_actions()
@@ -3082,6 +3206,8 @@ class MainWindow(QMainWindow):
                 panels.WARNING,
             )
             self._warning_count += 1
+            self._show_panel_tab(panels.TAB_PROBLEMS)
+            self._refresh_panel_tabs()
             self._status.setText(
                 f"предупреждение: {where or 'без места'} (всего: {self._warning_count})"
             )
@@ -3089,11 +3215,14 @@ class MainWindow(QMainWindow):
         self._append_output(
             f"*** {kind}: {where + ': ' if where else ''}{message}\n", panels.ERROR
         )
+        self._error_count += 1
         self._busy = False
         self._failed_in_load = True
         self._awaiting_query = False
         self._step_pane.idle()
         self._step_stack.clear()
+        self._show_panel_tab(panels.TAB_PROBLEMS)
+        self._refresh_panel_tabs()
         if position is not None and position.line:
             self._mark_error_line(position)
         # A failure ends whatever was in flight; whether the process is still there
@@ -3264,7 +3393,7 @@ class MainWindow(QMainWindow):
         if self._stopping:
             self._stopping = False
             self._flush_output()
-            self._output.flush()
+            self._flush_pane_tails()
             self._sync_run_actions()
             self._update_details()
             return
@@ -3274,9 +3403,9 @@ class MainWindow(QMainWindow):
         self._step_pane.idle()
         self._step_stack.clear()
         # The last half-line: a program that stopped in the middle of `ВЫВОД` left
-        # it in the pane's buffer, and nothing else will complete it.
+        # it in a pane's buffer, and nothing else will complete it.
         self._flush_output()
-        self._output.flush()
+        self._flush_pane_tails()
         self._status.setText(f"интерпретатор завершился, код {exit_code}")
         self._sync_run_actions()
         self._update_details()
@@ -3313,12 +3442,38 @@ class MainWindow(QMainWindow):
             if next_kind == kind:
                 text += more
                 continue
-            self._output.feed(text, kind)
+            self._feed_pane(kind, text)
             kind, text = next_kind, more
-        self._output.feed(text, kind)
+        self._feed_pane(kind, text)
+        self._refresh_panel_tabs()
+
+    def _feed_pane(self, kind: str, text: str) -> None:
+        """One run of one kind, into the pane its kind belongs to (task_50)."""
+        tab = panels.KIND_TAB.get(kind, panels.TAB_OUTPUT)
+        if tab == panels.TAB_PROBLEMS:
+            self._problems.feed(text, kind)
+        elif tab == panels.TAB_SYSTEM:
+            self._system.feed(text, kind)
+        else:
+            self._output.feed(text, kind)
+
+    def _flush_pane_tails(self) -> None:
+        """Ends the open half-line in every pane; nothing else will finish it."""
+        for pane in (self._output, self._problems, self._system):
+            pane.flush()
+        self._refresh_panel_tabs()
+
+    def _reset_panels(self) -> None:
+        """Empties the three read-only panes; the input queue is user data."""
+        self._output.reset()
+        self._problems.reset()
+        self._system.reset()
+        self._error_count = 0
+        self._warning_count = 0
+        self._refresh_panel_tabs()
 
     def _discard_output(self) -> None:
-        """Drops what is queued: the pane is about to be emptied or reused."""
+        """Drops what is queued: the panes are about to be emptied or reused."""
         self._output_timer.stop()
         self._output_pending.clear()
 

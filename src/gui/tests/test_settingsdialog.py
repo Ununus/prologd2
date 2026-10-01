@@ -84,11 +84,11 @@ def test_apply_writes_and_cancel_does_not(directory: pathlib.Path) -> None:
 
     dialog._widgets[keys["editor/line_numbers"].key].setChecked(False)
     dialog._widgets[keys["view/output_position"].key].setCurrentIndex(
-        dialog._widgets[keys["view/output_position"].key].findData("bottom")
+        dialog._widgets[keys["view/output_position"].key].findData("right")
     )
     dialog.button("cancel").click()
     assert Settings(path).line_numbers is True, "«Отмена» wrote the file"
-    assert Settings(path).output_position == "right", "«Отмена» wrote the file"
+    assert Settings(path).output_position == "bottom", "«Отмена» wrote the file"
 
     dialog = dialog_for(directory, "apply.ini")
     dialog._widgets[keys["editor/line_numbers"].key].setChecked(False)

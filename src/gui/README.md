@@ -89,7 +89,7 @@ version does not know are left alone (task_29 adds the dialog).
 | `Ctrl+F3` / `Ctrl+Shift+F3` | find the word under the caret, forwards and backwards |
 | `Esc` | close the find bar, the focus goes back to the editor |
 | `Enter` / `Shift+Enter` in the find field | the same as `F3` / `Shift+F3` |
-| `F4` | show or hide the output panel (the input queue goes with it) |
+| `F4` | show or hide the output panel (Проблемы, Вывод, Система, Ввод — one tab widget) |
 | `Ctrl+F4` | move that panel between the right side and the bottom |
 | `F1` | **Справка по предикату** — the record of the word under the caret, in a dock |
 | `Shift+F1` | **Руководство пользователя** — the built PDF (`doc/help.pdf`) |
@@ -239,7 +239,7 @@ The menus are **Файл** (Новый, Открыть…, Последние, �
 **Правка** (Отменить … Удалить, Выделить всё, Закомментировать,
 Раскомментировать, Форматировать, Настройки…), **Поиск** (Поиск и замена…,
 Далее, Назад), **Вид** (Панель
-инструментов, Панель вывода, Поле очереди ввода, Разделить редактор, Объединить
+инструментов, Панель вывода, Разделить редактор, Объединить
 редакторы, Сменить ориентацию сплита, Номера строк, Переносить длинные строки,
 Увеличить/Уменьшить/Обычный размер шрифта, Оформление (подменю: светлое, тёмное,
 системное), Полный экран), **Выполнение** (Запустить, Запустить с
@@ -444,35 +444,44 @@ can stand on a second screen — and the main window's handler never sees that k
 
 ## The output panel
 
-The output — with the input queue under it — is *one* panel inside a single
-`QSplitter` whose orientation is the only thing that changes: side by side with
-the editor when the panel is on the right, stacked under it when the panel is at
-the bottom.  `Ctrl+F4` turns it, `F4` shows and hides it, and the side together
-with the sizes of both splitters is remembered (`view/output_position`,
-`view/output_visible`, `view/panel_sizes`, `view/output_sizes`) and comes back on
-the next start.  A pane cannot be dragged away to nothing — `childrenCollapsible`
-is off and each half has a minimum size — because a panel squeezed to zero pixels
-looks like a lost window rather than a hidden one.
+The panel is **one tab widget** — **Проблемы**, **Вывод**, **Система**, **Ввод** —
+inside a single `QSplitter` whose orientation is the only thing that changes: side
+by side with the editor when the panel is on the right, stacked under it when the
+panel is at the bottom (the default).  `Ctrl+F4` turns it, `F4` shows and hides
+it, and the side together with the splitter's sizes is remembered
+(`view/output_position`, `view/output_visible`, `view/panel_sizes`) and comes back
+on the next start.  A pane cannot be dragged away to nothing —
+`childrenCollapsible` is off and each half has a minimum size — because a panel
+squeezed to zero pixels looks like a lost window rather than a hidden one.
 
-The text inside is `panels.OutputPane`: read-only, its own font and zoom (task_29:
-the editor and the output keep two sizes, and the output follows the editor's
-while nobody has set one of its own), and never wrapped (a log line cut in the
-middle cannot be read as data).  It
+Each tab's title carries its count — `Вывод:5`, `Проблемы:0`, `Система:3`,
+`Ввод:2` (Ввод counts the prepared lines) — and the «Проблемы» word is painted by
+the state of the run: the ordinary colour with nothing, orange with warnings
+only, red once an error has arrived.  A run brings up «Вывод»; a diagnostic
+(warning or error) brings up «Проблемы».  What goes where is decided by the
+*kind* of the line — the program's own output, the echo of an answer and the
+trace are «Вывод», the window's own notes («загрузка базы знаний», the limits,
+«остановлено», «база знаний загружена (N мс)») are «Система», the diagnostics
+are «Проблемы» — and the kind comes from the window, which knows whether it is
+feeding the program's text, a note or an error; nothing is guessed from the text.
+
+The three read-only panes are all `panels.OutputPane`: read-only, the output's
+own font and zoom (task_29: the editor and the output keep two sizes, and the
+output follows the editor's while nobody has set one of its own), and never
+wrapped (a log line cut in the middle cannot be read as data).  It
 **colours by kind** — program output plain, our echo of an answer in the query
-blue, our own markers grey, diagnostics crimson — and the kind comes from the
-window, which knows whether it is feeding the program's text, a note or an
-error; nothing is guessed from the text itself.  Chunks arrive mid-line, so a
-line is held until its newline (or until the run ends, which flushes it): that is
-the defect this code exists to avoid, and `LineBuffer` keeps it Qt-free so
-`test_output.py` hammers it.  The history is bounded — 50 000 lines by default,
-and the limit is a setting since task_29 (`output/line_limit`, 100…500 000:
-a smaller one trims the pane at once) —
-and the oldest lines are dropped with `*** вывод усечён … ***` kept
-as the first line.  The view follows the end of the output until the user scrolls
-up to read something, and follows again as soon as they come back to the bottom —
-unless «Следить за выводом» in the settings dialog is unticked
-(`view/follow_output`), which forbids the jump even at the end of the text, for a
-reader who wants the pane to hold still while a program talks.
+blue, diagnostics crimson — and a marker of our own grey in «Система».  Chunks
+arrive mid-line, so a line is held until its newline (or until the run ends,
+which flushes it): that is the defect this code exists to avoid, and `LineBuffer`
+keeps it Qt-free so `test_output.py` hammers it.  The history of each pane is
+bounded — 50 000 lines by default, and the limit is a setting since task_29
+(`output/line_limit`, 100…500 000: a smaller one trims the pane at once) — and
+the oldest lines are dropped with `*** вывод усечён … ***` kept as the first
+line.  The view follows the end of the output until the user scrolls up to read
+something, and follows again as soon as they come back to the bottom — unless
+«Следить за выводом» in the settings dialog is unticked (`view/follow_output`),
+which forbids the jump even at the end of the text, for a reader who wants the
+pane to hold still while a program talks.
 The pane is read-only, so the one operation it owes beside reading is copying text
 *out* of it: the mouse selects as usual, and `Ctrl+C` copies the selection of
 whichever text widget has the focus — the output, the input queue, the console
@@ -556,24 +565,26 @@ none left the window saying `выполняется` with `Запустить` d
 
 ### The input console
 
-Under the output sits the **console**: the field the program's question goes into.
-It is hidden while nothing is asked — an idle strip would take room from the output
-for nothing — and appears with the question, framed in yellow (`#e0b400`) and with
-the answer's own key in its placeholder (`Слово — Enter`, `Строка — Ctrl+Enter`,
-`Символ — Enter`; the one-line field sends on `Enter`, the text area for a `line`
-keeps `Enter` as a newline, because an answer to `ВВОДСТР` may be a sentence).
-`Отправить` is there for the mouse.  The answer is echoed into the output with `>`,
-like the prepared lines, and the strip disappears again.
+The **Ввод** tab holds the prepared answers and, under them, the **console**: the
+field the program's question goes into.  It is hidden while nothing is asked — an
+idle strip would take room from the queue for nothing — and appears with the
+question, framed in yellow (`#e0b400`) and with the answer's own key in its
+placeholder (`Слово — Enter`, `Строка — Ctrl+Enter`, `Символ — Enter`; the
+one-line field sends on `Enter`, the text area for a `line` keeps `Enter` as a
+newline, because an answer to `ВВОДСТР` may be a sentence).  `Отправить` is there
+for the mouse.  The answer is echoed into «Вывод» with `>`, like the prepared
+lines, and the strip disappears again.  The tab comes up by itself when the
+program asks, so the question is actually seen.
 
-Answers are taken in this order: the **prepared lines** under it (one per request),
-then the console, and the **modal dialog** only when the whole panel is hidden by
-`F4` — there is nowhere to put a console then.  «Вид → Поле очереди ввода» hides the
-prepared lines; a hidden field contributes nothing at all, so the console answers
-instead.  «Спрашивать ввод» in the settings dialog (`view/input_mode`) chooses
-between the two *places* a question is put: `в панели вывода` (the console, the box
-only when the panel is hidden — the default) or `в диалоге`, where every question is
-a box even with the console right there.  A run that is waiting is abandoned with
-«Остановить».
+Answers are taken in this order: the **prepared lines** (one per request), then
+the console, and the **modal dialog** only when the whole panel is hidden by `F4`
+— there is nowhere to put a console then.  The prepared lines are user data: a run
+consumes only its *copy* (`_queued_input`), and «Очистить вывод» never touches
+them.  «Спрашивать ввод» in the settings dialog (`view/input_mode`) chooses
+between the two *places* a question is put: `в панели вывода` (the console, the
+box only when the panel is hidden — the default) or `в диалоге`, where every
+question is a box even with the console right there.  A run that is waiting is
+abandoned with «Остановить».
 
 One thing the output pane learned from a user report: a line that has no newline yet
 is written **at once**.  `ВЫВОД` prints without ending the line (that is the language:
@@ -582,8 +593,8 @@ is written **at once**.  `ВЫВОД` prints without ending the line (that is th
 echo brought the newline — the program looked as if it asked before saying anything.
 The pane now writes the unfinished line and continues it in place; a change of kind
 (the window's own note arriving mid-line) still closes it first, and the end of a run
-closes what is left.  «Файл → Сохранить вывод…» writes the pane as UTF-8 text — the
-text, not the colours: a log should be readable in any editor.
+closes what is left.  «Файл → Сохранить вывод…» writes the Вывод tab as UTF-8 text —
+the text, not the colours: a log should be readable in any editor.
 
 ## The find bar
 
@@ -712,7 +723,7 @@ every record has a widget and every widget writes its key.
 | Section | What is in it |
 | --- | --- |
 | Редактор | font family and size, line numbers, the current-line band, word wrap, tabs or spaces and the width, auto-indent, completion (on/off, after how many letters, `Учитывать регистр`) |
-| Вид | theme (light, dark or system), toolbar, the output panel (shown, right or bottom), the input queue field, where a program's input question is asked (console or dialog), the output's font size, its line limit and whether it follows the end |
+| Вид | theme (light, dark or system), toolbar, the output panel (shown; right or bottom, the bottom being the default since task_50), where a program's input question is asked (console or dialog), the output's font size, its line limit and whether it follows the end |
 | Формат | the formatter's mode, width, indent and unit, «только выделенное» |
 | Выполнение | whether a run answers the program's own `?`-questions, save before run, the four limits (steps, depth, НАЙТИВСЕ solutions, milliseconds), **the interpreter path** (empty = the one the window was started with), **the process directory** (the running file's folder, the window's folder, or a fixed one — `ЗАПИСЬ_В`/`ЧТЕНИЕ_ИЗ` open relative to it), the `ИМПОРТ` search folders |
 | Файлы | autosave in minutes (0 = off), how many recent files to remember, restoring the open tabs at start-up |

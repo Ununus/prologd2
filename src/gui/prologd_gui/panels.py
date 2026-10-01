@@ -45,6 +45,27 @@ ERROR = "error"
 WARNING = "warning"
 TRACE = "trace"
 
+#: The tabs of the output panel (task_50): a pane per tab, the input queue with
+#: the request console under it in the last one.  The order is the order they are
+#: built in — «Проблемы» first, because a diagnostic is the thing the user is
+#: looking for when a run stops.
+TAB_PROBLEMS = "problems"
+TAB_OUTPUT = "output"
+TAB_SYSTEM = "system"
+TAB_INPUT = "input"
+
+#: What a kind belongs to.  The program's own output, the echo of an answer and
+#: the trace are all *the output*; the window's notes are system talk; the
+#: diagnostics are problems.  `OUTPUT` deliberately has no entry of its own — it
+#: falls back to the Вывод tab.
+KIND_TAB: dict[str, str] = {
+    ECHO: TAB_OUTPUT,
+    TRACE: TAB_OUTPUT,
+    NOTE: TAB_SYSTEM,
+    ERROR: TAB_PROBLEMS,
+    WARNING: TAB_PROBLEMS,
+}
+
 #: The colours of the kinds that have one, from a theme palette (task_29).  The
 #: pane is given a palette, so the dark theme's colours reach it the same way the
 #: editor's do; `KIND_COLORS` is only the light default.

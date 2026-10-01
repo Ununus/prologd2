@@ -155,10 +155,6 @@ ACTIONS: tuple[Action, ...] = (
     # right side and the bottom (`split_orientation` keeps the reference's name
     # for the command; the icon hints at the *other* position).
     Action("output", "Панель вывода", "view-output-right", ("F4",), checkable=True),
-    # The prepared answers under the output: a program reading a column of numbers
-    # is best answered by typing the column once, and hiding the field is how the
-    # console below takes over for good.
-    Action("input_queue", "Поле очереди ввода", None, checkable=True),
     Action("split", "Разделить редактор", "view-split-editor", ("Ctrl+\\",)),
     Action("merge", "Объединить редакторы", None, ("Ctrl+Shift+\\",)),
     Action("next_tab", "Следующая вкладка", None, ("Ctrl+Tab",)),
@@ -264,7 +260,6 @@ MENUS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "toolbar",
             SEPARATOR,
             "output",
-            "input_queue",
             SEPARATOR,
             "split",
             "merge",
