@@ -228,6 +228,7 @@ class MainWindow(QMainWindow):
             font_size=self._settings.output_font_size,
             line_limit=self._settings.output_line_limit,
         )
+        self._output.set_follow_output(self._settings.follow_output)
         self._output.setPlaceholderText("вывод интерпретатора")
         self._output.zoomChanged.connect(self._on_output_zoom)
         # A dropped program opens in a tab wherever it lands (see `dropEvent`).
@@ -1068,7 +1069,7 @@ class MainWindow(QMainWindow):
 
     # -- actions -----------------------------------------------------------
     def run_program(self, *, trace: bool = False, step: bool = False,
-                    questions: bool = True) -> bool:
+                    questions: bool | None = None) -> bool:
         """Runs the current buffer in a fresh interpreter.
 
         A run starts from a clean slate: a fresh interpreter (no clauses, RNG
@@ -1086,7 +1087,9 @@ class MainWindow(QMainWindow):
 
         `questions=False` loads the program without running its own `?`-statements:
         that is what the editor's margin needs, so one clicked question is
-        answered *alone* instead of after the whole lesson (task_36).
+        answered *alone* instead of after the whole lesson (task_36).  Left out, it
+        follows the «Выводить вопросы при запуске» switch (task_29), which is on
+        by default — a lesson is normally run to see its questions answered.
 
         The result is True when the load was sent; a caller that wants to add a
         query of its own (`_on_query_requested`) must not do it otherwise.
@@ -1106,6 +1109,8 @@ class MainWindow(QMainWindow):
         buffer = self.current_buffer()
         if buffer is None:
             return False
+        if questions is None:
+            questions = self._settings.run_questions
         path = buffer.model.path
         if self._settings.save_before_run and buffer.is_modified():
             # The switch of the «Выполнение» menu: a run is then always of what is
@@ -2183,6 +2188,10 @@ class MainWindow(QMainWindow):
         The lines come from the field under the output pane, one per request, and
         are echoed with `>` so it stays visible what the program was given.  Only
         when that list is empty does the window ask the user.
+
+        Where it asks is the «Спрашивать ввод» switch (task_29): in the console
+        under the output — the field takes the answer and the box is what is left
+        when that panel is hidden — or in a box every time.
         """
         if self._stopped_input:
             # Cancelled earlier in this run: the interpreter is on its way out and
@@ -2195,7 +2204,7 @@ class MainWindow(QMainWindow):
             self._session.answer_input(line)
             self._status.setText(f"ввод из поля, осталось строк — {len(self._queued_input)}")
             return
-        if not self._sidebar.isHidden():
+        if not self._sidebar.isHidden() and self._settings.input_mode == "panel":
             self._input_console.ask(kind)
             self._status.setText(f"ждёт ввода: {panels.INPUT_PROMPTS.get(kind, 'значение')}")
             return
@@ -2479,6 +2488,7 @@ class MainWindow(QMainWindow):
             buffer.set_current_line(self._settings.current_line)
             buffer.set_wrap(self._settings.wrap)
             buffer.set_indent(self._settings.indent_character, self._settings.indent_width)
+            buffer.set_auto_indent(self._settings.auto_indent)
             buffer.set_completion(
                 self._settings.completion,
                 self._settings.auto_complete_after,
@@ -2486,6 +2496,7 @@ class MainWindow(QMainWindow):
             )
         self._apply_output_font()
         self._output.set_line_limit(self._settings.output_line_limit)
+        self._output.set_follow_output(self._settings.follow_output)
         self._sync_query_line_font()
         self._step_pane.set_font_size(self._settings.font_size)
         self._reference_pane.set_font_size(self._settings.font_size)

@@ -266,6 +266,7 @@ class CodeEditor(ZoomablePlainTextEdit):
         line_numbers: bool = True,
         indent_character: str = "\t",
         indent_width: int = 1,
+        auto_indent: bool = True,
         completion: bool = True,
         auto_complete_after: int = 2,
         completion_match_case: bool = True,
@@ -274,6 +275,7 @@ class CodeEditor(ZoomablePlainTextEdit):
         super().__init__(parent, font_family=font_family, font_size=font_size)
         self._indent_character = indent_character
         self._indent_width = max(1, indent_width)
+        self._auto_indent = bool(auto_indent)
         self._line_numbers = line_numbers
         #: Whether the line the caret is on gets a pale band (task_29).
         self._current_line = bool(current_line)
@@ -635,6 +637,15 @@ class CodeEditor(ZoomablePlainTextEdit):
         self._indent_character = character
         self._indent_width = max(1, width)
 
+    def set_auto_indent(self, enabled: bool) -> None:
+        """Whether `Enter` continues the indentation (task_29's switch).
+
+        Off, a new line starts at the left margin: the indentation of a Prolog
+        clause is the author's, and a lecture that indents through a `:-` body is
+        easier to type with the editor out of the way.
+        """
+        self._auto_indent = bool(enabled)
+
     def indent_selection(self, outdent: bool = False) -> None:
         unit = self._indent_text()
 
@@ -975,7 +986,10 @@ class CodeEditor(ZoomablePlainTextEdit):
 
         if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and modifiers == Qt.KeyboardModifier.NoModifier:
             if not self.textCursor().hasSelection():
-                self._insert_newline_with_indent()
+                if self._auto_indent:
+                    self._insert_newline_with_indent()
+                else:
+                    self.insertPlainText("\n")
                 return
         if key == Qt.Key.Key_Tab and modifiers == Qt.KeyboardModifier.NoModifier:
             if self.textCursor().hasSelection():

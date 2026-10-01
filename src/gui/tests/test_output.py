@@ -143,6 +143,44 @@ def test_the_pane_colours_lines_and_keeps_a_bounded_history() -> None:
         del application
 
 
+def test_following_the_end_can_be_forbidden() -> None:
+    """task_29's «Следить за выводом»: off, new lines do not move the view.
+
+    The pane already stops following by itself when the reader scrolls up; the
+    switch is the other direction — «не уводите взгляд» — so it has to hold even
+    while the view *is* at the end.
+    """
+    # The application of the check above, not a second one: Qt has one per
+    # process, and a second is a hard error rather than a fresh window.
+    application = QApplication.instance() or QApplication(sys.argv[:1])
+    # A limit nothing reaches: the history trimming moves the view too (the oldest
+    # lines go, and Qt keeps the visible anchor), and this check is about the
+    # *following*, which must be the only thing that can move it here.
+    pane = panels.OutputPane(line_limit=1000)
+    try:
+        for number in range(200):
+            pane.feed(f"строка {number}\n")
+        bar = pane.verticalScrollBar()
+        assert bar.maximum() > 0, "nothing to scroll: the check would pass for free"
+        assert pane.following() is True
+
+        pane.set_follow_output(False)
+        assert bar.value() == bar.maximum(), "the view must start at the end"
+        was = bar.value()
+        pane.feed("хвост\n")
+        assert bar.value() == was, "the view moved with the switch off"
+        assert bar.maximum() > was, "the text did not grow: the check proves nothing"
+
+        pane.set_follow_output(True)
+        bar.setValue(bar.maximum())
+        pane.feed("ещё\n")
+        assert bar.value() == bar.maximum(), "with the switch on it must follow again"
+        print("ok: the output pane follows the end, and the switch can forbid it")
+    finally:
+        pane.deleteLater()
+        del application
+
+
 def main() -> int:
     if QApplication is None:
         print("skipped: PySide6 is not installed")
@@ -152,6 +190,7 @@ def main() -> int:
     test_a_change_of_kind_closes_the_open_line()
     test_flush_and_reset()
     test_the_pane_colours_lines_and_keeps_a_bounded_history()
+    test_following_the_end_can_be_forbidden()
     print("all output checks passed")
     return 0
 

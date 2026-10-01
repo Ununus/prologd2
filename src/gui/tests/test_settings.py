@@ -279,6 +279,12 @@ def test_the_new_keys_have_the_documented_defaults(directory: pathlib.Path) -> N
     assert settings.recent_limit == settings_module.DEFAULT_RECENT_LIMIT
     assert settings.working_directory == ""
     assert settings.import_paths == []
+    assert settings.auto_indent is True, "the editor indents until told otherwise"
+    assert settings.follow_output is True, "the pane followed the end before the switch"
+    assert settings.input_mode == settings_module.DEFAULT_INPUT_MODE == "panel"
+    assert settings.run_questions is True, "a lesson is run to see its questions answered"
+    settings.input_mode = "диалог"
+    assert settings.input_mode == settings_module.DEFAULT_INPUT_MODE, "junk falls back"
     settings.output_font_size = 100
     assert settings.output_font_size == settings_module.MAXIMUM_FONT_SIZE
     settings.autosave_minutes = -5

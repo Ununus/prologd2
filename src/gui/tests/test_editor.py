@@ -145,6 +145,35 @@ def test_enter_continues_the_clause_with_an_indent() -> None:
     print("ok: Enter indents a continuation and not a new clause")
 
 
+def test_auto_indent_can_be_switched_off() -> None:
+    """task_29: the switch over what used to be the editor's only behaviour.
+
+    The indent *unit* is a different thing and stays: `Tab` inserts it either
+    way, and only `Enter` stops continuing the line above.
+    """
+    editor = make_editor("правило :- цель1,")
+    editor.set_auto_indent(False)
+    cursor = editor.textCursor()
+    cursor.movePosition(QTextCursor.MoveOperation.End)
+    editor.setTextCursor(cursor)
+    QTest.keyClick(editor, Qt.Key.Key_Return)
+    assert editor.toPlainText() == "правило :- цель1,\n", ascii(editor.toPlainText())
+
+    QTest.keyClick(editor, Qt.Key.Key_Tab)
+    assert editor.toPlainText() == "правило :- цель1,\n\t"
+
+    # Back on, the continuation is indented again — one line up, the way a writer
+    # would do it after typing the indent by hand.
+    editor.set_auto_indent(True)
+    cursor = editor.textCursor()
+    cursor.movePosition(QTextCursor.MoveOperation.Up)
+    cursor.movePosition(QTextCursor.MoveOperation.End)
+    editor.setTextCursor(cursor)
+    QTest.keyClick(editor, Qt.Key.Key_Return)
+    assert editor.toPlainText() == "правило :- цель1,\n\t\n\t", ascii(editor.toPlainText())
+    print("ok: auto-indent is a switch, and the indent unit is not")
+
+
 def test_zoom_is_bounded_and_reported() -> None:
     editor = make_editor()
     sizes: list[float] = []
@@ -340,6 +369,7 @@ def main() -> int:
     test_indent_and_outdent_a_selection()
     test_tab_and_backtab_keys()
     test_enter_continues_the_clause_with_an_indent()
+    test_auto_indent_can_be_switched_off()
     test_zoom_is_bounded_and_reported()
     test_line_number_width_grows_with_the_document()
     test_the_error_line_is_marked_and_cleared()

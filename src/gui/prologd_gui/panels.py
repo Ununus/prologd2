@@ -146,6 +146,9 @@ class OutputPane(ZoomablePlainTextEdit):
         self._truncated = False
         #: True while the view follows the end of the output.
         self._following = True
+        #: The preference behind it (task_29's «Следить за выводом»): off, the
+        #: pane stays where the reader is even when that is the end.
+        self._follow = True
         self.verticalScrollBar().valueChanged.connect(self._on_scrolled)
 
     @staticmethod
@@ -187,7 +190,7 @@ class OutputPane(ZoomablePlainTextEdit):
             if piece.complete:
                 cursor.insertText("\n", fmt)
         self._trim()
-        if self._following:
+        if self._following and self._follow:
             bar = self.verticalScrollBar()
             bar.setValue(bar.maximum())
 
@@ -226,6 +229,14 @@ class OutputPane(ZoomablePlainTextEdit):
     def following(self) -> bool:
         """Whether the view is at the end of the output."""
         return self._following
+
+    def set_follow_output(self, enabled: bool) -> None:
+        """The «Следить за выводом» switch (task_29).
+
+        It does not move the view: turning it back on while the reader is at the
+        end changes nothing, and turning it off leaves the text where it is.
+        """
+        self._follow = bool(enabled)
 
     def pending(self) -> str:
         """The partial line the pane is holding."""

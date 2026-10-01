@@ -64,6 +64,7 @@ class Buffer(QObject):
             line_numbers=self._settings.line_numbers,
             indent_character=self._settings.indent_character,
             indent_width=self._settings.indent_width,
+            auto_indent=self._settings.auto_indent,
             completion=self._settings.completion,
             auto_complete_after=self._settings.auto_complete_after,
             completion_match_case=self._settings.completion_match_case,
@@ -164,6 +165,10 @@ class Buffer(QObject):
     def set_indent(self, character: str, width: int) -> None:
         for view in self._views:
             view.set_indent(character, width)
+
+    def set_auto_indent(self, enabled: bool) -> None:
+        for view in self._views:
+            view.set_auto_indent(enabled)
 
     def set_completion(self, enabled: bool, after: int, match_case: bool) -> None:
         """The three completion switches of task_29, in one call per view."""

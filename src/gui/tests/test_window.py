@@ -2340,6 +2340,66 @@ def test_an_unnamed_tab_left_unsaved_is_forgotten(
     )
 
 
+def test_the_questions_switch_decides_whether_a_run_answers(executable: str) -> None:
+    """task_29's «Выводить вопросы при запуске»: off, a lesson loads as rules.
+
+    The margin's own click is none of this switch's business — it always answers
+    the one question that was clicked (`test_a_marker_answers_one_question_alone`)
+    — and neither is a query typed into the query line.
+    """
+    window = empty_window(executable)
+    try:
+        window.editor().setPlainText("факт(1).\n?факт(1).\n")
+
+        window._settings.run_questions = False
+        window._actions["run"].trigger()
+        assert pump(window, lambda: window.status_text() == "выполнено"), window.status_text()
+        assert "ДА" not in window.output_text(), ascii(window.output_text())
+
+        window._settings.run_questions = True
+        window._actions["run"].trigger()
+        wait_for_result(window)
+        assert "ДА" in window.output_text(), ascii(window.output_text())
+    finally:
+        discard_changes(window)
+    print("ok: «выводить вопросы» decides whether a run answers the program's questions")
+
+
+def test_the_input_switch_chooses_where_to_ask(executable: str) -> None:
+    """task_29's «Спрашивать ввод»: the console under the output, or a box.
+
+    Both ways are open here — the panel is visible, so the console *can* take the
+    answer — which is what makes the setting a switch rather than a rule about
+    what is on screen.
+    """
+    window = empty_window(executable)
+    try:
+        assert window._sidebar.isHidden() is False, "both ways need the panel"
+        window.editor().setPlainText("?ВВОДЦЕЛ(А),ВЫВОД(А),ПС.\n")
+        asked: list[str] = []
+        window._ask_input = lambda kind: asked.append(kind) or "9"
+
+        window._settings.input_mode = "panel"
+        window.run_program()
+        assert pump(window, lambda: not window._input_console.isHidden()), "no console"
+        assert asked == [], "the box was used although the console is right there"
+        window._input_console._line.setText("5")
+        window._input_console.send()
+        wait_for_result(window)
+        assert printed_lines(window) == ["5", "А=5"], printed_lines(window)
+
+        window._settings.input_mode = "dialog"
+        window.run_program()
+        assert pump(window, lambda: bool(asked)), "the box was not used"
+        assert asked == ["token"], asked
+        assert window._input_console.isHidden() is True, "the console took the question"
+        wait_for_result(window)
+        assert printed_lines(window) == ["9", "А=9"], printed_lines(window)
+    finally:
+        discard_changes(window)
+    print("ok: «спрашивать ввод» chooses the console or a box, without hiding anything")
+
+
 def main(argv: list[str]) -> int:
     if QApplication is None:
         print("skipped: PySide6 is not installed")
@@ -2372,6 +2432,8 @@ def main(argv: list[str]) -> int:
         test_the_input_field_feeds_the_program(executable)
         test_the_console_answers_once_the_prepared_lines_run_out(executable)
         test_the_dialog_is_the_last_resort(executable)
+        test_the_questions_switch_decides_whether_a_run_answers(executable)
+        test_the_input_switch_chooses_where_to_ask(executable)
         test_the_console_appears_only_when_it_is_asked(executable)
         test_the_queue_field_can_be_hidden(executable)
         test_cancelling_input_stops_the_run(executable)

@@ -66,6 +66,9 @@ OUTPUT_LINE_LIMIT = "output/line_limit"
 COMPLETION_MATCH_CASE = "editor/completion_match_case"
 #: The pale band behind the line the caret is on.
 CURRENT_LINE = "editor/current_line"
+#: A new line continues the indentation of the one above it (task_29's switch
+#: over what used to be the editor's only behaviour).
+AUTO_INDENT = "editor/auto_indent"
 #: Minutes between two automatic saves of *named* buffers; 0 is off.
 AUTOSAVE_MINUTES = "files/autosave_minutes"
 RECENT_LIMIT = "files/recent_limit"
@@ -75,11 +78,23 @@ RESTORE_TABS = "files/restore_tabs"
 #: bar order (`documents.encode_tabs`) and which one was showing.
 SESSION_TABS = "session/tabs"
 SESSION_CURRENT = "session/current"
+#: Whether the output pane scrolls to the end as lines arrive.  It stops
+#: following by itself when the user scrolls up; this switch is the other way —
+#: «не уводите взгляд с того, что я читаю».
+FOLLOW_OUTPUT = "view/follow_output"
+#: Where the program's own input questions are answered (task_27 has both ways):
+#: in the console field under the output, or in a modal box per question.
+INPUT_MODE = "view/input_mode"
 #: The one folder the user keeps shared sources in (task_29): passed as `-I`
 #: on every session, so `ИМПОРТ("library.pld")` works from any program.
 WORKING_DIRECTORY = "execution/working_directory"
 #: More `-I` folders, in the order the engine will search them.
 IMPORT_PATHS = "execution/import_paths"
+#: Whether a run also answers the program's own `?`-statements — the `questions`
+#: flag of `load` (protocol 5).  Off, a lesson is loaded as rules only, which is
+#: what a lecture wants; the margin's own marker click always answers its one
+#: question, whatever this says.
+RUN_QUESTIONS = "execution/run_questions"
 
 DEFAULT_FONT_FAMILY = "Cascadia Mono"
 DEFAULT_FONT_SIZE = 11.0
@@ -89,6 +104,12 @@ DEFAULT_THEME = "light"
 #: editor or under it.  `Ctrl+F4` moves it, `F4` hides it.
 DEFAULT_OUTPUT_POSITION = "right"
 OUTPUT_POSITIONS = ("right", "bottom")
+
+#: How the program's input questions are answered: in the console under the
+#: output pane (the field is then the first thing looked at, and the modal box is
+#: the answer only when that panel is hidden) or in a box per question.
+DEFAULT_INPUT_MODE = "panel"
+INPUT_MODES = ("panel", "dialog")
 
 MINIMUM_FONT_SIZE = 6.0
 MAXIMUM_FONT_SIZE = 72.0
@@ -182,6 +203,8 @@ SETTINGS: tuple[Setting, ...] = (
             choices=(("\t", "табуляция"), (" ", "пробелы"))),
     Setting(INDENT_WIDTH, "Ширина отступа", "Редактор", "int", 1, 1, 16,
             suffix=" знаков"),
+    Setting(AUTO_INDENT, "Автоотступ", "Редактор", "bool", True,
+            hint="Новая строка продолжает отступ предыдущей; `Enter` на пустой строке ничего не добавляет"),
     Setting(COMPLETION, "Автодополнение", "Редактор", "bool", True),
     Setting(AUTO_COMPLETE_AFTER, "Показывать после", "Редактор", "int",
             DEFAULT_AUTO_COMPLETE_AFTER, MINIMUM_AUTO_COMPLETE_AFTER,
@@ -206,6 +229,11 @@ SETTINGS: tuple[Setting, ...] = (
             DEFAULT_OUTPUT_LINE_LIMIT, MINIMUM_OUTPUT_LINE_LIMIT,
             MAXIMUM_OUTPUT_LINE_LIMIT, suffix=" строк",
             hint="Старые строки удаляются, чтобы долгий прогон не съел память"),
+    Setting(FOLLOW_OUTPUT, "Следить за выводом", "Вид", "bool", True,
+            hint="Панель прокручивается к концу; выключено — остаётся там, где читают"),
+    Setting(INPUT_MODE, "Спрашивать ввод", "Вид", "choice", DEFAULT_INPUT_MODE,
+            choices=(("panel", "в панели вывода"), ("dialog", "в диалоге")),
+            hint="В панели — строки в поле под выводом; в диалоге — окно на каждый запрос"),
     # -- format
     Setting(FORMAT_MODE, "Режим", "Формат", "choice", DEFAULT_FORMAT_MODE,
             choices=(("line", "в одну строку"), ("soft", "мягкое"),
@@ -220,6 +248,8 @@ SETTINGS: tuple[Setting, ...] = (
             False),
     # -- execution
     Setting(SAVE_BEFORE_RUN, "Сохранять перед запуском", "Выполнение", "bool", False),
+    Setting(RUN_QUESTIONS, "Выводить вопросы при запуске", "Выполнение", "bool", True,
+            hint="Строки «?цель.» программы отвечают сами; выключено — только правила"),
     Setting(WORKING_DIRECTORY, "Рабочая папка (ИМПОРТ)", "Выполнение", "directory", "",
             hint="Общие программы: каталог ищется при каждом ИМПОРТ, в любом файле"),
     Setting(IMPORT_PATHS, "Дополнительные каталоги ИМПОРТ", "Выполнение", "dirs", (),
@@ -236,6 +266,10 @@ SETTINGS: tuple[Setting, ...] = (
 
 #: The key of a record, for the callers that have one and not the other.
 BY_KEY: dict[str, Setting] = {setting.key: setting for setting in SETTINGS}
+
+#: A record looked up by key, for a property that wants the bounds of that record
+#: rather than a number written out a second time (`input_mode`).
+_INPUT_MODE_SETTING = BY_KEY[INPUT_MODE]
 
 #: Stored, but written by the window rather than by the user: window geometry,
 #: the recent list, the insert table.  Kept here so a test can prove that every
@@ -515,6 +549,15 @@ class Settings:
         self._write(INDENT_WIDTH, int(min(16, max(1, value))))
 
     @property
+    def auto_indent(self) -> bool:
+        """Whether `Enter` starts the new line at the old line's indentation."""
+        return self._flag(AUTO_INDENT, True)
+
+    @auto_indent.setter
+    def auto_indent(self, value: bool) -> None:
+        self._write(AUTO_INDENT, bool(value))
+
+    @property
     def completion(self) -> bool:
         return self._flag(COMPLETION, True)
 
@@ -757,6 +800,24 @@ class Settings:
         )
 
     @property
+    def follow_output(self) -> bool:
+        """Whether the output pane keeps the end of the text in sight."""
+        return self._flag(FOLLOW_OUTPUT, True)
+
+    @follow_output.setter
+    def follow_output(self, value: bool) -> None:
+        self._write(FOLLOW_OUTPUT, bool(value))
+
+    @property
+    def input_mode(self) -> str:
+        """`panel` (the console under the output) or `dialog` (a box per question)."""
+        return self._choice(_INPUT_MODE_SETTING)
+
+    @input_mode.setter
+    def input_mode(self, value: str) -> None:
+        self.set_value(_INPUT_MODE_SETTING, value)
+
+    @property
     def output_sizes(self) -> list[int]:
         """The heights of the output and of the input queue inside the panel."""
         return self._sizes(OUTPUT_SIZES)
@@ -801,6 +862,21 @@ class Settings:
     @save_before_run.setter
     def save_before_run(self, value: bool) -> None:
         self._write(SAVE_BEFORE_RUN, bool(value))
+
+    @property
+    def run_questions(self) -> bool:
+        """Whether a run answers the program's own `?`-statements.
+
+        The `questions` flag of `load` (protocol 5).  Off, a lesson is loaded as
+        rules only — which is what a lecture wants: the questions come one at a
+        time, from the editor's margin.  The margin's own click is not affected:
+        it always answers its one question.
+        """
+        return self._flag(RUN_QUESTIONS, True)
+
+    @run_questions.setter
+    def run_questions(self, value: bool) -> None:
+        self._write(RUN_QUESTIONS, bool(value))
 
     @property
     def working_directory(self) -> str:

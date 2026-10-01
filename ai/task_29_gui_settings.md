@@ -34,6 +34,9 @@ Editor
 - [x] шрифт семейства (monospaced first, Cyrillic-capable), размер (6…72),
       текущий масштаб `Ctrl`+wheel;
 - [x] ширина табуляции, "табы или пробелы", автоотступ;
+      (2026-10-01: отступ после `Enter` стал переключателем
+      `editor/auto_indent`, включён — поведение то же, что и было, но его можно
+      выключить; единица отступа при этом остаётся за `Tab`.)
 - [x] перенос длинных строк (word wrap) вкл/выкл;
 - [x] автодополнение: вкл/выкл, после скольких букв, учитывать регистр;
 - [x] автосохранение (интервал или "перед запуском").
@@ -65,7 +68,9 @@ Output
       (Сделано 2026-10-01: `output/font_size` — пока его не задали, панель идёт
       за редактором, как раньше; колесо над панелью отделяет её навсегда.
       Семейство шрифта осталось одно на всё окно — панель вывода моноширинная,
-      и второй семейство ничего не покупает.)
+      и второй семейство ничего не покупает.  Тогда же — `view/follow_output` и
+      `execution/run_questions`: «следить за выводом» и «выводить вопросы» стали
+      переключателями над поведением, которое уже было.)
 
 Execution
 
@@ -87,7 +92,9 @@ Execution
       отдельная вещь — `ЗАПИСЬ_В` считается от него, — и ей нужен ключ сессии, а
       не ещё одна строка в диалоге.)
 - [ ] «сообщать, где искался импорт» — task_32, on by default.
-- [ ] вход: панель вывода или диалоги (task_27).
+- [x] вход: панель вывода или диалоги (task_27) — ключ `view/input_mode`:
+      «в панели» (по умолчанию) или «в диалоге», независимо от того, видна ли
+      панель (2026-10-01).  Раньше это решала только видимость панели.
 
 General
 
@@ -209,6 +216,25 @@ before it: «Отмена» leaves the window open, and a session written on the
 would describe a window that never closed.  Unticking the box opens the welcome
 program instead — the setting is the only switch.
 
+* 2026-10-01, the four switches that were left over — the «малочи» of this list,
+all of them switches over behaviour that already existed: «Редактор → Автоотступ»
+(`editor/auto_indent`), «Вид → Следить за выводом» (`view/follow_output`),
+«Вид → Спрашивать ввод» (`view/input_mode`) and «Выполнение → Выводить вопросы
+при запуске» (`execution/run_questions`).  Nothing else changed shape: `Enter`
+either continues the line's indentation or starts at the margin (the indent *unit*
+stays — `Tab` is not affected); the output pane either keeps the end in sight or
+holds still (it already stopped following when the reader scrolled up; the switch is
+the other direction, «не уводите взгляд»); a program's input question is answered in
+the console under the output or in a box, whatever is on screen; and a run either
+answers the program's own `?`-statements or loads it for its clauses only —
+`run_program`'s `questions` argument now defaults to the setting, while the margin's
+click still asks its one question explicitly.  Checked by
+`test_editor.py::test_auto_indent_can_be_switched_off`,
+`test_output.py::test_following_the_end_can_be_forbidden`,
+`test_window.py::test_the_questions_switch_decides_whether_a_run_answers`,
+`test_window.py::test_the_input_switch_chooses_where_to_ask` and the defaults in
+`test_settings.py`.  251/251 ctest, 20 headless-скриптов GUI, пять PDF.
+
 The working folder and the `-I` list reach the engine as `-I` arguments on every
 session (`PrologSession.set_includes`), after the command line's own ones; the
 importing file's directory still wins inside the engine.
@@ -224,7 +250,7 @@ importing file's directory still wins inside the engine.
       the query timeout and the path to the interpreter (still `--exe`), and the
       working directory of the process (`ЗАПИСЬ_В`/`ЧТЕНИЕ_ИЗ` are relative to
       it) — all of them need engine options that do not exist yet;
-- [ ] «выводить вопросы», «следить за выводом», «сообщать, где искался импорт»
-      (task_32) and the input mode as switches — behaviour exists, the switches
-      do not;
-- [ ] автоотступ as a switch; «проверять обновления» stays off by decision.
+- [ ] «сообщать, где искался импорт» (task_32) and the switches that are left
+      need the engine, not a dialog row: where the import search looked is
+      something only the interpreter can say;
+- [ ] «проверять обновления» stays off by decision — this is a local tool.

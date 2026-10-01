@@ -80,7 +80,7 @@ version does not know are left alone (task_29 adds the dialog).
 | `Enter` / `Tab` / `Esc` | take the highlighted completion / close the popup |
 | `Ctrl`+wheel, `Ctrl`+keypad `+`/`-`, `Ctrl+0` | font size (6…72 pt) and its reset |
 | `Tab` / `Shift+Tab` | indent / outdent the selected lines |
-| `Enter` | continues the indent after `,`, `:-` or `<-` |
+| `Enter` | starts the new line at the indentation of the one above, one step deeper after `,`, `:-` or `<-` (with «Автоотступ» unticked, it starts at the margin) |
 
 Long lines are wrapped only when **Вид → Переносить длинные строки** is on (no
 key, stored as `editor/wrap`): a program line is read as a whole, and a wrapped one
@@ -156,6 +156,12 @@ comment (`%   ?ВЕРСИЯ.`) — is marked with a blue triangle in the margin,
 the line numbers; a click runs exactly that statement.  The statement goes into
 the query line and stays visible there, the program is loaded *quietly*
 (`"questions":false`), and the pane holds the one answer that was clicked.
+
+That same flag is what «Выводить вопросы при запуске» in the settings dialog
+(`execution/run_questions`, on by default) puts on an ordinary run: unticked, a
+lesson is loaded for its clauses only — including through the step and trace
+commands, because a program's own `?`-statements and directives run during the
+load — and its questions wait for a click on their marker.
 
 Which lines are questions is decided by `queries.py` and checked without Qt in
 `test_queries.py`: the first non-blank characters of the line are `?` or `%`
@@ -376,7 +382,10 @@ and the limit is a setting since task_29 (`output/line_limit`, 100…500 000:
 a smaller one trims the pane at once) —
 and the oldest lines are dropped in one edit with `*** вывод усечён … ***` kept
 as the first line.  The view follows the end of the output until the user scrolls
-up to read something, and follows again as soon as they come back to the bottom.
+up to read something, and follows again as soon as they come back to the bottom —
+unless «Следить за выводом» in the settings dialog is unticked
+(`view/follow_output`), which forbids the jump even at the end of the text, for a
+reader who wants the pane to hold still while a program talks.
 The pane is read-only, so the one operation it owes beside reading is copying text
 *out* of it: the mouse selects as usual, and `Ctrl+C` copies the selection of
 whichever text widget has the focus — the output, the input queue, the console
@@ -425,7 +434,11 @@ Answers are taken in this order: the **prepared lines** under it (one per reques
 then the console, and the **modal dialog** only when the whole panel is hidden by
 `F4` — there is nowhere to put a console then.  «Вид → Поле очереди ввода» hides the
 prepared lines; a hidden field contributes nothing at all, so the console answers
-instead.  A run that is waiting is abandoned with «Остановить».
+instead.  «Спрашивать ввод» in the settings dialog (`view/input_mode`) chooses
+between the two *places* a question is put: `в панели вывода` (the console, the box
+only when the panel is hidden — the default) or `в диалоге`, where every question is
+a box even with the console right there.  A run that is waiting is abandoned with
+«Остановить».
 
 One thing the output pane learned from a user report: a line that has no newline yet
 is written **at once**.  `ВЫВОД` prints without ending the line (that is the language:
@@ -534,10 +547,10 @@ every record has a widget and every widget writes its key.
 
 | Section | What is in it |
 | --- | --- |
-| Редактор | font family and size, line numbers, the current-line band, word wrap, tabs or spaces and the width, completion (on/off, after how many letters, `Учитывать регистр`) |
-| Вид | theme (light or system), toolbar, the output panel (shown, right or bottom), the input queue field, the output's font size and its line limit |
+| Редактор | font family and size, line numbers, the current-line band, word wrap, tabs or spaces and the width, auto-indent, completion (on/off, after how many letters, `Учитывать регистр`) |
+| Вид | theme (light or system), toolbar, the output panel (shown, right or bottom), the input queue field, where a program's input question is asked (console or dialog), the output's font size, its line limit and whether it follows the end |
 | Формат | the formatter's mode, width, indent and unit, «только выделенное» |
-| Выполнение | save before run, the shared folder for `ИМПОРТ`, more `-I` folders |
+| Выполнение | whether a run answers the program's own `?`-questions, save before run, the shared folder for `ИМПОРТ`, more `-I` folders |
 | Файлы | autosave in minutes (0 = off), how many recent files to remember, restoring the open tabs at start-up |
 | Вставки | the live `Ctrl`+key table (task_31), the settings file path, «Вернуть встроенную таблицу» |
 
