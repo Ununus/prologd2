@@ -1,7 +1,6 @@
 # task_49 — Four defects and the live output
 
-**Status:** in progress (the four defects are done; the live output is the round
-left)
+**Status:** done (2026-10-01)
 **Depends on:** task_28 (stepping and the polite stop), task_29 (the session
 restore and its storage), task_02 of the front-end (the output pane), task_46
 (protocol 9, the run limits)
@@ -84,10 +83,18 @@ is the terminal's business.
 - [x] `panels.OutputPane` + `window.py`: the output is handed over in *batches*
       (one `feed` per run of one kind, on the next turn of the event loop) and the
       history is trimmed in *bulks* (a tenth of the limit).
-- [ ] `IoContext` + `protocol.cpp`: an output-line hook, and the session emitting
-      an `output` event per completed line inside a run.
+- [x] `IoContext` + `protocol.cpp`: an output-line hook (`setOutputLineSink`,
+      fired by `ПС` or by the `\n` a `ВЫВОД` carries), and the session answering it
+      with `flush()` — so the program's output goes out as it is written.  The
+      hook says *when*, never *what*: the owner takes the text from its own stream,
+      which is why the console needs no change at all and why a program that
+      redirected its output to a file reports nothing.
 - [x] Tests for the first three and for the geometry, each with the reproduction
       the user gave.
+- [x] `protocol_smoke.py` / `protocol_session.cmake`: one `output` event per
+      written line, every line before the `loaded` that ends the load (and the
+      two older expectations of the single-block shape updated — the text is the
+      same, the granularity is finer).
 
 ### 5. The main window forgets its size and place (found 2026-10-01)
 
@@ -149,11 +156,25 @@ task file had guessed «the per-event append or the trimming»; the numbers said
       arrives in bounded time.
 - [x] `test_window.py`: the window comes back with the size and the place it was
       closed at, and starts at the default when nothing is remembered.
-- [ ] `test_window.py`: a program that prints three lines with `ЖДИ` between them
+- [x] `test_window.py`: a program that prints three lines with `ЖДИ` between them
       shows them as they are produced — the pane holds the first line while the
-      run is still going.
-- [ ] `protocol_session.cmake`: the session emits `output` per line while a load
-      is still running.
+      run is still going, and not the third.
+- [x] `test_io_context.cpp`: the hook fires at a line end (`ПС`, or a `\n` inside a
+      `ВЫВОД`) and not for a line that is still open, and a context without a sink
+      is silent.
+- [x] `protocol_smoke.py`/`protocol_session.cmake`: see the deliverable above.
+
+## What the live output measured (2026-10-01)
+
+A program that prints three lines with `ЖДИ(60)` between them:
+
+| | events |
+|---|---|
+| before | `loaded@0.15`, then **one** `output@0.15` with all three lines |
+| after | `output@0.01`, `output@0.08`, `output@0.14`, `loaded@0.14` |
+
+The console prints byte for byte what it always did (`one\ntwo\nthree\nДА\n`): the
+hook is unset there, and the text does not depend on who is reading it.
 
 ## Acceptance
 

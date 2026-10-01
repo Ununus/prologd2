@@ -3,8 +3,7 @@
 Last updated: after the graphics window of task_45 (protocol 10), the interface
 cleanups of task_48 (icons, the toolbar, the search menu), the formatter's round of
 task_47 (the lessons in one style, the head on its own line, the mode control back
-on the toolbar) and the four window defects of task_49 (the pause after a stop, the
-starred tab, the trace that froze the window, the main window's geometry).
+on the toolbar) and task_49 (four window defects and the live output).
 
 ## Overall
 
@@ -12,7 +11,7 @@ starred tab, the trace that froze the window, the main window's geometry).
   started (protocol + skeleton).
 * Build: the `windows-msvc` preset (Visual Studio 18 2026, MSVC 19.51) build is
   green locally; the Linux presets, including `-Werror`, build cleanly.
-* Tests: 267/267 pass in about five seconds: 253 Catch2 cases plus 14 command-line
+* Tests: 268/268 pass in about five seconds: 254 Catch2 cases plus 14 command-line
   and integration tests (seven option tests, two `--list-keywords` tests, the
   import-search report, the JSON protocol session, the engine-limit cases, the
   diagnostics cases and the formatter round-trip).
@@ -118,11 +117,11 @@ starred tab, the trace that froze the window, the main window's geometry).
 | task_46_interpreter_options_and_limits | in progress | the limits are in: `Limits` + `applyTo` in the engine, `--max-findall`, protocol **9** (`limits` on `load`, a bad field is an `error` instead of a dead session), four dialog rows and a front-end deadline.  The core has **no limits of its own** (0 = «без предела», messages name a limit and its value only — ADR-020) and the window ships 0 / 1 000 000 / 1 000 000 / 0.  Still open: the interpreter path, the process directory, profiles, and `--timeout-ms` (a text-mode deadline would need a clock in the solver).  The last item of task_29's settings list, split out on 2026-10-01 |
 | task_47_lessons_and_formatting | done | the corpus in one style and the formatter's round of fixes: 21 of the 25 shipped programs reformatted by `prologd --format` (soft, 80, one tab) with a new check that every shipped program *is* the standard shape, so the style cannot drift again; the hard mode puts the head of a clause on a line of its own (the first goal was the one glued to the head); the format mode returns to the toolbar right after «Форматировать» (icon `edit-format-set`) and leaves «Правка»; lesson 12's animation is a click away (`%?`) with a two-frame version runs in the check; and the reformat taught the formatter a rule — a **query and a directive are never broken**, because the margin marker that runs them is line-local (the pinned question counts caught it) |
 | task_48_interface_cleanup | done | the round of small things the user asked for: five pictures left the tree (`help-about` — the same drawing as `prologd2`, the two `search-find-selected-*`, `view-toolbar`, `view-line-numbers`), `assets.MISSING` is down to four names, «Сохранить все» left the toolbar, the two «Найти выделенное» commands left «Поиск» with their icons; `Esc` now closes the graphics window → the find bar → the reference dock → the cheat sheet (one handler on the window, by *propagation*, so the completion popup and the find bar's field keep answering for themselves), and the graphics window opens itself on the **first primitive of a run** — once per run, so a window closed during an animation stays closed (task_45's window plus `_graphics_shown`) |
-| task_49_gui_defects | in progress | four defects found by using the window, and the live output still open.  `Шаг → Стоп → Запуск` no longer answers «нет шага, который ждёт ответа» (the paused flag is cleared by the events that conclude a run — including the *error* a «Стоп» turns into while a step waits); an untouched unnamed tab comes back clean (the session record carries the unsaved flag; JSON, because a fourth tab-separated field cannot be told apart from text with a tab in it); the format `Запустить с трассировкой` no longer takes the window (the output is handed over once per turn of the event loop, and the pane trims its history in bulks — 200 000 lines: 21.9 s → 3.0 s, a 16 000-line trace: 2.2 s → 0.6 s); and the main window remembers its size and place (`view/window_geometry`), which the graphics window had done since task_45.  Left: the interpreter reporting output per **line** (`IoContext` hook + protocol), so a countdown prints as it counts |
+| task_49_gui_defects | done | five defects found by using the window, all fixed.  `Шаг → Стоп → Запуск` no longer answers «нет шага, который ждёт ответа» (the paused flag is cleared by the events that conclude a run — including the *error* a «Стоп» turns into while a step waits); an untouched unnamed tab comes back clean (the session record carries the unsaved flag; JSON, because a fourth tab-separated field cannot be told apart from text with a tab in it); the format `Запустить с трассировкой` no longer takes the window (the output is handed over once per turn of the event loop, and the pane trims its history in bulks — 200 000 lines: 21.9 s → 3.0 s, a 16 000-line trace: 2.2 s → 0.6 s); the main window remembers its size and place (`view/window_geometry`), which the graphics window had done since task_45; and the **output arrives as it is written** — `IoContext::setOutputLineSink` fires at a line end and the session emits one `output` event per line, so a lesson's countdown counts 3, 2, 1 instead of arriving as one block when the program is over |
 
 ## Test suite
 
-267 tests, about five seconds: 253 Catch2 cases plus 14 command-line and
+268 tests, about five seconds: 254 Catch2 cases plus 14 command-line and
 integration tests (seven option tests, two `--list-keywords` tests, the
 import-search report, the JSON protocol session, the formatter round-trip and the
 engine-limit and diagnostics cases). Groups:
@@ -185,11 +184,13 @@ plain scripts.
    Russian).  Two of the user's ten «недочётов» are written down and both are
    done: `task_47_lessons_and_formatting.md` and
    `task_48_interface_cleanup.md` (its one loose end is the by-hand look at the
-   redrawn icons in the dark theme, the user's own).  Of the batch of defects found
-   by using the window (`task_49_gui_defects.md`) four are fixed and pinned by
-   reproductions; what is left there is the live output — an `IoContext` line hook
-   and the protocol event per line, so a countdown prints 3, 2, 1 instead of one
-   block at the end.
+   redrawn icons in the dark theme, the user's own).  The batch of defects found by
+   using the window (`task_49_gui_defects.md`) is closed as well: four fixes pinned
+   by reproductions and the live output — `IoContext::setOutputLineSink` plus one
+   `output` event per written line, so a countdown prints 3, 2, 1 while the program
+   is still running.  What is left on the board is `task_46`'s remainder (the
+   interpreter path, the process directory, named profiles), the by-hand look at the
+   icons in the dark theme, and whatever the next hands-on session turns up.
 
 ## Open questions for the user
 
@@ -1504,3 +1505,26 @@ Added on 2026-10-02 while implementing task_31:
   `test_window.py`, одна в `test_documents.py`, обновлённая в `test_output.py`),
   пять PDF.  Осталось в task_49: живой вывод — `IoContext` отдаёт строку, сессия
   шлёт событие на строку, и счёт печатается 3, 2, 1.
+* GUI round, part 47: **task_49 закрыт — живой вывод**.  Последний пункт задачи
+  родился из анимации урока: программа печатает строку, спит, печатает следующую, а
+  окно показывало это одним блоком в конце прогона, поэтому счёт в уроке 12
+  выглядел прыжком на последнее число.
+  Шов сделан в `IoContext`: `setOutputLineSink` — «строка, которую пишут, кончилась»,
+  и он срабатывает на `ПС` и на перевод строки, который несёт сам `ВЫВОД` (потому
+  что строка тогда кончается, хотя приглашения никто не печатал).  Хук говорит
+  *когда*, никогда *что*: текст берёт владелец из своего же потока, поэтому консоль
+  не меняется ни на байт, а программа, уведшая вывод в файл, не сообщает ничего.
+  Сессия ставит хук после `setTraceSink` и отвечает на него `flush()` — тем самым,
+  который и раньше отправлял `output` в конце запроса; гранулярность стала
+  построчной, форма события и порядок текста — нет.
+  Измерение (программа печатает три строки с `ЖДИ(60)` между ними): без хука
+  `loaded@0.15`, а за ним **одно** `output@0.15` со всеми тремя строками; с хуком
+  `output@0.01`, `output@0.08`, `output@0.14`, и только потом `loaded@0.14`.
+  Проверки: `test_io_context.cpp` (хук молчит на недописанной строке и на контексте
+  без владельца), раздел в `protocol_session.cmake` (четыре строки, каждая *до*
+  `loaded`, и позиции `one < two < three < loaded`), `protocol_smoke.py`,
+  `test_stepping.py` и новая `test_window.py::test_the_output_arrives_while_the_program_runs`
+  (первая строка в панели, пока идёт прогон, третьей ещё нет, «Запустить» выключена
+  — а потом есть и третья, и конец прогона).  Две старые проверки ожидали один блок
+  на строку-склейку и обновлены: текст тот же, крупность мельче.
+  Тесты: 268/268 ctest, 21 headless-скрипт GUI, пять PDF.

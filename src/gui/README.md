@@ -495,6 +495,29 @@ A long trace is what the user hit, but nothing here is special to the trace: a
 program that prints in a loop and a `НАЙТИВСЕ` that prints every solution go
 through the same path.
 
+### The output arrives while the program runs (task_49)
+
+The other half of the same defect is on the interpreter side: `ВЫВОД` was collected
+in one buffer per *request*, so a countdown that prints a line and then sleeps
+arrived as a single block when the whole program was over — a lesson's animation
+looked like a jump.  `IoContext` now has an **output-line hook**
+(`setOutputLineSink`) that fires when a written line ends (`ПС`, or the `\n` a
+`ВЫВОД` may carry), and `protocol.cpp` answers it with `flush()`: whatever the
+stream holds goes out as an `output` event — one whole line in the normal case, and
+text written without a line end still waits for the flush that ends the request.
+The hook says *when*, never *what* — the owner takes the text from its own stream,
+which is why the console needs no change at all (it leaves the hook unset and reads
+the stream itself) and why a program that redirected its output to a file reports
+nothing.
+
+Measured on a program that prints three lines with `ЖДИ(60)` between them:
+`output` events at 0.01 s, 0.08 s and 0.14 s and `loaded` at 0.14 s, against a
+single `output` at 0.15 s *after* `loaded` before the hook.  `protocol_smoke.py`
+and `protocol_session.cmake` pin the order and the count (one event per line, and
+every line before the `loaded` that ends the load), and `test_window.py` pins what
+the user sees: the pane holds the first line while the program is still sleeping,
+and not the third.
+
 Undo, redo, «Запустить» and «Остановить» follow the *state*, and the state of the
 interpreter is **two** things, not one: the process can be up and idle, and a
 computation can be in flight in it.  «Запустить» needs the second — a run in
@@ -904,7 +927,7 @@ The screen is 1024×768, it starts black, and a primitive outside it is clipped.
 | Event | Meaning |
 |-------|---------|
 | `{"event":"ready","protocol":10,"version":"2.0.0","keywords":[…]} `| the session is up |
-| `{"event":"output","text":"…"}` | program output (`ВЫВОД`, query results) |
+| `{"event":"output","text":"…"}` | program output (`ВЫВОД`, query results) — **one event per written line** since task_49, so it arrives while the program is still running; text written without a line end goes out with the end of the request (and a prompt with the `input_request` that follows it) |
 | `{"event":"result","found":true}` | one query finished; `found` is false when nothing matched |
 | `{"event":"loaded"}` | a `load` request is over: its program and its own `?`-statements ran (a `query` request is answered by its `result` alone) |
 | `{"event":"input_request","kind":"line"}` | `ВВОДСТР`/`ВВОДСИМВ`/`ВВКОД` waits for an answer; `kind` is `token`, `line` or `codepoint` |

@@ -41,7 +41,10 @@ set(expected_events
   "\"keywords\":"
   "{\"event\":\"result\",\"found\":true}"
   "{\"event\":\"loaded\"}"
-  "{\"event\":\"output\",\"text\":\"X=1\\nX=2\\n\"}"
+  # One event per written line since task_49, so the two answers of `?факт(X).`
+  # arrive separately — and *before* the `result` that ends the query.
+  "{\"event\":\"output\",\"text\":\"X=1\\n\"}"
+  "{\"event\":\"output\",\"text\":\"X=2\\n\"}"
   "{\"event\":\"input_request\",\"kind\":\"line\"}"
   "{\"event\":\"output\",\"text\":\"okX=ok\\n\"}"
   "{\"event\":\"bye\"}")
@@ -296,10 +299,56 @@ if(NOT exit_code EQUAL 0)
   message(FATAL_ERROR "A refused request must not change the exit code, got ${exit_code}")
 endif()
 
+# --- the program's output arrives as it is written, not at the end of the run --
+# task_49: `ВЫВОД` went into one buffer per *request*, so a countdown that prints a
+# line and then sleeps arrived as a single block when the program was over — a
+# lesson's animation looked like a jump.  The check is about the *order and the
+# count*: one `output` event per written line, and every one of them before the
+# `loaded` that ends the load.  The program prints ASCII words, because the needles
+# here have to survive `execute_process`'s code page.
+file(WRITE "${session}"
+  "{\"cmd\":\"load\",\"text\":\"?ВЫВОД(\\\"one\\\"),ПС,ЖДИ(50),ВЫВОД(\\\"two\\\"),ПС,ЖДИ(50),ВЫВОД(\\\"three\\\"),ПС.\\n\"}\n"
+  "{\"cmd\":\"quit\"}\n")
+
+execute_process(
+  COMMAND "${PROLOGD_EXE}" --protocol json
+  INPUT_FILE "${session}"
+  OUTPUT_VARIABLE events
+  RESULT_VARIABLE exit_code)
+
+string(REGEX MATCHALL "\\{\"event\":\"output\"" outputs "${events}")
+list(LENGTH outputs output_count)
+# Four: the three lines the program wrote, and the `ДА` the query answers with
+# (also a line, so also an event of its own).
+if(NOT output_count EQUAL 4)
+  message(FATAL_ERROR "Expected one output event per written line (4 with the answer), got ${output_count}\n--- got ---\n${events}")
+endif()
+
+string(FIND "${events}" "{\"event\":\"output\",\"text\":\"one\\n\"}" one_position)
+string(FIND "${events}" "{\"event\":\"output\",\"text\":\"two\\n\"}" two_position)
+string(FIND "${events}" "{\"event\":\"output\",\"text\":\"three\\n\"}" three_position)
+string(FIND "${events}" "{\"event\":\"loaded\"}" loaded_position)
+if(one_position EQUAL -1 OR two_position EQUAL -1 OR three_position EQUAL -1 OR loaded_position EQUAL -1)
+  message(FATAL_ERROR "The three lines did not arrive as three events\n--- got ---\n${events}")
+endif()
+if(NOT one_position LESS two_position)
+  message(FATAL_ERROR "The second line did not follow the first\n--- got ---\n${events}")
+endif()
+if(NOT two_position LESS three_position)
+  message(FATAL_ERROR "The third line did not follow the second\n--- got ---\n${events}")
+endif()
+if(NOT three_position LESS loaded_position)
+  message(FATAL_ERROR "The lines must arrive as they are written, before the load ends\n--- got ---\n${events}")
+endif()
+if(NOT exit_code EQUAL 0)
+  message(FATAL_ERROR "The live-output session exited with ${exit_code}")
+endif()
+
 # --- the trace goes out as events of its own ---------------------------------
 file(WRITE "${session}"
   "{\"cmd\":\"load\",\"text\":\"факт(1).\\n?факт(1).\\n\",\"trace\":true}\n"
   "{\"cmd\":\"quit\"}\n")
+
 execute_process(
   COMMAND "${PROLOGD_EXE}" --protocol json
   INPUT_FILE "${session}"

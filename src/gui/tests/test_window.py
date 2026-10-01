@@ -889,6 +889,35 @@ def press_escape(widget) -> bool:
     return event.isAccepted()
 
 
+def test_the_output_arrives_while_the_program_runs(executable: str) -> None:
+    """task_49: a countdown counts — it does not arrive as one block at the end.
+
+    `ВЫВОД`, `ЖДИ`, three times: the first line has to be in the pane *while* the
+    program is still sleeping, and the third must not be there yet.  That is what
+    the interpreter's output-line hook and the per-line `output` events are for;
+    before them a lesson's animation was one jump at the end of the run.
+    """
+    window = empty_window(executable)
+    try:
+        window.editor().setPlainText(
+            '?ВЫВОД("one"), ПС, ЖДИ(400), ВЫВОД("two"), ПС, ЖДИ(400), ВЫВОД("three"), ПС.\n'
+        )
+        window._actions["run"].trigger()
+        assert pump(window, lambda: "one" in window.output_text()), window.output_text()
+        assert "three" not in window.output_text(), (
+            "the last line was there before the program reached it: "
+            + ascii(window.output_text())
+        )
+        assert window._actions["run"].isEnabled() is False, "the run is still going"
+        assert pump(window, lambda: "three" in window.output_text()), window.output_text()
+        # The run is over when `Запустить` comes back, whatever the last answer was
+        # called («решение найдено» for a program whose query answers).
+        assert pump(window, lambda: window._actions["run"].isEnabled()), window.status_text()
+    finally:
+        discard_changes(window)
+    print("ok: the output arrives line by line while the program is still running")
+
+
 def test_the_window_remembers_its_size_and_place(executable: str) -> None:
     """task_49: the graphics window remembered its geometry; the main one did not.
 
@@ -2992,6 +3021,7 @@ def main(argv: list[str]) -> int:
         test_the_trace_is_coloured_apart_from_the_output(executable)
         test_a_long_trace_arrives_in_batches_and_stays_bounded(executable)
         test_the_window_remembers_its_size_and_place(executable)
+        test_the_output_arrives_while_the_program_runs(executable)
         test_a_marker_answers_one_question_alone(executable)
         test_a_question_parked_in_a_comment_runs_from_the_margin(executable)
         test_a_marker_while_a_step_is_paused_starts_a_fresh_quiet_run(executable)

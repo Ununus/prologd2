@@ -172,8 +172,39 @@ TEST_CASE("without a handler the base stream is read") {
   REQUIRE(*line == "из потока");
 }
 
-TEST_CASE("the external stop hook interrupts a running query") {
-  const auto result = runProgram(
+TEST_CASE("a written line tells its owner that it ended") {
+  std::istringstream input;
+  std::ostringstream output;
+  std::ostringstream error;
+  IoContext io(input, output, error);
+
+  int lines = 0;
+  io.setOutputLineSink([&lines] { ++lines; });
+  REQUIRE(io.hasOutputLineSink());
+
+  io.write("первая");  // the line is not over yet: nothing to hand on
+  REQUIRE(lines == 0);
+  io.newline();
+  REQUIRE(lines == 1);
+
+  io.write("вторая\nтретья");  // the newline inside the text ends a line
+  REQUIRE(lines == 2);
+  io.write(" и хвост");  // and the open line stays open
+  REQUIRE(lines == 2);
+  io.newline();
+  REQUIRE(lines == 3);
+  REQUIRE(output.str() == "первая\nвторая\nтретья и хвост\n");
+
+  // Without a sink the text is the same and nobody is told: that is the console,
+  // which reads the stream itself.
+  std::ostringstream quiet_output;
+  IoContext quiet(input, quiet_output, error);
+  REQUIRE_FALSE(quiet.hasOutputLineSink());
+  quiet.write("молча\n");
+  REQUIRE(quiet_output.str() == "молча\n");
+}
+
+TEST_CASE("the external stop hook interrupts a running query") {  const auto result = runProgram(
       "цикл :- цикл.\n"
       "?цикл.\n",
       {}, nullptr,

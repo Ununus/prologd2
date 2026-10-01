@@ -206,6 +206,16 @@ class Session {
     engine_.io().setTraceSink([this](std::string_view text) {
       emit(Json{{"event", "trace"}, {"text", std::string(text) + "\n"}});
     });
+    // The program's own output goes out as it is written, not once per request
+    // (task_49): a countdown that prints a line and then sleeps used to arrive as
+    // one block at the end of the run, so a lesson's animation looked like a jump.
+    // The seam is the end of a written line, because that is when the interpreter
+    // knows the line is over, and `flush` sends whatever the stream holds: one
+    // whole line per event, which is what a line of a countdown is.  A `ВЫВОД`
+    // that ends without `ПС` still waits for the prompt flush, exactly as before
+    // (and a single write carrying two newlines sends both in one event — the text
+    // and the moment are the same).
+    engine_.io().setOutputLineSink([this] { flush(); });
     // Diagnostics come with their position: a front-end must not have to parse
     // `file:line:column:` out of the message.
     engine_.setDiagnosticHook([this](const PrologError& diagnostic) {
@@ -616,7 +626,8 @@ class Session {
   }
 
   void flush() {
-    const std::string text = output_.str();    if (!text.empty()) {
+    const std::string text = output_.str();
+    if (!text.empty()) {
       output_.str(std::string());
       output_.clear();
       emit(Json{{"event", "output"}, {"text", text}});

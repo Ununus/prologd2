@@ -72,6 +72,20 @@ class IoContext {
   /// One line of trace text, wherever it goes.
   void writeTrace(std::string_view text);
 
+  /// Called when a written line ends: `ПС`, or the `\n` a `ВЫВОД` may carry.
+  ///
+  /// The hook says *when*, never *what*: the owner takes the text from its own
+  /// output stream, which is where it went.  That is what a front-end needs to
+  /// show output as it is produced — a countdown with `ЖДИ` between its lines was
+  /// one block at the end of the run without it (task_49) — while the console
+  /// leaves the hook unset and reads the stream as it always has.  A program that
+  /// redirected its output to a file reports nothing here: the line went to the
+  /// file, not to the owner's stream.
+  void setOutputLineSink(std::function<void()> sink);
+  [[nodiscard]] bool hasOutputLineSink() const noexcept {
+    return static_cast<bool>(output_line_sink_);
+  }
+
   // ---- redirection ----
   /// Switch input to `path`; empty or `con:` restores the base stream.
   bool openInput(const std::string& path);
@@ -88,6 +102,7 @@ class IoContext {
 
   InputRequestHandler input_handler_;
   std::function<void(std::string_view)> trace_sink_;
+  std::function<void()> output_line_sink_;
 
   std::istream* base_input_;
   std::ostream* base_output_;

@@ -17,13 +17,20 @@ void IoContext::write(std::string_view text) {
   }
   *output_ << text;
   output_->flush();
+  const bool line_ended = text.find('\n') != std::string_view::npos;
   at_line_start_ = text.back() == '\n';
+  if (line_ended && output_line_sink_) {
+    output_line_sink_();
+  }
 }
 
 void IoContext::newline() {
   *output_ << '\n';
   output_->flush();
   at_line_start_ = true;
+  if (output_line_sink_) {
+    output_line_sink_();
+  }
 }
 
 void IoContext::pushPreloadedLine(std::string line) { preloaded_.push_back(std::move(line)); }
@@ -34,6 +41,10 @@ void IoContext::setInputRequestHandler(InputRequestHandler handler) {
 
 void IoContext::setTraceSink(std::function<void(std::string_view)> sink) {
   trace_sink_ = std::move(sink);
+}
+
+void IoContext::setOutputLineSink(std::function<void()> sink) {
+  output_line_sink_ = std::move(sink);
 }
 
 void IoContext::writeTrace(std::string_view text) {

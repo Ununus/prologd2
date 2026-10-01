@@ -64,9 +64,12 @@ def test_a_stepped_run_reports_its_points(executable: str) -> None:
     # `exit` names no goal — the front-end pops what `call` pushed — and its depth
     # is the depth of the goal that is leaving.
     assert points[2]["action"] == "exit" and points[2]["depth"] == 1, describe(points[2])
-    # The run went on to its end after `continue`.
+    # The run went on to its end after `continue`.  The answers arrive one line at
+    # a time since task_49, in the order they were printed.
     assert find(events, "result", found=True), events
-    assert find(events, "output", text="X=1\nX=2\n"), events
+    answers = [event["text"] for event in events if event.get("event") == "output"]
+    assert "X=1\n" in answers and "X=2\n" in answers, events
+    assert answers.index("X=1\n") < answers.index("X=2\n"), answers
     print("ok: a stepped run reports call/exit points with depth and position")
 
 

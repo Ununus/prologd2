@@ -76,10 +76,16 @@ def main(argv: list[str]) -> int:
     assert ready["protocol"] == protocol.PROTOCOL_VERSION, ready
     reserved = {entry["name"] for entry in ready["keywords"]}
     assert {"НАЙТИВСЕ", "ВЫП", "ПС"} <= reserved, sorted(reserved)
-    assert find(events, "output", text="X=1\nX=2\n"), events
+    # One `output` event per written line (task_49): the answers of a query arrive
+    # as they are printed — before the `result` that ends the query — so a
+    # front-end shows the output of a run while it is still running.  The text is
+    # the same as it always was, only the granularity is finer.
+    answers = [event["text"] for event in events if event.get("event") == "output"]
+    assert answers == ["X=1\n", "X=2\n", "ДА\n"], events
     assert len([e for e in events if e.get("event") == "result"]) == 2, events
     assert events[-1].get("event") == "bye", events
     print("ok: load, query, output and result events")
+    print("ok: the output of a run arrives one line at a time")
     print(f"ok: ready carries {len(reserved)} reserved names")
 
     code, events = run_session(
