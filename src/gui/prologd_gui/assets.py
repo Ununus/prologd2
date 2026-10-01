@@ -24,17 +24,18 @@ DEFAULT_DIRECTORY = pathlib.Path(__file__).resolve().parent.parent / "assets"
 #: Referenced by the code, not drawn yet.  Task_26 lists the set and the sizes
 #: they should be drawn in; until then those actions show their title only (and a
 #: button whose icon never comes falls back to its caption — see `findbar`).  The
-#: `view-*` row is the switches of the «Вид» menu, and `execution-restart` is the
-#: picture for restarting a session after «Остановить», which nothing uses yet.
+#: `view-*` row is the switches of «Вид», and `execution-restart` is the picture
+#: for restarting a session after «Остановить», which nothing uses yet.
+#: `view-toolbar` and `view-line-numbers` left the list in task_48: their entries
+#: are text-only switches now, and a drawing list that keeps a picture nobody asks
+#: for is a to-do that lies.
 MISSING = frozenset(
     {
         "execution-restart",
-        "view-line-numbers",
         "view-output-bottom",
         "view-output-right",
         "view-split-editor",
         "view-theme",
-        "view-toolbar",
     }
 )
 

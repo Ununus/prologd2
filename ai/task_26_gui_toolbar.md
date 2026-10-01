@@ -22,7 +22,9 @@ drawing a text-only button.
     Выделить всё, Закомментировать `Ctrl+K`, Раскомментировать `Ctrl+U`,
     Форматировать `Ctrl+I`, Настройки…;
   * **Поиск**: Поиск/Замена `Ctrl+F`, Далее `F3`, Назад `Shift+F3`, Найти
-    выделенное `Ctrl+F3`, Найти выделенное назад `Ctrl+Shift+F3`;
+    выделенное `Ctrl+F3`, Найти выделенное назад `Ctrl+Shift+F3` (the last two,
+    with their pictures and their keys, left in `task_48_interface_cleanup.md`:
+    the find bar takes its question from the selection anyway);
   * **Вид**: Панель инструментов, Панель вывода `F4`, Сменить ориентацию
     сплита `Ctrl+F4`, Номера строк, Разделить редактор, Масштаб (`Ctrl+±`),
     Полный экран `F11`, Тема;
@@ -33,6 +35,8 @@ drawing a text-only button.
 - [x] Toolbar grouped as in the reference GUI: file | run/stop/step |
       graphics/help | comment/uncomment/format | settings, plus the font-size
       control and a spacer; every action that exists in a menu and is useful
+      (task_47 returned the formatter's **mode control** to the toolbar, right
+      after «Форматировать», and task_48 took «Сохранить все» off it)
       while typing also appears on the toolbar.
 - [x] Actions are created once (`actions.py`) and reused by the menus, the
       toolbar and the context menu of the editor, so shortcut, tooltip and

@@ -1,8 +1,9 @@
 # Status tracker
 
-Last updated: after the Windows/VS 2026 verification, the GUI protocol
-session, the limits of task_46 (protocol 9) and the graphics window of task_45
-(protocol 10).
+Last updated: after the graphics window of task_45 (protocol 10), the interface
+cleanups of task_48 (icons, the toolbar, the search menu) and the formatter's
+round of task_47 (the lessons in one style, the head on its own line, the mode
+control back on the toolbar).
 
 ## Overall
 
@@ -10,7 +11,7 @@ session, the limits of task_46 (protocol 9) and the graphics window of task_45
   started (protocol + skeleton).
 * Build: the `windows-msvc` preset (Visual Studio 18 2026, MSVC 19.51) build is
   green locally; the Linux presets, including `-Werror`, build cleanly.
-* Tests: 264/264 pass in about five seconds: 250 Catch2 cases plus 14 command-line
+* Tests: 267/267 pass in about five seconds: 253 Catch2 cases plus 14 command-line
   and integration tests (seven option tests, two `--list-keywords` tests, the
   import-search report, the JSON protocol session, the engine-limit cases, the
   diagnostics cases and the formatter round-trip).
@@ -93,11 +94,11 @@ session, the limits of task_46 (protocol 9) and the graphics window of task_45
 | task_23_gui_keyword_source | done | `--list-keywords` + `keywords` in `ready` (protocol 2); one source for the built-in list |
 | task_24_gui_completion | done | popup over the reserved names *and* the document's own names, with arities; no completion in a comment, string or `#…#`; `Ctrl+Space` |
 | task_25_gui_files_tabs | done | tabs, files, save prompts, encodings, input queue, drop anywhere and the split editor (two panes, one text per document) |
-| task_26_gui_toolbar | done | one action table (48 commands, 12 disabled with a reason) feeding the menu bar, the toolbar and the context menu; icon audit in `src/gui/README.md` (48 names referenced, 42 drawn, 6 left: the «Вид» switches) |
+| task_26_gui_toolbar | done | one action table (48 commands, 12 disabled with a reason) feeding the menu bar, the toolbar and the context menu; icon audit in `src/gui/README.md` (48 names referenced, 42 drawn, 6 left: the «Вид» switches — numbers as of task_26; task_47 and task_48 moved them) |
 | task_27_gui_panels | done | movable panel (`F4`, `Ctrl+F4`), output pane (colour by kind, visible half-lines, bounded history, auto-scroll, save to a file), input console with the queue switch, status-bar details and the two-state run/stop |
 | task_28_gui_run_step | done | `EngineOptions::stepHook` + `StepInfo`, protocol 3 (`step`/`trace` events, `step` request, positions on `error`), the step strip with the call stack, the trace line in the editor, `F10`/`Shift+F10`/`F5`, error and trace lines from structured positions |
 | task_29_gui_settings | done | `settings.SETTINGS` — one record per preference (key, label, section, kind, default, bounds, hint) that drives the dialog's row, validation, `«Сбросить»` and the map_positions-style test; `settingsdialog.SettingsDialog` with sections `Редактор/Вид/Формат/Выполнение/Файлы/Вставки`, «ОК»/«Применить»/«Отмена»/«Сбросить»/«Импорт…»/«Экспорт…»; the window applies everything without a restart (`apply_settings`); new keys: `output/font_size` (unset = follow the editor), `output/line_limit`, `editor/completion_match_case`, `editor/current_line`, `execution/working_directory`, `execution/import_paths`, `files/autosave_minutes`, `files/recent_limit`; unknown keys preserved through a foreign file; the dark theme and the system colours are done, session restore and the small switches are done, and **RU/EN was dropped** (ADR-021); profiles and limits are `task_46`, the graphics window `task_45` |
-| task_30_gui_formatter | done | `prlib/formatter.cpp` (whitespace-only, everything else copied byte for byte); three modes — **в одну строку**, **мягкое** (строки строятся заново: цели собираются до ширины) and **жёсткое** — chosen in «Правка → Формат»; `prologd --format[=soft|hard|line]` with `--format-width`, `--format-indent` and `--format-unit`; protocol **7**+**8** (`format` → `formatted`/`error`, answerable between queries; `loaded` when a run is over); the window's `Ctrl+I` with one undo step and the caret and selection mapped onto the new text; a source that does not parse is never rewritten |
+| task_30_gui_formatter | done | `prlib/formatter.cpp` (whitespace-only, everything else copied byte for byte); three modes — **в одну строку**, **мягкое** (строки строятся заново: цели собираются до ширины) and **жёсткое** — chosen in «Правка → Формат» (the submenu moved back to the toolbar in task_47); `prologd --format[=soft|hard|line]` with `--format-width`, `--format-indent` and `--format-unit`; protocol **7**+**8** (`format` → `formatted`/`error`, answerable between queries; `loaded` when a run is over); the window's `Ctrl+I` with one undo step and the caret and selection mapped onto the new text; a source that does not parse is never rewritten |
 | task_31_gui_shortcuts | done | `shortcuts.py` — a Qt-free table of `Ctrl`+**physical key** insertions, matched on `nativeScanCode()`: `:-.`, `()`, `[]`, `#`, `?`, `РАВНО(,)`, `БОЛЬШЕ(,)`, `МЕНЬШЕ(,)`, `СЛОЖЕНИЕ(,,)`, `УМНОЖЕНИЕ(,,)` and the simple symbols `/ - _ ! '' ""`; `:` and `?` carry two chords each (Russian `Shift+6`/`Shift+7`), a selection is *wrapped* by the bracket-like rows, every insert is one undo step, only `Ctrl` (plus `Shift`) is accepted — `Alt` and `Ctrl+Alt` are left to the window; the table is data in the settings file (`shortcuts/table`, JSON, one entry per insert with a list of chords) and «Справка → Шпаргалка по вставкам» lists it from the same object; zoom stays on the keypad, `|` has no chord (merge keeps `Ctrl+Shift+\`) |
 | task_32_import_search_report | done | `ИМПОРТ` failure names the directories tried, with reasons |
 | task_33_gui_search_replace | done | `search.py` (plain-text, Qt-free) + the find bar: question from the selection or the word at the caret, `F3`/`Shift+F3` with the wrap reported, three switches, «Заменить всё» as one undo step, the matches lit in every view; `test_search.py` has 17 checks |
@@ -114,10 +115,13 @@ session, the limits of task_46 (protocol 9) and the graphics window of task_45
 | task_44_names | done | the two names that promised something else: `ИЛИ/2` → `ПЕРВОЕ/2` (`or` → `first`) with the retired spelling removed from the language (a call is a load error naming the replacement), `НАЙТИВСЁ` → `НАЙТИВСЕ` (the spelling of the task and of the reference notes) with the retired spelling kept reserved, so its call is the ordinary suggestion «возможно, НАЙТИВСЕ/3»; the two `ИЛИ` library clauses removed so the old name cannot answer through the database; `doc/help.typ` §4.6, `prologd-diff.typ` §17/§18, lesson 4's section 5 |
 | task_45_gui_graphics_window | done | the graphics predicates are *visible*: `BitmapGraphicsBackend` inside the engine (a 1024×768 buffer that answers `getPixel` locally and performs `ЗАКРАСКА` itself, reporting every primitive), protocol **10** (`graphics` events and `{"cmd":"graphics","snapshot":true}` → `bitmap`), a Qt-free `graphics.Canvas` with the palette, and `graphicswindow.GraphicsWindow` — a window of its own with «Вписать в окно»/«1 : 1», «Очистить», «Сохранить как PNG…» and a cell readout; the last disabled menu entry is gone (ADR-022).  The by-hand look at `examples/drawing.pld` found two defects (the ellipse was read as a box; an untouched canvas was transparent) |
 | task_46_interpreter_options_and_limits | in progress | the limits are in: `Limits` + `applyTo` in the engine, `--max-findall`, protocol **9** (`limits` on `load`, a bad field is an `error` instead of a dead session), four dialog rows and a front-end deadline.  The core has **no limits of its own** (0 = «без предела», messages name a limit and its value only — ADR-020) and the window ships 0 / 1 000 000 / 1 000 000 / 0.  Still open: the interpreter path, the process directory, profiles, and `--timeout-ms` (a text-mode deadline would need a clock in the solver).  The last item of task_29's settings list, split out on 2026-10-01 |
+| task_47_lessons_and_formatting | done | the corpus in one style and the formatter's round of fixes: 21 of the 25 shipped programs reformatted by `prologd --format` (soft, 80, one tab) with a new check that every shipped program *is* the standard shape, so the style cannot drift again; the hard mode puts the head of a clause on a line of its own (the first goal was the one glued to the head); the format mode returns to the toolbar right after «Форматировать» (icon `edit-format-set`) and leaves «Правка»; lesson 12's animation is a click away (`%?`) with a two-frame version runs in the check; and the reformat taught the formatter a rule — a **query and a directive are never broken**, because the margin marker that runs them is line-local (the pinned question counts caught it) |
+| task_48_interface_cleanup | in progress | the first half is in: five pictures left the tree (`help-about`, the two `search-find-selected-*`, `view-toolbar`, `view-line-numbers`), `assets.MISSING` is down to four names, «Сохранить все» left the toolbar, the two «Найти выделенное» commands left «Поиск».  Still to do: Escape closing the graphics window → the find bar → the reference dock → the shortcut sheet in that order, and the graphics window opening itself on the first primitive of a run |
+| task_49_gui_defects | not started | three defects found by using the window: `Шаг → Стоп → Запуск` answers «нет шага, который ждёт ответа» (a finished run leaves `_paused` set), a second unnamed tab comes back modified after a restore, and «Запустить с трассировкой» on a deep recursion freezes the window (the output pane's per-line trim and repaints); plus live output — a countdown should print as it goes, not when the program ends |
 
 ## Test suite
 
-264 tests, about five seconds: 250 Catch2 cases plus 14 command-line and
+267 tests, about five seconds: 253 Catch2 cases plus 14 command-line and
 integration tests (seven option tests, two `--list-keywords` tests, the
 import-search report, the JSON protocol session, the formatter round-trip and the
 engine-limit and diagnostics cases). Groups:
@@ -177,7 +181,11 @@ plain scripts.
    The graphics window (`task_45_gui_graphics_window.md`) is done, and task_29's
    own list is closed: «использовать системные цвета» was done with the three
    themes, and **RU/EN was dropped** on 2026-10-01 (ADR-021 — the window stays
-   Russian).
+   Russian).  Two of the user's ten «недочётов» are written down and half done:
+   `task_47_lessons_and_formatting.md` (done) and
+   `task_48_interface_cleanup.md` (the second half — Escape's order and the
+   graphics window opening itself on the first primitive of a run), and the three
+   defects of using the window are `task_49_gui_defects.md`.
 
 ## Open questions for the user
 
@@ -1358,3 +1366,53 @@ Added on 2026-10-02 while implementing task_31:
   `RGBA8888` — прозрачность), из-за чего сквозь рисунок просвечивал рабочий стол.
   Обе ошибки были невидимы для сверки двух реализаций: обе рисовали одинаково и
   обе неправильно.  264/264 ctest, 21 headless-скрипт GUI, пять PDF.
+* GUI round, part 44: **task_47 и первая половина task_48 — то, что нашлось при
+  работе с уроками и окном**.  Пользователь поправил урок 12 руками, и из этого
+  выросли три задачи (`task_47`, `task_48`, `task_49`) и тринадцать замечаний;
+  этот заход закрывает первое и половину второго.
+  **Один стиль курса.**  21 из 25 программ репозитория выровнены самим
+  интерпретатором (`prologd --format`: мягкий режим, ширина 80, один таб) — до
+  этого уроки были в трёх стилях, а в `lesson_12` рядом с табами стояли пробелы.
+  Важнее самой правки проверка: новый тест «every shipped program is already in
+  the standard shape» сверяет каждый файл со его же форматированным видом и
+  называет тот, который отстал, — стиль теперь не надо держать в голове.
+  `examples/lessons/_old` не выравнивается нарочно: это образец порта, а не его
+  стиль.
+  **Что вылезло при выравнивании.**  Форматирование убирает висячие пробелы — и
+  в строках `%!` тоже, — а `lesson_07` обещал строку `Загадано число. ` с
+  пробелом (сам вывод его печатал); пробел убран из сообщения в правиле, а не из
+  обещания, и правило про это записано в `doc/lessons.typ`.  Уроки 7 и 12
+  держали запросы длиннее ширины, и мягкий режим их *переносил* — а треугольник
+  на полях читает строку, так что запрос, разорванный надвое, переставал быть
+  кликабельным; это заметил не глаз, а пришпиленные числа в `test_queries.py`
+  (`lesson_07`: 19 → 18).  Поэтому у форматтера появилось правило: **запрос и
+  директиву ширина не переносит ни в одном режиме** (комментарий и пустая строка
+  автора — переносят), и оно закреплено в `test_formatter.cpp` на ширине 20 и 80.
+  Два обещания `lesson_12` отстали от переписанного руками урока (список фигур
+  рамки и сада), а анимация была закомментирована и не печатала ничего: всё снято
+  с работающего интерпретатора, а рядом встала анимация из двух кадров (80 мс),
+  чтобы обещание «анимация окончена» осталось настоящим; 250 кадров остались
+  вопросом `%?`, который выполняется щелчком по треугольнику.
+  **Жёсткий режим** переносит и после `:-`: голова предложения стоит одна, а цели
+  тела начинаются со следующей строки — раньше первая цель пряталась в конце
+  строки с головой, там, где её как раз и пропускают.  У фактов, запросов и
+  директив форма не меняется: головы у них нет, и `:-` на отдельной строке — шум.
+  **Режим форматирования** вернулся на панель инструментов, сразу за
+  «Форматировать»: кнопка `QToolButton` со списком трёх режимов и «только
+  выделенное» (значок `edit-format-set`, нарисованный давно и никем не занятый),
+  а подменю «Правка → Формат» ушло — у органа управления одно место.
+  **Меньше значков и команд** (task_48): `help-about.png` был тем же рисунком, что
+  `prologd2.png` («О программе» теперь носит значок приложения), переключатели
+  «Номера строк» и «Панель инструментов» остались словами (их картинки убраны),
+  «Сохранить все» ушла с панели в «Файл», а команды «Найти выделенное» и «Найти
+  выделенное назад» — из «Поиска» вместе со своими значками.  Аудит значков теперь
+  45 имён, 41 нарисовано, 4 ждут (и `execution-restart`, нарисованный и никем не
+  занятый).
+  Тесты: 267/267 ctest (253 случая Catch2 — три новых: жёсткая форма головы,
+  запрос с директивой в одну строку, «все программы уже в стандартном виде»),
+  21 headless-скрипт GUI (`test_queries.py` с обновлённым списком вопросов,
+  `test_window.py` с кнопкой режима на панели и без «Сохранить все»), пять PDF.
+  Замечание про `window.close()` тоже оплачено временем: скрипт, закрывающий окно
+  с несохранёнными правками, открывает настоящий модальный вопрос и вешает прогон
+  — проверять восстановление сессии надо через `_store_session` и второй
+  `MainWindow`, а не через закрытие первого.

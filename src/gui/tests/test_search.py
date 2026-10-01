@@ -127,7 +127,7 @@ def main() -> int:
         return 0
 
     application = QApplication(sys.argv[:1])
-    test_the_five_search_commands_are_live()
+    test_the_search_commands_are_live()
     test_the_two_magnifiers_are_on_the_right_controls()
     test_the_bar_opens_on_the_word_under_the_caret()
     test_f3_walks_the_matches_and_reports_the_wrap()
@@ -216,9 +216,14 @@ def caption_button(bar, title: str):
     raise AssertionError(f"there is no {title!r} button on the bar")
 
 
-def test_the_five_search_commands_are_live() -> None:
-    """No entry of the «Поиск» menu says «ещё не реализовано» any more."""
-    keys = ("find", "find_next", "find_prev", "find_selected", "find_selected_prev")
+def test_the_search_commands_are_live() -> None:
+    """Every entry of the «Поиск» menu is live and enabled.
+
+    The two «найти выделенное» commands left the menu in task_48: the bar already
+    takes its question from the selection, and two commands for it were a second
+    way to do what happens anyway.
+    """
+    keys = ("find", "find_next", "find_prev")
     for key in keys:
         entry = actions.BY_KEY[key]
         assert entry.implemented is True, key

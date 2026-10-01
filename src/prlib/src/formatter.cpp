@@ -551,6 +551,13 @@ class Formatter {
   /// space (`:- ИМПОРТ(...)`).  «Мягкое» joins here too, breaking only when the
   /// line would not fit; a comment and a blank line the author left force the
   /// break in every mode but «в одну строку».
+  ///
+  /// «Жёсткое» breaks here as well **when the statement has a head**: the head
+  /// stands alone and every goal of the body gets a line of its own, so the first
+  /// goal is not the one glued to the head where a reader skips it (task_47).  A
+  /// directive and a query have no head, and `:-` or `?` alone on a line is noise,
+  /// so they keep their single space — and they keep their line: neither the soft
+  /// nor the hard mode breaks a query or a directive at all (`emitGoalGap`).
   void emitFirstBodyGap(const Statement& statement) {
     const std::size_t body_end = statement.terminated ? statement.last : tokens_->size();
     if (statement.body_begin == kNone || statement.body_begin >= body_end) {
@@ -561,13 +568,14 @@ class Formatter {
     const std::string_view gap = gapBetween(after, statement.body_begin);
     const bool has_comment = gap.find('%') != std::string_view::npos;
     const bool has_blank = hasInteriorBlank(gap);
+    const bool has_head = !statement.directive && !statement.query;
     bool broken = has_comment;
-    if (options_.mode == FormatMode::Soft &&
+    if (options_.mode == FormatMode::Soft && !statement.query && !statement.directive &&
         (has_blank || !goalFits(statement.body_begin, goalEnd(statement, 0),
                                 builder_.column(), join.size()))) {
       broken = true;
     }
-    if (options_.mode == FormatMode::Hard && has_blank) {
+    if (options_.mode == FormatMode::Hard && (has_blank || has_head)) {
       broken = true;
     }
     if (!broken) {
@@ -616,7 +624,7 @@ class Formatter {
       }
       const bool fits =
           goalFits(next_goal, goalEnd(statement, s + 1), builder_.column(), 1);
-      emitGoalGap(separator, next_goal, fits);
+      emitGoalGap(separator, next_goal, fits, statement.query || statement.directive);
       goal_start = next_goal;
     }
     if (statement.terminated) {
@@ -635,20 +643,28 @@ class Formatter {
   /// them is exactly what used to make «из жёсткого обратно в мягкое» impossible.
   /// Rebuilding the lines makes the soft shape canonical, so formatting a hard
   /// layout with it converts the program back.
-  void emitGoalGap(std::size_t separator, std::size_t next_goal, bool fits) {
+  ///
+  /// `single_line` marks a query or a directive.  Neither has a head or a body
+  /// to lay out — one is a question, the other an instruction — and the tools
+  /// that run them read a *line*: the window's margin marker is line-local by
+  /// design (task_36), so a break inside a query is a question nobody can click.
+  /// The width therefore never opens them; a comment or a blank line the author
+  /// left still does (task_47).
+  void emitGoalGap(std::size_t separator, std::size_t next_goal, bool fits,
+                   bool single_line) {
     const std::string_view gap = gapBetween(separator, next_goal);
     const bool has_comment = gap.find('%') != std::string_view::npos;
     bool broken = false;
     switch (options_.mode) {
       case FormatMode::Hard:
-        broken = true;
+        broken = !single_line;
         break;
       case FormatMode::Line:
         broken = has_comment;
         break;
       case FormatMode::None:
       case FormatMode::Soft:
-        broken = has_comment || hasInteriorBlank(gap) || !fits;
+        broken = has_comment || hasInteriorBlank(gap) || (!single_line && !fits);
         break;
     }
     if (!broken) {

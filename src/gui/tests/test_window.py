@@ -937,15 +937,17 @@ def test_the_toolbar_reuses_the_actions(executable: str) -> None:
         # not on the program, so it is kept away from the editing group.
         assert shown[-1] == actions.BY_KEY["clear_output"].title, shown
         assert window._font_size_box.parent() is not None, "the size control is on the toolbar"
+        # The toolbar keeps the three file buttons that act on the tab in front of
+        # the user; «Сохранить все» acts on every tab and belongs in «Файл» (task_48).
+        assert actions.BY_KEY["save_all"].title not in shown, shown
 
-        # An icon that exists is set; one that is not drawn yet leaves a text-only
-        # button.  `file-reload` used to be the missing one; the `view-*` switches
-        # are the row still waiting (see `assets.MISSING`).
+        # An icon that exists is set; the view switches have none by decision: their
+        # `view-*` pictures were dropped, and a switch reads faster than it is
+        # recognised (task_48).
         assert window._actions["save"].icon().isNull() is False
         assert window._actions["reload"].icon().isNull() is False, "file-reload.png is drawn now"
-        assert window._actions["line_numbers"].icon().isNull() is True, (
-            "view-line-numbers.png is not drawn yet"
-        )
+        assert window._actions["line_numbers"].icon().isNull() is True
+        assert window._actions["toolbar"].icon().isNull() is True
         print("ok: the toolbar shows the actions and their icons, text-only where none exists")
     finally:
         discard_changes(window)
@@ -2101,18 +2103,33 @@ def test_a_broken_program_is_reported_and_not_rewritten(executable: str) -> None
     print("ok: a broken program keeps its text and its line is marked")
 
 
-def test_the_mode_menu_stores_the_mode_and_the_hard_mode_reaches_the_wire(
+def test_the_mode_control_stands_beside_the_command_it_changes(
     executable: str,
 ) -> None:
-    """The mode submenu sits under «Форматировать», and each mode reaches the wire."""
+    """The mode is a toolbar control next to «Форматировать», and each mode reaches the wire."""
     window = empty_window(executable)
     try:
-        # «Правка» keeps the submenu right under the command it belongs to.
+        # On the toolbar, immediately after the command it changes (task_47): the
+        # mode is switched *while looking at the code*, and two menu levels for it
+        # is one too many.
+        entries = window._toolbar.actions()
+        index = entries.index(window._actions["format"])
+        assert entries[index + 1].defaultWidget() is window._format_button, (
+            "the mode control must stand right after «Форматировать»"
+        )
+        assert window._format_button.menu() is window._format_menu
+        assert window._format_button.popupMode().name == "InstantPopup", (
+            "one click opens the modes, without a long press"
+        )
+        assert window._format_button.icon().isNull() is False, "edit-format-set.png is drawn"
+        assert window._format_button.toolTip() != ""
+
+        # One home for one control: «Правка» does not carry a «Формат» submenu.
         editing = {
             entry.text(): entry.menu() for entry in window.menuBar().actions()
         }["Правка"]
         titles = [entry.text() for entry in editing.actions() if entry.text()]
-        assert titles.index("Формат") == titles.index("Форматировать") + 1, titles
+        assert "Формат" not in titles, titles
         assert [entry.text() for entry in window._format_menu.actions() if entry.text()] == [
             "В одну строку — цели тела собираются в строку",
             "Мягкое — переносить то, что не влезло",
@@ -2124,7 +2141,8 @@ def test_the_mode_menu_stores_the_mode_and_the_hard_mode_reaches_the_wire(
         assert window._settings.format_mode == "hard"
         window.editor().setPlainText("факт(1).\nцель(Х):-часть(Х), ещё(Х).\n")
         window._actions["format"].trigger()
-        hard = "факт(1).\nцель(Х):-часть(Х),\n\tещё(Х).\n"
+        # The head stands alone: the first goal was the one glued to it (task_47).
+        hard = "факт(1).\nцель(Х):-\n\tчасть(Х),\n\tещё(Х).\n"
         assert pump(window, lambda: window.editor().toPlainText() == hard), ascii(
             window.editor().toPlainText()
         )
@@ -2152,7 +2170,7 @@ def test_the_mode_menu_stores_the_mode_and_the_hard_mode_reaches_the_wire(
         )
     finally:
         discard_changes(window)
-    print("ok: «Формат» keeps the modes, and hard, soft and one-line reach the wire")
+    print("ok: the mode control sits on the toolbar, and hard, soft and one-line reach the wire")
 
 
 def test_the_reserved_names_are_there_before_the_first_run(executable: str) -> None:
@@ -2668,7 +2686,7 @@ def main(argv: list[str]) -> int:
         test_formatting_lays_the_buffer_out_and_stays_one_undo_step(executable)
         test_formatting_only_the_selection(executable)
         test_a_broken_program_is_reported_and_not_rewritten(executable)
-        test_the_mode_menu_stores_the_mode_and_the_hard_mode_reaches_the_wire(executable)
+        test_the_mode_control_stands_beside_the_command_it_changes(executable)
         test_the_reserved_names_are_there_before_the_first_run(executable)
         test_running_programs_without_questions_finishes(executable)
         test_f1_shows_the_record_of_the_word_under_the_caret(executable)

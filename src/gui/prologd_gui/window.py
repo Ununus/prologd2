@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QSplitter,
     QToolBar,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -477,8 +478,6 @@ class MainWindow(QMainWindow):
             "find": lambda: self.show_find(),
             "find_next": lambda: self.find_step(False),
             "find_prev": lambda: self.find_step(True),
-            "find_selected": lambda: self.find_selected(False),
-            "find_selected_prev": lambda: self.find_selected(True),
             "toolbar": self._toggle_toolbar,
             "output": self._toggle_output,
             "input_queue": self._toggle_input_queue,
@@ -518,19 +517,40 @@ class MainWindow(QMainWindow):
                 self._toolbar.addSeparator()
             elif key == actions.FONT_SIZE:
                 self._toolbar.addWidget(self._build_font_size_box())
+            elif key == actions.FORMAT_MODE:
+                self._toolbar.addWidget(self._build_format_button())
             else:
                 self._toolbar.addAction(self._actions[key])
         self._toolbar.setVisible(self._settings.toolbar_visible)
         self.addToolBar(self._toolbar)
 
-    def _build_format_menu(self, title: str) -> QMenu:
-        """The formatter's mode, under its action in «Правка» (task_30).
+    def _build_format_button(self) -> QToolButton:
+        """The formatter's mode, on the toolbar beside «Форматировать» (task_47).
 
-        The modes themselves are a preference (task_29's dialog will edit the
-        same keys), and «только выделенное» is the switch the task asked for — so
-        the submenu is a *view* of those values and the place they are changed
-        until the dialog exists.  It used to be a toolbar button; a menu that
-        belongs to one command sits under that command.
+        A `QToolButton` with a menu of its own: the three modes and «только
+        выделенное», the same values the settings dialog edits.  It lived in the
+        «Правка» submenu since task_30, and before that it was a toolbar button —
+        the mode is changed *while looking at the code*, so it stands next to the
+        command it changes.  The picture (`edit-format-set`) is the one the
+        reference front-end used for exactly this.
+        """
+        button = QToolButton(self)
+        button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        found = assets.icon(actions.FORMAT_ICON)
+        if found is not None:
+            button.setIcon(found)
+        button.setToolTip("Режим форматирования")
+        button.setMenu(self._build_format_menu("Формат"))
+        self._format_button = button
+        return button
+
+    def _build_format_menu(self, title: str) -> QMenu:
+        """The formatter's mode and its «только выделенное» switch (task_30, task_47).
+
+        The modes themselves are a preference (the settings dialog edits the same
+        keys), so this menu is a *view* of those values — and the only place they
+        are changed besides the dialog, which is why it hangs off the toolbar
+        button rather than sitting two levels deep in a menu.
         """
         menu = QMenu(title, self)
         self._format_menu = menu
@@ -690,7 +710,8 @@ class MainWindow(QMainWindow):
                     )
                     self._recent_menu.aboutToShow.connect(self._fill_recent_menu)
                 elif key == actions.FORMAT_MODE:
-                    menu.addMenu(self._build_format_menu("Формат"))
+                    # On the toolbar now (task_47): the menus walk past it.
+                    continue
                 elif key == actions.THEME_MODE:
                     menu.addMenu(self._build_theme_menu("Оформление"))
                 else:
@@ -2099,10 +2120,10 @@ class MainWindow(QMainWindow):
     def show_find(self, text: str | None = None) -> bool:
         """`Ctrl+F`: the bar above the editor, prefilled and focused.
 
-        `text` overrides the prefill, which is how `Ctrl+F3` hands over the word
-        it found.  An empty prefill leaves the previous question in the field: a
-        reader who searched for `факт` a moment ago does not want the field wiped
-        because the caret happens to sit on a bracket.
+        `text` overrides the prefill, so a caller can hand over a question of its
+        own.  An empty prefill leaves the previous question in the field: a reader
+        who searched for `факт` a moment ago does not want the field wiped because
+        the caret happens to sit on a bracket.
         """
         view = self._find_view()
         if view is None:
@@ -2135,39 +2156,12 @@ class MainWindow(QMainWindow):
         if view is not None:
             view.setFocus()
 
-    def find_selected(self, backwards: bool = False) -> bool:
-        """`Ctrl+F3` / `Ctrl+Shift+F3`: the word under the caret, then the next one.
-
-        The step starts *outside* the selection, or the first hit would be the
-        text that is already on screen and the command would look dead.
-        """
-        view = self._find_view()
-        if view is None:
-            return False
-        token = view.selected_token() or view.word_under_cursor()
-        if not token:
-            return False
-        self._find_bar.set_needle(token)
-        self._find_bar.setVisible(True)
-        self._bind_find_view(view)
-        cursor = view.textCursor()
-        # `-1` backwards is one before the first character, which wraps round the
-        # top of the document; `selectionEnd()` forwards is past the current word.
-        start = cursor.selectionStart() - 1 if backwards else cursor.selectionEnd()
-        self._find_current = None
-        found = self.find_step(backwards, start)
-        self._find_bar.focus_find()
-        return found
-
-    def find_step(self, backwards: bool = False, start: int | None = None) -> bool:
+    def find_step(self, backwards: bool = False) -> bool:
         """`F3` / `Shift+F3`: the next match, wrapping at the ends.
 
         Works with the bar closed — the question in its field is the one the last
         search asked — but a bar that has never been used has no question and
         `F3` then does what `Ctrl+F` does.
-
-        `start` overrides where the step begins, which is how «Найти выделенное»
-        skips the word that is already selected.
         """
         view = self._find_view()
         if view is None:
@@ -2184,12 +2178,11 @@ class MainWindow(QMainWindow):
             self._apply_find_highlight()
             self._find_status()
             return False
-        if start is None:
-            if self._find_current in found:
-                # Past the match the caret is on, in the direction of travel.
-                start = self._find_current - 1 if backwards else self._find_current + len(needle)
-            else:
-                start = view.textCursor().selectionStart()
+        if self._find_current in found:
+            # Past the match the caret is on, in the direction of travel.
+            start = self._find_current - 1 if backwards else self._find_current + len(needle)
+        else:
+            start = view.textCursor().selectionStart()
         if backwards:
             offset = search.previous_match(text, needle, start, options)
             # It wrapped when the match is *after* where the search started.

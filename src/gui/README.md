@@ -229,9 +229,8 @@ optional last argument is wired through a lambda (`"find": lambda: self.show_fin
 The menus are **Файл** (Новый, Открыть…, Последние, Сохранить, Сохранить как…,
 Сохранить все, Перечитать с диска, Закрыть вкладку, Закрыть все, Выход),
 **Правка** (Отменить … Удалить, Выделить всё, Закомментировать,
-Раскомментировать, Форматировать, Формат (подменю: режим и «только выделенное»),
-Настройки…), **Поиск** (Поиск и замена…,
-Далее, Назад, Найти выделенное, Найти выделенное назад), **Вид** (Панель
+Раскомментировать, Форматировать, Настройки…), **Поиск** (Поиск и замена…,
+Далее, Назад), **Вид** (Панель
 инструментов, Панель вывода, Поле очереди ввода, Разделить редактор, Объединить
 редакторы, Сменить ориентацию сплита, Номера строк, Переносить длинные строки,
 Увеличить/Уменьшить/Обычный размер шрифта, Оформление (подменю: светлое, тёмное,
@@ -243,17 +242,29 @@ The menus are **Файл** (Новый, Открыть…, Последние, �
 
 An entry that does not exist yet stays in its menu but is **disabled**, and its
 tooltip names what it waits for.  **That list is empty now**: «Графическое окно»
-left it in task_45, and the list before it — «Поиск» in task_33, the «Выполнение»
-group in task_28 («Запустить с трассировкой», «Шаг» и «Шаг с обходом» are live),
-«Форматировать» in task_30 and «Настройки…» in task_29.  A menu that silently
-lacks half of the feature list is worse than one that says so, and a menu where
-nothing has to be said is better than both.  The toolbar is
-grouped as
+left it in task_45, and before that «Поиск» in task_33, the «Выполнение» group in
+task_28, «Форматировать» in task_30 and «Настройки…» in task_29.  A menu that
+silently lacks half of the feature list is worse than one that says so, and a menu
+where nothing has to be said is better than both.
+
+The toolbar is grouped as
 the reference front-end had it: file | run/stop/step | editing (comment,
-uncomment, format) | font size | tools (graphics, settings, help), and at the far
+uncomment, format and, right beside it, the formatter's **mode control** — a
+`QToolButton` with the three modes and «только выделенное», where a mode is
+switched while looking at the code) | font size | tools (graphics, settings,
+help), and at the far
 right **Очистить вывод**, which acts on the output rather than on the program;
 `QToolBar.setIconSize(QSize(24, 24))` is set explicitly so the layout does not
 depend on the style.
+
+Two commands left the toolbar in this round.  «Сохранить все» acts on *every*
+tab, so it lives in «Файл» where the rest of them are: the toolbar keeps the
+three file buttons that act on the tab in front of the user.  And «Найти
+выделенное» / «Найти выделенное назад» are gone altogether — with the word under
+the caret already in the «Найти» field, one `Ctrl+F` did the same thing, and the
+two commands cost two entries and two icons.  The «Вид» switches («Номера
+строк», «Панель инструментов») are deliberately **text-only**: a switch reads
+faster as a word than it is recognised as a picture.
 
 The two commands of the split editor follow the number of panes: `split` is
 enabled while there is one, `merge` while there are two.  That is not cosmetic —
@@ -267,31 +278,39 @@ split could not be undone without a restart.
 
 `test_icons.py` is the guard: it fails as soon as a name is misspelled, and it
 also checks that an icon which *does* have a file is not still listed as missing.
-The code references **49** names, **43** of which have a file in
+The code references **45** names, **41** of which have a file in
 `src/gui/assets` (64×64 PNG, transparent background).  A missing file is not an
 error: the action is built without a picture, and the name is reported once on
 stderr (`icons: no view-theme.png — the action will have no picture`).
 
-Present (43): `edit-clear`, `edit-comment`, `edit-copy`, `edit-cut`, `edit-del`,
-`edit-find-replace`, `edit-format`, `edit-paste`, `edit-redo`, `edit-uncomment`,
-`edit-undo`, `execution-abort`, `execution-execute`, `execution-step-into`,
-`execution-step-over`, `execution-tracing`, `file`, `file-close`,
-`file-close-all`, `file-exit`, `file-modified`, `file-new`, `file-open`,
-`file-recent`, `file-reload`, `file-save`, `file-save-all`, `file-save-as`,
-`file-saved`, `help`, `help-about`, `prologd2`, `search-find`, `search-find-next`,
-`search-find-prev`, `search-find-selected-next`, `search-find-selected-prev`,
-`tools-settings`, `view-full-screen`, `view-graphics`, `view-zoom-in`,
-`view-zoom-out`, `view-zoom-reset`.
+Present (41): `edit-clear`, `edit-comment`, `edit-copy`, `edit-cut`, `edit-del`,
+`edit-find-replace`, `edit-format`, `edit-format-set`, `edit-paste`, `edit-redo`,
+`edit-uncomment`, `edit-undo`, `execution-abort`, `execution-execute`,
+`execution-step-into`, `execution-step-over`, `execution-tracing`, `file`,
+`file-close`, `file-close-all`, `file-exit`, `file-modified`, `file-new`,
+`file-open`, `file-recent`, `file-reload`, `file-save`, `file-save-all`,
+`file-save-as`, `file-saved`, `help`, `prologd2`, `search-find`,
+`search-find-next`, `search-find-prev`, `tools-settings`, `view-full-screen`,
+`view-graphics`, `view-zoom-in`, `view-zoom-out`, `view-zoom-reset`.
 
-Still to draw (6 names, listed in `assets.MISSING`) — the «Вид» switches
-`view-toolbar`, `view-split-editor`, `view-output-right`, `view-output-bottom`,
-`view-line-numbers` and `view-theme` — plus `execution-restart`, which nothing
-refers to yet.  `view-theme` belongs to the «Оформление» submenu, which is words
+Still to draw (4 names, listed in `assets.MISSING`) — the «Вид» switches
+`view-split-editor`, `view-output-right`, `view-output-bottom` and `view-theme` —
+plus `execution-restart`, whose file is drawn but which nothing refers to yet.
+`view-theme` belongs to the «Оформление» submenu, which is words
 rather than pictures, and it stays in the audit because it is the picture the
 reference front-end used for exactly this.
 
+Three pictures left the audit.  `help-about` was the same drawing as
+`prologd2`, and two files for one picture drift apart, so «О программе» now wears
+the application icon; `search-find-selected-next` and
+`search-find-selected-prev` went with the commands they belonged to; and
+`view-toolbar` and `view-line-numbers` were dropped because those two switches
+are words now.  `edit-format-set` — the formatter's mode — is the one that
+*joined* the set, and it is what the mode control on the toolbar wears.
+
 Five of the names are not buttons at all: `file`, `file-saved` and
-`file-modified` are the states of a tab, `prologd2` is the window icon, and
+`file-modified` are the states of a tab, `prologd2` is the window icon and
+the picture of «О программе» (one drawing, one file), and
 `edit-del` is the picture of «Удалить» in the «Правка» menu.  `search-find`
 (`actions.FIND_ICON`) is the lens at the left of the find bar *and* the picture of
 «Поиск и замена…» — the plain lens, because the command is the search; the
@@ -556,18 +575,26 @@ puts the answer back.  The grammar's copy of that request is `prologd --format`;
 the protocol contract has the details, and `src/gui/tests/test_formatter.py`
 drives the wire headlessly.
 
-The mode lives in **Правка → Формат**, the submenu right under the command it
-belongs to (it is a preference, so task_29's dialog will edit the same keys — it
-used to be a toolbar button): **в одну строку** joins the goals of a body
+The mode is the button on the toolbar right after **Форматировать** (it is a
+preference, so task_29's dialog edits the same keys): one click opens the list —
+**в одну строку** joins the goals of a body
 whatever the line costs; **мягкое** builds the lines again — goals are packed up
 to the width (80 columns by default) and moved to a continuation line when they
-do not fit; **жёсткое** puts each goal of a body on a line of its own.  The same
-submenu carries «только выделенное»: with it, only the selected fragment is sent,
+do not fit; **жёсткое** puts the head of a clause on a line of its own and each
+goal of its body on a line of its own.  The same menu carries «только выделенное»:
+with it, only the selected fragment is sent,
 and a fragment that breaks off in the middle of a body is formatted up to its
 last complete goal — the rest is copied as it stands.  Trailing whitespace never
 survives, runs of blank lines between statements collapse into one (inside a
 statement an author's blank line stays and forces a break), and a `%` comment
 stays on the line it was written on.
+
+A **query** and a **directive** are never broken, in any mode.  Neither has a
+head or a body to lay out — one is a question, the other an instruction — and the
+tools that run them read a *line*: the margin marker is line-local by design
+(task_36), so a query split by the formatter would be a question nobody can
+click.  This is not abstract: formatting lesson 12 broke its long «сад» query in
+two and the pinned question count in `test_queries.py` caught it.
 
 The soft mode deliberately does **not** keep the author's line breaks between
 goals: a break written by the hard mode cannot be told apart from one the author

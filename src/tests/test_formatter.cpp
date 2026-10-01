@@ -53,8 +53,11 @@ TEST_CASE("the hard shape puts one goal of a body per line") {
   const std::string source =
       "правило(а,б,с):-функция1(а,б,с), функция2(а,б,с), функция3(а,б,с),\n"
       "функция4(а,б,с), функция5(а,б,с), функция6(а,б,с).\n";
+  // The head stands alone: the *first* goal was the one glued to it, and a goal
+  // that hides at the end of the head's line is the one a reader skips (task_47).
   const std::string expected =
-      "правило(а,б,с):-функция1(а,б,с),\n"
+      "правило(а,б,с):-\n"
+      "\tфункция1(а,б,с),\n"
       "\tфункция2(а,б,с),\n"
       "\tфункция3(а,б,с),\n"
       "\tфункция4(а,б,с),\n"
@@ -65,11 +68,27 @@ TEST_CASE("the hard shape puts one goal of a body per line") {
   REQUIRE(result.text == expected);
 }
 
+TEST_CASE("the hard shape leaves a directive and a query on their line") {
+  // There is no head to stand alone: `:-` or `?` on a line of its own is noise,
+  // and a directive is one command with its arguments.  A query is one question,
+  // so its goals stay beside `?` too — the window runs a question from a *line*
+  // (task_36), and a question split in two cannot be clicked (task_47).
+  const std::string source =
+      ":- ИМПОРТ(\"lib.pld\").\n"
+      ":- РАВНО(Х, 1).\n"
+      "?цель(Х), другая(Х).\n"
+      "факт(1).\n";
+  const FormatResult result = format(source, hard());
+  REQUIRE(result.ok());
+  REQUIRE(result.text == source);
+  REQUIRE_FALSE(result.changed);
+}
+
 TEST_CASE("a space after the last comma does not survive") {
   const std::string source = "факт(1).   \nцель(Х):-часть(Х), два(Х). \n";
   const FormatResult result = format(source, hard());
   REQUIRE(result.ok());
-  REQUIRE(result.text == "факт(1).\nцель(Х):-часть(Х),\n\tдва(Х).\n");
+  REQUIRE(result.text == "факт(1).\nцель(Х):-\n\tчасть(Х),\n\tдва(Х).\n");
   REQUIRE(result.text.find(" \n") == std::string::npos);
 }
 
@@ -126,7 +145,7 @@ TEST_CASE("an arrow rule formats like a colon-dash rule") {
   const std::string source = "правило(Х)<-часть(Х),   ещё(Х).\n";
   const FormatResult result = format(source, hard());
   REQUIRE(result.ok());
-  REQUIRE(result.text == "правило(Х)<-часть(Х),\n\tещё(Х).\n");
+  REQUIRE(result.text == "правило(Х)<-\n\tчасть(Х),\n\tещё(Х).\n");
 }
 
 TEST_CASE("a directive keeps its space and a query stays glued") {
@@ -140,6 +159,26 @@ TEST_CASE("a directive keeps its space and a query stays glued") {
           "?ВЕРСИЯ.\n"
           ":- ИМПОРТ(\"library.pld\").\n"
           "%? НЕ(ЛОЖЬ).\n");
+}
+
+TEST_CASE("a query and a directive keep their one line") {
+  // A query is a question and a directive is an instruction: neither has a head
+  // or a body to lay out, and the window's margin marker reads a *line*
+  // (task_36), so a break inside one is a question nobody can click.  The width
+  // therefore never opens them, however narrow it is (task_47).
+  const std::string source =
+      ":- ИМПОРТ(\"длинное_имя_библиотеки_для_проверки.pld\", "
+      "\"длинное_имя_модуля_для_проверки_импорта\").\n"
+      "?первая_цель(Очень_длинный_аргумент), вторая_цель(Ещё_Длиннее_Аргумент), "
+      "третья_цель(Х).\n";
+  FormatOptions narrow;
+  narrow.width = 20;
+  for (const FormatOptions& options : {FormatOptions{}, narrow, hard(), hard(20)}) {
+    const FormatResult result = format(source, options);
+    REQUIRE(result.ok());
+    REQUIRE_FALSE(result.changed);
+    REQUIRE(result.text == source);
+  }
 }
 
 TEST_CASE("a source that does not parse comes back untouched, with diagnostics") {
@@ -167,7 +206,8 @@ TEST_CASE("blank lines collapse between clauses and survive inside one") {
   REQUIRE(result.text ==
           "первый(1).\n"
           "\n"
-          "второй(Х):-часть(Х),\n"
+          "второй(Х):-\n"
+          "\tчасть(Х),\n"
           "\n"
           "\tещё(Х).\n");
 }
@@ -195,13 +235,41 @@ TEST_CASE("formatting is idempotent for every example program") {
   }
 }
 
+TEST_CASE("every shipped program is already in the standard shape") {
+  // `prologd --format` is the layout the repository keeps its own programs in,
+  // and the lessons are the widest corpus of real text there is (task_47): the
+  // moment one of them drifts, this check says which.  `examples/lessons/_old`
+  // holds the ported originals for comparison with the port, so it keeps their
+  // spelling rather than the port's; `test_lessons.cpp` is what proves that
+  // formatting a lesson did not move a printed line.
+  namespace fs = std::filesystem;
+  const fs::path root(PROLOGD_TEST_DATA_DIR);
+  std::size_t checked = 0;
+  for (const auto& entry : fs::recursive_directory_iterator(root)) {
+    if (!entry.is_regular_file() || entry.path().extension() != ".pld") {
+      continue;
+    }
+    if (entry.path().parent_path().filename() == "_old") {
+      continue;
+    }
+    const std::string source = readFile(entry.path());
+    INFO("file: " << entry.path().string());
+    const FormatResult result = format(source);
+    REQUIRE(result.ok());
+    REQUIRE_FALSE(result.changed);
+    REQUIRE(result.text == source);
+    ++checked;
+  }
+  REQUIRE(checked >= 25);
+}
+
 TEST_CASE("a fragment is formatted up to its last complete goal") {
   FormatOptions options = hard();
   options.selection_only = true;
   const std::string source = "факт(1).\nсчёт(Х):-факт(Х), ещё(Х), оста";
   const FormatResult result = format(source, options);
   REQUIRE(result.ok());
-  REQUIRE(result.text == "факт(1).\nсчёт(Х):-факт(Х),\n\tещё(Х), оста");
+  REQUIRE(result.text == "факт(1).\nсчёт(Х):-\n\tфакт(Х),\n\tещё(Х), оста");
   REQUIRE(result.changed);
 }
 
@@ -211,7 +279,7 @@ TEST_CASE("a complete selection is just formatted") {
   const std::string source = "счёт(Х):-факт(Х), ещё(Х).\n";
   const FormatResult result = format(source, options);
   REQUIRE(result.ok());
-  REQUIRE(result.text == "счёт(Х):-факт(Х),\n\tещё(Х).\n");
+  REQUIRE(result.text == "счёт(Х):-\n\tфакт(Х),\n\tещё(Х).\n");
 }
 
 TEST_CASE("a fragment with nothing complete in it is left alone") {

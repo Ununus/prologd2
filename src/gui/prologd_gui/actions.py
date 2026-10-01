@@ -30,6 +30,12 @@ FIND_ICON = "search-find"
 #: «Поиск» commands carry their own search pictures.
 REPLACE_ICON = "edit-find-replace"
 
+#: The picture of the format *mode* control (task_47): one shape on the toolbar
+#: whose menu carries the mode and the «только выделенное» switch.  It is not an
+#: action, so it is named here for the audit like the other pictures that belong
+#: to a control rather than to a command.
+FORMAT_ICON = "edit-format-set"
+
 #: Names that belong to no action: the tab picture of a buffer (never saved,
 #: saved, modified) and the application icon.  They live here because
 #: `ICON_NAMES` is the list `test_icons.py` holds the code to.
@@ -50,10 +56,11 @@ RECENT = "recent"
 #: The font-size control, not an action either: the window puts it here.
 FONT_SIZE = "#font"
 
-#: The formatter's mode (task_30): a submenu of «Правка», right under
-#: «Форматировать» — it carries the mode and the «только выделенное» switch the
-#: action reads.  It used to sit on the toolbar; the menu is where a command that
-#: belongs to one action is looked for.
+#: The formatter's mode (task_30, moved back to the toolbar in task_47): a
+#: control of the toolbar, right after «Форматировать» — it carries the mode and
+#: the «только выделенное» switch the action reads.  It lived in the «Правка»
+#: submenu for a while; a mode is switched *while looking at the code*, so it
+#: belongs next to the command it changes.
 FORMAT_MODE = "#format-mode"
 
 #: The appearance (task_29's dark theme): a submenu of «Вид», because a *set* of
@@ -132,20 +139,12 @@ ACTIONS: tuple[Action, ...] = (
         "search-find-prev",
         ("Shift+F3",),
     ),
-    Action(
-        "find_selected",
-        "Найти выделенное",
-        "search-find-selected-next",
-        ("Ctrl+F3",),
-    ),
-    Action(
-        "find_selected_prev",
-        "Найти выделенное назад",
-        "search-find-selected-prev",
-        ("Ctrl+Shift+F3",),
-    ),
     # -- view
-    Action("toolbar", "Панель инструментов", "view-toolbar", checkable=True),
+    # Both switches are text-only on purpose: a checkable entry of «Вид» says what
+    # it does in words, and the two pictures (`view-toolbar`, `view-line-numbers`)
+    # were never drawn — asking for them was a to-do that kept the audit noisy
+    # (task_48).
+    Action("toolbar", "Панель инструментов", None, checkable=True),
     # The output panel: `F4` shows and hides it, `Ctrl+F4` moves it between the
     # right side and the bottom (`split_orientation` keeps the reference's name
     # for the command; the icon hints at the *other* position).
@@ -159,7 +158,7 @@ ACTIONS: tuple[Action, ...] = (
     Action("next_tab", "Следующая вкладка", None, ("Ctrl+Tab",)),
     Action("previous_tab", "Предыдущая вкладка", None, ("Ctrl+Shift+Tab",)),
     Action("split_orientation", "Сменить ориентацию сплита", "view-output-bottom", ("Ctrl+F4",)),
-    Action("line_numbers", "Номера строк", "view-line-numbers", checkable=True),
+    Action("line_numbers", "Номера строк", None, checkable=True),
     # Long clauses are easier to read wrapped, but a log line cut in the middle is
     # not — so this switch is the *editor's*, and the output stays as it is.
     Action("wrap", "Переносить длинные строки", None, checkable=True),
@@ -195,7 +194,9 @@ ACTIONS: tuple[Action, ...] = (
     # is data in the settings file, so the list has to be read from it.
     Action("shortcuts", "Шпаргалка по вставкам", None),
     Action("help_gui", "Справка по окну", None),
-    Action("about", "О программе", "help-about"),
+    # «О программе» wears the application icon: it *is* the same picture, and two
+    # files for one drawing is a file that goes stale (task_48).
+    Action("about", "О программе", APPLICATION_ICON),
 )
 
 BY_KEY: dict[str, Action] = {action.key: action for action in ACTIONS}
@@ -204,8 +205,8 @@ BY_KEY: dict[str, Action] = {action.key: action for action in ACTIONS}
 #: files in `assets/` and against the documented `MISSING` list.
 ICON_NAMES: frozenset[str] = frozenset(
     [action.icon for action in ACTIONS if action.icon]
-    + [RECENT_ICON, FIND_ICON, REPLACE_ICON, FILE_ICON, SAVED_ICON, MODIFIED_ICON,
-       APPLICATION_ICON, THEME_ICON]
+    + [RECENT_ICON, FIND_ICON, REPLACE_ICON, FORMAT_ICON, FILE_ICON, SAVED_ICON,
+       MODIFIED_ICON, APPLICATION_ICON, THEME_ICON]
 )
 
 #: The menu bar: (title, entries).  `-` is a separator, `recent` the submenu of
@@ -246,12 +247,11 @@ MENUS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "comment",
             "uncomment",
             "format",
-            FORMAT_MODE,
             SEPARATOR,
             "settings",
         ),
     ),
-    ("Поиск", ("find", "find_next", "find_prev", SEPARATOR, "find_selected", "find_selected_prev")),
+    ("Поиск", ("find", "find_next", "find_prev")),
     (
         "Вид",
         (
@@ -295,13 +295,15 @@ MENUS: tuple[tuple[str, tuple[str, ...]], ...] = (
 )
 
 #: The toolbar, grouped as the reference front-end had it: files, run/stop/step,
-#: editing, then the size control, then the tools — and, at the far right,
-#: «Очистить вывод», which acts on the output rather than on the program.
+#: editing (with the format *mode* control right after «Форматировать»), then the
+#: size control, then the tools — and, at the far right, «Очистить вывод», which
+#: acts on the output rather than on the program.  «Сохранить все» is not here:
+#: a command that acts on every tab belongs in «Файл», and the toolbar keeps the
+#: three file buttons that act on the tab in front of the user (task_48).
 TOOLBAR: tuple[str, ...] = (
     "new",
     "open",
     "save",
-    "save_all",
     SEPARATOR,
     "run",
     "stop",
@@ -310,6 +312,7 @@ TOOLBAR: tuple[str, ...] = (
     "comment",
     "uncomment",
     "format",
+    FORMAT_MODE,
     SEPARATOR,
     FONT_SIZE,
     SEPARATOR,

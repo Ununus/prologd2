@@ -85,8 +85,10 @@ def test_the_hard_shape_and_its_settings(executable: str) -> None:
     )
     assert code == 0, f"exit code {code}"
     text = find(events, "formatted")["text"]
+    # The head stands alone and every goal gets its own line (task_47).
     assert text == (
-        "правило(а,б,с):-функция1(а,б,с),\n"
+        "правило(а,б,с):-\n"
+        "        функция1(а,б,с),\n"
         "        функция2(а,б,с),\n"
         "        функция3(а,б,с),\n"
         "        функция4(а,б,с),\n"
@@ -117,7 +119,7 @@ def test_a_selection_is_formatted_up_to_its_last_complete_goal(executable: str) 
     )
     assert code == 0, f"exit code {code}"
     text = find(events, "formatted")["text"]
-    assert text == "факт(1).\nсчёт(Х):-факт(Х),\n\tещё(Х), оста", ascii(text)
+    assert text == "факт(1).\nсчёт(Х):-\n\tфакт(Х),\n\tещё(Х), оста", ascii(text)
     print("ok: a fragment is formatted up to its last complete goal")
 
 
