@@ -1,7 +1,8 @@
 # task_46 — Interpreter options, profiles and limits
 
-**Status:** in progress — the limits are done (protocol 9), the interpreter path,
-the process directory and profiles remain (2026-10-01)
+**Status:** in progress — the limits are done (protocol 9), the interpreter path
+and the process directory are done (2026-10-02), profiles remain; `--timeout-ms`
+was dropped by decision (2026-10-02)
 **Depends on:** task_29 (the dialog and the description table), task_21/task_27
 (the session and its run states), task_38 (the engine's own limits)
 **Milestone:** M16
@@ -24,10 +25,10 @@ does not carry the values, and the engine has some of them.
 |---|---|---|
 | `maxSteps` (0 = unlimited), `maxDepth`, `maxNestedDepth`, `maxFindAllSolutions` | `prlib/engine.hpp`, `EngineOptions` | in the engine |
 | `--max-steps`, `--max-depth` | `src/cli/main.cpp` | CLI only |
-| `--exe PATH` | `src/gui/main.py` | command line only |
+| `--exe PATH` | `src/gui/main.py`, and `execution/interpreter` in the dialog | the row wins, `--exe` is the fallback (done 2026-10-02) |
 | the shared folder and the `-I` list | `settings` `execution/working_directory`, `execution/import_paths`, the dialog | done (task_29) |
 | a wall-clock timeout | `window.py` (`_arm_timeout`) | done in the front-end (2026-10-01) |
-| the working directory of the *process* (`ЗАПИСЬ_В`, `ЧТЕНИЕ_ИЗ` are relative to it) | — | does not exist |
+| the working directory of the *process* (`ЗАПИСЬ_В`, `ЧТЕНИЕ_ИЗ` are relative to it) | `execution/process_directory` + `…_path`, `QProcess.setWorkingDirectory` | done (2026-10-02) |
 | interpreter profiles | — | do not exist |
 
 The JSON session exposed **none** of the limits until protocol 9: `load` carried
@@ -45,11 +46,11 @@ The JSON session exposed **none** of the limits until protocol 9: `load` carried
       **has no timeout**: see the note below.
 - [x] **CLI parity, half of it**: `--max-findall N` sits next to
       `--max-steps`/`--max-depth` and is documented in `help.typ`.
-- [ ] **CLI parity, the rest**: `--timeout-ms N` — a *text-mode* deadline.  Not
-      needed by the window (which has its own clock, below); it would have to be
-      polled from inside `Engine::shouldStop()`, and a clock read at every
-      solution is exactly the cost the front-end clock avoids.  Decide whether a
-      text-mode deadline is worth that before adding it.
+- [x] **CLI parity, the rest — decided not to do it (2026-10-02).**  A text-mode
+      `--timeout-ms` would have to be polled from inside `Engine::shouldStop()`,
+      and a clock read at every solution is exactly the cost the front-end clock
+      avoids; the window has its own deadline, and a console run that needs one
+      has the shell's own timeout.  Dropped by the user's decision.
 - [x] **Protocol 9**: the `limits` object on `load` (`maxSteps`, `maxDepth`,
       `maxFindall`; `0` = без предела; applied *before* the load, because the
       program's own `?`-statements run during it).  A limit that fires ends the
@@ -60,13 +61,21 @@ The JSON session exposed **none** of the limits until protocol 9: `load` carried
       of kind `protocol` and the session reads the next line; before version 9 such
       a request took the process down.  `timeoutMs` is **not** on the wire (see
       the design notes).
-- [ ] **The GUI rows** (`Выполнение`): `execution/interpreter` (a file path — the
-      dialog's folder rows already have the «Обзор…» button), and
-      `execution/process_directory` as a *choice* — `каталог файла` (default for a
-      saved file), `рабочая папка` (default for «Без имени») or a fixed directory.
-      Both are pushed into `PrologSession` (`setProgram`, and the child's working
-      directory via `QProcess.setWorkingDirectory`), and «Применить» **restarts a
-      live session** after either changes, saying so in the status bar.
+- [x] **The GUI rows** (`Выполнение`, 2026-10-02): `execution/interpreter` (a
+      *file* path — the dialog grew a `file` kind with its own «Обзор…», a file
+      chooser, not the folder one), and `execution/process_directory` as a
+      *choice* — `каталог файла` (default for a saved file), `рабочая папка`
+      (default for «Без имени») or `свой каталог` (`execution/process_directory_path`).
+      The empty interpreter row means «the one the window was started with»
+      (`--exe`, itself auto-detected), so `main.py` now checks the path that will
+      *actually* run.  Both values are pushed into `PrologSession`
+      (`set_executable` + `setWorkingDirectory` on the child), every session start
+      goes through one gate (`window._start_session`), and «Применить» restarts a
+      live session after either changes — or says «интерпретатор не найден» when
+      the new path points at nothing, leaving the live session alone.
+- [x] The status bar names the interpreter when the rows chose a different one,
+      so a window that runs another build says so (`prologd: …\Debug\prologd.exe`)
+      — the right-hand side of the status bar, next to the run state.
 - [x] **The GUI rows** for the limits: `execution/max_steps` → «Предел шагов»,
       `execution/max_depth` → «Предел глубины», `execution/max_findall` → «Предел
       решений НАЙТИВСЕ», `execution/timeout_seconds` → «Предел времени, с»; all
@@ -82,8 +91,8 @@ The JSON session exposed **none** of the limits until protocol 9: `load` carried
       «Профили» in the dialog to add, rename, copy and delete one, and «Сделать
       текущей».  A profile is applied at every session start, and switching one on
       restarts a live session.
-- [ ] The status bar names the interpreter when it is not the default one, so a
-      window that runs a different build says so (`проlogd: …\Debug\prologd.exe`).
+- [x] The status bar names the interpreter when it is not the default one, so a
+      window that runs a different build says so (`prologd: …\Debug\prologd.exe`).
 
 ## Design notes
 
@@ -130,10 +139,13 @@ The JSON session exposed **none** of the limits until protocol 9: `load` carried
 - [x] `test_window.py`: the limits reach the wire (a run with a step cap of 5000
       stops and says why), the run names its limits, the deadline is armed and
       dropped with the run, and an expired deadline interrupts.
-- [ ] `test_window.py` for the rest: a profile changes the `-I` list of the next
-      session; changing the interpreter path with «Применить» stops the live
-      session and the next run uses the new path (a copy of the built exe as the
-      «other» interpreter).
+- [x] `test_window.py` for the interpreter and the directory: a copy of the built
+      exe as the «other» interpreter (the row reaches the session, the run uses
+      it, and the status bar names it), a missing path is reported in the pane
+      and starts no session, and `ЗАПИСЬ_В` writes into the chosen folder — a
+      fixed one, and the running file's own under «каталог файла».
+- [ ] `test_window.py` for the profiles: a profile changes the `-I` list of the
+      next session; switching one restarts a live session.
 - [ ] By hand: a lesson program with an endless loop stops with a message; a
       teacher's profile switches the search path in one click.
 

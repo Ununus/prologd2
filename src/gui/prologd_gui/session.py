@@ -85,6 +85,9 @@ class PrologSession(QObject):
         super().__init__(parent)
         self._executable = executable
         self._includes = list(includes or [])
+        #: The child's working directory (task_46); `""` means «inherit the
+        #: window's own folder», which is what a process always did before.
+        self._working_directory = ""
         self._decoder = protocol.Decoder()
         self._awaiting_input = False
         self._paused = False
@@ -105,6 +108,27 @@ class PrologSession(QObject):
         starts a fresh session anyway, which is when the new path takes effect.
         """
         self._includes = [str(directory) for directory in includes or [] if str(directory)]
+
+    def set_executable(self, executable: str) -> None:
+        """Replaces the program the next `start()` launches (task_46).
+
+        Like `-I`, the path is fixed once a process is up: a running session keeps
+        the interpreter it was started with, and the next `start()` — a run always
+        starts one — picks the new one up.
+        """
+        self._executable = str(executable)
+
+    def executable(self) -> str:
+        """The program `start()` launches (what a test reads back)."""
+        return self._executable
+
+    def set_working_directory(self, directory: str) -> None:
+        """Replaces the child's working directory; `""` is «inherit» (task_46)."""
+        self._working_directory = str(directory or "")
+
+    def working_directory(self) -> str:
+        """The working directory the next `start()` gives the child; `""` = inherit."""
+        return self._working_directory
 
     # -- lifecycle ---------------------------------------------------------
     def start(self) -> None:
@@ -131,6 +155,10 @@ class PrologSession(QObject):
         self._pending.clear()
         self._process.setProgram(self._executable)
         self._process.setArguments(arguments)
+        # The relative paths of a program (`ЗАПИСЬ_В`, `ЧТЕНИЕ_ИЗ`) start here;
+        # `""` leaves the setting unset and the child inherits the window's own
+        # folder, as it always did (task_46).
+        self._process.setWorkingDirectory(self._working_directory)
         self._process.start()
 
     def is_running(self) -> bool:

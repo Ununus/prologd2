@@ -55,16 +55,21 @@ def main(argv: list[str] | None = None) -> int:
     arguments = parser.parse_args(argv)
     assets.set_directory(arguments.icons)
 
-    if not pathlib.Path(arguments.exe).exists():
-        print(f"prologd not found: {arguments.exe}", file=sys.stderr)
-        print("build it first (cmake --preset windows-msvc && cmake --build build/windows-msvc --config Release)", file=sys.stderr)
-        return 1
-
     # The settings path is derived from these names, so they are set before the
     # first `Settings()` call rather than left to Qt's defaults.
     QCoreApplication.setOrganizationName(Settings.organization)
     QCoreApplication.setApplicationName(Settings.application)
     preferences = Settings(arguments.settings)
+
+    # Which interpreter will actually run: the `execution/interpreter` row when it
+    # names one, else the `--exe` of this launch (task_46).  The check follows
+    # that path, so a teacher's machine that ships the binary next to the window
+    # is not refused because the default build path does not exist there.
+    executable = preferences.interpreter.strip() or arguments.exe
+    if not pathlib.Path(executable).is_file():
+        print(f"prologd not found: {executable}", file=sys.stderr)
+        print("build it first (cmake --preset windows-msvc && cmake --build build/windows-msvc --config Release)", file=sys.stderr)
+        return 1
 
     # Qt must not see our own options: it parses the arguments it is given and
     # would complain about `--theme`.

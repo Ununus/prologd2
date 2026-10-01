@@ -92,6 +92,9 @@ class MainWindow(QMainWindow):
         #: Preferences; tests pass a file of their own so a run cannot touch the
         #: user's real settings.
         self._settings = settings if settings is not None else Settings()
+        #: The interpreter `main.py` gave the window — the fallback `_interpreter_path`
+        #: uses when the `execution/interpreter` row is empty (task_46).
+        self._default_executable = executable
         #: The built-in reference (`doc/builtins.json`), read once for the whole
         #: window: the popup's detail label and `F1` read the same object, and a
         #: checkout without the file is an empty reference, not a failure.
@@ -110,7 +113,7 @@ class MainWindow(QMainWindow):
         #: preference the dialog may quietly replace.
         self._command_line_includes = list(includes or [])
 
-        self._session = PrologSession(executable, self._import_directories(), self)
+        self._session = PrologSession(self._interpreter_path(), self._import_directories(), self)
         # Completion, colouring and the cheat sheet need the reserved names
         # *before* anything is run — waiting for the first `ready` is why
         # autocompletion used to work only after the first run.  A window that
@@ -118,7 +121,7 @@ class MainWindow(QMainWindow):
         # is fetched once with `--list-keywords` (the same query the CLI answers)
         # and the first real session replaces it with the `ready` event's copy
         # of the same data.
-        self._session.keywords = read_keywords(executable)
+        self._session.keywords = read_keywords(self._interpreter_path())
         self._session.ready.connect(self._on_ready)
         self._session.output.connect(self._append_output)
         self._session.result.connect(self._on_result)
@@ -440,6 +443,53 @@ class MainWindow(QMainWindow):
         self._add_pane()
         self._sync_actions()
         self._update_details()
+
+    # -- the interpreter and its working directory (task_46) ---------------
+    def _interpreter_path(self) -> str:
+        """The `prologd` a run starts: the row, or the one the window was given."""
+        row = self._settings.interpreter.strip()
+        return row or self._default_executable
+
+    def _process_working_directory(self) -> str:
+        """Where the child process starts; `ЗАПИСЬ_В`/`ЧТЕНИЕ_ИЗ` are relative to it.
+
+        `file` is the folder of the running file (a new, unsaved buffer has none
+        and falls through to `window`), `window` is the window's own folder — the
+        old behaviour — and `custom` is the `execution/process_directory_path` row.
+        `""` means «inherit», which `QProcess` reads as the calling process's own.
+        """
+        mode = self._settings.process_directory
+        if mode == "custom":
+            return self._settings.process_directory_path.strip()
+        if mode == "file":
+            buffer = self.current_buffer()
+            path = buffer.model.path if buffer is not None else None
+            if path:
+                return str(pathlib.Path(path).parent)
+        return ""
+
+    def _start_session(self) -> bool:
+        """Starts the interpreter with the current path and working directory.
+
+        One gate for every place a fresh session begins (a run, a query, a
+        format): the rows of task_46 change *which* interpreter starts and *where*
+        its files go, and a missing path is reported here — in the pane, before
+        the process is asked to start at all — instead of by a silent half-started
+        process.
+        """
+        executable = self._interpreter_path()
+        self._session.set_executable(executable)
+        self._session.set_working_directory(self._process_working_directory())
+        if not pathlib.Path(executable).is_file():
+            self._append_output(
+                f"*** не удалось запустить интерпретатор: {executable}\n", panels.ERROR
+            )
+            self._status.setText(
+                f"интерпретатор не найден: {pathlib.Path(executable).name}"
+            )
+            return False
+        self._session.start()
+        return True
 
     # -- commands ----------------------------------------------------------
     def _build_actions(self) -> None:
@@ -827,6 +877,12 @@ class MainWindow(QMainWindow):
         else:
             state = "интерпретатор запущен"
         parts = [state]
+        # The interpreter a run will actually start, when the rows named a
+        # different build (task_46): what the command line chose is invisible, so
+        # a window that runs another `prologd` has to say so.
+        row = self._settings.interpreter.strip()
+        if row:
+            parts.append(f"prologd: {row}")
         buffer = self.current_buffer()
         if buffer is not None:
             view = self.view_for(buffer)
@@ -1261,7 +1317,8 @@ class MainWindow(QMainWindow):
         # value — and a cancelled question applies to this run only.
         self._stopped_input = False
         self._queued_input = self._input_lines()
-        self._session.start()
+        if not self._start_session():
+            return False
         # A run starts a *fresh* interpreter, and its screen comes up blank: the
         # window's picture clears with it, or it would keep showing a drawing the
         # engine no longer has (`start` is also what a restart of a live session
@@ -1490,7 +1547,8 @@ class MainWindow(QMainWindow):
         # a session has to be up; starting one is cheap, and nothing is loaded
         # into it.
         if not self._session.is_running():
-            self._session.start()
+            if not self._start_session():
+                return
         self._status.setText("форматирование…")
         self._session.format_text(
             text,
@@ -1555,7 +1613,8 @@ class MainWindow(QMainWindow):
         # A query needs an interpreter, and the window may not have one yet: the
         # session is started by the first run *or* by a goal typed into this line.
         if not self._session.is_running():
-            self._session.start()
+            if not self._start_session():
+                return
         self._busy = True
         self._session.run_query(text)
         self._sync_run_actions()
@@ -2839,6 +2898,32 @@ class MainWindow(QMainWindow):
         self._sync_theme_menu()
         self._sync_actions()
         self._status.setText("настройки применены")
+
+        # The interpreter and where its files go (task_46): a changed value
+        # cannot reach a live process (the program and the working directory are
+        # fixed once it is up), so a live session is restarted — and the status
+        # says so, because a silently different interpreter is exactly the
+        # mystery these rows exist to end.  A path that does not exist is not
+        # something to restart *to*: the live session keeps its own binary, the
+        # row takes effect at the next start, and the status says why.
+        executable = self._interpreter_path()
+        directory = self._process_working_directory()
+        changed = executable != self._session.executable() or directory != self._session.working_directory()
+        if changed:
+            live = self._session.is_running()
+            self._session.set_executable(executable)
+            self._session.set_working_directory(directory)
+            if live:
+                if pathlib.Path(executable).is_file():
+                    self._session.start()
+                    self._status.setText(
+                        "настройки применены; интерпретатор изменён — сессия перезапущена"
+                    )
+                else:
+                    self._status.setText(
+                        f"интерпретатор не найден: {pathlib.Path(executable).name}"
+                    )
+        self._update_details()
 
     def _import_directories(self) -> list[str]:
         """The `-I` directories of the next session: command line, then settings.

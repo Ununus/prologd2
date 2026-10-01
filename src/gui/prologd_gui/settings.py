@@ -121,6 +121,18 @@ MAX_FINDALL = "execution/max_findall"
 #: polite-stop machinery (`interrupt`), which also keeps a clock out of the
 #: solver's hot loop.
 TIMEOUT_SECONDS = "execution/timeout_seconds"
+#: Which `prologd` the window runs (task_46).  Empty means «the one the window
+#: was started with» — `--exe`, itself auto-detected when left out.  A row that
+#: names another build takes effect at the next session start, and the status
+#: bar says which one is in use.
+INTERPRETER = "execution/interpreter"
+#: Where the *process* starts (task_46): `ЗАПИСЬ_В`, `ЧТЕНИЕ_ИЗ` and the other
+#: relative paths open from this folder.  Three answers: the running file's
+#: folder, the window's own folder, or a fixed one (`PROCESS_DIRECTORY_PATH`).
+#: Not the same thing as `WORKING_DIRECTORY` — that row is a search directory
+#: for `ИМПОРТ`, this one is the working directory of the child process.
+PROCESS_DIRECTORY = "execution/process_directory"
+PROCESS_DIRECTORY_PATH = "execution/process_directory_path"
 
 DEFAULT_FONT_FAMILY = "Cascadia Mono"
 DEFAULT_FONT_SIZE = 11.0
@@ -193,6 +205,13 @@ MAXIMUM_MAX_FINDALL = 100_000_000
 DEFAULT_TIMEOUT_SECONDS = 0
 MAXIMUM_TIMEOUT_SECONDS = 3_600
 
+#: task_46's process directory: where a program's relative file paths point.
+#: `file` is the folder of the running file (a new, unsaved buffer falls back to
+#: `window`), `window` is the folder the window itself was started in — the old
+#: behaviour — and `custom` is `PROCESS_DIRECTORY_PATH`.
+DEFAULT_PROCESS_DIRECTORY = "file"
+PROCESS_DIRECTORY_MODES = ("file", "window", "custom")
+
 _TRUE = ("1", "true", "yes", "y", "да")
 
 
@@ -203,7 +222,7 @@ class Setting:
     The same record is what the dialog builds its row from, what validation
     clamps against, and what «Сбросить» writes back — so a value can neither be
     editable without being stored nor stored without being documented.  `kind` is
-    one of `bool`, `int`, `float`, `choice`, `text`, `directory`, `dirs`.
+    one of `bool`, `int`, `float`, `choice`, `text`, `file`, `directory`, `dirs`.
     """
 
     key: str
@@ -311,6 +330,16 @@ SETTINGS: tuple[Setting, ...] = (
             hint="Общие программы: каталог ищется при каждом ИМПОРТ, в любом файле"),
     Setting(IMPORT_PATHS, "Дополнительные каталоги ИМПОРТ", "Выполнение", "dirs", (),
             hint="Передаются интерпретатору как -I, в этом порядке"),
+    Setting(INTERPRETER, "Интерпретатор", "Выполнение", "file", "",
+            hint="Путь к prologd; пусто — тот, с которым окно запущено.  Смена действует со следующего запуска"),
+    Setting(PROCESS_DIRECTORY, "Рабочий каталог процесса", "Выполнение", "choice",
+            DEFAULT_PROCESS_DIRECTORY,
+            choices=(("file", "каталог файла программы"),
+                     ("window", "рабочая папка окна"),
+                     ("custom", "свой каталог")),
+            hint="Отсюда считаются ЗАПИСЬ_В, ЧТЕНИЕ_ИЗ и другие относительные пути"),
+    Setting(PROCESS_DIRECTORY_PATH, "Свой каталог процесса", "Выполнение", "directory", "",
+            hint="Используется, когда выше выбран «свой каталог»"),
     # -- files
     Setting(RESTORE_TABS, "Восстанавливать вкладки при старте", "Файлы", "bool", True,
             hint="Файлы читаются заново с диска; «Без имени» возвращаются как были"),
@@ -327,6 +356,10 @@ BY_KEY: dict[str, Setting] = {setting.key: setting for setting in SETTINGS}
 #: A record looked up by key, for a property that wants the bounds of that record
 #: rather than a number written out a second time (`input_mode`).
 _INPUT_MODE_SETTING = BY_KEY[INPUT_MODE]
+#: The same for the process directory (task_46): its `file|window|custom` answer
+#: is written through the description, so a wrong value in a hand-edited file
+#: falls back the way every other choice does.
+_PROCESS_DIRECTORY_SETTING = BY_KEY[PROCESS_DIRECTORY]
 
 #: Stored, but written by the window rather than by the user: window geometry,
 #: the recent list, the insert table.  Kept here so a test can prove that every
@@ -439,7 +472,7 @@ class Settings:
             return self._choice(setting)
         if setting.kind == "dirs":
             return self._paths(setting.key)
-        if setting.kind in ("text", "directory"):
+        if setting.kind in ("text", "directory", "file"):
             return self._text(setting.key, str(setting.default))
         raise ValueError(f"unknown kind {setting.kind!r} for {setting.key}")
 
@@ -456,7 +489,7 @@ class Settings:
             self._write(setting.key, value if value in values else setting.default)
         elif setting.kind == "dirs":
             self._write(setting.key, [str(item) for item in value or [] if str(item)])
-        elif setting.kind in ("text", "directory"):
+        elif setting.kind in ("text", "directory", "file"):
             self._write(setting.key, str(value))
         else:
             raise ValueError(f"unknown kind {setting.kind!r} for {setting.key}")
@@ -1065,6 +1098,34 @@ class Settings:
     @import_paths.setter
     def import_paths(self, paths) -> None:
         self._write(IMPORT_PATHS, [str(path) for path in paths if str(path)])
+
+    # -- the interpreter and its process directory (task_46) ------------------
+    @property
+    def interpreter(self) -> str:
+        """The `prologd` path the rows name; `""` means «the window's own»."""
+        return self._text(INTERPRETER, "")
+
+    @interpreter.setter
+    def interpreter(self, value: str) -> None:
+        self._write(INTERPRETER, str(value))
+
+    @property
+    def process_directory(self) -> str:
+        """`file`, `window` or `custom`; anything else reads as `file`."""
+        return self._choice(_PROCESS_DIRECTORY_SETTING)
+
+    @process_directory.setter
+    def process_directory(self, value: str) -> None:
+        self.set_value(_PROCESS_DIRECTORY_SETTING, value)
+
+    @property
+    def process_directory_path(self) -> str:
+        """The folder of the `custom` answer; `""` when none was set."""
+        return self._text(PROCESS_DIRECTORY_PATH, "")
+
+    @process_directory_path.setter
+    def process_directory_path(self, value: str) -> None:
+        self._write(PROCESS_DIRECTORY_PATH, str(value))
 
     # -- the formatter (task_30) ---------------------------------------------
     @property

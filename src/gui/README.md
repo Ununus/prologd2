@@ -30,7 +30,10 @@ python -m venv .venv
 `--exe` overrides the interpreter path (by default the newest build under
 `build/` is used), `--include` adds an `ИМПОРТ` search directory and may be
 repeated, and `--icons DIR` points the icon loader at another directory (the
-default is `src/gui/assets`).
+default is `src/gui/assets`).  The «Интерпретатор» row of the settings dialog
+(`execution/interpreter`) beats `--exe`: when it is not empty, *it* is what a run
+starts, and the status bar names a build that is not the one the window was
+started with.
 
 Activating the environment is optional: calling `.venv\Scripts\python.exe`
 directly needs no `Set-ExecutionPolicy` and makes it obvious which interpreter is
@@ -705,7 +708,7 @@ every record has a widget and every widget writes its key.
 | Редактор | font family and size, line numbers, the current-line band, word wrap, tabs or spaces and the width, auto-indent, completion (on/off, after how many letters, `Учитывать регистр`) |
 | Вид | theme (light, dark or system), toolbar, the output panel (shown, right or bottom), the input queue field, where a program's input question is asked (console or dialog), the output's font size, its line limit and whether it follows the end |
 | Формат | the formatter's mode, width, indent and unit, «только выделенное» |
-| Выполнение | whether a run answers the program's own `?`-questions, save before run, the four limits (steps, depth, НАЙТИВСЕ solutions, seconds), the shared folder for `ИМПОРТ`, more `-I` folders |
+| Выполнение | whether a run answers the program's own `?`-questions, save before run, the four limits (steps, depth, НАЙТИВСЕ solutions, seconds), **the interpreter path** (empty = the one the window was started with), **the process directory** (the running file's folder, the window's folder, or a fixed one — `ЗАПИСЬ_В`/`ЧТЕНИЕ_ИЗ` open relative to it), the shared folder for `ИМПОРТ`, more `-I` folders |
 | Файлы | autosave in minutes (0 = off), how many recent files to remember, restoring the open tabs at start-up |
 | Вставки | the live `Ctrl`+key table (task_31), the settings file path, «Вернуть встроенную таблицу» |
 
@@ -1003,8 +1006,12 @@ One piece of work is planned in a task file of its own (`ai/task_*.md`):
   `ai/task_46_interpreter_options_and_limits.md`.  The limits are done: the
   session carries them on `load` (protocol 9), the dialog has a row for each of
   them plus «Предел времени, с», and a run names the rows it goes with before it
-  starts.  Still open: the path to the interpreter (still `--exe`), the working
-  directory of the process, and named profiles.
+  starts.  The interpreter path and the process directory are done too (2026-10-02):
+  `execution/interpreter` picks the binary (empty = `--exe`, which stays the
+  fallback), `execution/process_directory` picks where the child starts, «Применить»
+  restarts a live session on either change, and a missing path is reported in the
+  pane.  A text-mode `--timeout-ms` was dropped by decision.  Still open: named
+  profiles.
 * **Three defects found by using the window** — `ai/task_49_gui_defects.md`:
   `Шаг → Стоп → Запуск` answering «нет шага, который ждёт ответа», a second
   unnamed tab coming back modified after a restore, «Запустить с трассировкой»

@@ -3,7 +3,9 @@
 Last updated: after the graphics window of task_45 (protocol 10), the interface
 cleanups of task_48 (icons, the toolbar, the search menu), the formatter's round of
 task_47 (the lessons in one style, the head on its own line, the mode control back
-on the toolbar) and task_49 (four window defects and the live output).
+on the toolbar), task_49 (four window defects and the live output), and task_46's
+interpreter path and process directory (the two rows that pick the binary and
+where its files go).
 
 ## Overall
 
@@ -114,7 +116,7 @@ on the toolbar) and task_49 (four window defects and the live output).
 | task_43_language_surface | done | `ВЫП/2..N` (`call/N`): the extra arguments are appended to the goal (callee dereferenced first; the keyword table says `ВЫП/+`; the checker expands the same term; `!` inside the argument stays a parse error and the manual no longer promises it); the module-collision warning — one per predicate fed by two files with no import path between them, silent for the diamond and for extending an imported module (ADR-019); the dead library is gone (`?СКОЛЬКО(НЕ, А)` answers 0; ADR-018) |
 | task_44_names | done | the two names that promised something else: `ИЛИ/2` → `ПЕРВОЕ/2` (`or` → `first`) with the retired spelling removed from the language (a call is a load error naming the replacement), `НАЙТИВСЁ` → `НАЙТИВСЕ` (the spelling of the task and of the reference notes) with the retired spelling kept reserved, so its call is the ordinary suggestion «возможно, НАЙТИВСЕ/3»; the two `ИЛИ` library clauses removed so the old name cannot answer through the database; `doc/help.typ` §4.6, `prologd-diff.typ` §17/§18, lesson 4's section 5 |
 | task_45_gui_graphics_window | done | the graphics predicates are *visible*: `BitmapGraphicsBackend` inside the engine (a 1024×768 buffer that answers `getPixel` locally and performs `ЗАКРАСКА` itself, reporting every primitive), protocol **10** (`graphics` events and `{"cmd":"graphics","snapshot":true}` → `bitmap`), a Qt-free `graphics.Canvas` with the palette, and `graphicswindow.GraphicsWindow` — a window of its own with «Вписать в окно»/«1 : 1», «Очистить», «Сохранить как PNG…» and a cell readout; the last disabled menu entry is gone (ADR-022).  The by-hand look at `examples/drawing.pld` found two defects (the ellipse was read as a box; an untouched canvas was transparent) |
-| task_46_interpreter_options_and_limits | in progress | the limits are in: `Limits` + `applyTo` in the engine, `--max-findall`, protocol **9** (`limits` on `load`, a bad field is an `error` instead of a dead session), four dialog rows and a front-end deadline.  The core has **no limits of its own** (0 = «без предела», messages name a limit and its value only — ADR-020) and the window ships 0 / 1 000 000 / 1 000 000 / 0.  Still open: the interpreter path, the process directory, profiles, and `--timeout-ms` (a text-mode deadline would need a clock in the solver).  The last item of task_29's settings list, split out on 2026-10-01 |
+| task_46_interpreter_options_and_limits | in progress | the limits are in: `Limits` + `applyTo` in the engine, `--max-findall`, protocol **9** (`limits` on `load`, a bad field is an `error` instead of a dead session), four dialog rows and a front-end deadline.  The core has **no limits of its own** (0 = «без предела», messages name a limit and its value only — ADR-020) and the window ships 0 / 1 000 000 / 1 000 000 / 0.  The **interpreter path** and the **process directory** are in too (2026-10-02): `execution/interpreter` (a `file` row; empty = «the one the window was started with», the row wins over `--exe`, the status bar names a non-default build) and `execution/process_directory` (`каталог файла` / `рабочая папка` / `свой каталог`; `ЗАПИСЬ_В`/`ЧТЕНИЕ_ИЗ` open relative to it) — every session start goes through one gate, «Применить» restarts a live session on either change and reports a missing path.  Still open: profiles, and `--timeout-ms` (a text-mode deadline would need a clock in the solver — **dropped by decision**).  The last item of task_29's settings list, split out on 2026-10-01 |
 | task_47_lessons_and_formatting | done | the corpus in one style and the formatter's round of fixes: 21 of the 25 shipped programs reformatted by `prologd --format` (soft, 80, one tab) with a new check that every shipped program *is* the standard shape, so the style cannot drift again; the hard mode puts the head of a clause on a line of its own (the first goal was the one glued to the head); the format mode returns to the toolbar right after «Форматировать» (icon `edit-format-set`) and leaves «Правка»; lesson 12's animation is a click away (`%?`) with a two-frame version runs in the check; and the reformat taught the formatter a rule — a **query and a directive are never broken**, because the margin marker that runs them is line-local (the pinned question counts caught it) |
 | task_48_interface_cleanup | done | the round of small things the user asked for: five pictures left the tree (`help-about` — the same drawing as `prologd2`, the two `search-find-selected-*`, `view-toolbar`, `view-line-numbers`), `assets.MISSING` is down to four names, «Сохранить все» left the toolbar, the two «Найти выделенное» commands left «Поиск» with their icons; `Esc` now closes the graphics window → the find bar → the reference dock → the cheat sheet (one handler on the window, by *propagation*, so the completion popup and the find bar's field keep answering for themselves), and the graphics window opens itself on the **first primitive of a run** — once per run, so a window closed during an animation stays closed (task_45's window plus `_graphics_shown`) |
 | task_49_gui_defects | done | five defects found by using the window, all fixed.  `Шаг → Стоп → Запуск` no longer answers «нет шага, который ждёт ответа» (the paused flag is cleared by the events that conclude a run — including the *error* a «Стоп» turns into while a step waits); an untouched unnamed tab comes back clean (the session record carries the unsaved flag; JSON, because a fourth tab-separated field cannot be told apart from text with a tab in it); the format `Запустить с трассировкой` no longer takes the window (the output is handed over once per turn of the event loop, and the pane trims its history in bulks — 200 000 lines: 21.9 s → 3.0 s, a 16 000-line trace: 2.2 s → 0.6 s); the main window remembers its size and place (`view/window_geometry`), which the graphics window had done since task_45; and the **output arrives as it is written** — `IoContext::setOutputLineSink` fires at a line end and the session emits one `output` event per line, so a lesson's countdown counts 3, 2, 1 instead of arriving as one block when the program is over |
@@ -182,15 +184,18 @@ plain scripts.
    own list is closed: «использовать системные цвета» was done with the three
    themes, and **RU/EN was dropped** on 2026-10-01 (ADR-021 — the window stays
    Russian).  Two of the user's ten «недочётов» are written down and both are
-   done: `task_47_lessons_and_formatting.md` and
-   `task_48_interface_cleanup.md` (its one loose end is the by-hand look at the
-   redrawn icons in the dark theme, the user's own).  The batch of defects found by
+   done: `task_47_lessons_and_formatting.md` and `task_48_interface_cleanup.md`
+   (its last loose end — the by-hand look at the redrawn icons in the dark theme —
+   was confirmed by the user on 2026-10-02: «иконки в тёмной теме нормальные»).
+   The batch of defects found by
    using the window (`task_49_gui_defects.md`) is closed as well: four fixes pinned
    by reproductions and the live output — `IoContext::setOutputLineSink` plus one
    `output` event per written line, so a countdown prints 3, 2, 1 while the program
-   is still running.  What is left on the board is `task_46`'s remainder (the
-   interpreter path, the process directory, named profiles), the by-hand look at the
-   icons in the dark theme, and whatever the next hands-on session turns up.
+   is still running.  What is left on the board is `task_46`'s remainder:
+   **named profiles** (a table of sets — `-I`, limits, interpreter — with «Сделать
+   текущей» in one click); the text-mode `--timeout-ms` was **dropped by decision**
+   (a clock in the solver's hot path is a cost the front-end deadline avoids, and
+   a console run has the shell's own timeout).
 
 ## Open questions for the user
 
@@ -1528,3 +1533,45 @@ Added on 2026-10-02 while implementing task_31:
   — а потом есть и третья, и конец прогона).  Две старые проверки ожидали один блок
   на строку-склейку и обновлены: текст тот же, крупность мельче.
   Тесты: 268/268 ctest, 21 headless-скрипт GUI, пять PDF.
+* GUI round, part 48: **значки в тёмной теме приняты** — пользователь посмотрел
+  перерисованные значки: «иконки в тёмной теме нормальные», дорисовывать нечего.
+  Это закрывает последний хвост `task_48`, и на доске остаётся только `task_46`
+  (путь к интерпретатору, рабочий каталог процесса, профили) плюс решение, нужен ли
+  текстовому режиму `--timeout-ms`.
+* GUI round, part 49: **task_46 — путь к интерпретатору и рабочий каталог процесса;
+  `--timeout-ms` решён и отложен**.  Пользователь выбрал первые два пункта и
+  отказался от четвёртого.
+  **Интерпретатор.**  Строка `execution/interpreter` — новый тип `file` в таблице
+  настроек (со своим «Обзор…»: выбирает файл, а не каталог); пустая строка значит
+  «тот, с которым окно запущено», а заполненная главнее `--exe`, который остаётся
+  запасным (сам он, как и раньше, ищет свежую сборку).  `main.py` проверяет теперь
+  тот путь, который *действительно* запустится, — иначе на машине учителя, где
+  рядом с окном лежит свой `prologd.exe`, проверка строительного пути ошибочно
+  отказала бы.  Сессия получила `set_executable`/`executable`, и у окна появился
+  один шлюз `_start_session`, через который проходят все три места, где сессия
+  заводится (запуск, запрос, форматирование): несуществующий путь сообщается в
+  панели до всякого старта, а не половиной запущенного процесса.  Строка состояния
+  называет интерпретатор, когда строкой выбран другой (`prologd: …` справа), — то
+  есть окно видно, что работает не та сборка.
+  **Рабочий каталог процесса.**  `execution/process_directory` — выбор из трёх:
+  «каталог файла программы» (сохранённый файл пишет рядом с собой), «рабочая папка
+  окна» (прежнее поведение) и «свой каталог» (`execution/process_directory_path`).
+  Это не «Рабочая папка (ИМПОРТ)» — та строка идёт в `-I` как каталог *поиска*,
+  а эта — `QProcess.setWorkingDirectory`: от неё считаются `ЗАПИСЬ_В`, `ЧТЕНИЕ_ИЗ`
+  и остальные относительные пути.  Раньше всё это писало туда, откуда запущено окно
+  (наследуется у родителя), то есть у каждого ученика — в другое место.
+  **«Применить».**  Перемены в любом из двух пунктов не могут дойти до живого
+  процесса (программа и каталог зафиксированы стартом), поэтому живая сессия
+  перезапускается — и строка состояния об этом говорит; путь, которого нет, живую
+  сессию не трогает и пишет «интерпретатор не найден».
+  **`--timeout-ms`** — решено не делать: часы в горячем месте решателя были бы
+  платой за каждое решение, предел времени окна это уже покрывает, а у консольного
+  запуска есть таймаут оболочки.
+  Проверки: `test_settings.py` (умолчания и круговорот новых ключей, битый выбор
+  падает в `file`), `test_settingsdialog.py` (строка-файл спрашивает файл, а не
+  каталог; выбор из трёх), три новые в `test_window.py` (копия exe как «другой»
+  интерпретатор — строка доходит до сессии, прогон идёт копией, строка состояния
+  её называет; несуществующий путь сообщается в панели и сессии не заводит;
+  `ЗАПИСЬ_В` пишет в выбранный каталог — и фиксированный, и «рядом с файлом»).
+  Осталось в task_46: профили.
+

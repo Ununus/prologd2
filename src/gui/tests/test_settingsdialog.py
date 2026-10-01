@@ -212,6 +212,26 @@ def test_the_folder_rows_and_the_insert_page(directory: pathlib.Path) -> None:
     print("ok: the folder rows work, and the insert page lists and restores the table")
 
 
+def test_the_interpreter_and_process_directory_rows(directory: pathlib.Path) -> None:
+    """The two rows of task_46: a file chooser and a three-way choice."""
+    dialog = dialog_for(directory, "interp.ini")
+    keys = {setting.key: setting for setting in settings_module.SETTINGS}
+
+    # The interpreter is a *file* row: its «…» asks for one file, not a folder.
+    field = dialog._widgets[keys["execution/interpreter"].key]
+    dialog._ask_file = lambda: "C:/проlogd/prologd.exe"
+    dialog._browse(keys["execution/interpreter"].key)
+    assert field.text() == "C:/проlogd/prologd.exe"
+
+    # The process directory is a choice of three, and the default is `file`.
+    combo = dialog._widgets[keys["execution/process_directory"].key]
+    assert combo.count() == 3
+    assert combo.currentData() == "file"
+    values = [combo.itemData(row) for row in range(combo.count())]
+    assert values == ["file", "window", "custom"], values
+    print("ok: the interpreter row asks for a file, the directory row is a three-way choice")
+
+
 def test_applying_announces_itself(directory: pathlib.Path) -> None:
     """`changesApplied` is what makes «Применить» visible behind the dialog.
 
@@ -287,6 +307,7 @@ def main(argv: list[str]) -> int:
         test_import_stages_a_file_and_carries_unknown_keys(directory)
         test_export_writes_a_file_another_store_can_read(directory)
         test_the_folder_rows_and_the_insert_page(directory)
+        test_the_interpreter_and_process_directory_rows(directory)
         test_the_button_row_and_the_shared_label_column(directory)
         test_applying_announces_itself(directory)
     del application

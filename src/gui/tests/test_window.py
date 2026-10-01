@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 import pathlib
+import shutil
 import sys
 import tempfile
 
@@ -2956,6 +2957,97 @@ def test_the_graphics_window_follows_the_program(executable: str) -> None:
     print("ok: the graphics window follows the program, survives hiding, and saves")
 
 
+def test_the_interpreter_row_picks_the_binary_and_names_it(
+    executable: str, directory: pathlib.Path
+) -> None:
+    """task_46: the «Интерпретатор» row replaces `--exe`, and the window says so."""
+    other = directory / "другой" / "prologd.exe"
+    other.parent.mkdir()
+    shutil.copy2(executable, other)
+
+    window = empty_window(executable)
+    try:
+        window._settings.interpreter = str(other)
+        window.apply_settings()
+        assert window.session.executable() == str(other), "the row did not reach the session"
+        assert f"prologd: {other}" in window._details.text(), window._details.text()
+
+        window.editor().setPlainText('?ВЫВОД("ок"),ПС.\n')
+        window.run_program()
+        wait_for_result(window)
+        assert "ок" in window.output_text(), ascii(window.output_text())
+        print("ok: the interpreter row picks the binary and the status bar names it")
+    finally:
+        discard_changes(window)
+
+
+def test_a_missing_interpreter_is_reported_not_half_started(
+    executable: str, directory: pathlib.Path
+) -> None:
+    """task_46: a row that points at nothing fails loudly, not half-open."""
+    missing = directory / "нет" / "prologd.exe"
+
+    window = make_window(executable, ready=False)
+    try:
+        window._settings.interpreter = str(missing)
+        window.apply_settings()
+        assert window.session.executable() == str(missing), "the row did not reach the session"
+
+        window.editor().setPlainText('?ВЫВОД("ок"),ПС.\n')
+        assert window.run_program() is False
+        assert (
+            "не удалось запустить интерпретатор" in window.output_text()
+        ), ascii(window.output_text())
+        assert window.session.is_running() is False, "a missing binary must not start a session"
+        print("ok: a missing interpreter is reported in the pane, and no session starts")
+    finally:
+        discard_changes(window)
+
+
+def test_the_process_directory_is_where_files_go(
+    executable: str, directory: pathlib.Path
+) -> None:
+    """task_46: `ЗАПИСЬ_В` writes into the chosen folder, relative paths and all.
+
+    The two answers that matter for a lesson: a fixed folder («свой каталог»)
+    for an unnamed buffer, and the running file's own folder («каталог файла»).
+    """
+    window = empty_window(executable)
+    try:
+        fixed = directory / "туда"
+        fixed.mkdir()
+        window._settings.process_directory = "custom"
+        window._settings.process_directory_path = str(fixed)
+        window.apply_settings()
+        assert window.session.working_directory() == str(fixed)
+
+        window.editor().setPlainText('?ЗАПИСЬ_В("данные.txt"), ВЫВОД("ок"), ПС, ЗАПИСЬ_В("").\n')
+        window.run_program()
+        assert pump(window, lambda: "решени" in window.status_text()), ascii(window.output_text())
+        written = fixed / "данные.txt"
+        assert written.is_file(), "the program wrote next to nothing"
+        assert written.read_text(encoding="utf-8") == "ок\n"
+
+        # A saved program writes next to itself under «каталог файла программы».
+        program_dir = directory / "программа"
+        program_dir.mkdir()
+        program = program_dir / "пишет.pld"
+        program.write_text(
+            '?ЗАПИСЬ_В("файл.txt"), ВЫВОД("файл"), ПС, ЗАПИСЬ_В("").\n', encoding="utf-8"
+        )
+        window._settings.process_directory = "file"
+        window.apply_settings()
+        window.open_path(str(program))
+        window.run_program()
+        assert pump(window, lambda: "решени" in window.status_text()), ascii(window.output_text())
+        beside = program_dir / "файл.txt"
+        assert beside.is_file(), "the program did not write next to itself"
+        assert beside.read_text(encoding="utf-8") == "файл\n"
+        print("ok: the process directory decides where a program's files go")
+    finally:
+        discard_changes(window)
+
+
 def main(argv: list[str]) -> int:
     if QApplication is None:
         print("skipped: PySide6 is not installed")
@@ -3044,6 +3136,9 @@ def main(argv: list[str]) -> int:
         test_the_settings_dialog_changes_the_window_without_a_restart(executable)
         test_the_theme_switch_reaches_the_text_and_the_widgets(executable)
         test_the_shared_folder_reaches_the_interpreter(executable)
+        test_the_interpreter_row_picks_the_binary_and_names_it(executable, files)
+        test_a_missing_interpreter_is_reported_not_half_started(executable, files)
+        test_the_process_directory_is_where_files_go(executable, files)
         test_autosave_writes_named_buffers_and_skips_the_rest(executable, files)
         test_saving_before_a_run_writes_the_file(executable, files)
         test_the_tabs_come_back_on_the_next_start(executable, files)

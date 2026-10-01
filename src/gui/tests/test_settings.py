@@ -312,7 +312,31 @@ def test_the_new_keys_have_the_documented_defaults(directory: pathlib.Path) -> N
     assert settings.output_font_size == settings_module.MAXIMUM_FONT_SIZE
     settings.autosave_minutes = -5
     assert settings.autosave_minutes == 0
+    # task_46's other two rows: the interpreter is empty (the window's own), and
+    # the process starts in the running file's folder until told otherwise.
+    assert settings.interpreter == "", "empty means the one the window was started with"
+    assert settings.process_directory == "file"
+    assert settings.process_directory_path == ""
     print("ok: the new preferences start where the task says they start")
+
+
+def test_the_interpreter_and_process_directory_round_trip(directory: pathlib.Path) -> None:
+    path = directory / "interp.ini"
+    settings = Settings(path)
+    settings.interpreter = "C:/проlogd/prologd.exe"
+    settings.process_directory = "custom"
+    settings.process_directory_path = "C:/курс"
+
+    reopened = Settings(path)
+    assert reopened.interpreter == "C:/проlogd/prologd.exe"
+    assert reopened.process_directory == "custom"
+    assert reopened.process_directory_path == "C:/курс"
+
+    # A choice the rows do not know falls back like every other choice, and the
+    # setter writes the fallback rather than a value the combo could not show.
+    settings.process_directory = "каталог"
+    assert settings.process_directory == "file", "an unknown answer reads as `file`"
+    print("ok: the interpreter path and the process directory round-trip")
 
 
 def main() -> int:
@@ -324,6 +348,7 @@ def main() -> int:
         test_setters_clamp(directory)
         test_unknown_keys_survive(directory)
         test_the_new_keys_have_the_documented_defaults(directory)
+        test_the_interpreter_and_process_directory_round_trip(directory)
         test_every_row_round_trips_and_resets(directory)
         test_set_value_clamps_and_survives_junk(directory)
         test_reset_touches_only_described_settings(directory)

@@ -190,7 +190,7 @@ class SettingsDialog(QDialog):
                 label = QLabel(f"{setting.label}:")
                 self._labels.append(label)
                 field: QWidget = widget
-                if setting.kind == "directory":
+                if setting.kind in ("directory", "file"):
                     field = self._with_browse(setting, widget)
                 # Every value fills its column, so the right edge of the fields is
                 # one line on the page; a checkbox stays its own size and sits at
@@ -283,10 +283,16 @@ class SettingsDialog(QDialog):
         return QLineEdit(self)
 
     def _with_browse(self, setting: settings_module.Setting, field: QWidget) -> QWidget:
-        """A folder field with a «…» button, since nobody types a path by hand."""
+        """A path field with a «…» button, since nobody types a path by hand.
+
+        A `directory` row asks for a folder, a `file` row for one file (task_46's
+        interpreter); the button's tooltip says which.
+        """
         button = QToolButton(self)
         button.setText("…")
-        button.setToolTip("Выбрать каталог")
+        button.setToolTip(
+            "Выбрать файл" if setting.kind == "file" else "Выбрать каталог"
+        )
         button.clicked.connect(lambda: self._browse(setting.key))
         holder = QWidget(self)
         row = QHBoxLayout(holder)
@@ -579,6 +585,14 @@ class SettingsDialog(QDialog):
         )
         return chosen or None
 
+    def _ask_file(self) -> str | None:
+        """The chooser of the interpreter row (task_46): one executable."""
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Интерпретатор", str(self._start_directory()),
+            "Исполняемый файл (*.exe);;Все файлы (*)",
+        )
+        return path or None
+
     def _start_directory(self) -> pathlib.Path:
         remembered = self._settings.last_directory
         if remembered and pathlib.Path(remembered).is_dir():
@@ -586,7 +600,8 @@ class SettingsDialog(QDialog):
         return pathlib.Path.home()
 
     def _browse(self, key: str) -> None:
-        chosen = self._ask_directory()
+        setting = settings_module.BY_KEY[key]
+        chosen = self._ask_file() if setting.kind == "file" else self._ask_directory()
         widget = self._widgets.get(key)
         if chosen and isinstance(widget, QLineEdit):
             widget.setText(chosen)
