@@ -31,7 +31,7 @@ from __future__ import annotations
 import pathlib
 
 from PySide6.QtCore import Qt, QUrl, Signal
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtGui import QColor, QDesktopServices
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -40,6 +40,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QFormLayout,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QLineEdit,
     QListWidget,
@@ -48,6 +49,8 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QSpinBox,
     QStackedWidget,
+    QTableWidget,
+    QTableWidgetItem,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -56,10 +59,19 @@ from PySide6.QtWidgets import (
 from . import actions, assets
 from . import settings as settings_module
 from . import shortcuts
+from . import theme as theme_module
 #: The page that is not built from the table: the insert table of task_31 is
 #: *data* in the settings file, and what the user needs here is to see it and to
 #: find the file — not a JSON editor.
 INSERTS_PAGE = "Вставки"
+#: The page that lists the syntax colours (task_50): the light and dark palettes
+#: side by side, so the two themes can be compared without leaving the dialog.
+SYNTAX_PAGE = "Подсветка"
+
+
+def _text_for(color: str) -> str:
+    """Black or white, whichever reads on the swatch of `color` (task_50)."""
+    return "#1a1a1a" if theme_module.relative_luminance(color) > 0.3 else "#ffffff"
 
 
 class PathListEditor(QWidget):
@@ -218,6 +230,8 @@ class SettingsDialog(QDialog):
             self._forms.append(form)
             self._sections[section] = self._pages.addWidget(page)
             self._nav.addItem(section)
+            if section == "Вид":
+                self._build_syntax_page()
         self._build_inserts_page()
         self._align_columns()
         # «Свой каталог процесса» follows the choice above it: inactive until
@@ -332,6 +346,55 @@ class SettingsDialog(QDialog):
         row.addWidget(field, 1)
         row.addWidget(button)
         return holder
+
+    def _build_syntax_page(self) -> None:
+        """The «Подсветка» page (task_50): every highlighted role, both themes.
+
+        Read-only on purpose: the colours belong to the two shipped palettes, and
+        the way to change the whole set is «Вид → Оформление».  The page is a
+        table of `что подсвечено · светлая · тёмная`, each hex painted in its own
+        colour, so the two columns read as the two themes at a glance.
+        """
+        page = QWidget(self)
+        layout = QVBoxLayout(page)
+        note = QLabel(
+            "Одна и та же роль в двух темах, рядом.  Эти цвета принадлежат теме "
+            "и по отдельности не меняются — выбрать тему можно в «Вид → "
+            "Оформление»."
+        )
+        note.setWordWrap(True)
+        layout.addWidget(note)
+
+        table = QTableWidget(0, 3, page)
+        table.setHorizontalHeaderLabels(["Что подсвечено", "Светлая", "Тёмная"])
+        header = table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        table.verticalHeader().setVisible(False)
+        table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
+        table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+
+        self._syntax_rows: list[tuple[str, str, str]] = []
+        for row, (label, light, dark) in enumerate(theme_module.syntax_rows()):
+            self._syntax_rows.append((label, light, dark))
+            table.insertRow(row)
+            table.setItem(row, 0, QTableWidgetItem(label))
+            for column, hex_value in ((1, light), (2, dark)):
+                item = QTableWidgetItem(hex_value)
+                item.setBackground(QColor(hex_value))
+                item.setForeground(QColor(_text_for(hex_value)))
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                table.setItem(row, column, item)
+
+        layout.addWidget(table, 1)
+        self._sections[SYNTAX_PAGE] = self._pages.addWidget(page)
+        self._nav.addItem(SYNTAX_PAGE)
+
+    def syntax_rows(self) -> list[tuple[str, str, str]]:
+        """The «Подсветка» page as `(what, light hex, dark hex)` rows (task_50)."""
+        return list(self._syntax_rows)
 
     def _build_inserts_page(self) -> None:
         """The «Вставки» page: what `Ctrl`+key does, and where the table lives.

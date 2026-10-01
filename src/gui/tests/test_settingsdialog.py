@@ -37,10 +37,13 @@ def dialog_for(directory: pathlib.Path, name: str = "gui.ini"):
 def test_a_page_per_section_and_a_widget_per_row(directory: pathlib.Path) -> None:
     """The dialog *is* the description table — nothing added, nothing forgotten."""
     dialog = dialog_for(directory)
-    assert dialog.section_names() == [
-        *settings_module.SECTIONS,
-        settings_module.__dict__.get("INSERTS_PAGE", "Вставки"),
-    ] or dialog.section_names()[:-1] == list(settings_module.SECTIONS), dialog.section_names()
+    names = dialog.section_names()
+    # The described sections in order, with the two data pages slotted in:
+    # «Подсветка» right after «Вид» (it is about the theme), «Вставки» at the end.
+    described = list(settings_module.SECTIONS)
+    described.insert(described.index("Вид") + 1, settings_module.__dict__.get(
+        "SYNTAX_PAGE", "Подсветка"))
+    assert names == [*described, settings_module.__dict__.get("INSERTS_PAGE", "Вставки")], names
 
     widgets = dialog.widgets()
     described = {setting.key for setting in settings_module.SETTINGS}
@@ -57,6 +60,24 @@ def test_a_page_per_section_and_a_widget_per_row(directory: pathlib.Path) -> Non
             if setting.section == section:
                 assert setting.label in labels, (section, setting.label)
     print(f"ok: {len(widgets)} rows over {len(dialog.section_names())} pages, from the table alone")
+
+
+def test_the_syntax_page_lists_every_colour_in_both_themes(directory: pathlib.Path) -> None:
+    """«Подсветка» (task_50): each role with its light and dark hex side by side."""
+    from prologd_gui import theme
+
+    dialog = dialog_for(directory)
+    assert dialog.show_section("Подсветка") is True
+    rows = dialog.syntax_rows()
+    assert len(rows) == len(theme.SYNTAX_LABELS) == len(theme.Theme.__dataclass_fields__), len(rows)
+    # The first row is the comment, in the light palette's and the dark one's hex.
+    assert rows[0] == ("Комментарий", theme.LIGHT_SYNTAX.comment, theme.DARK_SYNTAX.comment), rows[0]
+    for label, light, dark in rows:
+        assert len(light) == 7 and light.startswith("#"), light
+        assert len(dark) == 7 and dark.startswith("#"), dark
+    labels = [label for label, _, _ in rows]
+    assert labels == list(theme.SYNTAX_LABELS.values()), labels
+    print(f"ok: {len(rows)} syntax roles, light and dark hex for each")
 
 
 def test_the_widgets_show_the_stored_values(directory: pathlib.Path) -> None:
@@ -319,6 +340,7 @@ def main(argv: list[str]) -> int:
     with tempfile.TemporaryDirectory(prefix="prologd_gui_dialog_") as name:
         directory = pathlib.Path(name)
         test_a_page_per_section_and_a_widget_per_row(directory)
+        test_the_syntax_page_lists_every_colour_in_both_themes(directory)
         test_the_widgets_show_the_stored_values(directory)
         test_apply_writes_and_cancel_does_not(directory)
         test_reset_puts_the_defaults_in_the_widgets_and_needs_applying(directory)

@@ -718,7 +718,9 @@ discarding the edit.
 key, label, section, kind, default, bounds, hint — that is also what validation
 clamps against and what «Сбросить» writes back.  A new preference is therefore a
 new record, and the dialog grows by itself; `test_settingsdialog.py` checks that
-every record has a widget and every widget writes its key.
+every record has a widget and every widget writes its key.  Two pages are *not*
+rows of the table: **Подсветка** (the light and dark syntax palettes, side by
+side — data of `theme.py`) and **Вставки** (the `Ctrl`+key table).
 
 | Section | What is in it |
 | --- | --- |
@@ -727,6 +729,7 @@ every record has a widget and every widget writes its key.
 | Формат | the formatter's mode, width, indent and unit, «только выделенное» |
 | Выполнение | whether a run answers the program's own `?`-questions, save before run, the four limits (steps, depth, НАЙТИВСЕ solutions, milliseconds), **the interpreter path** (empty = the one the window was started with), **the process directory** (the running file's folder, the window's folder, or a fixed one — `ЗАПИСЬ_В`/`ЧТЕНИЕ_ИЗ` open relative to it), the `ИМПОРТ` search folders |
 | Файлы | autosave in minutes (0 = off), how many recent files to remember, restoring the open tabs at start-up |
+| Подсветка | the syntax colours, read-only: every highlighted role («Комментарий», «Строка», «Атом латиницей» …) with its hex in the light and the dark theme side by side (the two shipped palettes of `theme.py`; the whole set follows «Вид → Оформление») |
 | Вставки | the live `Ctrl`+key table (task_31), the settings file path, «Вернуть встроенную таблицу» |
 
 * **ОК** and **Применить** write through `Settings` and say so

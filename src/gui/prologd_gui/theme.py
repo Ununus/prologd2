@@ -121,6 +121,46 @@ DARK_SYNTAX = Theme(
     mixed="#d16d9e",
 )
 
+#: What each syntax colour is, in the words of the settings dialog (task_50).
+#: The keys are the `Theme` field names, and the order is the order of the fields
+#: themselves — so a colour added to `Theme` gets a row in the dialog once its
+#: label is here.
+SYNTAX_LABELS: dict[str, str] = {
+    "comment": "Комментарий",
+    "query_comment": "Вопрос в комментарии",
+    "string": "Строка",
+    "quoted_atom": "Атом в кавычках",
+    "keyword": "Служебное имя",
+    "integer": "Целое число",
+    "float": "Вещественное число",
+    "punctuation": "Знаки препинания",
+    "query": "Вопрос (?цель)",
+    "expression": "Выражение (#…)",
+    "atom_latin": "Атом латиницей",
+    "atom_cyrillic": "Атом кириллицей",
+    "variable_latin": "Переменная латиницей",
+    "variable_cyrillic": "Переменная кириллицей",
+    "mixed": "Имя из двух алфавитов",
+}
+
+
+def syntax_rows() -> list[tuple[str, str, str]]:
+    """`(what, light hex, dark hex)` for every highlighted role (task_50).
+
+    The settings dialog's «Подсветка» page and its test both read this, so a
+    colour added to `Theme` shows up in both without a second edit.  Qt-free on
+    purpose: the labels and the two hexes are data, and the dialog is what paints
+    them.
+    """
+    return [
+        (
+            SYNTAX_LABELS[field.name],
+            getattr(LIGHT_SYNTAX, field.name),
+            getattr(DARK_SYNTAX, field.name),
+        )
+        for field in fields(Theme)
+    ]
+
 
 @dataclass(frozen=True)
 class Palette:
