@@ -929,7 +929,7 @@ class CodeEditor(ZoomablePlainTextEdit):
         if offer is None:
             return
         self._hide_completion()
-        self._insert_completion(offer.insert_text)
+        self._insert_completion(*offer.call_form)
 
     def _accept_completion(self) -> bool:
         """`Enter`/`Tab`: takes the highlighted row.  False when there is none."""
@@ -939,20 +939,26 @@ class CodeEditor(ZoomablePlainTextEdit):
         self._hide_completion()
         if offer is None:
             return False
-        self._insert_completion(offer.insert_text)
+        self._insert_completion(*offer.call_form)
         return True
 
-    def _insert_completion(self, text: str) -> None:
-        """Replaces the word being typed; the arity in the label is not inserted."""
+    def _insert_completion(self, text: str, caret_after: int | None = None) -> None:
+        """Replaces the word being typed; the caret lands at `caret_after`.
+
+        `caret_after` is the offset from the start of the inserted text — the
+        call form puts it right after the opening parenthesis, so the user types
+        the first argument at once (the arity in the label is never typed).
+        """
         cursor = self.textCursor()
         prefix = completion.word_before(self.toPlainText(), cursor.position())
+        start = cursor.position() - len(prefix) if prefix else cursor.position()
         cursor.beginEditBlock()
         if prefix:
-            cursor.setPosition(
-                cursor.position() - len(prefix), QTextCursor.MoveMode.KeepAnchor
-            )
+            cursor.setPosition(start, QTextCursor.MoveMode.KeepAnchor)
         cursor.insertText(text)
         cursor.endEditBlock()
+        if caret_after is not None:
+            cursor.setPosition(start + caret_after)
         self.setTextCursor(cursor)
 
     # -- keys ---------------------------------------------------------------

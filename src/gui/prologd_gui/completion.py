@@ -72,6 +72,23 @@ class Candidate:
         """What replaces the typed prefix — the name, never the arity."""
         return self.name
 
+    @property
+    def call_form(self) -> tuple[str, int]:
+        """`(text, caret)` for accepting this offer (2026-10-02).
+
+        A predicate with arguments inserts its call skeleton — `СЛОЖЕНИЕ(, , )`
+        for arity 3 — with the caret right after the opening parenthesis, so the
+        next keystroke types the first argument.  Variadic `ВЫВОД` behaves like
+        one argument (nobody knows how many it takes), and a zero-arity name or
+        a bare atom inserts only the name with the caret at the end.
+        """
+        if self.variadic:
+            return self.name + "()", len(self.name) + 1
+        if self.arity is None or self.arity == 0:
+            return self.name, len(self.name)
+        skeleton = self.name + "(" + ", ".join([""] * self.arity) + ")"
+        return skeleton, len(self.name) + 1
+
 
 def _count_arguments(line_tokens: list[tokens.Token], start: int) -> int | None:
     """Arity of the call whose `(` is at `start`, or `None` if it does not close.

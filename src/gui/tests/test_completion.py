@@ -92,11 +92,13 @@ def test_reserved_names_come_with_their_arity() -> None:
     print("ok: reserved and document names, with the right labels")
 
 
-def test_only_the_name_is_inserted() -> None:
+def test_the_call_form_is_inserted_with_the_caret_after_the_paren() -> None:
+    """Accepting inserts `имя(` with the caret after `(`; arity adds commas."""
     offers = {offer.name: offer for offer in completion.collect(DOCUMENT, RESERVED)}
     assert offers["НАЙТИВСЕ"].label == "НАЙТИВСЕ/3"
-    assert offers["НАЙТИВСЕ"].insert_text == "НАЙТИВСЕ", "the arity must not be typed for the user"
-    print("ok: the arity is shown but never inserted")
+    assert offers["НАЙТИВСЕ"].call_form == ("НАЙТИВСЕ(, , )", 9), offers["НАЙТИВСЕ"].call_form
+    assert offers["ВЫВОД"].call_form == ("ВЫВОД()", 6), offers["ВЫВОД"].call_form
+    print("ok: accepting inserts the call form, with the caret after the opening parenthesis")
 
 
 def test_matching_is_case_sensitive_by_default() -> None:
@@ -225,9 +227,10 @@ def test_the_popup_opens_and_accepts() -> None:
     assert "ab" in offers, offers
 
     QTest.keyClick(editor, Qt.Key.Key_Return)
-    assert editor.toPlainText() == "abc(1).\nabc", editor.toPlainText()
+    assert editor.toPlainText() == "abc(1).\nabc()", editor.toPlainText()
+    assert editor.textCursor().position() == 12, editor.textCursor().position()
     assert not editor.completion_visible(), "Enter must close the popup, not open a line"
-    print("ok: two letters open the popup and Enter takes the name without a newline")
+    print("ok: two letters open the popup and Enter inserts the call form without a newline")
 
 
 def test_escape_closes_and_arrows_keep_working() -> None:
@@ -349,7 +352,7 @@ def main() -> int:
     test_the_document_is_scanned_for_names()
     test_lists_do_not_inflate_the_arity()
     test_reserved_names_come_with_their_arity()
-    test_only_the_name_is_inserted()
+    test_the_call_form_is_inserted_with_the_caret_after_the_paren()
     test_matching_is_case_sensitive_by_default()
     test_the_same_alphabet_sorts_first()
     test_completion_is_suppressed_inside_comments_and_strings()

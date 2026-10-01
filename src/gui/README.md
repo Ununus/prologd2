@@ -95,6 +95,7 @@ version does not know are left alone (task_29 adds the dialog).
 | `Shift+F1` | **Руководство пользователя** — the built PDF (`doc/help.pdf`) |
 | `Ctrl+Space` | completion popup — it also opens by itself after two letters |
 | `Enter` / `Tab` / `Esc` | take the highlighted completion / close the popup |
+| | taking a predicate inserts `имя(` with the caret after the `(`, and a comma per extra argument — `НАЙТИВСЕ(, , )` |
 | `Ctrl`+wheel, `Ctrl`+keypad `+`/`-`, `Ctrl+0` | font size (6…72 pt) and its reset |
 | `Tab` / `Shift+Tab` | indent / outdent the selected lines |
 | `Enter` | starts the new line at the indentation of the one above, one step deeper after `,`, `:-` or `<-` (with «Автоотступ» unticked, it starts at the margin) |
