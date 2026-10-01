@@ -295,17 +295,20 @@ def test_no_popup_inside_a_comment_or_a_string() -> None:
 
 
 def test_the_popup_shows_the_description_of_the_highlighted_row() -> None:
-    """The label under the popup (task_37): the summary of the highlighted name.
+    """The label under the popup (task_37, multi-line since 2026-10-02).
 
     It is a window of its own (`Qt.ToolTip`), so it must appear with the popup,
     follow the highlight and leave with the popup — and a name that has no record
-    must leave it hidden rather than show a frame about the previous row.
+    must leave it hidden rather than show a frame about the previous row.  What
+    it shows is the record's title (name, alias, summary) and its argument modes.
     """
     from PySide6.QtCore import Qt
     from PySide6.QtGui import QTextCursor
     from PySide6.QtTest import QTest
 
     from prologd_gui.editor import CodeEditor
+
+    described = "abc (abc_en) — тестовый предикат\n\nabc(X) — тест"
 
     editor = CodeEditor(auto_complete_after=1)
     editor.set_completion_keywords(RESERVED)
@@ -317,14 +320,14 @@ def test_the_popup_shows_the_description_of_the_highlighted_row() -> None:
     assert editor.completion_visible()
     # `a` itself is offered last: the line being typed is part of the document.
     assert editor.completion_labels() == ["abc/1", "abc2/1", "a"], editor.completion_labels()
-    assert editor.completion_detail() == "abc — тестовый предикат", editor.completion_detail()
+    assert editor.completion_detail() == described, editor.completion_detail()
 
     # Down moves the highlight to a name the reference does not know: the label
     # goes away, it does not keep describing `abc`.
     QTest.keyClick(editor, Qt.Key.Key_Down)
     assert editor.completion_detail() == "", editor.completion_detail()
     QTest.keyClick(editor, Qt.Key.Key_Up)
-    assert editor.completion_detail() == "abc — тестовый предикат", editor.completion_detail()
+    assert editor.completion_detail() == described, editor.completion_detail()
 
     QTest.keyClick(editor, Qt.Key.Key_Escape)
     assert not editor.completion_visible()

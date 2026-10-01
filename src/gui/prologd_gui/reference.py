@@ -31,6 +31,25 @@ from collections.abc import Iterator
 DEFAULT_PATH = pathlib.Path(__file__).resolve().parents[3] / "doc" / "builtins.json"
 
 
+def record_title(record: dict) -> str:
+    """The first line of a record: `ИМЯ (алиас) — сводка`.
+
+    The English spelling is no longer a line of its own (2026-10-02): it sits
+    next to the Russian name in parentheses, so the help reads
+    `ВВКОД (put_code) — …` instead of a separate «английское имя».  A name with
+    several spellings lists them all: `ИМЯ (alias1, alias2) — …`.
+    """
+    name = record.get("name")
+    head = str(name) if isinstance(name, str) else ""
+    aliases = [alias for alias in (record.get("aliases") or []) if isinstance(alias, str)]
+    if aliases:
+        head = f"{head} ({', '.join(aliases)})"
+    summary = record.get("summary")
+    if isinstance(summary, str) and summary:
+        return f"{head} — {summary}" if head else summary
+    return head
+
+
 class Reference:
     """The records by name; an alias resolves to the record of its predicate."""
 
@@ -92,3 +111,28 @@ class Reference:
         record = self.record(name)
         text = record.get("section") if record else None
         return text if isinstance(text, str) else ""
+
+    def title(self, name: str) -> str:
+        """The first line of a record, by name: `ИМЯ (алиас) — сводка`."""
+        record = self.record(name)
+        return record_title(record) if record else ""
+
+    def detail_lines(self, name: str) -> list[str]:
+        """The popup's preview: the title, then one line per call form.
+
+        What the completion popup shows under the list (2026-10-02): the name
+        with its alias and summary, then the argument modes — the same facts the
+        `F1` dock shows, compacted to what a glance needs.
+        """
+        record = self.record(name)
+        if record is None:
+            return []
+        title = record_title(record)
+        if not title:
+            return []
+        lines = [title]
+        variants = self.variants(name)
+        if variants:
+            lines.append("")
+            lines.extend(variants)
+        return lines

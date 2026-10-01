@@ -2723,11 +2723,8 @@ class MainWindow(QMainWindow):
 
     @staticmethod
     def _reference_text(record: dict) -> str:
-        """A record as the dock shows it: one line, the aliases, the modes."""
-        aliases = record.get("aliases") or []
-        lines = [f"{record['name']} — {record['summary']}"]
-        if aliases:
-            lines.append("английское имя: " + ", ".join(aliases))
+        """A record as the dock shows it: the title, the section, the modes."""
+        lines = [reference.record_title(record)]
         lines.append(f"раздел руководства: {record['section']}")
         variants = record.get("variants") or []
         if variants:

@@ -63,6 +63,11 @@ _COMPLETION_ACCEPT_KEYS = (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Tab)
 #: they walk the list.
 _POPUP_CLOSE_KEYS = (Qt.Key.Key_Left, Qt.Key.Key_Right, Qt.Key.Key_Home, Qt.Key.Key_End)
 
+#: The width the completion's description wraps at (task_37, made multi-line in
+#: 2026-10-02): wide enough for a summary, narrow enough that the label under the
+#: popup never runs off the screen.
+COMPLETION_DETAIL_WIDTH = 460
+
 
 class LineNumberArea(QWidget):
     """The margin the editor paints line numbers and run markers into."""
@@ -848,12 +853,14 @@ class CodeEditor(ZoomablePlainTextEdit):
         return super().eventFilter(watched, event)
 
     def _update_detail(self, label: str = "") -> None:
-        """The one-line description of the highlighted candidate (task_37).
+        """The description of the highlighted candidate: title, then the modes.
 
         `label` is what `QCompleter.highlighted` carries — the text of the row;
         without it (the popup was just shown, or hidden) the highlighted index
         answers.  No record for the name means no label: saying nothing is better
         than a label that says «нет описания» for every name of the document.
+        The label is word-wrapped to a width of its own, so a long summary and
+        the argument modes read as several lines, not as one line off the screen.
         """
         if self._completer is None or self._detail is None or self._reference is None:
             return
@@ -864,11 +871,13 @@ class CodeEditor(ZoomablePlainTextEdit):
         offer = next((item for item in self._offers if item.label == label), None)
         if offer is None:
             offer = self._offer_at(popup.currentIndex().row())
-        summary = self._reference.summary(offer.name) if offer is not None else ""
-        if not summary:
+        lines = self._reference.detail_lines(offer.name) if offer is not None else []
+        if not lines:
             self._detail.hide()
             return
-        self._detail.setText(f"{offer.name} — {summary}")
+        self._detail.setText("\n".join(lines))
+        self._detail.setWordWrap(True)
+        self._detail.setMaximumWidth(COMPLETION_DETAIL_WIDTH)
         self._detail.adjustSize()
         self._detail.move(popup.mapToGlobal(QPoint(0, popup.height() + 2)))
         self._detail.show()
