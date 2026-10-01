@@ -242,12 +242,12 @@ The menus are **Файл** (Новый, Открыть…, Последние, �
 пользователя, Справка по окну, О программе).
 
 An entry that does not exist yet stays in its menu but is **disabled**, and its
-tooltip names what it waits for: «Графическое окно» is the one left, and it names
-`task_45_gui_graphics_window.md`.  A menu that silently lacks half of the feature
-list is worse than one that says so.  «Поиск» left that list in task_33, the
-«Выполнение» group in task_28 — «Запустить с трассировкой», «Шаг» and «Шаг с
-обходом» are live — «Форматировать» in task_30, and «Настройки…» in task_29: it is
-the last command that left it except the graphics window.  The toolbar is
+tooltip names what it waits for.  **That list is empty now**: «Графическое окно»
+left it in task_45, and the list before it — «Поиск» in task_33, the «Выполнение»
+group in task_28 («Запустить с трассировкой», «Шаг» и «Шаг с обходом» are live),
+«Форматировать» in task_30 and «Настройки…» in task_29.  A menu that silently
+lacks half of the feature list is worse than one that says so, and a menu where
+nothing has to be said is better than both.  The toolbar is
 grouped as
 the reference front-end had it: file | run/stop/step | editing (comment,
 uncomment, format) | font size | tools (graphics, settings, help), and at the far
@@ -371,6 +371,38 @@ Marking line 1 of the program for a failed query is exactly what that rule fixed
 the error is in the statement, not in the first line of the program.  A line past
 the end of the file (where `непарные скобки` is reported) is clamped to the last
 line that exists, and the first edit clears the mark.
+
+## The graphics window
+
+The graphics predicates draw into the interpreter (a `ТОЧКА(X, Y, Цвет)` read and
+a `ЗАКРАСКА` read cells from *inside* a built-in, so the pixels cannot live on the
+other side of the pipe) and **«Выполнение → Графическое окно»** shows them.  The
+entry is checkable — its state is the window's visibility — and both the
+visibility and where the window stood are remembered (`view/graphics_visible`,
+`view/graphics_geometry`, a `saveGeometry()` blob: Qt knows about screens, a
+maximised window and a display that is no longer there).
+
+`graphicswindow.GraphicsWindow` is a window of its own (`Qt.Window`, *owned* by
+the main window — without that flag a `QWidget` with a parent is a child widget
+and the picture would be embedded in the editor).  Its toolbar has «Вписать в
+окно» (the whole 1024×768 screen in the window), «1 : 1» (one cell per screen
+pixel, with the scroll area doing the moving), «Очистить» (the *window's* picture
+— the interpreter's screen belongs to the program, and a new run starts a fresh
+interpreter and clears the canvas with it) and «Сохранить как PNG…»; to the right
+stands the cell under the pointer («x=320 y=240 цвет=14»), because "why is it
+yellow" is a question the palette answers.
+
+`CanvasView` paints `graphics.Canvas.rgba` — the canvas' own buffer, wrapped in a
+`QImage` without a copy, so a primitive costs a few writes and one repaint and an
+animation (lesson 12) follows the program.  The scale is nearest-neighbour: the
+picture is pixel art, and a smoothed line at a fractional zoom no longer stands
+where the program put it.
+
+The drawing arrives as events while the window is open; a window that was **not**
+open asks for the whole screen when it opens (`{"cmd":"graphics","snapshot":true}`
+→ `bitmap`).  A window that was never opened costs nothing: the canvas is created
+on first use, and the events of a run nobody watched are simply not needed — the
+snapshot has them.
 
 ## The output panel
 
@@ -671,9 +703,15 @@ Headless check of the protocol, without PySide6 installed:
 
 ```powershell
 python src/gui/tests/protocol_smoke.py
+python src/gui/tests/test_graphics.py
 ```
 
-## Protocol contract (version 9)
+The second one is the picture: it checks the canvas on its own, and — when a build
+is found — draws a program, asks for the finished bitmap and replays the very
+events the same session reported, so the two rasterisers (C++ and Python) cannot
+drift apart quietly.
+
+## Protocol contract (version 10)
 
 One JSON object per line in both directions; the interpreter writes nothing else
 to stdout.  The C++ side lives in `src/cli/protocol.cpp`, the Python side in
@@ -690,7 +728,9 @@ margin uses it to answer one clicked query alone, task_36); version 6 adds
 front-end knows a run *without* questions (an empty program included) finished;
 version 9 adds the `limits` object of `load` (the step, depth and НАЙТИВСЕ caps of
 the run, `0` for «без предела» — task_46) and answers a request whose field has
-the wrong *type* with an `error` event instead of ending the session.
+the wrong *type* with an `error` event instead of ending the session; version 10
+adds the drawing: `graphics` events, one per primitive, and the `graphics` request
+with `snapshot`, answered with the whole `bitmap` (task_45).
 Version 1 sessions are still understood by the Python client (the table is then
 empty and completion falls back to the document's own predicates).
 
@@ -704,6 +744,7 @@ empty and completion falls back to the document's own predicates).
 | `{"cmd":"input","text":"…"}` | answer the pending `input_request` |
 | `{"cmd":"step","action":"into"}` | answer the pending `step` event; `action` is `into`, `over`, `continue` or `stop` |
 | `{"cmd":"format","text":"…","mode":"hard"}` | lay the text out and answer with `formatted`; `mode` is `soft` (default), `hard` or `line`, and `width`, `indent`, `unit` (`tab`/`spaces`) and `selection` say how |
+| `{"cmd":"graphics","snapshot":true}` | the whole picture drawn so far, as a `bitmap` event |
 | `{"cmd":"interrupt"}` | ask for a stop (see the note below) |
 | `{"cmd":"quit"}` | end the session |
 
@@ -733,11 +774,47 @@ field of the wrong type — `"maxSteps":-1`, or a string where a number belongs 
 is answered with an `error` event of kind `protocol`, and the session reads the
 next line; before version 9 such a request took the process down.
 
+The graphics predicates (version 10) draw **in the session**: the pixels live next
+to the engine, because a `ТОЧКА(X, Y, Цвет)` read and a `ЗАКРАСКА` read cells
+from inside a built-in, and a front-end on the other side of a pipe is asked
+nothing in the middle of one.  Every primitive goes out as it is drawn:
+
+```json
+{"event":"graphics","op":"setPixel","x":1,"y":2,"color":3}
+{"event":"graphics","op":"line","x1":0,"y1":0,"x2":60,"y2":40,"color":5}
+{"event":"graphics","op":"rectangle",…}   {"event":"graphics","op":"vertical",…}
+{"event":"graphics","op":"ellipse","x":320,"y":240,"rx":240,"ry":240,"color":14}
+{"event":"graphics","op":"floodFill","x":30,"y":15,"color":9}
+{"event":"graphics","op":"clearView","color":0}
+```
+
+Every primitive is a **cell** (`setPixel`, `floodFill`: `x`, `y`), a **segment**
+(`line`, `vertical`, `horizontal`: `x1`, `y1`, `x2`, `y2`, both ends included) or a
+**box** (`rectangle`: `x1`, `y1`, `x2`, `y2`, opposite corners in any order);
+`ellipse` is the odd one and says so in its field names — a centre `x`, `y` and two
+radii `rx`, `ry`, because `ОКРУЖНОСТЬ(X, Y, R, Цвет)` passes its four numbers
+straight through.  `clearView` carries the colour alone.  The coordinates are the
+ones the program asked for, *not* the clipped ones: the engine and the canvas clip
+the same way, and a picture drawn off the screen should be visible as what it was.
+
+A window that was not open while the program drew asks for the picture instead of
+starting blank:
+
+```json
+{"event":"bitmap","width":1024,"height":768,"data":"AwAAAA…"}
+```
+
+`data` is base64 of `width × height` **four-byte little-endian colour values** —
+the program's own numbers, not ARGB, so a replayed picture and a snapshot are
+comparable cell by cell (`protocol_smoke.py` compares them for a program that
+draws one of everything, and `test_graphics.py` does it for a whole drawing).
+The screen is 1024×768, it starts black, and a primitive outside it is clipped.
+
 ### Events
 
 | Event | Meaning |
 |-------|---------|
-| `{"event":"ready","protocol":9,"version":"2.0.0","keywords":[…]} `| the session is up |
+| `{"event":"ready","protocol":10,"version":"2.0.0","keywords":[…]} `| the session is up |
 | `{"event":"output","text":"…"}` | program output (`ВЫВОД`, query results) |
 | `{"event":"result","found":true}` | one query finished; `found` is false when nothing matched |
 | `{"event":"loaded"}` | a `load` request is over: its program and its own `?`-statements ran (a `query` request is answered by its `result` alone) |
@@ -745,6 +822,8 @@ next line; before version 9 such a request took the process down.
 | `{"event":"step","action":"call","goal":"…","depth":2,"file":"…","line":9,"column":1}` | a step point; `action` is `call`, `exit`, `redo` or `fail`.  `goal` is absent for `exit` (the goal is the one its `call` named), and the position is absent when there is none |
 | `{"event":"trace","text":"…"}` | one line of the `ТРАССА` trace |
 | `{"event":"formatted","text":"…","changed":true}` | the laid-out text of a `format` request; `changed` says whether it differs from what was sent |
+| `{"event":"graphics","op":"setPixel","x":1,"y":2,"color":3}` | one drawing primitive, as the program called it; `op` is one of the eight and the fields are the cell, the segment or the box it acts on |
+| `{"event":"bitmap","width":1024,"height":768,"data":"…"}` | the whole screen, base64 of four-byte little-endian colour values — the answer to a `graphics` request |
 | `{"event":"error","kind":"parse","severity":"warning","message":"…","file":"…","line":3,"column":5}` | diagnostic; `kind` is `parse`, `runtime` or `protocol`, `severity` is `error` or `warning` (a warning never ends the run), and the position is absent when there is none to report |
 | `{"event":"bye"}` | the session is over |
 
@@ -806,19 +885,18 @@ failure (for example an interrupted query).
 
 ## Roadmap
 
-Two pieces of work are planned in task files of their own (`ai/task_*.md`):
+One piece of work is planned in a task file of its own (`ai/task_*.md`):
 
-* **The graphics window** — `ai/task_45_gui_graphics_window.md`.  A
-  `GraphicsBackend` that emits protocol events (`ТОЧКА`, `ЛИНИЯ`, … reach a null
-  backend today), a bitmap backend inside the engine so `getPixel` and
-  `ЗАКРАСКА` stay correct without a round trip, a canvas and the last disabled
-  menu entry.
 * **Interpreter options, profiles and limits** —
   `ai/task_46_interpreter_options_and_limits.md`.  The limits are done: the
   session carries them on `load` (protocol 9), the dialog has a row for each of
   them plus «Предел времени, с», and a run names the rows it goes with before it
   starts.  Still open: the path to the interpreter (still `--exe`), the working
   directory of the process, and named profiles.
+
+The graphics window left this list in task_45: the engine keeps the pixels, the
+session draws them and sends every primitive, and `graphicswindow.py` shows the
+picture (section «The graphics window» above).
 
 task_29's own list is closed: «использовать системные цвета» was done with the
 three themes, and **RU/EN was dropped** (2026-10-01, ADR-021 — the window stays

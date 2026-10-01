@@ -900,20 +900,25 @@ def test_the_menus_come_from_the_action_table(executable: str) -> None:
         assert set(window._actions) == set(actions.BY_KEY), "the window has stray actions"
 
         # What is not implemented yet says so instead of doing nothing quietly.
-        # The execution group left this list in task_28 — `Запустить с
-        # трассировкой`, `Шаг` and `Шаг с обходом` are live now — `test_search.py`
-        # is where the search entries are checked, and «Настройки…» left it in
-        # task_29.  Only «Графическое окно» is still waiting for a task file.
+        # That list is empty now: the execution group left it in task_28
+        # (`Запустить с трассировкой`, `Шаг`, `Шаг с обходом` are live),
+        # `test_search.py` is where the search entries are checked, «Настройки…»
+        # left it in task_29, and «Графическое окно» in task_45 — it is the
+        # picture of the graphics predicates now, and its state is the window's
+        # visibility.
         settings = window._actions["settings"]
         assert settings.isEnabled() is True, "«Настройки…» is live since task_29"
         assert "не реализовано" not in settings.toolTip(), settings.toolTip()
         assert settings.icon().isNull() is False, "tools-settings.png is drawn"
-        assert window._actions["graphics"].isEnabled() is False
-        assert "не реализовано" in window._actions["graphics"].toolTip()
+        graphics = window._actions["graphics"]
+        assert graphics.isEnabled() is True, "the picture window is live now (task_45)"
+        assert graphics.isCheckable() is True, "its check state is the window's visibility"
+        assert "не реализовано" not in graphics.toolTip(), graphics.toolTip()
+        assert graphics.icon().isNull() is False, "view-graphics.png is drawn"
         assert window._actions["format"].isEnabled() is True, "the formatter is live now (task_30)"
         assert window._actions["step"].isEnabled() is True, "stepping is implemented now"
         assert window._actions["run_trace"].isEnabled() is True
-        print("ok: the menu bar is built from the action table, disabled entries explain themselves")
+        print("ok: the menu bar is built from the action table, and no entry is disabled any more")
     finally:
         discard_changes(window)
 
@@ -2515,6 +2520,83 @@ def test_the_limits_stop_a_runaway_and_name_themselves(executable: str) -> None:
     print("ok: the limits reach the run, name themselves, and the deadline is the window's")
 
 
+def test_the_graphics_window_follows_the_program(executable: str) -> None:
+    """task_45: the drawing reaches a window of its own, and it survives hiding.
+
+    The pixels live in the interpreter (a `getPixel` and a `ЗАКРАСКА` read cells
+    from inside a built-in), so the window gets the primitives as events while it
+    is open and asks for a snapshot when it was not there to hear them.
+    """
+    from prologd_gui.settings import Settings
+
+    window = empty_window(executable)
+    settings_path = window._settings.path
+    try:
+        # The entry opens a window of its own, and the picture starts blank.
+        window._actions["graphics"].setChecked(True)
+        assert window.graphics_available() is True
+        picture = window.graphics_window()
+        assert picture.isVisible() is True
+        assert window._settings.graphics_visible is True
+        assert window.canvas().filled_cells() == 0
+        assert window.canvas().pixel(0, 0) == 0
+
+        # A program draws: a point, a line, a frame and a fill inside it.
+        window.editor().setPlainText(
+            "?ТОЧКА(1, 2, 3).\n"
+            "?ЛИНИЯ(0, 0, 60, 40, 5).\n"
+            "?ЛИНИЯ(20, 10, 40, 10, 7), ЛИНИЯ(20, 20, 40, 20, 7),\n"
+            "  ЛИНИЯ(20, 10, 20, 20, 7), ЛИНИЯ(40, 10, 40, 20, 7).\n"
+            "?ЗАКРАСКА(30, 15, 9).\n")
+        window._actions["run"].trigger()
+        assert pump(window, lambda: window.canvas().pixel(30, 15) == 9), window.output_text()
+        assert window.canvas().pixel(1, 2) == 3, "the point"
+        assert window.canvas().pixel(0, 0) == 5 and window.canvas().pixel(60, 40) == 5, "the line"
+        assert window.canvas().pixel(20, 10) == 7, "the frame"
+        assert window.canvas().pixel(30, 25) == 0, "nothing outside the frame was filled"
+
+        # Hiding the window keeps the picture: the canvas is not thrown away.
+        window._actions["graphics"].setChecked(False)
+        assert window._settings.graphics_visible is False
+        assert picture.isVisible() is False
+        assert window.canvas().pixel(1, 2) == 3
+
+        # Closing it the way a user does turns the entry off too.
+        picture.show()
+        picture.close()
+        assert picture.isVisible() is False
+        assert window._actions["graphics"].isChecked() is False
+
+        # Reopening asks the interpreter for the whole picture: that is the path
+        # a window that missed the drawing takes, and the picture is the same.
+        window._actions["graphics"].setChecked(True)
+        assert pump(window, lambda: window.status_text().startswith("рисунок получен")), (
+            window.status_text()
+        )
+        assert window.canvas().pixel(1, 2) == 3
+        assert window.canvas().pixel(30, 15) == 9
+        assert window.canvas().pixel(30, 25) == 0
+
+        # What is shown can be saved as a picture.
+        directory = tempfile.mkdtemp(prefix="prologd_png_")
+        target = pathlib.Path(directory) / "рисунок.png"
+        assert picture.save_png(str(target)) is True
+        assert target.stat().st_size > 0
+
+        # A new run starts a fresh interpreter with a blank screen, and the
+        # window clears with it instead of keeping a drawing that is gone.
+        window.editor().setPlainText("?ТОЧКА(4, 4, 1).\n")
+        window._actions["run"].trigger()
+        assert pump(window, lambda: window.canvas().pixel(4, 4) == 1), window.output_text()
+        assert window.canvas().pixel(1, 2) == 0, "the previous run's picture stayed"
+        assert window.canvas().pixel(30, 15) == 0
+        window.stop_program()
+    finally:
+        discard_changes(window)
+    assert Settings(settings_path).graphics_visible is True, "the window was remembered"
+    print("ok: the graphics window follows the program, survives hiding, and saves")
+
+
 def main(argv: list[str]) -> int:
     if QApplication is None:
         print("skipped: PySide6 is not installed")
@@ -2560,6 +2642,7 @@ def main(argv: list[str]) -> int:
         test_the_split_survives_a_restart(executable)
         test_split_and_merge_follow_the_pane_count(executable)
         test_the_output_panel_moves_and_hides(executable)
+        test_the_graphics_window_follows_the_program(executable)
         test_the_menus_come_from_the_action_table(executable)
         test_the_toolbar_reuses_the_actions(executable)
         test_view_switches_are_stored(executable)

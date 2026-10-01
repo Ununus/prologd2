@@ -34,7 +34,92 @@ using Json = nlohmann::json;
 ///    the surface and «в одну строку» joined it.
 /// 8: `loaded` — the load and the program's own `?`-statements are over, which
 ///    is what tells a front-end that a run *finished*.
-constexpr int kProtocolVersion = 9;
+/// 9: the `limits` object of `load` (a step, depth and НАЙТИВСЕ cap, applied
+///    before the load), and a request whose field has the wrong type is an
+///    `error` event instead of the end of the session (task_46).
+/// 10: `graphics` events — every drawing primitive as the program calls it —
+///    and the `graphics` request with `"snapshot":true`, answered with a
+///    `bitmap` event (task_45).
+constexpr int kProtocolVersion = 10;
+
+[[nodiscard]] std::string graphicsOpName(GraphicsOp op) {
+  switch (op) {
+    case GraphicsOp::SetPixel:
+      return "setPixel";
+    case GraphicsOp::Line:
+      return "line";
+    case GraphicsOp::Rectangle:
+      return "rectangle";
+    case GraphicsOp::Ellipse:
+      return "ellipse";
+    case GraphicsOp::FloodFill:
+      return "floodFill";
+    case GraphicsOp::ClearView:
+      return "clearView";
+    case GraphicsOp::Vertical:
+      return "vertical";
+    case GraphicsOp::Horizontal:
+      return "horizontal";
+    case GraphicsOp::GetPixel:
+      break;  // a read: it never travels
+  }
+  return "setPixel";
+}
+
+/// A primitive as it goes on the wire: a cell, a segment or a box (task_45).
+///
+/// The names are the backend's method names, and the numbers are the ones the
+/// program asked for — not the clipped ones.  The front-end clips the same way
+/// (`src/gui/prologd_gui/graphics.py`), and a program that drew off the screen
+/// should be visible in the event stream as what it was.
+[[nodiscard]] Json graphicsJson(const GraphicsEvent& event) {
+  Json json{{"event", "graphics"}, {"op", graphicsOpName(event.op)}, {"color", event.color}};
+  switch (event.op) {
+    case GraphicsOp::SetPixel:
+    case GraphicsOp::FloodFill:
+      json["x"] = event.x1;
+      json["y"] = event.y1;
+      break;
+    case GraphicsOp::Ellipse:
+      // A centre and two radii, not a box: the field names say which, because
+      // `ОКРУЖНОСТЬ(X, Y, R, Цвет)` passes its numbers straight through.
+      json["x"] = event.x1;
+      json["y"] = event.y1;
+      json["rx"] = event.x2;
+      json["ry"] = event.y2;
+      break;
+    case GraphicsOp::ClearView:
+      break;  // the colour alone
+    default:
+      json["x1"] = event.x1;
+      json["y1"] = event.y1;
+      json["x2"] = event.x2;
+      json["y2"] = event.y2;
+      break;
+  }
+  return json;
+}
+
+/// Base64 of a byte range: a snapshot is a megabyte of pixels, and JSON has no
+/// bytes.  The front-end decodes it with `base64.b64decode`.
+[[nodiscard]] std::string base64(const std::vector<unsigned char>& bytes) {
+  static constexpr char kAlphabet[] =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  std::string text;
+  text.reserve((bytes.size() + 2) / 3 * 4);
+  for (std::size_t index = 0; index < bytes.size(); index += 3) {
+    const std::size_t rest = bytes.size() - index;
+    const unsigned first = bytes[index];
+    const unsigned second = rest > 1 ? bytes[index + 1] : 0u;
+    const unsigned third = rest > 2 ? bytes[index + 2] : 0u;
+    const unsigned triple = (first << 16) | (second << 8) | third;
+    text.push_back(kAlphabet[(triple >> 18) & 0x3Fu]);
+    text.push_back(kAlphabet[(triple >> 12) & 0x3Fu]);
+    text.push_back(rest > 1 ? kAlphabet[(triple >> 6) & 0x3Fu] : '=');
+    text.push_back(rest > 2 ? kAlphabet[triple & 0x3Fu] : '=');
+  }
+  return text;
+}
 
 [[nodiscard]] std::string stepActionName(StepAction action) {
   switch (action) {
@@ -127,6 +212,14 @@ class Session {
       reportDiagnostic(diagnostic, "parse");
     });
     loader_.setQueryRunner([this](const Query& query) { runQuery(query); });
+    // The pixels live *here*, inside the session (task_45): `ТОЧКА(X, Y, Ц)`
+    // reads a cell and `ЗАКРАСКА` reads what it has just written, and a front-end
+    // on the other side of a pipe is asked nothing in the middle of a built-in.
+    // Every primitive is reported as it is drawn, so a window that is open
+    // follows the picture; the snapshot is for one that opens later.
+    graphics_ = std::make_shared<BitmapGraphicsBackend>();
+    graphics_->setSink([this](const GraphicsEvent& event) { emit(graphicsJson(event)); });
+    engine_.setGraphicsBackend(graphics_);
 
     emit(Json{{"event", "ready"},
               {"protocol", kProtocolVersion},
@@ -189,6 +282,10 @@ class Session {
       // A `step` is the answer to a paused step point, and the pause is the wait
       // inside `onStep`; reaching this line means nothing is paused.
       fail("protocol", "нет шага, который ждёт ответа");
+      return;
+    }
+    if (command == "graphics") {
+      snapshot(request);
       return;
     }
     if (command == "interrupt") {
@@ -487,9 +584,39 @@ class Session {
     return std::nullopt;
   }
 
+  /// The picture the session has so far, for a window that opens while a
+  /// program is drawing (task_45).  Asking for anything else is the front-end's
+  /// mistake, and saying so is better than a blank window that looks correct.
+  void snapshot(const Json& request) {
+    if (!request.value("snapshot", false)) {
+      fail("protocol", "graphics: ожидался snapshot");
+      return;
+    }
+    if (!graphics_) {
+      fail("protocol", "графика недоступна");
+      return;
+    }
+    const std::vector<GraphicsColor>& pixels = graphics_->pixels();
+    std::vector<unsigned char> bytes;
+    bytes.reserve(pixels.size() * 4);
+    for (const GraphicsColor value : pixels) {
+      // Four bytes per cell, least significant first: the front-end unpacks them
+      // with `struct.unpack_from("<I")`.  The values are the program's colour
+      // values, so a picture that travelled this way and one built event by
+      // event are comparable cell by cell.
+      bytes.push_back(static_cast<unsigned char>(value & 0xFFu));
+      bytes.push_back(static_cast<unsigned char>((value >> 8) & 0xFFu));
+      bytes.push_back(static_cast<unsigned char>((value >> 16) & 0xFFu));
+      bytes.push_back(static_cast<unsigned char>((value >> 24) & 0xFFu));
+    }
+    emit(Json{{"event", "bitmap"},
+              {"width", graphics_->width()},
+              {"height", graphics_->height()},
+              {"data", base64(bytes)}});
+  }
+
   void flush() {
-    const std::string text = output_.str();
-    if (!text.empty()) {
+    const std::string text = output_.str();    if (!text.empty()) {
       output_.str(std::string());
       output_.clear();
       emit(Json{{"event", "output"}, {"text", text}});
@@ -529,6 +656,9 @@ class Session {
   std::ostringstream output_;
   std::ostringstream error_;
   int exit_code_ = 0;
+
+  /// The pixels of this session (task_45).
+  std::shared_ptr<BitmapGraphicsBackend> graphics_;
 
   /// True once a diagnostic was emitted for the current request, so the loader's
   /// summary is not printed on top of the diagnostics themselves.

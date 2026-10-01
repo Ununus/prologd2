@@ -37,7 +37,7 @@ execute_process(
 
 set(expected_events
   "{\"event\":\"ready\","
-  "\"protocol\":9"
+  "\"protocol\":10"
   "\"keywords\":"
   "{\"event\":\"result\",\"found\":true}"
   "{\"event\":\"loaded\"}"
@@ -343,6 +343,7 @@ string(FIND "${events}" "\"kind\":\"runtime\"" position)
 if(position EQUAL -1)
   message(FATAL_ERROR "A failed query was not reported as a runtime error\n--- got ---\n${events}")
 endif()
+
 string(FIND "${events}" "\"file\":\"<query>\"" position)
 if(position EQUAL -1)
   message(FATAL_ERROR "A query error must name the query\n--- got ---\n${events}")
@@ -353,4 +354,83 @@ if(NOT position EQUAL -1)
 endif()
 if(NOT exit_code EQUAL 3)
   message(FATAL_ERROR "Expected exit code 3 after a runtime error, got ${exit_code}")
+endif()
+
+# --- the drawing reaches the wire as events, and the snapshot as a bitmap ----
+# task_45.  The primitives go out one by one, in the order the program drew
+# them, and a window that opens later asks for the picture instead of starting
+# blank.  The bitmap itself is checked by its *bytes*: the first cell of
+# `?ТОЧКА(0, 0, 3)` is 3, so the four little-endian bytes `03 00 00 00` start
+# the payload, whose base64 begins `AwAAAA`.
+file(WRITE "${session}"
+  "{\"cmd\":\"load\",\"text\":\"?ТОЧКА(0, 0, 3).\\n?ЛИНИЯ(1, 1, 8, 4, 5).\\n\"}\n"
+  "{\"cmd\":\"graphics\",\"snapshot\":true}\n"
+  "{\"cmd\":\"quit\"}\n")
+
+execute_process(
+  COMMAND "${PROLOGD_EXE}" --protocol json
+  INPUT_FILE "${session}"
+  OUTPUT_VARIABLE events
+  RESULT_VARIABLE exit_code)
+
+if(NOT exit_code EQUAL 0)
+  message(FATAL_ERROR "A drawing session must end cleanly, got ${exit_code}: ${events}")
+endif()
+
+string(FIND "${events}" "\"op\":\"setPixel\"" point_position)
+if(point_position EQUAL -1)
+  message(FATAL_ERROR "A ТОЧКА did not reach the wire\n--- got ---\n${events}")
+endif()
+string(FIND "${events}" "\"op\":\"line\"" line_position)
+if(line_position EQUAL -1)
+  message(FATAL_ERROR "A ЛИНИЯ did not reach the wire\n--- got ---\n${events}")
+endif()
+if(NOT point_position LESS line_position)
+  message(FATAL_ERROR "The primitives arrived out of order\n--- got ---\n${events}")
+endif()
+string(FIND "${events}" "\"color\":5" position)
+if(position EQUAL -1)
+  message(FATAL_ERROR "The primitive did not carry its colour\n--- got ---\n${events}")
+endif()
+
+string(FIND "${events}" "\"event\":\"bitmap\"" position)
+if(position EQUAL -1)
+  message(FATAL_ERROR "The snapshot did not come back\n--- got ---\n${events}")
+endif()
+string(FIND "${events}" "\"width\":1024" position)
+if(position EQUAL -1)
+  message(FATAL_ERROR "The snapshot must be the engine's screen\n--- got ---\n${events}")
+endif()
+string(FIND "${events}" "\"height\":768" position)
+if(position EQUAL -1)
+  message(FATAL_ERROR "The snapshot must be the engine's screen\n--- got ---\n${events}")
+endif()
+string(FIND "${events}" "\"data\":\"AwAAAA" position)
+if(position EQUAL -1)
+  message(FATAL_ERROR "The bitmap does not carry the pixel that was drawn\n--- got ---\n${events}")
+endif()
+
+# Asking for anything else is the front-end's mistake, and it is answered: a
+# blank window that looks correct is the one outcome worse than an error.
+file(WRITE "${session}"
+  "{\"cmd\":\"graphics\"}\n"
+  "{\"cmd\":\"load\",\"text\":\"?less(2, 3).\\n\"}\n"
+  "{\"cmd\":\"quit\"}\n")
+
+execute_process(
+  COMMAND "${PROLOGD_EXE}" --protocol json
+  INPUT_FILE "${session}"
+  OUTPUT_VARIABLE events
+  RESULT_VARIABLE exit_code)
+
+string(FIND "${events}" "\"kind\":\"protocol\"" position)
+if(position EQUAL -1)
+  message(FATAL_ERROR "A graphics request without snapshot must be refused\n--- got ---\n${events}")
+endif()
+string(FIND "${events}" "{\"event\":\"loaded\"}" position)
+if(position EQUAL -1)
+  message(FATAL_ERROR "The session did not go on after the refusal\n--- got ---\n${events}")
+endif()
+if(NOT exit_code EQUAL 0)
+  message(FATAL_ERROR "A refused graphics request must not change the exit code, got ${exit_code}")
 endif()

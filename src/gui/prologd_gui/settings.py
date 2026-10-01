@@ -43,6 +43,12 @@ LAST_DIRECTORY = "files/last_directory"
 SPLIT_EDITOR = "view/split"
 SPLIT_SIZES = "view/split_sizes"
 RESTORE_SPLIT = "view/restore_split"
+#: The graphics window (task_45): whether it was open, and where it stood.  Both
+#: are records the *window* keeps rather than choices in the dialog — the same
+#: kind of thing as the split sizes, and the reason they are listed in
+#: `MACHINE_KEYS`.
+GRAPHICS_VISIBLE = "view/graphics_visible"
+GRAPHICS_GEOMETRY = "view/graphics_geometry"
 TOOLBAR = "view/toolbar"
 OUTPUT_POSITION = "view/output_position"
 OUTPUT_VISIBLE = "view/output_visible"
@@ -324,6 +330,8 @@ MACHINE_KEYS = (
     SPLIT_EDITOR,
     SPLIT_SIZES,
     RESTORE_SPLIT,
+    GRAPHICS_VISIBLE,
+    GRAPHICS_GEOMETRY,
     OUTPUT_SIZES,
     PANEL_SIZES,
     SHORTCUTS_TABLE,
@@ -736,6 +744,30 @@ class Settings:
     @session_current.setter
     def session_current(self, value: str) -> None:
         self._write(SESSION_CURRENT, str(value))
+
+    @property
+    def graphics_visible(self) -> bool:
+        """Whether the graphics window was open when the window was last closed."""
+        return self._flag(GRAPHICS_VISIBLE, False)
+
+    @graphics_visible.setter
+    def graphics_visible(self, value: bool) -> None:
+        self._write(GRAPHICS_VISIBLE, bool(value))
+
+    @property
+    def graphics_geometry(self) -> str:
+        """The graphics window's geometry as text; "" until it was ever moved.
+
+        Stored as text and not as a rectangle: Qt's `saveGeometry`/`restoreGeometry`
+        know about screens, a maximised state and a window that was moved to a
+        display that is no longer there, and a hand-made x/y/width/height would
+        have to re-learn all of that.
+        """
+        return self._text(GRAPHICS_GEOMETRY, "")
+
+    @graphics_geometry.setter
+    def graphics_geometry(self, value: str) -> None:
+        self._write(GRAPHICS_GEOMETRY, str(value))
 
     # -- the split editor ---------------------------------------------------
     @property

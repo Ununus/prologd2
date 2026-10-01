@@ -19,6 +19,7 @@ namespace prologd::cli {
 /// | `{"cmd":"query","text":"?goal."}` | run one statement |
 /// | `{"cmd":"input","text":"..."}` | answer the pending `input_request` |
 /// | `{"cmd":"step","action":"into"}` | answer the pending `step` event |
+/// | `{"cmd":"graphics","snapshot":true}` | the picture drawn so far |
 /// | `{"cmd":"interrupt"}` | stop the current query |
 /// | `{"cmd":"quit"}` | end the session |
 ///
@@ -27,9 +28,14 @@ namespace prologd::cli {
 /// waits for a `step` request; `action` is `into`, `over`, `continue` or `stop`).
 ///
 /// Events are written to `out`, one JSON object per line: `ready`, `output`,
-/// `result`, `input_request`, `step`, `trace`, `error`, `bye`.  `error` carries
-/// `file`/`line`/`column` when the diagnostic has a position.  The contract is
-/// written down in `src/gui/README.md`.
+/// `result`, `input_request`, `step`, `trace`, `graphics`, `bitmap`, `error`,
+/// `bye`.  `error` carries `file`/`line`/`column` when the diagnostic has a
+/// position.  The contract is written down in `src/gui/README.md`.
+///
+/// The graphics predicates draw into the session itself (`graphics` events, one
+/// per primitive, in the order the program called them) and the `graphics`
+/// request answers with the whole `bitmap` for a window that was not open while
+/// the picture was made (task_45).
 ///
 /// The session replaces the engine streams and the loader's query runner, so it
 /// is an alternative to the console front-end, not an addition to it.

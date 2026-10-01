@@ -21,14 +21,14 @@ TEST_CASE("graphics predicates call the backend") {
   REQUIRE(result.loaded);
   REQUIRE(result.output == "ДА\nДА\nДА\nДА\n");
   REQUIRE(backend->calls().size() == 4);
-  REQUIRE(backend->calls()[0].kind == GraphicsCall::Kind::SetPixel);
+  REQUIRE(backend->calls()[0].op == GraphicsOp::SetPixel);
   REQUIRE(backend->calls()[0].x1 == 10);
   REQUIRE(backend->calls()[0].y1 == 20);
   REQUIRE(backend->calls()[0].color == 3);
-  REQUIRE(backend->calls()[1].kind == GraphicsCall::Kind::Line);
+  REQUIRE(backend->calls()[1].op == GraphicsOp::Line);
   REQUIRE(backend->calls()[1].x2 == 100);
-  REQUIRE(backend->calls()[2].kind == GraphicsCall::Kind::Ellipse);
-  REQUIRE(backend->calls()[3].kind == GraphicsCall::Kind::FloodFill);
+  REQUIRE(backend->calls()[2].op == GraphicsOp::Ellipse);
+  REQUIRE(backend->calls()[3].op == GraphicsOp::FloodFill);
 }
 
 TEST_CASE("point with a variable reads a pixel colour") {
@@ -37,7 +37,7 @@ TEST_CASE("point with a variable reads a pixel colour") {
   REQUIRE(result.loaded);
   REQUIRE(result.output == "C=0\n");
   REQUIRE(backend->calls().size() == 1);
-  REQUIRE(backend->calls()[0].kind == GraphicsCall::Kind::GetPixel);
+  REQUIRE(backend->calls()[0].op == GraphicsOp::GetPixel);
 }
 
 TEST_CASE("graphics predicates reject free coordinates where they are required") {
@@ -58,9 +58,9 @@ TEST_CASE("free arguments choose the mode of the point predicate") {
   // A query with a free variable reports the bindings, not `ДА`.
   REQUIRE(result.output == "X=_1\nY=_1\nY=_1\nX=_1\n");
   REQUIRE(backend->calls().size() == 3);
-  REQUIRE(backend->calls()[0].kind == GraphicsCall::Kind::Clear);
-  REQUIRE(backend->calls()[1].kind == GraphicsCall::Kind::Vertical);
-  REQUIRE(backend->calls()[2].kind == GraphicsCall::Kind::Horizontal);
+  REQUIRE(backend->calls()[0].op == GraphicsOp::ClearView);
+  REQUIRE(backend->calls()[1].op == GraphicsOp::Vertical);
+  REQUIRE(backend->calls()[2].op == GraphicsOp::Horizontal);
 
   // Three free arguments are not a mode at all.
   const auto allFree = runProgram("?ТОЧКА(X, Y, Z).\n", "", backend);
@@ -84,14 +84,14 @@ TEST_CASE("free arguments choose the mode of the line and circle predicates") {
   REQUIRE(result.loaded);
   REQUIRE(result.output == "Y=_1\nX=_1\nY=_1\nX=_1\nX=_1\nY=_1\nДА\nY=_1\nX=_1\nX=_1\nY=_1\n");
   REQUIRE(backend->calls().size() == 8);
-  REQUIRE(backend->calls()[0].kind == GraphicsCall::Kind::Vertical);
-  REQUIRE(backend->calls()[1].kind == GraphicsCall::Kind::Horizontal);
-  REQUIRE(backend->calls()[2].kind == GraphicsCall::Kind::Rectangle);
-  REQUIRE(backend->calls()[3].kind == GraphicsCall::Kind::Rectangle);
-  REQUIRE(backend->calls()[4].kind == GraphicsCall::Kind::Ellipse);
-  REQUIRE(backend->calls()[5].kind == GraphicsCall::Kind::Rectangle);
-  REQUIRE(backend->calls()[6].kind == GraphicsCall::Kind::Rectangle);
-  REQUIRE(backend->calls()[7].kind == GraphicsCall::Kind::Clear);
+  REQUIRE(backend->calls()[0].op == GraphicsOp::Vertical);
+  REQUIRE(backend->calls()[1].op == GraphicsOp::Horizontal);
+  REQUIRE(backend->calls()[2].op == GraphicsOp::Rectangle);
+  REQUIRE(backend->calls()[3].op == GraphicsOp::Rectangle);
+  REQUIRE(backend->calls()[4].op == GraphicsOp::Ellipse);
+  REQUIRE(backend->calls()[5].op == GraphicsOp::Rectangle);
+  REQUIRE(backend->calls()[6].op == GraphicsOp::Rectangle);
+  REQUIRE(backend->calls()[7].op == GraphicsOp::ClearView);
 }
 
 TEST_CASE("a coordinate that is not a number is an error") {

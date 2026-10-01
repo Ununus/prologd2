@@ -1,7 +1,8 @@
 # Status tracker
 
 Last updated: after the Windows/VS 2026 verification, the GUI protocol
-session and the limits of task_46 (protocol 9).
+session, the limits of task_46 (protocol 9) and the graphics window of task_45
+(protocol 10).
 
 ## Overall
 
@@ -9,14 +10,14 @@ session and the limits of task_46 (protocol 9).
   started (protocol + skeleton).
 * Build: the `windows-msvc` preset (Visual Studio 18 2026, MSVC 19.51) build is
   green locally; the Linux presets, including `-Werror`, build cleanly.
-* Tests: 252/252 pass in about five seconds: 238 Catch2 cases plus 14 command-line
+* Tests: 264/264 pass in about five seconds: 250 Catch2 cases plus 14 command-line
   and integration tests (seven option tests, two `--list-keywords` tests, the
   import-search report, the JSON protocol session, the engine-limit cases, the
   diagnostics cases and the formatter round-trip).
   or `--source`), stdin, the REPL and the `--protocol json` session for
   front-ends.
 * GUI: `src/gui` (PySide6) drives the executable through the JSON protocol; the
-  window, the protocol and the stepping are covered by twenty offscreen scripts
+  window, the protocol and the stepping are covered by twenty-one offscreen scripts
   (`src/gui/tests/`), which need no display.
 * Documentation: `doc/help.typ`, `doc/technical.typ`, `doc/prologd-diff.typ`
   written (Russian); `cmake --build build --target docs` compiles them when
@@ -111,12 +112,12 @@ session and the limits of task_46 (protocol 9).
 | task_42_engine_hot_path | done | the constant tax, measured: the two per-goal lookups stop building strings (`BuiltinKey` keyed by `string_view`; the database is a two-level `name -> (arity -> list)` map looked up with `std::less<>`, no `"name/arity"` key, `key_order_` gone) — interleaved six pairs on a dispatch-bound loop: median 1.45 s → 1.40 s, every pair faster, ≈ 4 %; clause indexing measured and deferred (ADR-017: a 100 000-clause scan costs ≈ 20 ms, lesson predicates have a handful of clauses, and the queens workload is a shape an index cannot prune); term interning bounded by that same ≈ 4 % and deferred; `tools/bench_engine.py` gained the `dispatch`, `structured` and `queens` workloads and `--only` |
 | task_43_language_surface | done | `ВЫП/2..N` (`call/N`): the extra arguments are appended to the goal (callee dereferenced first; the keyword table says `ВЫП/+`; the checker expands the same term; `!` inside the argument stays a parse error and the manual no longer promises it); the module-collision warning — one per predicate fed by two files with no import path between them, silent for the diamond and for extending an imported module (ADR-019); the dead library is gone (`?СКОЛЬКО(НЕ, А)` answers 0; ADR-018) |
 | task_44_names | done | the two names that promised something else: `ИЛИ/2` → `ПЕРВОЕ/2` (`or` → `first`) with the retired spelling removed from the language (a call is a load error naming the replacement), `НАЙТИВСЁ` → `НАЙТИВСЕ` (the spelling of the task and of the reference notes) with the retired spelling kept reserved, so its call is the ordinary suggestion «возможно, НАЙТИВСЕ/3»; the two `ИЛИ` library clauses removed so the old name cannot answer through the database; `doc/help.typ` §4.6, `prologd-diff.typ` §17/§18, lesson 4's section 5 |
-| task_45_gui_graphics_window | not started | the graphics predicates become *visible*: a bitmap backend inside the engine (the source of truth, so `getPixel` and `ЗАКРАСКА` need no round trip), protocol 10 events (`9` went to task_46's limits) plus a snapshot, a Qt-free canvas and a window of its own — the last disabled menu entry.  Split out of task_21/task_15 on 2026-10-01 |
+| task_45_gui_graphics_window | done | the graphics predicates are *visible*: `BitmapGraphicsBackend` inside the engine (a 1024×768 buffer that answers `getPixel` locally and performs `ЗАКРАСКА` itself, reporting every primitive), protocol **10** (`graphics` events and `{"cmd":"graphics","snapshot":true}` → `bitmap`), a Qt-free `graphics.Canvas` with the palette, and `graphicswindow.GraphicsWindow` — a window of its own with «Вписать в окно»/«1 : 1», «Очистить», «Сохранить как PNG…» and a cell readout; the last disabled menu entry is gone (ADR-022).  The by-hand look at `examples/drawing.pld` found two defects (the ellipse was read as a box; an untouched canvas was transparent) |
 | task_46_interpreter_options_and_limits | in progress | the limits are in: `Limits` + `applyTo` in the engine, `--max-findall`, protocol **9** (`limits` on `load`, a bad field is an `error` instead of a dead session), four dialog rows and a front-end deadline.  The core has **no limits of its own** (0 = «без предела», messages name a limit and its value only — ADR-020) and the window ships 0 / 1 000 000 / 1 000 000 / 0.  Still open: the interpreter path, the process directory, profiles, and `--timeout-ms` (a text-mode deadline would need a clock in the solver).  The last item of task_29's settings list, split out on 2026-10-01 |
 
 ## Test suite
 
-252 tests, about five seconds: 238 Catch2 cases plus 14 command-line and
+264 tests, about five seconds: 250 Catch2 cases plus 14 command-line and
 integration tests (seven option tests, two `--list-keywords` tests, the
 import-search report, the JSON protocol session, the formatter round-trip and the
 engine-limit and diagnostics cases). Groups:
@@ -171,9 +172,9 @@ plain scripts.
    task_23 the keyword source.  The rest is task_24–task_31, see the board above.
    The settings file is written to `%LOCALAPPDATA%\PrologD\gui\gui.ini`; the
    dialog that edits it is task_29, and `--settings FILE` overrides the path.
-   Open for the next session, and no longer part of task_29: the **graphics
-   window** (`task_45_gui_graphics_window.md`) and the **interpreter options,
-   profiles and limits** (`task_46_interpreter_options_and_limits.md`).  task_29's
+   Open for the next session, and no longer part of task_29: the **interpreter
+   options, profiles and limits** (`task_46_interpreter_options_and_limits.md`).
+   The graphics window (`task_45_gui_graphics_window.md`) is done, and task_29's
    own list is closed: «использовать системные цвета» was done with the three
    themes, and **RU/EN was dropped** on 2026-10-01 (ADR-021 — the window stays
    Russian).
@@ -1327,3 +1328,33 @@ Added on 2026-10-02 while implementing task_31:
   руководства.  Пункт закрыт в task_29 и в §10 `gui.typ` — теперь он там назван
   решением, а не долгом.
   252/252 ctest, 20 headless-скриптов GUI, пять PDF.
+* GUI round, part 43: **task_45 — графическое окно**.  `ТОЧКА`, `ЛИНИЯ`,
+  `ОКРУЖНОСТЬ` и `ЗАКРАСКА` рисовали в пустую реализацию: программа рисовала
+  картинку, а студент не видел ничего.  Теперь экран ведёт *интерпретатор*
+  (`BitmapGraphicsBackend`: буфер 1024×768, который сам отвечает на `TOCHKA(X, Y,
+  Ц)`-чтение и сам выполняет `ЗАКРАСКА`), а окно получает каждую нарисованную
+  фигуру — протокол **10**: события `graphics` (ячейка, отрезок или прямоугольник)
+  и запрос `{"cmd":"graphics","snapshot":true}`, на который приходит `bitmap` со
+  всем экраном (base64, по четыре байта на точку).  Пиксели остаются внутри не
+  зря: `ТОЧКА(X, Y, Цвет)` читает точку, а `ЗАКРАСКА` — то, что только что
+  нарисовано, и всё это изнутри встроенного предиката; синхронный вопрос оболочке
+  посреди предиката протокол не задаёт нигде.  `graphics.py` (без Qt) повторяет
+  те же правила рисования — Брезенхам, контур прямоугольника, эллипс по
+  параметрическому уравнению, заливка по четырём соседям, отсечение по краям, — и
+  `test_graphics.py` сверяет две реализации *попиксельно*: рисует программу, берёт
+  у интерпретатора готовый растр и повторяет те же события на холсте.
+  `graphicswindow.py` — отдельное окно (`Qt.Window`, иначе виджет с родителем
+  становится дочерним и рисунок встраивается в редактор) с «Вписать в окно»,
+  «1 : 1» с прокруткой, «Очистить», «Сохранить как PNG…» и координатами точки под
+  курсором; открытость и положение окна — машинные ключи `view/graphics_visible` и
+  `view/graphics_geometry` (`saveGeometry` в base64: Qt знает про экраны, а
+  прямоугольник пришлось бы этому учить заново).  Меню больше не имеет
+  выключенных пунктов: «Графическое окно» — последний, который чего-то ждал.
+  Два дефекта нашлись ровно там, где их и обещала найти приёмка — глазами на
+  нарисованном: эллипс читался как *прямоугольник* (`ОКРУЖНОСТЬ(X, Y, R, Цвет)`
+  передаёт четыре числа как есть, а имена параметров с task_15 говорили `x1..y2`),
+  поэтому лицо из `examples/drawing.pld` выходило синим полем, а не лицом; и
+  пустой холст был *прозрачно-чёрным* (`bytearray` — нули, а нулевая альфа в
+  `RGBA8888` — прозрачность), из-за чего сквозь рисунок просвечивал рабочий стол.
+  Обе ошибки были невидимы для сверки двух реализаций: обе рисовали одинаково и
+  обе неправильно.  264/264 ctest, 21 headless-скрипт GUI, пять PDF.

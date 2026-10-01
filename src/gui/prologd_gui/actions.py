@@ -178,13 +178,11 @@ ACTIONS: tuple[Action, ...] = (
     Action("step_over", "Шаг с обходом", "execution-step-over", ("Shift+F10",)),
     Action("stop", "Остановить", "execution-abort", ("Shift+F5",)),
     Action("save_before_run", "Сохранять перед запуском", None, checkable=True),
-    Action(
-        "graphics",
-        "Графическое окно",
-        "view-graphics",
-        implemented=False,
-        waiting_for="task_45_gui_graphics_window.md (см. Roadmap в src/gui/README.md)",
-    ),
+    # The window the graphics predicates draw into (task_45): a window of its own,
+    # so the picture can go to a second screen and does not take space from the
+    # code.  Checkable, like the output panel: its state is the window's
+    # visibility, and both survive a restart (`view/graphics_visible`).
+    Action("graphics", "Графическое окно", "view-graphics", checkable=True),
     # -- help
     # The reference of a predicate (task_37): the same help picture, because it
     # is the same «справка» — only the answer comes from `doc/builtins.json`

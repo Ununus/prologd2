@@ -600,3 +600,52 @@ it, and nothing pretends to be.
 
 **Status.** Accepted (task cancelled by the user's decision).
 
+---
+
+## ADR-022: The pixels live in the interpreter, the primitives travel
+
+**Context.** The graphics predicates draw through `GraphicsBackend`, which lives
+*inside* the interpreter process, while the window is on the other side of a pipe
+(`--protocol json`).  Two facts decide the design: a drawing call is one-way, and
+`ТОЧКА(X, Y, Цвет)` with a free colour and `ЗАКРАСКА` are **reads** the engine
+performs from inside a built-in.  A synchronous question to the front-end in the
+middle of a built-in is something the protocol does nowhere, and `ЗАКРАСКА` reads
+cells the same query has just written.
+
+**Decision.**
+
+* The screen is a `BitmapGraphicsBackend` inside the session: a `1024 × 768` buffer
+  that answers `getPixel` locally and performs `floodFill` and `clearView` itself.
+  The console build keeps `NullGraphicsBackend`; nothing there changed.
+* Every primitive is **reported** as it is drawn (`GraphicsEvent` → a `graphics`
+  event on the wire): a few bytes per `ТОЧКА` instead of the megabytes a bitmap
+  would cost, and the window redraws it in O(cells of that primitive).
+* A cell holds **the colour value the program wrote**, not an ARGB word.  A read
+  has to give back exactly what a write put there, and turning a value into a
+  visible colour is the front-end's business: `0`…`15` are the EGA palette the
+  original lessons draw with, anything above is read as `0xRRGGBB` (`color_for`,
+  one function, in `graphics.py`).
+* A window that was **not open** while the program drew asks for the whole screen:
+  `{"cmd":"graphics","snapshot":true}` → a `bitmap` event, base64 of four-byte
+  little-endian values (the program's numbers, so a replayed picture and a
+  snapshot are comparable cell by cell).  The snapshot is not the normal path.
+* The **rasterising rules** — Bresenham lines, an outlined rectangle, an ellipse
+  from its parametric equation with `floor(v + 0.5)`, a four-connected fill, and
+  clipping at the edges (with coordinates clamped at ±1 000 000 first, because
+  `10**18` overflows C++ and does not overflow Python) — are written twice: in
+  `prlib/graphics.cpp` and in `prologd_gui/graphics.py`.  `test_graphics.py` pins
+  them to each other: it draws a program, takes the engine's bitmap and replays the
+  same events into a canvas, then compares the two pictures cell by cell.
+* An `ellipse` is a **centre and two radii**, not a bounding box:
+  `ОКРУЖНОСТЬ(X, Y, R, Цвет)` passes its four numbers straight through, and the
+  interface's parameter names (`x1, y1, x2, y2`, task_15) said otherwise until the
+  first look at a real drawing.  The wire spells the fields `x`, `y`, `rx`, `ry`.
+
+**Consequences.** A front-end can be written in anything, and the protocol stays
+line-delimited JSON with no back-channel.  The engine owns the truth, so a
+`getPixel` after a fill is the same answer whoever asks.  The price is a second
+implementation of the drawing rules, which is why the cross-check exists and why
+it compares pictures rather than calls.
+
+**Status.** Accepted.
+

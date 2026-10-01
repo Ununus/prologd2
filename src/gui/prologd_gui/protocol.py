@@ -27,10 +27,15 @@ from typing import Any, Iterator
 #:    stop a runaway program the way the command line does (task_46).  A field of
 #:    the wrong *type* is answered with an `error` event instead of ending the
 #:    session.
-PROTOCOL_VERSION = 9
+#: 10: `graphics` events — every drawing primitive as the program calls it, a cell,
+#:    a segment or a box — and the `graphics` request with `snapshot`, answered
+#:    with the whole `bitmap` (task_45), for a window that was not open while the
+#:    picture was made.
+PROTOCOL_VERSION = 10
 
 #: Event names the interpreter emits.
-EVENTS = ("ready", "output", "result", "input_request", "step", "trace", "error", "bye")
+EVENTS = ("ready", "output", "result", "input_request", "step", "trace", "graphics",
+          "bitmap", "error", "bye")
 
 #: What the solver was doing at a step point, as the `step` event spells it.
 STEP_ACTIONS = ("call", "exit", "redo", "fail")
@@ -122,6 +127,16 @@ def load_file(path: str, *, step: bool = False, trace: bool = False,
 def query(text: str, *, step: bool = False, trace: bool = False) -> bytes:
     """Runs one statement, usually `?Goal.`."""
     return encode_request(cmd="query", text=text, **_flags(step=step, trace=trace))
+
+
+def graphics_snapshot() -> bytes:
+    """Asks for the picture drawn so far (protocol 10, task_45).
+
+    The primitives arrive as they are drawn, so a window that is open follows the
+    program; a window that opens in the middle of one asks for this instead of
+    starting blank.  The answer is a `bitmap` event with the whole screen.
+    """
+    return encode_request(cmd="graphics", snapshot=True)
 
 
 def step_answer(action: str) -> bytes:

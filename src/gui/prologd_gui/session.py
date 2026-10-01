@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import QObject, QProcess, Signal
 
-from . import protocol
+from . import graphics, protocol
 from .keywords import Keywords
 
 
@@ -67,6 +67,12 @@ class PrologSession(QObject):
     #: A load and the program's own `?`-statements are over (protocol 8).  It is
     #: what tells a front-end that a run *without* questions finished.
     loaded = Signal()
+    #: One drawing primitive, as the program called it (protocol 10): a cell, a
+    #: segment or a box, in the order the program drew them (task_45).
+    drawn = Signal(dict)
+    #: The whole picture, for a window that was not open while it was drawn:
+    #: width, height and the raw little-endian colour values.
+    bitmap = Signal(int, int, bytes)
     #: The session ended; carries the process exit code.
     ended = Signal(int)
 
@@ -185,6 +191,15 @@ class PrologSession(QObject):
     def interrupt(self) -> None:
         self._send(protocol.interrupt())
 
+    def request_graphics_snapshot(self) -> None:
+        """Asks for the picture drawn so far (protocol 10, task_45).
+
+        A window that opens in the middle of a run has missed every primitive
+        already drawn; this is how it catches up, and the answer is a `bitmap`
+        signal.
+        """
+        self._send(protocol.graphics_snapshot())
+
     def quit(self) -> None:
         self._send(protocol.quit_session())
 
@@ -265,6 +280,24 @@ class PrologSession(QObject):
             self.formatted.emit(str(event.get("text", "")), bool(event.get("changed", False)))
         elif name == "loaded":
             self.loaded.emit()
+        elif name == "graphics":
+            # The operation has to be one this version knows: a picture with a
+            # primitive quietly missing looks correct and is not, so an unknown
+            # one is reported the way an unknown event is.
+            op = str(event.get("op", ""))
+            if op not in graphics.GRAPHICS_OPS:
+                self.failed.emit(
+                    "protocol", "error", f"неизвестная графическая операция: {op}", None
+                )
+                return
+            self.drawn.emit(dict(event))
+        elif name == "bitmap":
+            try:
+                width, height, data = graphics.decode_bitmap(event)
+            except ValueError as broken:
+                self.failed.emit("protocol", "error", str(broken), None)
+                return
+            self.bitmap.emit(width, height, data)
         elif name == "error":
             self.failed.emit(
                 str(event.get("kind", "")),

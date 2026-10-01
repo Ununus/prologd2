@@ -44,6 +44,8 @@ from . import (
     documents,
     findbar,
     formatter,
+    graphics,
+    graphicswindow,
     panels,
     reference,
     search,
@@ -124,6 +126,8 @@ class MainWindow(QMainWindow):
         self._session.stepped.connect(self._on_stepped)
         self._session.loaded.connect(self._on_loaded)
         self._session.formatted.connect(self._on_formatted)
+        self._session.drawn.connect(self._on_drawn)
+        self._session.bitmap.connect(self._on_bitmap)
         self._session.ended.connect(self._on_ended)
 
         #: Warnings seen in the current run, shown beside the answer; reset when
@@ -189,6 +193,13 @@ class MainWindow(QMainWindow):
         self._results_in_load = 0
         self._failed_in_load = False
         self._awaiting_query = False
+        #: The picture of the graphics predicates (task_45).  The interpreter
+        #: keeps its own pixels, so this canvas mirrors the screen: it is created
+        #: the first time the graphics window is opened, and what happened before
+        #: that is fetched as a snapshot — drawing 1024×768 cells for a reader who
+        #: never opens the window would be work nobody asked for.
+        self._canvas: graphics.Canvas | None = None
+        self._graphics_window: graphicswindow.GraphicsWindow | None = None
         #: The `format` request that is in flight (task_30): what was sent, where
         #: it came from and where the caret stood.  The answer arrives as an
         #: event, so this state outlives the call that started it.
@@ -198,6 +209,11 @@ class MainWindow(QMainWindow):
         # The autosave interval the settings ask for; a change in the dialog
         # re-arms it through `apply_settings`.
         self._apply_autosave()
+        # The picture window comes back where it was (task_45): it is a window of
+        # its own and can stand on a second screen, so where it stood is part of
+        # what the settings file remembers.
+        if self._settings.graphics_visible:
+            self.show_graphics_window(True)
         # The split editor comes back if it was left open, and before the first
         # document, so the welcome program is shown in both panes on that start.
         if self._settings.restore_split and self._settings.split_editor:
@@ -466,6 +482,7 @@ class MainWindow(QMainWindow):
             "toolbar": self._toggle_toolbar,
             "output": self._toggle_output,
             "input_queue": self._toggle_input_queue,
+            "graphics": self.show_graphics_window,
             "split": self.split_editor,
             "merge": self.merge_editor,
             "next_tab": self._next_tab,
@@ -803,6 +820,7 @@ class MainWindow(QMainWindow):
         self._actions["full_screen"].setChecked(self.isFullScreen())
         self._actions["output"].setChecked(self.output_visible())
         self._actions["input_queue"].setChecked(self._settings.input_queue)
+        self._actions["graphics"].setChecked(self._settings.graphics_visible)
         self._sync_pane_actions()
         self._sync_undo_actions()
         self._sync_run_actions()
@@ -1177,6 +1195,14 @@ class MainWindow(QMainWindow):
         self._stopped_input = False
         self._queued_input = self._input_lines()
         self._session.start()
+        # A run starts a *fresh* interpreter, and its screen comes up blank: the
+        # window's picture clears with it, or it would keep showing a drawing the
+        # engine no longer has (`start` is also what a restart of a live session
+        # does, so this is the one place the two agree).
+        if self._canvas is not None:
+            self._canvas.clear()
+            if self._graphics_window is not None:
+                self._graphics_window.refresh()
         # After `start()`, not before: it stops a live session first, and the
         # `ended` event of that old process (delivered inside the stop) would
         # clear the flags just set — a restart is not an unload, and the new
@@ -1222,6 +1248,64 @@ class MainWindow(QMainWindow):
             name = pathlib.Path(path).name if path else buffer.title()
             self._status.setText(f"выполняется {name} (есть несохранённые правки)")
         return True
+
+    # -- the graphics window (task_45) -------------------------------------
+    def canvas(self) -> graphics.Canvas:
+        """The picture, created on first use."""
+        if self._canvas is None:
+            self._canvas = graphics.Canvas()
+        return self._canvas
+
+    def graphics_window(self) -> graphicswindow.GraphicsWindow:
+        """The window the picture is shown in, created on first use."""
+        if self._graphics_window is None:
+            window = graphicswindow.GraphicsWindow(self.canvas(), self)
+            window.closed.connect(lambda: self.show_graphics_window(False))
+            self._graphics_window = window
+        return self._graphics_window
+
+    def graphics_available(self) -> bool:
+        """Whether a window for the picture exists (tests ask instead of opening)."""
+        return self._graphics_window is not None
+
+    def show_graphics_window(self, visible: bool) -> None:
+        """The «Графическое окно» entry: shows or hides the picture.
+
+        Opening a window that is *not* the interpreter's only subscriber is why
+        the snapshot exists: the program may have drawn half a picture while this
+        window did not exist, and the interpreter still holds every pixel of it.
+        """
+        window = self.graphics_window()
+        visible = bool(visible)
+        if visible:
+            window.restore_geometry(self._settings.graphics_geometry)
+            window.show()
+            window.raise_()
+            if self._session.is_running():
+                self._session.request_graphics_snapshot()
+        else:
+            window.hide()
+        self._settings.graphics_visible = visible
+        self._settings.graphics_geometry = window.geometry_text()
+        self._actions["graphics"].setChecked(visible)
+        self._status.setText(
+            "графическое окно показано" if visible else "графическое окно скрыто"
+        )
+
+    def _on_drawn(self, event: dict) -> None:
+        """One primitive reached the window (protocol 10)."""
+        if self._canvas is None:
+            return  # nobody has opened the picture yet; a snapshot will catch up
+        self._canvas.draw(event)
+        if self._graphics_window is not None:
+            self._graphics_window.refresh()
+
+    def _on_bitmap(self, width: int, height: int, data: bytes) -> None:
+        """The whole screen arrived: what a window opened mid-run starts from."""
+        self.canvas().apply_bitmap(width, height, data)
+        if self._graphics_window is not None:
+            self._graphics_window.refresh()
+        self._status.setText(f"рисунок получен ({width}×{height})")
 
     def _limits_note(self) -> str:
         """The limits a run goes with, in the words of their rows (task_46).

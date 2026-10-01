@@ -15,6 +15,7 @@ add_executable(prlib_tests
   test_builtins_database.cpp
   test_findall.cpp
   test_graphics.cpp
+  test_graphics_backend.cpp
   test_module_loader.cpp
   test_io_context.cpp
   test_stepping.cpp
