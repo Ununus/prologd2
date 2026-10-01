@@ -97,6 +97,17 @@ IMPORT_PATHS = "execution/import_paths"
 #: what a lecture wants; the margin's own marker click always answers its one
 #: question, whatever this says.
 RUN_QUESTIONS = "execution/run_questions"
+#: The guards of a run (task_46), sent with every `load` (protocol 9).  `0` means
+#: «без предела» for all of them, and each one names itself in the message the
+#: engine prints when it fires — a limit nobody can name is a mystery.
+MAX_STEPS = "execution/max_steps"
+MAX_DEPTH = "execution/max_depth"
+MAX_FINDALL = "execution/max_findall"
+#: The wall-clock timeout in seconds; `0` is off.  Checked by the *window*, not
+#: by the engine: it is a property of the run, and the front-end already owns the
+#: polite-stop machinery (`interrupt`), which also keeps a clock out of the
+#: solver's hot loop.
+TIMEOUT_SECONDS = "execution/timeout_seconds"
 
 DEFAULT_FONT_FAMILY = "Cascadia Mono"
 DEFAULT_FONT_SIZE = 11.0
@@ -151,6 +162,19 @@ MAXIMUM_AUTOSAVE_MINUTES = 120
 
 DEFAULT_RECENT_LIMIT = 10
 MAXIMUM_RECENT_LIMIT = 50
+
+#: task_46's limits.  The defaults are *no* limit for steps and time, and the
+#: engine's own numbers for depth and НАЙТИВСЕ (`--max-depth`/`--max-findall`
+#: quote the same values): a window that never touches these settings runs a
+#: program exactly as it did before they existed.
+DEFAULT_MAX_STEPS = 0
+MAXIMUM_MAX_STEPS = 1_000_000_000
+DEFAULT_MAX_DEPTH = 10_000
+MAXIMUM_MAX_DEPTH = 10_000_000
+DEFAULT_MAX_FINDALL = 1_000_000
+MAXIMUM_MAX_FINDALL = 100_000_000
+DEFAULT_TIMEOUT_SECONDS = 0
+MAXIMUM_TIMEOUT_SECONDS = 3_600
 
 _TRUE = ("1", "true", "yes", "y", "да")
 
@@ -254,6 +278,18 @@ SETTINGS: tuple[Setting, ...] = (
     Setting(SAVE_BEFORE_RUN, "Сохранять перед запуском", "Выполнение", "bool", False),
     Setting(RUN_QUESTIONS, "Выводить вопросы при запуске", "Выполнение", "bool", True,
             hint="Строки «?цель.» программы отвечают сами; выключено — только правила"),
+    Setting(MAX_STEPS, "Предел шагов", "Выполнение", "int", DEFAULT_MAX_STEPS, 0,
+            MAXIMUM_MAX_STEPS,
+            hint="Сколько шагов решателя на один запуск; 0 — без предела.  Сообщение назовёт этот предел"),
+    Setting(MAX_DEPTH, "Предел глубины", "Выполнение", "int", DEFAULT_MAX_DEPTH, 0,
+            MAXIMUM_MAX_DEPTH,
+            hint="Глубина рекурсии; 0 — без предела.  Защита от убежавшей программы"),
+    Setting(MAX_FINDALL, "Предел решений НАЙТИВСЕ", "Выполнение", "int",
+            DEFAULT_MAX_FINDALL, 0, MAXIMUM_MAX_FINDALL,
+            hint="Столько решений соберёт НАЙТИВСЕ; 0 — без предела.  Предел — ошибка, а не обрезанный список"),
+    Setting(TIMEOUT_SECONDS, "Предел времени, с", "Выполнение", "int",
+            DEFAULT_TIMEOUT_SECONDS, 0, MAXIMUM_TIMEOUT_SECONDS,
+            hint="Остановить программу по часам; 0 — без предела.  Ждущий ввода не прерывается"),
     Setting(WORKING_DIRECTORY, "Рабочая папка (ИМПОРТ)", "Выполнение", "directory", "",
             hint="Общие программы: каталог ищется при каждом ИМПОРТ, в любом файле"),
     Setting(IMPORT_PATHS, "Дополнительные каталоги ИМПОРТ", "Выполнение", "dirs", (),
@@ -894,6 +930,60 @@ class Settings:
     @run_questions.setter
     def run_questions(self, value: bool) -> None:
         self._write(RUN_QUESTIONS, bool(value))
+
+    @property
+    def max_steps(self) -> int:
+        """The step cap of a run; 0 is «без предела»."""
+        return int(self._number(MAX_STEPS, DEFAULT_MAX_STEPS, 0, MAXIMUM_MAX_STEPS))
+
+    @max_steps.setter
+    def max_steps(self, value: int) -> None:
+        self._write(MAX_STEPS, int(min(MAXIMUM_MAX_STEPS, max(0, value))))
+
+    @property
+    def max_depth(self) -> int:
+        """The recursion-depth cap of a run; 0 is «без предела»."""
+        return int(self._number(MAX_DEPTH, DEFAULT_MAX_DEPTH, 0, MAXIMUM_MAX_DEPTH))
+
+    @max_depth.setter
+    def max_depth(self, value: int) -> None:
+        self._write(MAX_DEPTH, int(min(MAXIMUM_MAX_DEPTH, max(0, value))))
+
+    @property
+    def max_findall(self) -> int:
+        """How many solutions one НАЙТИВСЕ may collect; 0 is «без предела»."""
+        return int(self._number(MAX_FINDALL, DEFAULT_MAX_FINDALL, 0, MAXIMUM_MAX_FINDALL))
+
+    @max_findall.setter
+    def max_findall(self, value: int) -> None:
+        self._write(MAX_FINDALL, int(min(MAXIMUM_MAX_FINDALL, max(0, value))))
+
+    @property
+    def timeout_seconds(self) -> int:
+        """The wall-clock cap of a run in seconds; 0 is off."""
+        return int(
+            self._number(TIMEOUT_SECONDS, DEFAULT_TIMEOUT_SECONDS, 0,
+                         MAXIMUM_TIMEOUT_SECONDS)
+        )
+
+    @timeout_seconds.setter
+    def timeout_seconds(self, value: int) -> None:
+        self._write(TIMEOUT_SECONDS, int(min(MAXIMUM_TIMEOUT_SECONDS, max(0, value))))
+
+    def limits(self) -> dict:
+        """The three caps, as the `limits` object of a `load` (protocol 9).
+
+        `0` is «без предела» and is therefore *left out*: the engine's own
+        defaults are the ones to use, and a zero on the wire would be a second
+        way of saying «nothing asked for».  The timeout is not here — the window
+        keeps that clock.
+        """
+        asked = {
+            "maxSteps": self.max_steps,
+            "maxDepth": self.max_depth,
+            "maxFindall": self.max_findall,
+        }
+        return {name: value for name, value in asked.items() if value > 0}
 
     @property
     def working_directory(self) -> str:

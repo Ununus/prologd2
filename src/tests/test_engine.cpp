@@ -156,7 +156,77 @@ TEST_CASE("the depth limit reports runaway recursion") {
   REQUIRE(result.loaded);
   REQUIRE(result.runtimeError);
   REQUIRE(result.error.find("Превышена глубина рекурсии") != std::string::npos);
-  REQUIRE(result.error.find("лимит 200") != std::string::npos);
+  // A limit that fires has to name itself: the value, the flag and the setting
+  // that raises it (task_46).  A message that only says "too deep" leaves the
+  // reader with no way out.
+  REQUIRE(result.error.find("200") != std::string::npos);
+  REQUIRE(result.error.find("--max-depth") != std::string::npos);
+  REQUIRE(result.error.find("Предел глубины") != std::string::npos);
+}
+
+TEST_CASE("every limit names itself, its value and where to raise it") {
+  SECTION("steps") {
+    const auto result = runProgram(
+        "цикл :- цикл.\n"
+        "?цикл.\n",
+        {}, nullptr, [](prologd::Engine& engine) {
+          prologd::Limits limits;
+          limits.maxSteps = 1000;
+          limits.applyTo(engine.options());
+        });
+    REQUIRE(result.runtimeError);
+    REQUIRE(result.error.find("Превышен предел шагов") != std::string::npos);
+    REQUIRE(result.error.find("1000") != std::string::npos);
+    REQUIRE(result.error.find("--max-steps") != std::string::npos);
+    REQUIRE(result.error.find("Предел шагов") != std::string::npos);
+  }
+
+  SECTION("НАЙТИВСЕ") {
+    // The cap is a *diagnostic*, never a silent truncation: the answer list must
+    // not come back short and look complete.  The template comes first and the
+    // goal second (`НАЙТИВСЕ(Шаблон, Цель, Список)`).
+    const auto result = runProgram(
+        "число(0).\n"
+        "число(Н) :- число(Н1), СЛОЖЕНИЕ(Н1, 1, Н).\n"
+        "?НАЙТИВСЕ(Х, число(Х), С).\n",
+        {}, nullptr, [](prologd::Engine& engine) {
+          prologd::Limits limits;
+          limits.maxFindAllSolutions = 50;
+          limits.applyTo(engine.options());
+        });
+    REQUIRE(result.runtimeError);
+    REQUIRE(result.error.find("Предел решений НАЙТИВСЕ") != std::string::npos);
+    REQUIRE(result.error.find("50") != std::string::npos);
+    REQUIRE(result.error.find("--max-findall") != std::string::npos);
+  }
+
+  SECTION("a zero means «no limit» for every one of them") {
+    const auto result = runProgram(
+        "число(1).\n"
+        "число(2).\n"
+        "число(3).\n"
+        "?НАЙТИВСЕ(Х, число(Х), С), ВЫВОД(С), ПС.\n",
+        {}, nullptr, [](prologd::Engine& engine) {
+          prologd::Limits limits;
+          limits.maxFindAllSolutions = 0;
+          limits.maxDepth = 0;
+          limits.maxSteps = 0;
+          limits.applyTo(engine.options());
+        });
+    REQUIRE_FALSE(result.runtimeError);
+    REQUIRE(result.output.find("[1,2,3]") != std::string::npos);
+  }
+
+  SECTION("defaults") {
+    // One record, one set of defaults: a front-end that hands in nothing gets
+    // exactly what the engine had before the record existed.
+    prologd::EngineOptions options;
+    prologd::Limits().applyTo(options);
+    REQUIRE(options.maxSteps == 0);
+    REQUIRE(options.maxDepth == prologd::kDefaultMaxDepth);
+    REQUIRE(options.maxFindAllSolutions == prologd::kDefaultMaxFindAllSolutions);
+    REQUIRE(options.maxNestedDepth == prologd::kDefaultMaxNestedDepth);
+  }
 }
 
 TEST_CASE("quiet suppresses solution output for its query only") {

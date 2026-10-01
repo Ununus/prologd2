@@ -567,7 +567,7 @@ every record has a widget and every widget writes its key.
 | Редактор | font family and size, line numbers, the current-line band, word wrap, tabs or spaces and the width, auto-indent, completion (on/off, after how many letters, `Учитывать регистр`) |
 | Вид | theme (light, dark or system), toolbar, the output panel (shown, right or bottom), the input queue field, where a program's input question is asked (console or dialog), the output's font size, its line limit and whether it follows the end |
 | Формат | the formatter's mode, width, indent and unit, «только выделенное» |
-| Выполнение | whether a run answers the program's own `?`-questions, save before run, the shared folder for `ИМПОРТ`, more `-I` folders |
+| Выполнение | whether a run answers the program's own `?`-questions, save before run, the four limits (steps, depth, НАЙТИВСЕ solutions, seconds), the shared folder for `ИМПОРТ`, more `-I` folders |
 | Файлы | autosave in minutes (0 = off), how many recent files to remember, restoring the open tabs at start-up |
 | Вставки | the live `Ctrl`+key table (task_31), the settings file path, «Вернуть встроенную таблицу» |
 
@@ -673,7 +673,7 @@ Headless check of the protocol, without PySide6 installed:
 python src/gui/tests/protocol_smoke.py
 ```
 
-## Protocol contract (version 8)
+## Protocol contract (version 9)
 
 One JSON object per line in both directions; the interpreter writes nothing else
 to stdout.  The C++ side lives in `src/cli/protocol.cpp`, the Python side in
@@ -687,7 +687,10 @@ margin uses it to answer one clicked query alone, task_36); version 6 adds
 `format` — the formatter, which needs no engine and is answerable at any time
 (task_30); version 7 makes its modes `line`, `soft` and `hard`; version 8 adds
 `loaded` — the load and the program's own `?`-statements are over, which is how a
-front-end knows a run *without* questions (an empty program included) finished.
+front-end knows a run *without* questions (an empty program included) finished;
+version 9 adds the `limits` object of `load` (the step, depth and НАЙТИВСЕ caps of
+the run, `0` for «без предела» — task_46) and answers a request whose field has
+the wrong *type* with an `error` event instead of ending the session.
 Version 1 sessions are still understood by the Python client (the table is then
 empty and completion falls back to the document's own predicates).
 
@@ -711,11 +714,25 @@ the program is then loaded for its clauses only, and its own `?`-statements are
 not run (what the margin's single query needs).  A false `step`/`trace` flag is
 left off the wire.
 
+`load` takes `"limits"` as well (version 9): `{"maxSteps":100000,"maxDepth":10000,
+"maxFindall":1000}`, each `0` for «без предела», applied *before* the load — the
+program's own `?`-statements run during it, and a limit set afterwards would miss
+the run it was meant for.  A limit that fires ends the run with a diagnostic that
+names the limit, its value and the flag or setting that raises it
+(`--max-steps`/«Предел шагов»); the `НАЙТИВСЕ` cap is a *diagnostic*, never a
+silently shortened list.  The window's «Предел времени» is not in this object: the
+deadline belongs to the front-end (a timer and the `interrupt` request), which
+keeps a clock out of the solver's hot loop — and a program waiting *outside* the
+solver (a `ВВОД` nobody answers) is not preempted by it at all.  A request with a
+field of the wrong type — `"maxSteps":-1`, or a string where a number belongs —
+is answered with an `error` event of kind `protocol`, and the session reads the
+next line; before version 9 such a request took the process down.
+
 ### Events
 
 | Event | Meaning |
 |-------|---------|
-| `{"event":"ready","protocol":8,"version":"2.0.0","keywords":[…]} `| the session is up |
+| `{"event":"ready","protocol":9,"version":"2.0.0","keywords":[…]} `| the session is up |
 | `{"event":"output","text":"…"}` | program output (`ВЫВОД`, query results) |
 | `{"event":"result","found":true}` | one query finished; `found` is false when nothing matched |
 | `{"event":"loaded"}` | a `load` request is over: its program and its own `?`-statements ran (a `query` request is answered by its `result` alone) |
@@ -792,11 +809,11 @@ Two pieces of work are planned in task files of their own (`ai/task_*.md`):
   `ЗАКРАСКА` stay correct without a round trip, a canvas and the last disabled
   menu entry.
 * **Interpreter options, profiles and limits** —
-  `ai/task_46_interpreter_options_and_limits.md`.  The path to the interpreter
-  (still `--exe`), the working directory of the process, named profiles, and the
-  limits a student program needs: `--max-steps`/`--max-depth` exist in the engine
-  and on the command line, but the *session* does not carry them, so the dialog
-  cannot reach them; a wall-clock timeout does not exist at all.
+  `ai/task_46_interpreter_options_and_limits.md`.  The limits are done: the
+  session carries them on `load` (protocol 9), the dialog has a row for each of
+  them plus «Предел времени», and each of them names itself when it fires.  Still
+  open: the path to the interpreter (still `--exe`), the working directory of the
+  process, and named profiles.
 
 The rest of task_29's list (RU/EN, «использовать системные цвета» as a choice of
 its own beyond the three themes) is named in `ai/task_29_gui_settings.md`; the

@@ -1,7 +1,7 @@
 # Status tracker
 
-Last updated: after the Windows/VS 2026 verification and the GUI protocol
-session.
+Last updated: after the Windows/VS 2026 verification, the GUI protocol
+session and the limits of task_46 (protocol 9).
 
 ## Overall
 
@@ -9,14 +9,14 @@ session.
   started (protocol + skeleton).
 * Build: the `windows-msvc` preset (Visual Studio 18 2026, MSVC 19.51) build is
   green locally; the Linux presets, including `-Werror`, build cleanly.
-* Tests: 248/248 pass in about five seconds: 234 Catch2 cases plus 14 command-line
+* Tests: 252/252 pass in about five seconds: 238 Catch2 cases plus 14 command-line
   and integration tests (seven option tests, two `--list-keywords` tests, the
   import-search report, the JSON protocol session, the engine-limit cases, the
   diagnostics cases and the formatter round-trip).
   or `--source`), stdin, the REPL and the `--protocol json` session for
   front-ends.
 * GUI: `src/gui` (PySide6) drives the executable through the JSON protocol; the
-  window, the protocol and the stepping are covered by eighteen offscreen scripts
+  window, the protocol and the stepping are covered by twenty offscreen scripts
   (`src/gui/tests/`), which need no display.
 * Documentation: `doc/help.typ`, `doc/technical.typ`, `doc/prologd-diff.typ`
   written (Russian); `cmake --build build --target docs` compiles them when
@@ -111,14 +111,15 @@ session.
 | task_42_engine_hot_path | done | the constant tax, measured: the two per-goal lookups stop building strings (`BuiltinKey` keyed by `string_view`; the database is a two-level `name -> (arity -> list)` map looked up with `std::less<>`, no `"name/arity"` key, `key_order_` gone) — interleaved six pairs on a dispatch-bound loop: median 1.45 s → 1.40 s, every pair faster, ≈ 4 %; clause indexing measured and deferred (ADR-017: a 100 000-clause scan costs ≈ 20 ms, lesson predicates have a handful of clauses, and the queens workload is a shape an index cannot prune); term interning bounded by that same ≈ 4 % and deferred; `tools/bench_engine.py` gained the `dispatch`, `structured` and `queens` workloads and `--only` |
 | task_43_language_surface | done | `ВЫП/2..N` (`call/N`): the extra arguments are appended to the goal (callee dereferenced first; the keyword table says `ВЫП/+`; the checker expands the same term; `!` inside the argument stays a parse error and the manual no longer promises it); the module-collision warning — one per predicate fed by two files with no import path between them, silent for the diamond and for extending an imported module (ADR-019); the dead library is gone (`?СКОЛЬКО(НЕ, А)` answers 0; ADR-018) |
 | task_44_names | done | the two names that promised something else: `ИЛИ/2` → `ПЕРВОЕ/2` (`or` → `first`) with the retired spelling removed from the language (a call is a load error naming the replacement), `НАЙТИВСЁ` → `НАЙТИВСЕ` (the spelling of the task and of the reference notes) with the retired spelling kept reserved, so its call is the ordinary suggestion «возможно, НАЙТИВСЕ/3»; the two `ИЛИ` library clauses removed so the old name cannot answer through the database; `doc/help.typ` §4.6, `prologd-diff.typ` §17/§18, lesson 4's section 5 |
-| task_45_gui_graphics_window | not started | the graphics predicates become *visible*: a bitmap backend inside the engine (the source of truth, so `getPixel` and `ЗАКРАСКА` need no round trip), protocol 9 events plus a snapshot, a Qt-free canvas and a window of its own — the last disabled menu entry.  Split out of task_21/task_15 on 2026-10-01 |
-| task_46_interpreter_options_and_limits | not started | the interpreter path, the working directory of the process, named profiles and the limits a student program needs.  Half of it exists already (`maxSteps`, `maxDepth`, `maxNestedDepth`, `maxFindAllSolutions` in `EngineOptions`; `--max-steps`/`--max-depth` on the command line) — what is missing is the session carrying them, a wall-clock timeout, and the GUI rows.  The last item of task_29's settings list, split out on 2026-10-01 |
+| task_45_gui_graphics_window | not started | the graphics predicates become *visible*: a bitmap backend inside the engine (the source of truth, so `getPixel` and `ЗАКРАСКА` need no round trip), protocol 10 events (`9` went to task_46's limits) plus a snapshot, a Qt-free canvas and a window of its own — the last disabled menu entry.  Split out of task_21/task_15 on 2026-10-01 |
+| task_46_interpreter_options_and_limits | in progress | the limits are in: `Limits` + `applyTo` in the engine, `--max-findall`, protocol **9** (`limits` on `load`, a bad field is an `error` instead of a dead session), four dialog rows and a front-end deadline.  Still open: the interpreter path, the process directory, profiles, and `--timeout-ms` (a text-mode deadline would need a clock in the solver).  The last item of task_29's settings list, split out on 2026-10-01 |
 
 ## Test suite
 
-248 tests, about five seconds: 234 Catch2 cases plus 14 command-line and
+252 tests, about five seconds: 238 Catch2 cases plus 14 command-line and
 integration tests (seven option tests, two `--list-keywords` tests, the
-import-search report, the JSON protocol session and the engine-limit cases). Groups:
+import-search report, the JSON protocol session, the formatter round-trip and the
+engine-limit and diagnostics cases). Groups:
 BigInt, lexer, keywords, parser, unification, engine, every built-in group,
 `НАЙТИВСЕ`, module loader (including the import search report), the I/O seams,
 typical tasks (factorial, Fibonacci, GCD, insertion sort, 4-queens, knapsack),
@@ -1268,3 +1269,31 @@ Added on 2026-10-02 while implementing task_31:
   «Оформление»), а §10 всё ещё называл отдельный размер шрифта панели вывода
   невыполненным — он есть с task_29; в §10 встали графическое окно и профили с
   ссылками на новые задачи, а в README — точные числа аудита (49/43/6).
+* GUI round, part 42: **task_46, половина про пределы**.  Программа, ушедшая в
+  бесконечный поиск, должна кончаться сама: теперь у запуска есть четыре предела,
+  каждый называет себя, а ноль всюду значит «без предела».  В движке появились
+  именованные значения по умолчанию и `Limits` с `applyTo(EngineOptions&)` — через
+  него идут и флаги, и протокол, так что строка настроек и флаг не могут разойтись;
+  `--max-findall` встал рядом с `--max-steps`/`--max-depth` (и `--max-findall 0`
+  перестал значить «ноль решений» — теперь это «без предела», как у соседей).
+  Протокол **9**: у `load` есть объект `limits`, и он применяется *до* загрузки —
+  программу выполняет та же загрузка, и предел, поставленный после неё, опоздал бы
+  к своему прогону.  Сообщение называет предел, его значение и то, где его поднять:
+  «Превышен предел шагов выполнения: 5000 (--max-steps; «Предел шагов» в настройках
+  окна)», и строка в диалоге носит то же имя.  `НАЙТИВСЕ`, упёршийся в предел, — это
+  *диагностика*, а не тихая обрезка: список покороче, который потом считают ответом,
+  хуже ошибки.  В диалоге четыре строки («Предел шагов», «Предел глубины», «Предел
+  решений НАЙТИВСЕ», «Предел времени, с»), а прогон сам пишет в панель, с какими
+  пределами пошёл.
+  Таймаут решён **по часам окна** (`QTimer` и запрос `interrupt`), а не в движке:
+  `steady_clock::now()` в горячем месте — это плата за каждое решение, и о том, что
+  «слишком долго для урока», знает всё-таки передний край.  Отсюда два проверенных
+  следствия: считающий прогон кончается по сроку (движок и так опрашивает флаг
+  остановки на каждом шаге), а прогон, ждущий `ВВОД`, стоит *вне* решателя, и его
+  обрывает только «Остановить» — так и записано в task_46, а не обещано иначе.
+  Попутно протокол стал честнее: запрос с полем не того типа (`"maxSteps":-1`, или
+  строка вместо числа) раньше молча превращался в огромный предел, а теперь это
+  событие `error` с `kind":"protocol"`, и сессия читает следующую строку — на таком
+  запросе процесс раньше падал.
+  252/252 ctest, 20 headless-скриптов GUI, пять PDF (`gui.pdf` — 27 страниц, §6.3
+  на 19–20; `help.pdf` — 30 страниц, §15 на 24).

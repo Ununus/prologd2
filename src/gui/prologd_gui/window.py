@@ -162,6 +162,12 @@ class MainWindow(QMainWindow):
         self._stop_grace = QTimer(self)
         self._stop_grace.setSingleShot(True)
         self._stop_grace.timeout.connect(self._stop_expired)
+        #: The deadline of a *run* (task_46): `execution/timeout_seconds` measured
+        #: by the window, because the engine's hot loop must stay clock-free.  When
+        #: it fires the run is asked to stop the same way the button asks.
+        self._timeout = QTimer(self)
+        self._timeout.setSingleShot(True)
+        self._timeout.timeout.connect(self._on_timeout)
         #: The autosave timer (task_29).  Minutes in the settings, so the interval
         #: is re-armed by `_apply_autosave` whenever they change; a test drives
         #: `autosave_now` directly instead of waiting for it.
@@ -724,7 +730,13 @@ class MainWindow(QMainWindow):
         whole file, whether the interpreter is idle with a base loaded or gone
         altogether.  `Остановить` is for a live process: stopping an idle one is
         how the knowledge base is unloaded, which is what its message says.
+
+        The deadline of a run (task_46) is dropped here as well: every path that
+        ends a run comes through this method, and a timer that outlived its run
+        would stop the *next* one.
         """
+        if not self._busy:
+            self._timeout.stop()
         # A *paused* step is a usable state, not a busy one: «Запустить» then
         # means «продолжить», and «Шаг», «Шаг с обходом» and the traced run have
         # to be live, or their keys are dead exactly when the user needs them — a
@@ -1133,6 +1145,7 @@ class MainWindow(QMainWindow):
         # reaches the new interpreter — clearing it early would report the
         # termination status as an exit code.
         self._stop_grace.stop()
+        self._timeout.stop()
         if self._session.paused() and not (trace or step):
             # `F5` while a step is paused means «продолжить»: starting the file over
             # would throw away the run the user is walking through.
@@ -1179,10 +1192,20 @@ class MainWindow(QMainWindow):
         self._append_note("--- загрузка базы знаний ---\n")
         if self._queued_input:
             self._append_note(f"--- ввод из поля, строк — {len(self._queued_input)} ---\n")
+        # The guards of the run (task_46): three go on the wire with the load, and
+        # the deadline is the window's own clock — the same answer «Остановить»
+        # uses, so a program that computes forever stops on time.
+        limits = self._settings.limits()
+        if limits:
+            self._append_note("--- пределы: " +
+                              ", ".join(f"{name} {value}" for name, value in limits.items()) +
+                              " ---\n")
+        self._arm_timeout()
         if path is not None and not buffer.is_modified():
             # A saved, unmodified buffer is loaded by path: `ИМПОРТ` resolves
             # against the file's own directory and diagnostics name the file.
-            self._session.load_file(path, step=step, trace=trace, questions=questions)
+            self._session.load_file(path, step=step, trace=trace, questions=questions,
+                                    limits=limits)
             self._status.setText(f"выполняется {pathlib.Path(path).name}")
         else:
             # Otherwise the text comes from the editor, and the path, when there
@@ -1195,10 +1218,34 @@ class MainWindow(QMainWindow):
             # point at the real file), an unnamed buffer by its title — the name
             # the user sees in the tab and in the status bar of a diagnostic.
             self._session.load_text(buffer.text(), path or buffer.title(), step=step,
-                                    trace=trace, questions=questions)
+                                    trace=trace, questions=questions, limits=limits)
             name = pathlib.Path(path).name if path else buffer.title()
             self._status.setText(f"выполняется {name} (есть несохранённые правки)")
         return True
+
+    def _arm_timeout(self) -> None:
+        """Starts the «Предел времени» clock of a run, if one is set (task_46).
+
+        The deadline is a `QTimer` and the answer is `interrupt` — the same polite
+        stop the button uses, so the engine ends the query where it stands instead
+        of the window killing a process mid-write.  What it cannot reach is a
+        program waiting *outside* the solver (a `ВВОД` nobody answers, a `ЖДИ`):
+        the request is read when the solver looks next, and until then the run
+        keeps waiting — «Остановить» is what ends a program like that.
+        """
+        self._timeout.stop()
+        seconds = self._settings.timeout_seconds
+        if seconds > 0:
+            self._timeout.start(seconds * 1000)
+
+    def _on_timeout(self) -> None:
+        """The run outlived its deadline: ask the interpreter to stop solving."""
+        if not self._busy:
+            return
+        seconds = self._settings.timeout_seconds
+        self._append_note(f"--- предел времени: {seconds} с, остановлено ---\n")
+        self._status.setText(f"остановлено по времени (предел {seconds} с)")
+        self._session.interrupt()
 
     def format_document(self) -> None:
         """Lays the current buffer — or the selection — out (task_30).

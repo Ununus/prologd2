@@ -71,10 +71,17 @@ enum class StepDecision {
   Stop,      ///< end the query: the engine raises `Interrupted`
 };
 
+/// The default guards of a fresh engine (task_46).  They are named here because
+/// the command line, the protocol and the settings dialog all quote them, and a
+/// default written out in three places is three chances to drift.
+inline constexpr std::size_t kDefaultMaxNestedDepth = 10'000;
+inline constexpr std::size_t kDefaultMaxFindAllSolutions = 1'000'000;
+inline constexpr std::size_t kDefaultMaxDepth = 10'000;
+
 struct EngineOptions {
   bool trace = false;
-  std::size_t maxNestedDepth = 10'000;
-  std::size_t maxFindAllSolutions = 1'000'000;
+  std::size_t maxNestedDepth = kDefaultMaxNestedDepth;
+  std::size_t maxFindAllSolutions = kDefaultMaxFindAllSolutions;
   std::size_t maxSteps = 0;  // 0 = unlimited
   /// How deep a clause body may nest before the solver refuses to go on.
   ///
@@ -86,7 +93,7 @@ struct EngineOptions {
   /// released iteratively now, so this limit is a *guard against runaway
   /// programs*, not a workaround: a lesson needs hundreds of levels, and a
   /// search that needs more asks for it with `--max-depth 0`.
-  std::size_t maxDepth = 10'000;
+  std::size_t maxDepth = kDefaultMaxDepth;
 
   /// Extra stop condition, polled by the solver next to the internal flag.
   /// A front-end uses it to turn the Ctrl+C signal flag or a GUI "Stop" button
@@ -101,6 +108,23 @@ struct EngineOptions {
   /// *not* a signal handler and may block (that is how a step waits for the
   /// next command) — and it must not throw.
   std::function<StepDecision(const StepInfo&)> stepHook;
+};
+
+/// The guards a front-end hands in, in one record (task_46).
+///
+/// `0` means "no limit" everywhere — the command line, the protocol and the
+/// settings dialog copy them into the options through `applyTo`, so the three
+/// cannot disagree about what a zero means or where a default comes from.  The
+/// wall-clock timeout is deliberately **not** here: it is a property of the run,
+/// not of the solver — the front-end owns the clock (a GUI timer, the command
+/// line's Ctrl+C), which also keeps a `steady_clock::now()` out of the solver's
+/// hot loop.
+struct Limits {
+  std::size_t maxSteps = 0;
+  std::size_t maxDepth = kDefaultMaxDepth;
+  std::size_t maxFindAllSolutions = kDefaultMaxFindAllSolutions;
+
+  void applyTo(EngineOptions& options) const;
 };
 
 class Engine;

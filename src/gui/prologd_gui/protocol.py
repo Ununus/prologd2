@@ -22,7 +22,12 @@ from typing import Any, Iterator
 #: 6: `format` for the formatter; the answer is a `formatted` event (task_30).
 #: 7: the modes of `format` are `line`, `soft` and `hard`.
 #: 8: `loaded` — a load and the program's own `?`-statements are over.
-PROTOCOL_VERSION = 8
+#: 9: `load` takes `limits` — the step, depth and НАЙТИВСЕ caps of the run
+#:    (`maxSteps`, `maxDepth`, `maxFindall`; `0` is «без предела»), so a window can
+#:    stop a runaway program the way the command line does (task_46).  A field of
+#:    the wrong *type* is answered with an `error` event instead of ending the
+#:    session.
+PROTOCOL_VERSION = 9
 
 #: Event names the interpreter emits.
 EVENTS = ("ready", "output", "result", "input_request", "step", "trace", "error", "bye")
@@ -83,7 +88,8 @@ def encode_request(**fields: Any) -> bytes:
 
 
 def load_text(text: str, name: str = "<buffer>", *, step: bool = False,
-              trace: bool = False, questions: bool = True) -> bytes:
+              trace: bool = False, questions: bool = True,
+              limits: dict | None = None) -> bytes:
     """Loads program text (the editor buffer).
 
     `step` makes the run stop at its first step point and wait for a `step`
@@ -92,18 +98,24 @@ def load_text(text: str, name: str = "<buffer>", *, step: bool = False,
     `?`-statements: what the editor's margin needs to answer one clicked query
     alone (task_36).  The flags are left off the wire when they are false, which
     keeps a plain run looking exactly as it did before protocol 3.
+
+    `limits` are the guards of the run (protocol 9): `maxSteps`, `maxDepth`,
+    `maxFindall`, each `0` for «без предела».  The *wall-clock* timeout is not
+    here — it is the front-end's own clock (task_46).
     """
     return encode_request(
         cmd="load", text=text, name=name,
         **_flags(step=step, trace=trace, questions=questions),
+        **_limits(limits),
     )
 
 
 def load_file(path: str, *, step: bool = False, trace: bool = False,
-              questions: bool = True) -> bytes:
+              questions: bool = True, limits: dict | None = None) -> bytes:
     """Loads a program from disk; imports resolve against `-I` directories."""
     return encode_request(
-        cmd="load", path=path, **_flags(step=step, trace=trace, questions=questions)
+        cmd="load", path=path, **_flags(step=step, trace=trace, questions=questions),
+        **_limits(limits),
     )
 
 
@@ -163,6 +175,19 @@ def _flags(*, step: bool = False, trace: bool = False, questions: bool = True) -
     if not questions:
         flags["questions"] = False
     return flags
+
+
+def _limits(limits: dict | None) -> dict:
+    """The `limits` object of a `load`, or nothing when they are the defaults.
+
+    Only the ones that were asked for travel: a window that sets no limit sends
+    no `limits` at all, which is what keeps an old front-end's traffic identical
+    to what it was before protocol 9.
+    """
+    if not limits:
+        return {}
+    asked = {name: int(value) for name, value in limits.items() if int(value) > 0}
+    return {"limits": asked} if asked else {}
 
 
 def input_answer(text: str) -> bytes:

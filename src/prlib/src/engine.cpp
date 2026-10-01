@@ -34,6 +34,16 @@ BigInt ArithValue::asInteger() const {
 }
 
 // ---------------------------------------------------------------------------
+// Limits
+// ---------------------------------------------------------------------------
+
+void Limits::applyTo(EngineOptions& options) const {
+  options.maxSteps = maxSteps;
+  options.maxDepth = maxDepth;
+  options.maxFindAllSolutions = maxFindAllSolutions;
+}
+
+// ---------------------------------------------------------------------------
 // Solver
 // ---------------------------------------------------------------------------
 
@@ -466,15 +476,20 @@ void Solver::run(std::span<const Term> goals, const std::function<bool()>& on_so
       engine_.raise(ErrorCode::Interrupted);
     }
     if (engine_.options().maxSteps != 0 && ++steps_ > engine_.options().maxSteps) {
-      engine_.raise(ErrorCode::Interrupted, "Превышен лимит шагов выполнения");
+      engine_.raise(
+          ErrorCode::Interrupted,
+          "Превышен предел шагов выполнения: " +
+              std::to_string(engine_.options().maxSteps) +
+              " (--max-steps; «Предел шагов» в настройках окна)");
     }
     // A guard, not a workaround: the solver loops instead of recursing, and the
     // chain release is iterative, so this only stops a runaway program with a
     // message instead of letting it eat memory for an hour.
     if (engine_.options().maxDepth != 0 && env_->depth > engine_.options().maxDepth) {
       engine_.raise(ErrorCode::StackOverflow,
-                    "Превышена глубина рекурсии (лимит " +
-                        std::to_string(engine_.options().maxDepth) + ")");
+                    "Превышена глубина рекурсии: " +
+                        std::to_string(engine_.options().maxDepth) +
+                        " (--max-depth; «Предел глубины» в настройках окна)");
     }
     if (env_->index >= env_->goals->size()) {
       if (env_->parent == nullptr) {
@@ -789,10 +804,16 @@ std::vector<Term> Engine::collectAll(const Term& goal, const Term& templ,
   if (++nested_depth_ > options_.maxNestedDepth) {
     --nested_depth_;
     bindings_.unwind(mark);
-    raise(ErrorCode::StackOverflow);
+    raise(ErrorCode::StackOverflow,
+          "Превышен предел вложенности вызовов: " +
+              std::to_string(options_.maxNestedDepth) +
+              " (защита от НАЙТИВСЕ и ВЫП внутри самих себя)");
   }
   nested.run(std::span<const Term>(&single, 1), [&]() {
-    if (collected.size() >= limit) {
+    // `limit == 0` is «не ограничивать», like the step and depth limits: a zero
+    // that silently means «ни одного решения» is the kind of surprise a settings
+    // dialog must not have (task_46).
+    if (limit != 0 && collected.size() >= limit) {
       exceeded = true;
       return false;
     }
@@ -802,7 +823,12 @@ std::vector<Term> Engine::collectAll(const Term& goal, const Term& templ,
   --nested_depth_;
   bindings_.unwind(mark);
   if (exceeded) {
-    raise(ErrorCode::TooManySolutions);
+    // A limit that fires is a *diagnostic*, never a silent truncation: a list
+    // that stops early and looks complete is the one outcome worse than an
+    // error, so the message says the limit, its value and where to raise it.
+    raise(ErrorCode::TooManySolutions,
+          "Превышен предел решений НАЙТИВСЕ: " + std::to_string(limit) +
+              " (--max-findall; «Предел решений НАЙТИВСЕ» в настройках окна)");
   }
   return collected;
 }

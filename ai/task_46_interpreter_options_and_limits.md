@@ -1,6 +1,7 @@
 # task_46 — Interpreter options, profiles and limits
 
-**Status:** not started
+**Status:** in progress — the limits are done (protocol 9), the interpreter path,
+the process directory and profiles remain (2026-10-01)
 **Depends on:** task_29 (the dialog and the description table), task_21/task_27
 (the session and its run states), task_38 (the engine's own limits)
 **Milestone:** M16
@@ -25,26 +26,38 @@ does not carry the values, and the engine has some of them.
 | `--max-steps`, `--max-depth` | `src/cli/main.cpp` | CLI only |
 | `--exe PATH` | `src/gui/main.py` | command line only |
 | the shared folder and the `-I` list | `settings` `execution/working_directory`, `execution/import_paths`, the dialog | done (task_29) |
-| a wall-clock timeout | — | does not exist |
+| a wall-clock timeout | `window.py` (`_arm_timeout`) | done in the front-end (2026-10-01) |
 | the working directory of the *process* (`ЗАПИСЬ_В`, `ЧТЕНИЕ_ИЗ` are relative to it) | — | does not exist |
 | interpreter profiles | — | do not exist |
 
-The JSON session exposes **none** of the limits: `load` carries `step`, `trace`
-and `questions` and nothing else, so a dialog cannot reach `maxSteps`.
+The JSON session exposed **none** of the limits until protocol 9: `load` carried
+`step`, `trace` and `questions` and nothing else, so a dialog could not reach
+`maxSteps`.  Version 9 adds the `limits` object (see below).
 
 ## Deliverables
 
-- [ ] **One place that builds the limits.**  `EngineOptions` gains a
-      `timeoutMs` (0 = none) next to the existing caps, and a single helper fills
-      an `EngineOptions` from a `Limits` struct — the CLI and the protocol both use
-      it, so a flag and a setting cannot drift apart.
-- [ ] **CLI parity**: `--max-findall N` and `--timeout-ms N` next to the existing
-      `--max-steps`/`--max-depth`, documented in `help.typ` and the README.
-- [ ] **Protocol 9/10**: a `limits` object on `load` (or a `set_limits` request
-      answered by `limits_set`) with `maxSteps`, `maxDepth`, `maxFindall`,
-      `timeoutMs`; a limit that fires ends the run with a diagnostic that **names
-      the limit and the setting that raises it** — «остановлено: превышен предел
-      шагов (execution/max_steps)» — because a limit nobody can name is a mystery.
+- [x] **One place that builds the limits.**  `prlib/engine.hpp` has named defaults
+      (`kDefaultMaxDepth`, `kDefaultMaxFindAllSolutions`, …) and a `Limits` struct
+      with `applyTo(EngineOptions&)`; `--max-steps`/`--max-depth`/`--max-findall`
+      all go through it, so a flag and a setting cannot drift apart.  The struct
+      deliberately **has no timeout**: see the note below.
+- [x] **CLI parity, half of it**: `--max-findall N` sits next to
+      `--max-steps`/`--max-depth` and is documented in `help.typ`.
+- [ ] **CLI parity, the rest**: `--timeout-ms N` — a *text-mode* deadline.  Not
+      needed by the window (which has its own clock, below); it would have to be
+      polled from inside `Engine::shouldStop()`, and a clock read at every
+      solution is exactly the cost the front-end clock avoids.  Decide whether a
+      text-mode deadline is worth that before adding it.
+- [x] **Protocol 9**: the `limits` object on `load` (`maxSteps`, `maxDepth`,
+      `maxFindall`; `0` = без предела; applied *before* the load, because the
+      program's own `?`-statements run during it).  A limit that fires ends the
+      run with a diagnostic that **names the limit, its value and where to raise
+      it** — «Превышен предел шагов выполнения: 5000 (--max-steps; «Предел шагов»
+      в настройках окна)», and the window's row carries the same name.  A request
+      with a field of the wrong type (`"maxSteps":-1`) is an `error` event of
+      kind `protocol` and the session reads the next line; before version 9 such
+      a request took the process down.  `timeoutMs` is **not** on the wire (see
+      the design notes).
 - [ ] **The GUI rows** (`Выполнение`): `execution/interpreter` (a file path — the
       dialog's folder rows already have the «Обзор…» button), and
       `execution/process_directory` as a *choice* — `каталог файла` (default for a
@@ -52,9 +65,12 @@ and `questions` and nothing else, so a dialog cannot reach `maxSteps`.
       Both are pushed into `PrologSession` (`setProgram`, and the child's working
       directory via `QProcess.setWorkingDirectory`), and «Применить» **restarts a
       live session** after either changes, saying so in the status bar.
-- [ ] **The GUI rows** for the limits: `execution/max_steps`, `execution/max_depth`,
-      `execution/max_findall`, `execution/timeout_ms`, all `0 = без предела`, sent
-      with every `load`.
+- [x] **The GUI rows** for the limits: `execution/max_steps` → «Предел шагов»,
+      `execution/max_depth` → «Предел глубины», `execution/max_findall` → «Предел
+      решений НАЙТИВСЕ», `execution/timeout_seconds` → «Предел времени, с»; all
+      four `0 = без предела`, and the three solver limits are sent with every
+      `load`.  The run names them in the output pane («пределы: maxSteps 5000,
+      maxDepth 10000») so a program that stops has an explanation next to it.
 - [ ] **Profiles**: `execution/profiles` — a table of named sets of (the `-I`
       list, the limits, the interpreter path), stored as JSON in the settings file
       the way `shortcuts/table` is; `execution/profile` — the active name; a page
@@ -66,13 +82,18 @@ and `questions` and nothing else, so a dialog cannot reach `maxSteps`.
 
 ## Design notes
 
-* **A wall-clock timeout cannot preempt everything.**  The solver polls
-  `shouldStop()` at every step, next to `externalStop`, so a *computing* program
-  ends on time; a program **waiting for input** (`ВВОД` with nobody answering) is
-  blocked outside the solver and the deadline does not reach it — that is what
-  «Остановить» is for, and the task file says so instead of promising otherwise.
-  Pin both halves with tests: a runaway computation stops on the deadline, a
-  waiting read does not (the GUI's stop request is what ends it).
+* **The wall-clock timeout lives in the front-end, by decision (2026-10-01).**
+  The engine counts steps and never looks at a clock: a `steady_clock::now()` in
+  the solver's hot path is a cost paid for every solution, and it is the front-end
+  that knows what «too slow for a lesson» means anyway.  So the window arms a
+  `QTimer` for the run and, when it fires, prints «--- предел времени: N с,
+  остановлено ---» and sends the ordinary `interrupt` request.  Consequences, both
+  pinned by tests: a *computing* program stops on the deadline (the engine polls
+  the stop flag at every step, as it already did for «Остановить»), while a
+  program **waiting for input** (`ВВОД` with nobody answering) is blocked outside
+  the solver and the deadline does not reach it — that is what «Остановить» is for.
+  A text-mode `--timeout-ms` would need the engine clock back; it stays unwritten
+  until someone wants a deadline outside the window.
 * The **step cap is the cheap guard** for a runaway *search* (it counts work), the
   **timeout** for a slow computation (it counts wall clock), and the `НАЙТИВСЕ`
   cap is a **diagnostic, not a silent truncation**: reaching it is an error that
@@ -86,19 +107,23 @@ and `questions` and nothing else, so a dialog cannot reach `maxSteps`.
 
 ## Tests
 
-- [ ] Catch2: `timeoutMs` ends a slow query with the documented diagnostic; the
-      step cap and the `НАЙТИВСЕ` cap keep their messages (task_38's tests grow a
-      case each); a limit of `0` really means unlimited.
-- [ ] `protocol_session.cmake`: the limits travel on `load`, they are refused when
-      they make no sense (`-1`), and the diagnostic names the limit.
-- [ ] `test_settings.py` / `test_settingsdialog.py`: the new rows round-trip and
-      the profile table survives a foreign file; «Профили» adds, copies and
-      deletes.
-- [ ] `test_window.py`: the limits reach the wire (a run with a step cap of 1
-      stops and says why); a profile changes the `-I` list of the next session;
-      changing the interpreter path with «Применить» stops the live session and
-      the next run uses the new path (a copy of the built exe as the «other»
-      interpreter).
+- [x] Catch2: the step cap, the depth cap (value, flag and row name in the
+      message) and the `НАЙТИВСЕ` cap each name themselves
+      (`every limit names itself, its value and where to raise it`), a fresh
+      `Limits` equals the engine's defaults, and a limit of `0` really means
+      unlimited for every one of them.  No `timeoutMs` case: there is no engine
+      clock to test.
+- [x] `protocol_session.cmake`: the limits travel on `load`, a negative one is
+      refused with a `protocol` error, and the session serves the next request.
+- [x] `test_settings.py` (defaults, `limits()` shape, a negative value falls back
+      to `0`, the timeout is clamped) and `test_settingsdialog.py` (a row each).
+- [x] `test_window.py`: the limits reach the wire (a run with a step cap of 5000
+      stops and says why), the run names its limits, the deadline is armed and
+      dropped with the run, and an expired deadline interrupts.
+- [ ] `test_window.py` for the rest: a profile changes the `-I` list of the next
+      session; changing the interpreter path with «Применить» stops the live
+      session and the next run uses the new path (a copy of the built exe as the
+      «other» interpreter).
 - [ ] By hand: a lesson program with an endless loop stops with a message; a
       teacher's profile switches the search path in one click.
 

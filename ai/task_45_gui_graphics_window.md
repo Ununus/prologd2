@@ -51,7 +51,7 @@ other side of a pipe.  Two consequences decide the design:
       method* names, so the tests, the wire and the GUI share one vocabulary) plus
       its arguments and the colour.  One struct, one function that turns it into
       the protocol's JSON.
-- [ ] Protocol **9**: `{"event":"graphics", …}` per primitive, and a snapshot for
+- [ ] Protocol **10** (`9` is the limits of task_46): `{"event":"graphics", …}` per primitive, and a snapshot for
       a window that was opened (or reopened) while the program was drawing:
       `{"cmd":"graphics","snapshot":true}` → `{"event":"bitmap","width":…,
       "height":…,"data":"<base64 ARGB>"}`.  `protocol_session.cmake` covers both;

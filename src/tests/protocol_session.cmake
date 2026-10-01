@@ -37,7 +37,7 @@ execute_process(
 
 set(expected_events
   "{\"event\":\"ready\","
-  "\"protocol\":8"
+  "\"protocol\":9"
   "\"keywords\":"
   "{\"event\":\"result\",\"found\":true}"
   "{\"event\":\"loaded\"}"
@@ -248,11 +248,58 @@ if(position EQUAL -1)
   message(FATAL_ERROR "The runtime error did not name its clause\n--- got ---\n${events}")
 endif()
 
+# --- the limits of a run travel with the load (protocol 9, task_46) ----------
+# The message a limit prints is Cyrillic and cannot survive this file's code page,
+# so the check is about the *shape*: a runaway with a step cap ends the run as a
+# runtime error (exit code 3) instead of running for ever, and a limit of the
+# wrong type is an error event that leaves the session alive.
+file(WRITE "${session}"
+  "{\"cmd\":\"load\",\"text\":\"loop :- loop.\\n?loop.\\n\",\"limits\":{\"maxSteps\":1000}}\n"
+  "{\"cmd\":\"quit\"}\n")
+
+execute_process(
+  COMMAND "${PROLOGD_EXE}" --protocol json
+  INPUT_FILE "${session}"
+  OUTPUT_VARIABLE events
+  RESULT_VARIABLE exit_code)
+
+string(FIND "${events}" "\"kind\":\"runtime\"" position)
+if(position EQUAL -1)
+  message(FATAL_ERROR "A runaway with a step cap was not stopped\n--- got ---\n${events}")
+endif()
+if(NOT exit_code EQUAL 3)
+  message(FATAL_ERROR "Expected exit code 3 for a limit that fired, got ${exit_code}")
+endif()
+
+file(WRITE "${session}"
+  "{\"cmd\":\"load\",\"text\":\"fact(1).\\n\",\"limits\":{\"maxSteps\":-1}}\n"
+  "{\"cmd\":\"load\",\"text\":\"?less(2,3).\\n\"}\n"
+  "{\"cmd\":\"quit\"}\n")
+
+execute_process(
+  COMMAND "${PROLOGD_EXE}" --protocol json
+  INPUT_FILE "${session}"
+  OUTPUT_VARIABLE events
+  RESULT_VARIABLE exit_code)
+
+string(FIND "${events}" "\"kind\":\"protocol\"" position)
+if(position EQUAL -1)
+  message(FATAL_ERROR "A negative limit must be refused with an error event\n--- got ---\n${events}")
+endif()
+# The refused load defined nothing (`fact/1` never arrived), so the next request
+# is a program of its own: what is being checked is that the session reads it.
+string(FIND "${events}" "{\"event\":\"loaded\"}" position)
+if(position EQUAL -1)
+  message(FATAL_ERROR "The session did not serve the request after a bad one\n--- got ---\n${events}")
+endif()
+if(NOT exit_code EQUAL 0)
+  message(FATAL_ERROR "A refused request must not change the exit code, got ${exit_code}")
+endif()
+
 # --- the trace goes out as events of its own ---------------------------------
 file(WRITE "${session}"
   "{\"cmd\":\"load\",\"text\":\"факт(1).\\n?факт(1).\\n\",\"trace\":true}\n"
   "{\"cmd\":\"quit\"}\n")
-
 execute_process(
   COMMAND "${PROLOGD_EXE}" --protocol json
   INPUT_FILE "${session}"

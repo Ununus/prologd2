@@ -99,6 +99,40 @@ def main(argv: list[str]) -> int:
     assert find(events, "error", kind="parse"), events
     print("ok: parse failure is reported as an event with exit code 2")
 
+    # task_46: the caps travel with the load, and the message names the limit, its
+    # value and the flag that raises it — a limit nobody can name is a mystery.
+    code, events = run_session(
+        executable,
+        [protocol.load_text("цикл :- цикл.\n?цикл.\n", limits={"maxSteps": 1000})],
+        timeout=60.0,
+    )
+    assert code == 3, f"expected the run to end with a diagnostic, got {code}"
+    stopped = find(events, "error", kind="runtime")
+    message = stopped["message"]
+    assert "предел шагов" in message, message
+    assert "1000" in message and "--max-steps" in message, message
+    assert "Предел шагов" in message, message
+    print("ok: a limit travels with the load and names itself when it fires")
+
+    # A field of the wrong *type* is the front-end's mistake, not a reason to take
+    # the session down: the request is answered with an error and the next one is
+    # served (a negative limit is exactly such a mistake, and `value<size_t>`
+    # throws on it).
+    code, events = run_session(
+        executable,
+        [
+            protocol.encode_request(cmd="load", text="факт(1).\n",
+                                    limits={"maxSteps": -1}),
+            # The refused load defined nothing, so the next request brings its own
+            # program: what is checked is that the session reads it at all.
+            protocol.load_text("?БОЛЬШЕ(2, 3).\n"),
+        ],
+    )
+    assert code == 0, f"exit code {code}"
+    assert find(events, "error", kind="protocol"), events
+    assert find(events, "loaded"), events
+    print("ok: a request with a bad field is an error event, and the session goes on")
+
     print("all protocol checks passed")
     return 0
 

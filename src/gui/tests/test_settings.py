@@ -283,6 +283,23 @@ def test_the_new_keys_have_the_documented_defaults(directory: pathlib.Path) -> N
     assert settings.follow_output is True, "the pane followed the end before the switch"
     assert settings.input_mode == settings_module.DEFAULT_INPUT_MODE == "panel"
     assert settings.run_questions is True, "a lesson is run to see its questions answered"
+    # task_46's guards: steps and time are unlimited out of the box, depth and
+    # НАЙТИВСЕ carry the engine's own numbers — and a limit nobody asked for is
+    # left *off* the wire, so an old engine sees exactly the traffic it saw before.
+    assert settings.max_steps == 0, "no step limit until one is asked for"
+    assert settings.timeout_seconds == 0, "no deadline until one is asked for"
+    assert settings.max_depth == settings_module.DEFAULT_MAX_DEPTH
+    assert settings.max_findall == settings_module.DEFAULT_MAX_FINDALL
+    assert settings.limits() == {
+        "maxDepth": settings_module.DEFAULT_MAX_DEPTH,
+        "maxFindall": settings_module.DEFAULT_MAX_FINDALL,
+    }, settings.limits()
+    settings.max_steps = 5000
+    assert settings.limits()["maxSteps"] == 5000
+    settings.max_steps = -5
+    assert settings.max_steps == 0, "a negative limit is not a limit"
+    settings.timeout_seconds = 99_999
+    assert settings.timeout_seconds == settings_module.MAXIMUM_TIMEOUT_SECONDS
     settings.input_mode = "диалог"
     assert settings.input_mode == settings_module.DEFAULT_INPUT_MODE, "junk falls back"
     settings.output_font_size = 100

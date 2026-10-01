@@ -103,6 +103,7 @@ int main(int argc, char** argv) {
   // flag that repeats them would become a second place to change them.
   std::optional<std::size_t> maxDepth;
   std::optional<std::size_t> maxSteps;
+  std::optional<std::size_t> maxFindAll;
 
   app.add_option("-s,--source", sources, "Interpret the given source file (repeatable)");
   app.add_option("-I,--include", includeDirectories, "Add an import search directory");
@@ -117,6 +118,8 @@ int main(int argc, char** argv) {
                  "Recursion depth limit for one query (0 = unlimited, default 10000)");
   app.add_option("--max-steps", maxSteps,
                  "Step limit for one query (0 = unlimited, default unlimited)");
+  app.add_option("--max-findall", maxFindAll,
+                 "Solution limit for one НАЙТИВСЕ (0 = unlimited, default 1000000)");
   app.add_option("--protocol", protocol, "Front-end protocol: text (default) or json")
       ->check(CLI::IsMember({"text", "json"}));
   app.add_flag("--list-keywords", listKeywords,
@@ -273,12 +276,20 @@ int main(int argc, char** argv) {
   std::signal(SIGTERM, handleInterruptSignal);
 #endif
   engine.options().externalStop = consumeInterrupt;
+  // One record, one place that copies the three limits in: the same values arrive
+  // from the protocol and from the settings dialog, and a `0` means the same thing
+  // in all three (task_46).
+  prologd::Limits limits;
   if (maxDepth) {
-    engine.options().maxDepth = *maxDepth;
+    limits.maxDepth = *maxDepth;
   }
   if (maxSteps) {
-    engine.options().maxSteps = *maxSteps;
+    limits.maxSteps = *maxSteps;
   }
+  if (maxFindAll) {
+    limits.maxFindAllSolutions = *maxFindAll;
+  }
+  limits.applyTo(engine.options());
 
   std::vector<std::filesystem::path> includePaths;
   for (const std::string& directory : includeDirectories) {

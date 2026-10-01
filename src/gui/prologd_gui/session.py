@@ -151,13 +151,15 @@ class PrologSession(QObject):
 
     # -- requests ----------------------------------------------------------
     def load_text(self, text: str, name: str = "<buffer>", *, step: bool = False,
-                  trace: bool = False, questions: bool = True) -> None:
+                  trace: bool = False, questions: bool = True,
+                  limits: dict | None = None) -> None:
         self._send(protocol.load_text(text, name, step=step, trace=trace,
-                                      questions=questions))
+                                      questions=questions, limits=limits))
 
     def load_file(self, path: str, *, step: bool = False, trace: bool = False,
-                  questions: bool = True) -> None:
-        self._send(protocol.load_file(path, step=step, trace=trace, questions=questions))
+                  questions: bool = True, limits: dict | None = None) -> None:
+        self._send(protocol.load_file(path, step=step, trace=trace, questions=questions,
+                                      limits=limits))
 
     def run_query(self, text: str, *, step: bool = False, trace: bool = False) -> None:
         self._send(protocol.query(text, step=step, trace=trace))

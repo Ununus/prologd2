@@ -2464,6 +2464,50 @@ def test_the_theme_switch_reaches_the_text_and_the_widgets(executable: str) -> N
     print("ok: the dark theme reaches the widgets, the syntax, the bands and the output")
 
 
+def test_the_limits_stop_a_runaway_and_name_themselves(executable: str) -> None:
+    """task_46: a runaway program stops, and the message says which limit did it.
+
+    The three caps travel with the load (`limits`, protocol 9) and the deadline is
+    the window's own clock — the same polite stop «Остановить» uses.  A program the
+    deadline cannot reach is pinned too: waiting *outside* the solver is a state the
+    request only sees afterwards, which is why «Остановить» is still the answer for
+    a program that waits for input nobody gives.
+    """
+    from prologd_gui.settings import Settings
+
+    window = empty_window(executable)
+    settings_path = window._settings.path
+    try:
+        window.editor().setPlainText("цикл :- цикл.\n?цикл.\n")
+        window._settings.max_steps = 5000
+        window._settings.timeout_seconds = 2
+        window._actions["run"].trigger()
+
+        assert "пределы: maxSteps 5000" in window.output_text(), window.output_text()
+        assert window._timeout.isActive() is True, "the deadline was not armed"
+        said = pump(window, lambda: "предел шагов" in window.output_text())
+        assert said, f"the run never stopped: {ascii(window.output_text())}"
+        text = window.output_text()
+        assert "5000" in text and "Предел шагов" in text, ascii(text)
+        assert window._timeout.isActive() is False, "the deadline outlived its run"
+
+        # «Предел времени»: the run is asked to stop, and the pane says by what.
+        window.editor().setPlainText("?ВВОДЦЕЛ(А).\n")
+        window._settings.timeout_seconds = 1
+        window.run_program()
+        assert pump(window, lambda: window.status_text().startswith("ждёт ввода")), \
+            window.status_text()
+        assert window._timeout.isActive() is True
+        window._on_timeout()
+        assert "остановлено по времени" in window.status_text(), window.status_text()
+        assert "предел времени: 1 с" in window.output_text(), ascii(window.output_text())
+        window.stop_program()
+    finally:
+        discard_changes(window)
+    assert Settings(settings_path).max_steps == 5000, "the setting was not stored"
+    print("ok: the limits reach the run, name themselves, and the deadline is the window's")
+
+
 def main(argv: list[str]) -> int:
     if QApplication is None:
         print("skipped: PySide6 is not installed")
@@ -2498,6 +2542,7 @@ def main(argv: list[str]) -> int:
         test_the_dialog_is_the_last_resort(executable)
         test_the_questions_switch_decides_whether_a_run_answers(executable)
         test_the_input_switch_chooses_where_to_ask(executable)
+        test_the_limits_stop_a_runaway_and_name_themselves(executable)
         test_the_console_appears_only_when_it_is_asked(executable)
         test_the_queue_field_can_be_hidden(executable)
         test_cancelling_input_stops_the_run(executable)

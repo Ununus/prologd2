@@ -34,7 +34,7 @@ using Json = nlohmann::json;
 ///    the surface and «в одну строку» joined it.
 /// 8: `loaded` — the load and the program's own `?`-statements are over, which
 ///    is what tells a front-end that a run *finished*.
-constexpr int kProtocolVersion = 8;
+constexpr int kProtocolVersion = 9;
 
 [[nodiscard]] std::string stepActionName(StepAction action) {
   switch (action) {
@@ -153,7 +153,16 @@ class Session {
       if (command == "quit") {
         break;
       }
-      dispatch(command, request);
+      // A request whose fields have the wrong *type* is the front-end's mistake,
+      // not a reason to take the session down: `value<…>` throws, and a process
+      // that dies on a malformed line is worse than one that answers with an
+      // error event and reads the next line (task_46 found this while adding
+      // `limits`, where a negative number is exactly such a mistake).
+      try {
+        dispatch(command, request);
+      } catch (const Json::exception& bad_field) {
+        fail("protocol", command + ": " + bad_field.what());
+      }
       flush();
     }
 
@@ -209,6 +218,37 @@ class Session {
     const bool stepping = request.value("step", false);
     if (stepping) {
       armStepping();
+    }
+    // The guards of the run (task_46).  The same three the command line takes,
+    // and through the same record, so a window and a script cannot disagree about
+    // what a `0` means.  Applied *before* the load: the program's own
+    // `?`-statements run during it, and a limit set after them would be a limit
+    // that missed the run it was meant for.
+    if (request.contains("limits")) {
+      const Json& limits = request.at("limits");
+      if (!limits.is_object()) {
+        fail("protocol", command + ": limits должен быть объектом");
+        return;
+      }
+      // Read as *signed* numbers and refuse a negative one: an unsigned field
+      // would turn `-1` into a limit of 18 446 744 073 709 551 615 — a limit that
+      // never fires, accepted without a word, which is the one outcome a guard
+      // must not have.
+      const long long steps =
+          limits.value("maxSteps", static_cast<long long>(prologd::Limits{}.maxSteps));
+      const long long depth =
+          limits.value("maxDepth", static_cast<long long>(prologd::Limits{}.maxDepth));
+      const long long findall = limits.value(
+          "maxFindall", static_cast<long long>(prologd::Limits{}.maxFindAllSolutions));
+      if (steps < 0 || depth < 0 || findall < 0) {
+        fail("protocol", command + ": пределы не могут быть отрицательными");
+        return;
+      }
+      prologd::Limits wanted;
+      wanted.maxSteps = static_cast<std::size_t>(steps);
+      wanted.maxDepth = static_cast<std::size_t>(depth);
+      wanted.maxFindAllSolutions = static_cast<std::size_t>(findall);
+      wanted.applyTo(engine_.options());
     }
     reported_diagnostics_ = false;
     // A single query asked for from the editor's margin is loaded *quietly*: a
