@@ -458,7 +458,7 @@ the defect this code exists to avoid, and `LineBuffer` keeps it Qt-free so
 `test_output.py` hammers it.  The history is bounded — 50 000 lines by default,
 and the limit is a setting since task_29 (`output/line_limit`, 100…500 000:
 a smaller one trims the pane at once) —
-and the oldest lines are dropped in one edit with `*** вывод усечён … ***` kept
+and the oldest lines are dropped with `*** вывод усечён … ***` kept
 as the first line.  The view follows the end of the output until the user scrolls
 up to read something, and follows again as soon as they come back to the bottom —
 unless «Следить за выводом» in the settings dialog is unticked
@@ -469,6 +469,31 @@ The pane is read-only, so the one operation it owes beside reading is copying te
 whichever text widget has the focus — the output, the input queue, the console
 line or the editor — instead of always the editor's (the command is a window
 shortcut and used to do exactly that).
+
+### A trace must not take the window (task_49)
+
+Two measurements decided this part, and both are pinned by checks:
+
+* **The window hands its output over once per turn of the event loop.**  A
+  `feed` per event costs some 30 µs of Python on top of the insertion, and the
+  trace of a deep recursion is hundreds of thousands of events: 16 002 trace
+  lines took 2.2 s that way and 0.6 s in one batch.  `_append_output` queues
+  `(kind, text)`, a zero-timer flushes, and `_flush_output` joins the neighbours
+  of one kind — which is the whole trace — into a single call.
+  It is a batch, not a throttle: nothing is dropped and nothing waits for a
+  clock, because a lost line in a log is worse than a slow one.  Everything that
+  *reads* the pane (`output_text`, «Сохранить вывод…», the end of a run) flushes
+  first, so no caller can see the delay.
+* **The history is trimmed in bulks** — a tenth of the limit.  Removing text from
+  the front of a `QTextDocument` costs about the same whatever is removed, so one
+  line per appended line was quadratic: 200 000 lines with a 50 000-line limit
+  took **21.9 s** and now take **3.0 s**, at a flat ~15 µs per line.  The pane may
+  therefore hold one chunk more than its limit between trims, and asking for a
+  limit (`set_line_limit`) trims at once.
+
+A long trace is what the user hit, but nothing here is special to the trace: a
+program that prints in a loop and a `НАЙТИВСЕ` that prints every solution go
+through the same path.
 
 Undo, redo, «Запустить» and «Остановить» follow the *state*, and the state of the
 interpreter is **two** things, not one: the process can be up and idle, and a
@@ -679,7 +704,9 @@ every section.  Every label is given the width of the widest one in the dialog
 column, so the two columns line up wherever the user looks.
 * **Сбросить** puts the defaults into the widgets; they still have to be applied,
 so a reset can be looked at before it is kept.  It touches the preferences only —
-the recent list, the window geometry and the insert table are records the window
+  the recent list, the window geometry (the `view/window_geometry` blob of
+  task_49, the same kind of record the graphics window keeps in
+  `view/graphics_geometry`) and the insert table are records the window
 keeps, not choices the user made in this dialog.
 * **Импорт…** stages a file and shows it («ОК» keeps it, «Отмена» drops it, and
 a key this version does not know travels with the rest); **Экспорт…** applies
@@ -722,9 +749,13 @@ run reads the file, so a change the user refused to save is not resurrected.  An
 buffer that does not fit is dropped whole and counted, because a tab that comes
 back with half of its text is worse than one that does not come back at all, and
 an empty untitled tab is not stored, being the placeholder a first file would
-replace anyway.  A stored path whose file has gone is skipped and **named** in the
-status bar («не найдено: …») while the rest of the session opens.  A restored
-untitled tab counts as **unsaved work**, so the next close asks about it, and an
+replace anyway.  A record carries whether the tab held **unsaved changes**, so a
+restored untitled tab comes back the way it went in: closing the window has
+already asked about every change there was (`close_all` does that), so a tab that
+survives as *text* is one the user left alone — and one that came back used to be
+starred and asked about although nobody had touched it (task_49).  A stored path
+whose file has gone is skipped and **named** in the
+status bar («не найдено: …») while the rest of the session opens.  An
 untitled tab that *is* answered with «Не сохранять» is **left out of the session
 altogether** — the answer means the text is not to be seen again, so a session
 written before the questions would make it a lie.  The same rule works the other

@@ -889,6 +889,63 @@ def press_escape(widget) -> bool:
     return event.isAccepted()
 
 
+def test_the_window_remembers_its_size_and_place(executable: str) -> None:
+    """task_49: the graphics window remembered its geometry; the main one did not.
+
+    The user's report — «Графическое окно сохраняет свой размер и положение, а
+    при этом главное окно не сохраняет» — and the two windows now keep the same
+    kind of record (`prologd_gui.geometry`): `saveGeometry()` wrapped in base64, so
+    the size, the place and the maximised state all come back, and a window last
+    seen on a screen that is gone is placed where Qt can.
+    """
+    from prologd_gui.settings import Settings
+    from prologd_gui.window import MainWindow
+
+    directory = tempfile.TemporaryDirectory(prefix="prologd_gui_test_")
+    _SETTINGS_DIRECTORIES.append(directory)
+    path = pathlib.Path(directory.name) / "gui.ini"
+
+    first = MainWindow(executable, [], Settings(path))
+    try:
+        assert first._settings.window_geometry == "", "nothing was remembered yet"
+        first.show()
+        # Inside the offscreen platform's 800×800 screen on purpose: `restoreGeometry`
+        # clamps a size that no longer fits the screen, which is its own good
+        # behaviour, and measuring it here would be measuring Qt.
+        first.resize(720, 520)
+        first.move(60, 40)
+        place, size = first.pos(), first.size()
+        assert size.width() == 720 and place.x() == 60, (size, place)
+        first.close()
+    finally:
+        first.stop_program()
+
+    stored = Settings(path)
+    assert stored.window_geometry, "closing the window did not write its geometry"
+
+    # The next start, with that file: the same size, the same place.
+    second = MainWindow(executable, [], stored)
+    try:
+        second.show()
+        assert second.size() == size, (second.size(), size)
+        assert second.pos() == place, (second.pos(), place)
+    finally:
+        discard_changes(second)
+
+    # And with nothing remembered — a first start, or the file the old version
+    # left — the window is where the code puts it: the record is what makes the
+    # difference, nothing else does.
+    stored.window_geometry = ""
+    third = MainWindow(executable, [], stored)
+    try:
+        third.show()
+        assert third.size() != size or third.pos() != place, "the default start vanished"
+        assert third.size().width() == 1000, third.size()
+    finally:
+        discard_changes(third)
+    print("ok: the main window comes back with the size and the place it was closed at")
+
+
 def test_escape_closes_the_picture_then_the_bar_then_the_docks(executable: str) -> None:
     """task_48: one key, four things, in the order the user asked for.
 
@@ -988,6 +1045,48 @@ def test_a_run_that_draws_opens_the_picture_by_itself(executable: str) -> None:
     finally:
         discard_changes(window)
     print("ok: a run that draws opens the picture once, and a closed window stays closed")
+
+
+def test_a_long_trace_arrives_in_batches_and_stays_bounded(executable: str) -> None:
+    """task_49: «Запустить с трассировкой» on a deep recursion used to take the window.
+
+    Two costs, both measured: one `feed` per event is some 30 us of Python on top of
+    the insertion, and trimming *one* line per appended line is quadratic — 200 000
+    lines took 22 s that way, and about 2 s in bulks.  So the window now hands its
+    output to the pane once per turn of the event loop, and the pane trims in
+    bulks.
+    """
+    from prologd_gui import panels
+
+    window = empty_window(executable)
+    try:
+        # The batching contract without an interpreter in the way: 20 000 lines
+        # queued, nothing in the pane until the loop turns, every one of them after.
+        line = "правило: цель(аргумент, ещё_один)\n"
+        for _ in range(20000):
+            window._append_output(line, panels.TRACE)
+        assert window._output.toPlainText() == "", "the queue went in line by line"
+        assert pump(window, lambda: len(window.output_text().splitlines()) > 19999), (
+            "the queued output never arrived"
+        )
+        assert window._output.truncated() is False, "20 000 lines fit in the history"
+        window.clear_output()
+        assert window.output_text() == "", "clearing drops what was queued"
+
+        # And a real trace: a deep recursion traced to its end, in bounded time.
+        window.editor().setPlainText(
+            "шаг(0).\n"
+            "шаг(Н):-БОЛЬШЕ(Н, 0), СЛОЖЕНИЕ(М, 1, Н), шаг(М).\n"
+            "?шаг(1200).\n"
+        )
+        window._actions["run_trace"].trigger()
+        assert pump(window, lambda: "решени" in window.status_text()), window.status_text()
+        text = window.output_text()
+        assert text.count("Согласуется с") > 1000, text.count("Согласуется с")
+        assert window._output.truncated() is False, "a trace of this size still fits"
+    finally:
+        discard_changes(window)
+    print("ok: a long trace arrives in batches, in bulks, and without taking the window")
 
 
 def test_the_menus_come_from_the_action_table(executable: str) -> None:
@@ -2334,9 +2433,11 @@ def test_the_tabs_come_back_on_the_next_start(
     """task_29: the session — the tabs of the previous run open again.
 
     A *file* tab is read from disk, so a change the user refused to save is not
-    resurrected; an untitled tab comes back with its text and stays unsaved work;
-    the tab that was showing is the one that shows again; and a file that has gone
-    is named instead of silently missing from the session.
+    resurrected; an untitled tab comes back with its text and with the state it
+    had when the window closed — a tab that was not unsaved work does not come
+    back starred (task_49: every restored untitled tab used to be); the tab that
+    was showing is the one that shows again; and a file that has gone is named
+    instead of silently missing from the session.
 
     The unnamed tab is *not* left unsaved here: this check is about the text
     travelling with the record, and a tab answered with «Не сохранять» does not
@@ -2392,7 +2493,11 @@ def test_the_tabs_come_back_on_the_next_start(
         assert reopened.buffers()[0].text() == "снег.\n", "read from the file"
         assert reopened.buffers()[0].is_modified() is False
         assert reopened.buffers()[2].text() == "факт(1).\n"
-        assert reopened.buffers()[2].is_modified() is True, "unsaved work stays unsaved"
+        assert reopened.buffers()[2].is_modified() is False, (
+            "the tab was not unsaved work when the window closed — the close had "
+            "already asked about everything that was — so it comes back clean "
+            "(task_49)"
+        )
         assert reopened.current_buffer().model.name == third, "the tab that was showing"
         assert "восстановлено вкладок: 3" in reopened.status_text(), reopened.status_text()
     finally:
@@ -2484,6 +2589,56 @@ def test_an_unnamed_tab_left_unsaved_is_forgotten(
     )
 
 
+def test_an_untouched_unnamed_tab_comes_back_clean(executable: str) -> None:
+    """task_49: two unnamed tabs — the restored one used to come back as `*Без имени`.
+
+    The reproduction the user gave: a window with the welcome tab and a second,
+    brand-new one.  Nothing was edited, so the close asks nothing; the session
+    keeps the first tab (the second is empty and is not worth keeping), and the
+    next start restored it as *unsaved work* — a star on a program nobody had
+    written, and a save question about it on the way out.  With one tab the
+    window came back clean, which is why the two cases looked different: that
+    tab was empty and was not stored at all.
+
+    What a record now carries is the state the buffer had: closing the window has
+    already asked about every change there was (that is what `close_all` does), so
+    a tab that survives as *text* is one the user left alone.
+    """
+    from prologd_gui import documents
+    from prologd_gui.settings import Settings
+    from prologd_gui.window import MainWindow
+
+    window = make_window(executable)
+    settings_path = window._settings.path
+    try:
+        assert window.buffers()[0].text().startswith("% PrologD"), "the welcome tab"
+        assert window.buffers()[0].is_modified() is False
+        window.new_buffer()
+        assert window.tab_count() == 2, window.tab_count()
+        assert window.buffers()[1].text() == ""
+        window.close()  # nothing was edited, so no question is asked
+    finally:
+        window.stop_program()
+
+    settings = Settings(settings_path)
+    stored = documents.decode_tabs(settings.session_tabs)
+    assert [record.name for record in stored] == ["Без имени"], stored
+    assert stored[0].text.startswith("% PrologD")
+    assert stored[0].modified is False, "nobody edited the welcome program"
+
+    reopened = MainWindow(executable, [], settings)
+    try:
+        assert reopened.tab_count() == 1, [b.model.name for b in reopened.buffers()]
+        assert reopened.buffers()[0].text().startswith("% PrologD")
+        assert reopened.buffers()[0].is_modified() is False, (
+            "the restored tab carries a star it never earned"
+        )
+        assert reopened.buffers()[0].model.title() == "Без имени", reopened.buffers()[0].model.title()
+    finally:
+        discard_changes(reopened)
+    print("ok: an untouched unnamed tab comes back clean, without a star or a question")
+
+
 def test_the_questions_switch_decides_whether_a_run_answers(executable: str) -> None:
     """task_29's «Выводить вопросы при запуске»: off, a lesson loads as rules.
 
@@ -2564,6 +2719,9 @@ def test_the_theme_switch_reaches_the_text_and_the_widgets(executable: str) -> N
         window.editor().setPlainText("факт(1).\n% комментарий\n")
         window._append_output("вывод программы\n", panels.OUTPUT)
         window._append_output("ошибка выполнения\n", panels.ERROR)
+        # The window hands its output over on the next turn of the event loop
+        # (task_49), and this check reads the pane with no loop running.
+        window._flush_output()
         assert colour_of(window._output, 1) == panels.KIND_COLORS[panels.ERROR]
 
         window._settings.theme = theme.DARK.name
@@ -2655,6 +2813,41 @@ def test_the_limits_stop_a_runaway_and_name_themselves(executable: str) -> None:
         discard_changes(window)
     assert Settings(settings_path).max_steps == 5000, "the setting was not stored"
     print("ok: the limits reach the run, name themselves, and the deadline is the window's")
+
+
+def test_stop_after_a_step_leaves_the_next_run_to_start_over(executable: str) -> None:
+    """task_49: `Шаг` → `Стоп` → `Запуск` used to answer «нет шага, который ждёт ответа».
+
+    The pause belonged to a run that was over, so `Запуск` took the «продолжить»
+    path and sent a `step` answer into an interpreter with nothing waiting: the
+    session printed the protocol error, and the program the user asked for never
+    ran.  What makes a pause over is one of the events that conclude a run — the
+    answer, the load, an error (which is what «Стоп» arrives as while a step is
+    waiting) or the process ending.
+    """
+    window = empty_window(executable)
+    try:
+        window.editor().setPlainText("факт(1).\n?факт(X), РАВНО(Y, 2).\n")
+        window._actions["step"].trigger()
+        assert pump(window, lambda: window.stepping()), "the step panel never appeared"
+        assert window.session.paused() is True
+
+        window._actions["stop"].trigger()
+        assert pump(window, lambda: not window.stepping()), "the step panel stayed up"
+        assert window.session.is_running() is True, (
+            "«Стоп» during a run unloads nothing: the process stays, so the pause "
+            "cannot have been cleared by the session ending"
+        )
+        assert window.session.paused() is False, "the session still thinks it is paused"
+
+        window._actions["run"].trigger()
+        assert pump(window, lambda: "X=1" in window.output_text()), window.output_text()
+        assert "Y=2" in window.output_text(), ascii(window.output_text())
+        assert "нет шага" not in window.output_text(), ascii(window.output_text())
+        assert window.stepping() is False, "a fresh run is not a step"
+    finally:
+        discard_changes(window)
+    print("ok: Шаг → Стоп → Запуск runs the program instead of asking for a step")
 
 
 def test_the_graphics_window_follows_the_program(executable: str) -> None:
@@ -2797,6 +2990,8 @@ def main(argv: list[str]) -> int:
         test_a_diagnostic_from_an_imported_file_opens_it(executable, files)
         test_stepping_shows_the_goal_the_stack_and_the_line(executable)
         test_the_trace_is_coloured_apart_from_the_output(executable)
+        test_a_long_trace_arrives_in_batches_and_stays_bounded(executable)
+        test_the_window_remembers_its_size_and_place(executable)
         test_a_marker_answers_one_question_alone(executable)
         test_a_question_parked_in_a_comment_runs_from_the_margin(executable)
         test_a_marker_while_a_step_is_paused_starts_a_fresh_quiet_run(executable)
@@ -2823,6 +3018,7 @@ def main(argv: list[str]) -> int:
         test_saving_before_a_run_writes_the_file(executable, files)
         test_the_tabs_come_back_on_the_next_start(executable, files)
         test_an_unnamed_tab_left_unsaved_is_forgotten(executable, files)
+        test_an_untouched_unnamed_tab_comes_back_clean(executable)
     print("all window checks passed")
     del application
     return 0

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import pathlib
 
-from PySide6.QtCore import QByteArray, QPoint, QRect, QSize, Qt, Signal
+from PySide6.QtCore import QPoint, QRect, QSize, Qt, Signal
 from PySide6.QtGui import QImage, QPainter
 from PySide6.QtWidgets import (
     QFileDialog,
@@ -26,7 +26,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from . import graphics
+from . import geometry, graphics
 
 #: The text of the coordinate label while the pointer is off the picture.
 NO_CELL = "вне экрана"
@@ -263,16 +263,11 @@ class GraphicsWindow(QWidget):
     # -- the window itself -------------------------------------------------
     def geometry_text(self) -> str:
         """The geometry as text, for the settings file (machine key)."""
-        return bytes(self.saveGeometry().toBase64()).decode("ascii")
+        return geometry.geometry_text(self)
 
     def restore_geometry(self, text: str) -> None:
         """Puts the window back where it was; junk in the file is ignored."""
-        if not text:
-            return
-        try:
-            self.restoreGeometry(QByteArray.fromBase64(text.encode("ascii")))
-        except (ValueError, TypeError):
-            pass
+        geometry.restore_geometry(self, text)
 
     def closeEvent(self, event) -> None:  # noqa: N802 - Qt spelling
         """Closing hides: the picture is kept, and the action turns itself off."""

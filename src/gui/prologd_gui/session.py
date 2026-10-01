@@ -259,6 +259,12 @@ class PrologSession(QObject):
         elif name == "output":
             self.output.emit(str(event.get("text", "")))
         elif name == "result":
+            # The query this step belonged to has answered, so nothing is waiting
+            # for a `step` answer any more (task_49).  A step point is *inside* a
+            # query: `result` cannot arrive while one is pending, and the events
+            # below are the end of the run wherever it was paused — the same three
+            # places that end a run.
+            self._paused = False
             self.result.emit(bool(event.get("found", False)))
         elif name == "input_request":
             self._awaiting_input = True
@@ -279,6 +285,7 @@ class PrologSession(QObject):
         elif name == "formatted":
             self.formatted.emit(str(event.get("text", "")), bool(event.get("changed", False)))
         elif name == "loaded":
+            self._paused = False  # a load that ends ends the pause with it
             self.loaded.emit()
         elif name == "graphics":
             # The operation has to be one this version knows: a picture with a
@@ -299,6 +306,12 @@ class PrologSession(QObject):
                 return
             self.bitmap.emit(width, height, data)
         elif name == "error":
+            # An error ends the query it belongs to, so a step point cannot still
+            # be pending — and this is the event a user's «Стоп» arrives as while
+            # a step was waiting (the interrupted query).  A *warning* is not an
+            # end of anything, which is why it is left out.
+            if str(event.get("severity", "error")) != "warning":
+                self._paused = False
             self.failed.emit(
                 str(event.get("kind", "")),
                 str(event.get("severity", "error")),
@@ -314,4 +327,8 @@ class PrologSession(QObject):
         for event in self._decoder.feed(b"\n"):
             self._dispatch(event)
         self._ready = False
+        # The process is gone, so no step point can be pending: a pause that
+        # outlived its interpreter would turn the next «Запуск» into a `step`
+        # request (task_49).
+        self._paused = False
         self.ended.emit(exit_code)

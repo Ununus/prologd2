@@ -178,37 +178,62 @@ def test_the_session_records_round_trip() -> None:
     """task_29: what a tab keeps between runs, and what it refuses to keep."""
     records = [
         documents.TabRecord(path="C:/пример.pld", name="пример.pld"),
-        documents.TabRecord(name="Без имени 2", text="факт(1).\n?факт(1).\n"),
+        documents.TabRecord(name="Без имени 2", text="факт(1).\n?факт(1).\n", modified=True),
     ]
     lines = documents.encode_tabs(records)
     assert len(lines) == 2, "one entry per tab: the file has to stay readable"
+    assert lines[0].startswith("{"), lines[0]
     assert documents.decode_tabs(lines) == records
 
-    # A text with the separators inside it survives: the *first* two tab
-    # characters are the fields, the rest is text.
-    text = "а\tб\nв\\г\n"
-    one = [documents.TabRecord(name="Без имени", text=text)]
+    # A text with separators inside it survives — the tabs and the quotes of a
+    # program included: the record is JSON, so nothing of the text is a field.
+    text = "а\tб\nв\\г\nфакт(\"ц\").\n"
+    one = [documents.TabRecord(name="Без имени", text=text, modified=True)]
     assert documents.decode_tabs(documents.encode_tabs(one))[0].text == text
 
     # A file is remembered by its path and no text at all: the next run reads the
-    # file, so a change the user refused to save is not resurrected.
+    # file, so a change the user refused to save is not resurrected.  The
+    # «unsaved» flag is kept for an *untitled* tab only (task_49): a file tab comes
+    # back as the file on disk, so the flag would be a promise nothing can keep.
     kept, dropped = documents.session_records(
-        [("C:/a.pld", "a.pld", "x" * 1000), ("", "Без имени", "я" * 10)]
+        [("C:/a.pld", "a.pld", "x" * 1000, True), ("", "Без имени", "я" * 10, True)]
     )
     assert dropped == 0
     assert kept[0] == documents.TabRecord(path="C:/a.pld", name="a.pld")
     assert kept[0].text == "" and kept[0].untitled is False
+    assert kept[0].modified is False, "a file tab is clean: it is read from disk"
     assert kept[1].untitled is True and kept[1].text == "я" * 10
+    assert kept[1].modified is True, "a tab the user changed is still unsaved work"
+    untouched, _ = documents.session_records([("", "Без имени", "пример.\n", False)])
+    assert untouched[0].modified is False, "a tab nobody edited comes back clean"
     print("ok: a session record round-trips, and a file is not stored as text")
+
+
+def test_a_record_of_the_tab_separated_shape_still_reads() -> None:
+    """task_29's three fields are read as they were written (task_49).
+
+    That shape had no flag, and an untitled tab of those days was restored as
+    unsaved work — which is what it meant then, so that is what it means here.  A
+    file line is clean either way: its text comes from disk.
+    """
+    older = ["C:/a.pld\ta.pld\t", "\tБез имени 2\tфакт(1).\n\tс табом"]
+    read = documents.decode_tabs(older)
+    assert len(read) == 2, read
+    assert read[0] == documents.TabRecord(path="C:/a.pld", name="a.pld")
+    assert read[0].modified is False
+    assert read[1].untitled is True
+    assert read[1].text == "факт(1).\n\tс табом", ascii(read[1].text)
+    assert read[1].modified is True, "that shape meant «unsaved work»"
+    print("ok: a tab-separated record of task_29 is still read, tab in the text and all")
 
 
 def test_the_session_budget_drops_whole_tabs_and_reports_them() -> None:
     """A buffer that does not fit goes entirely: half a text is worse than none."""
     tabs = [
-        ("C:/a.pld", "a.pld", "x" * 100),
-        ("", "первый", "я" * 80),
-        ("", "второй", "я" * 80),
-        ("", "пустой", "   \n"),
+        ("C:/a.pld", "a.pld", "x" * 100, False),
+        ("", "первый", "я" * 80, True),
+        ("", "второй", "я" * 80, True),
+        ("", "пустой", "   \n", False),
     ]
     kept, dropped = documents.session_records(tabs, budget=100)
     assert [record.name for record in kept] == ["a.pld", "первый"], kept
@@ -217,7 +242,7 @@ def test_the_session_budget_drops_whole_tabs_and_reports_them() -> None:
     # The budget counts untitled text only, and an empty tab is a placeholder: it
     # would be replaced by the first opened file anyway.
     assert documents.session_records(tabs, budget=1000)[1] == 0
-    empty, dropped = documents.session_records([("", "Без имени", "\n\n")], budget=10)
+    empty, dropped = documents.session_records([("", "Без имени", "\n\n", False)], budget=10)
     assert empty == [] and dropped == 0
     print("ok: the budget drops whole buffers, counts them, and skips placeholders")
 
@@ -227,8 +252,12 @@ def test_a_session_that_cannot_be_read_costs_nothing() -> None:
     assert documents.decode_tabs([]) == []
     assert documents.decode_tabs(None) == []
     assert documents.decode_tabs(["", "без разделителей", "один\tразделитель"]) == []
+    assert documents.decode_tabs(["{ не JSON", "{} мусор после объекта"]) == []
     good = "C:/a.pld\ta.pld\t"
     assert len(documents.decode_tabs(["мусор", good])) == 1
+    assert documents.decode_tabs(['{"name": "Без имени"}']) == [
+        documents.TabRecord(name="Без имени")
+    ], "a JSON record with fields missing is still a tab"
     print("ok: a broken session line is dropped, and the rest still reads")
 
 

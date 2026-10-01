@@ -45,6 +45,7 @@ from . import (
     documents,
     findbar,
     formatter,
+    geometry,
     graphics,
     graphicswindow,
     panels,
@@ -212,7 +213,24 @@ class MainWindow(QMainWindow):
         #: event, so this state outlives the call that started it.
         self._format_pending: dict | None = None
 
+        #: Output that the current turn has produced and the pane has not been
+        #: given yet (task_49), as `(kind, text)` in arrival order.  A trace of a
+        #: deep recursion arrives as hundreds of thousands of small events, and one
+        #: `feed` per event costs some 30 us of Python on top of the insertion —
+        #: enough to starve the window.  `_flush_output` joins the neighbours of one
+        #: kind, which is the whole trace, into a single call.
+        self._output_pending: list[tuple[str, str]] = []
+        self._output_timer = QTimer(self)
+        self._output_timer.setSingleShot(True)
+        self._output_timer.setInterval(0)
+        self._output_timer.timeout.connect(self._flush_output)
+
         self._build_ui()
+        # The window's own size and place come back too (task_49): the graphics
+        # window has remembered its own since task_45, and the main window — the one
+        # the user moves first — did not, which is what the user ran into.  Restored
+        # *after* the widgets exist: `restoreGeometry` needs a window to put back.
+        self.restore_window_geometry()
         # The autosave interval the settings ask for; a change in the dialog
         # re-arms it through `apply_settings`.
         self._apply_autosave()
@@ -1135,6 +1153,25 @@ class MainWindow(QMainWindow):
         self._settings.split_editor = len(self._panes) > 1
         self._settings.split_sizes = list(self._editor_splitter.sizes())
 
+    # -- the window itself -------------------------------------------------
+    def window_geometry_text(self) -> str:
+        """The window's size and place as text, for the settings file (task_49)."""
+        return geometry.geometry_text(self)
+
+    def restore_window_geometry(self) -> bool:
+        """Puts the window back where it stood, if the file remembers it.
+
+        True when the stored text was used.  A window is only as stubborn as its
+        `restoreGeometry`: a blob written on a screen that is gone (or by another
+        display layout) is placed by Qt where it can be, so nothing here has to
+        check whether the rectangle is still on a monitor.
+        """
+        return geometry.restore_geometry(self, self._settings.window_geometry)
+
+    def _save_window_state(self) -> None:
+        """Remembers the window's size and place for the next start."""
+        self._settings.window_geometry = self.window_geometry_text()
+
     def _on_pane_activated(self, pane: Pane) -> None:
         if pane not in self._panes:
             return
@@ -1210,7 +1247,10 @@ class MainWindow(QMainWindow):
             if not self.save_buffer(buffer):
                 self._status.setText("запуск отменён: сохранить не удалось")
                 return False
-        self._output.clear()
+        # The pane starts empty, and so does what has not reached it yet: a run
+        # begins with its own output, never with the tail of the previous one.
+        self._discard_output()
+        self._output.reset()
         # A new run starts clean: the red line of the last failure and the line a
         # step was standing on are both about a run that is over.
         self._clear_marks()
@@ -1865,6 +1905,7 @@ class MainWindow(QMainWindow):
 
     def clear_output(self) -> None:
         """Empties the pane, including the half-line it was holding."""
+        self._discard_output()
         self._output.reset()
 
     def _save_output(self) -> None:
@@ -1872,6 +1913,8 @@ class MainWindow(QMainWindow):
         path = self._ask_save_output_path()
         if not path:
             return
+        # What is still queued belongs to the log as much as the rest does.
+        self._flush_output()
         try:
             self._output.save_to(path)
         except OSError as error:
@@ -1995,8 +2038,11 @@ class MainWindow(QMainWindow):
         now, not on what the editor held when the last window closed; a file that
         has gone is skipped and named in the status line, because a half session
         that says nothing is worse than one that says what is missing.  An
-        untitled tab comes back with its text and stays **modified**: it is
-        unsaved work, and the next close has to ask about it.
+        untitled tab comes back with its text and with the state it had: a tab the
+        user had changed stays unsaved work and the next close has to ask about
+        it, while one that was never touched comes back clean (task_49 — every
+        restored untitled tab used to be starred, which was a save question about
+        a program nobody had edited).
         """
         records = documents.decode_tabs(self._settings.session_tabs)
         missing: list[str] = []
@@ -2016,9 +2062,10 @@ class MainWindow(QMainWindow):
             )
             model.text = record.text
             buffer = self._add_buffer(model)
-            # Restored but not saved: closing the window must ask about it.
-            buffer.document.setModified(True)
-            buffer.sync_modified()
+            if record.modified:
+                # Unsaved work stays unsaved: closing the window must ask about it.
+                buffer.document.setModified(True)
+                buffer.sync_modified()
             opened += 1
 
         current = self._settings.session_current
@@ -2048,12 +2095,12 @@ class MainWindow(QMainWindow):
         the text is not to be seen again.
 
         A file tab is stored by its path (see `documents.TabRecord`) and an
-        untitled one by its text, up to the budget; `session_records` says how
-        many did not fit.
+        untitled one by its text and by whether it held unsaved changes, up to the
+        budget; `session_records` says how many did not fit.
         """
         kept = [buffer for buffer in tabs if buffer not in self._discarded]
         records, dropped = documents.session_records(
-            (buffer.model.path or "", buffer.model.name, buffer.text())
+            (buffer.model.path or "", buffer.model.name, buffer.text(), buffer.is_modified())
             for buffer in kept
         )
         self._settings.session_tabs = documents.encode_tabs(records)
@@ -2083,6 +2130,7 @@ class MainWindow(QMainWindow):
                 self._store_session(tabs, current)
                 self._save_split_state()
                 self._save_panel_state()
+                self._save_window_state()
                 # The interpreter is this window's child: an unasked-for close
                 # must not leave it running behind the user (and a headless test
                 # suite otherwise collects one live process per test).
@@ -2567,6 +2615,13 @@ class MainWindow(QMainWindow):
         return self._status.text()
 
     def output_text(self) -> str:
+        """What the pane holds — the batch that is still in flight goes in first.
+
+        The window hands output over on the next turn of the event loop (task_49),
+        so a caller that reads the pane has to be the one who ends that turn: a test
+        and «сохранить вывод» would otherwise miss the last lines of a run.
+        """
+        self._flush_output()
         return self._output.toPlainText()
 
     def current_path(self) -> str | None:
@@ -2939,7 +2994,7 @@ class MainWindow(QMainWindow):
             self._finish_polite_stop()
             return
         if severity == "warning":
-            self._output.feed(
+            self._append_output(
                 f"*** предупреждение: {where + ': ' if where else ''}{message}\n",
                 panels.WARNING,
             )
@@ -2948,7 +3003,9 @@ class MainWindow(QMainWindow):
                 f"предупреждение: {where or 'без места'} (всего: {self._warning_count})"
             )
             return
-        self._output.feed(f"*** {kind}: {where + ': ' if where else ''}{message}\n", panels.ERROR)
+        self._append_output(
+            f"*** {kind}: {where + ': ' if where else ''}{message}\n", panels.ERROR
+        )
         self._busy = False
         self._failed_in_load = True
         self._awaiting_query = False
@@ -3123,6 +3180,7 @@ class MainWindow(QMainWindow):
         # stays «остановлено» and the status bar keeps the last real code.
         if self._stopping:
             self._stopping = False
+            self._flush_output()
             self._output.flush()
             self._sync_run_actions()
             self._update_details()
@@ -3134,19 +3192,52 @@ class MainWindow(QMainWindow):
         self._step_stack.clear()
         # The last half-line: a program that stopped in the middle of `ВЫВОД` left
         # it in the pane's buffer, and nothing else will complete it.
+        self._flush_output()
         self._output.flush()
         self._status.setText(f"интерпретатор завершился, код {exit_code}")
         self._sync_run_actions()
         self._update_details()
 
     def _append_output(self, text: str, kind: str = panels.OUTPUT) -> None:
-        """Hands text to the output pane, which colours it by kind.
+        """Queues text for the output pane, which colours it by kind.
 
         The pane holds whatever follows the last newline, so a program that prints
         with `ВЫВОД` and no `ПС` keeps its half-line until the rest arrives — or
-        until the run ends and `flush()` writes it.
+        until the run ends and `flush()` writes it.  What is queued goes in on the
+        next turn of the event loop (`_flush_output`), and everything that *reads*
+        the pane flushes first, so no caller can see the delay — only the cost per
+        line, which is what a trace of a deep recursion cannot afford (task_49).
         """
+        self._output_pending.append((kind, text))
+        if not self._output_timer.isActive():
+            self._output_timer.start()
+
+    def _flush_output(self) -> None:
+        """Hands the queued output to the pane: one call per run of one kind.
+
+        A batch, not a throttle: everything that arrived in the turn goes in, and
+        the next turn gets its own — nothing is dropped and nothing waits for a
+        clock.  A timer that *sampled* the output would lose lines, and a lost line
+        in a log is worse than a slow one.
+        """
+        self._output_timer.stop()
+        pending = self._output_pending
+        if not pending:
+            return
+        self._output_pending = []
+        kind, text = pending[0]
+        for next_kind, more in pending[1:]:
+            if next_kind == kind:
+                text += more
+                continue
+            self._output.feed(text, kind)
+            kind, text = next_kind, more
         self._output.feed(text, kind)
+
+    def _discard_output(self) -> None:
+        """Drops what is queued: the pane is about to be emptied or reused."""
+        self._output_timer.stop()
+        self._output_pending.clear()
 
     def _append_note(self, text: str) -> None:
         """Appends a note of our own, coloured apart from the program's output.
@@ -3156,7 +3247,8 @@ class MainWindow(QMainWindow):
         `ПС` starts a new line).  The pane closes the half-line first, because the
         kind changed — otherwise the note would be glued to the program's text.
         """
-        self._output.feed(text, panels.NOTE)
+        self._append_output(text, panels.NOTE)
+
     # -- drag and drop -----------------------------------------------------
     def dragEnterEvent(self, event) -> None:  # noqa: N802 - Qt spelling
         if any(url.isLocalFile() for url in event.mimeData().urls()):

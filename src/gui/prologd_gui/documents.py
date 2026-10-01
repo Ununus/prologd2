@@ -9,6 +9,7 @@ widgets and the prompts.
 
 from __future__ import annotations
 
+import json
 import os
 import pathlib
 from dataclasses import dataclass
@@ -208,17 +209,25 @@ SESSION_TEXT_BUDGET = 256 * 1024
 
 @dataclass(frozen=True)
 class TabRecord:
-    """One tab as it is remembered between runs (task_29).
+    """One tab as it is remembered between runs (task_29, task_49).
 
     A file is remembered by its **path**: the next run reads the file, so the tab
     shows the file on disk rather than what the editor held when the window
     closed — a user who answered «не сохранять» meant it.  An untitled buffer has
     no file to read, so its text travels with the record, up to the budget.
+
+    `modified` is the «there are unsaved changes» flag the buffer had when the
+    session was written (task_49).  It matters for untitled tabs only: a file tab
+    is read from disk, so what comes back is not unsaved work whatever the flag
+    said.  Without it, *every* untitled tab came back starred — including one the
+    user had never touched, which is what the user ran into (`*Без имени` after a
+    restart, and a save question about a program nobody had edited).
     """
 
     path: str = ""
     name: str = ""
     text: str = ""
+    modified: bool = False
 
     @property
     def untitled(self) -> bool:
@@ -226,44 +235,91 @@ class TabRecord:
 
 
 def encode_tabs(records: Iterable[TabRecord]) -> list[str]:
-    """The records as the settings file holds them: `path<TAB>name<TAB>text`.
+    """The records as the settings file holds them: one JSON object per tab.
 
-    One entry per tab, in the order the tab bar shows them, and the tab character
-    as the separator simply because no path or buffer name may contain one.
+    JSON and not `path<TAB>name<TAB>text` (the shape of task_29): the text of an
+    untitled buffer may hold tab characters — program text does, our own
+    indentation is one — so the text was already the last field, and a *fourth*
+    field after it cannot be told apart from an old three-field line whose text
+    contains a tab.  JSON escapes them, and a record that does not parse is read
+    the old way (see `decode_tabs`).  One record per line, in tab-bar order: the
+    file stays a text file a human may open.
     """
-    return [f"{record.path}\t{record.name}\t{record.text}" for record in records]
+    return [
+        json.dumps(
+            {
+                "path": record.path,
+                "name": record.name,
+                "text": record.text,
+                "modified": bool(record.modified),
+            },
+            ensure_ascii=False,
+        )
+        for record in records
+    ]
 
 
 def decode_tabs(lines: Iterable[str]) -> list[TabRecord]:
     """The other way.  A line that makes no sense is dropped, never fatal.
 
     The file may be hand-edited, or written by another version: a session that
-    cannot be read may cost the *session*, never the start.
+    cannot be read may cost the *session*, never the start.  Two shapes are read:
+    the JSON objects of task_49 and the tab-separated lines of task_29, which had
+    no flag — an untitled tab of those was restored as unsaved work, which is
+    what it meant when it was written.
     """
     records: list[TabRecord] = []
     for line in lines or []:
-        if not isinstance(line, str) or line.count("\t") < 2:
+        if not isinstance(line, str):
             continue
-        path, name, text = line.split("\t", 2)
-        records.append(TabRecord(path=path, name=name, text=text))
+        record = _decode_tab(line)
+        if record is not None:
+            records.append(record)
     return records
 
 
+def _decode_tab(line: str) -> TabRecord | None:
+    """One record, in either shape; `None` for a line that is neither."""
+    if line.startswith("{"):
+        try:
+            data = json.loads(line)
+        except ValueError:
+            return None
+        if not isinstance(data, dict):
+            return None
+        return TabRecord(
+            path=str(data.get("path") or ""),
+            name=str(data.get("name") or ""),
+            text=str(data.get("text") or ""),
+            modified=bool(data.get("modified", False)),
+        )
+    if line.count("\t") < 2:
+        return None
+    path, name, text = line.split("\t", 2)
+    return TabRecord(path=path, name=name, text=text, modified=not path and bool(text))
+
+
 def session_records(
-    tabs: Iterable[tuple[str, str, str]], budget: int = SESSION_TEXT_BUDGET
+    tabs: Iterable[tuple[str, str, str, bool]], budget: int = SESSION_TEXT_BUDGET
 ) -> tuple[list[TabRecord], int]:
     """What of the open tabs is worth remembering, and how many were dropped.
 
-    `tabs` are `(path, name, text)` triples in tab-bar order.  Only an *untitled*
-    buffer spends the budget, and one that does not fit is dropped whole: a tab
-    that comes back with half of its text is worse than one that does not come
-    back, and the window says how many were left out.  An empty untitled tab is
-    skipped altogether — it is the placeholder a first file would replace anyway.
+    `tabs` are `(path, name, text, modified)` quadruples in tab-bar order.  The
+    flag is kept for untitled buffers only: a file tab comes back as the file on
+    disk, so whether its buffer had unsaved changes when the window closed is not
+    something the next run can honour.
+
+    Only an *untitled* buffer spends the budget, and one that does not fit is
+    dropped whole: a tab that comes back with half of its text is worse than one
+    that does not come back, and the window says how many were left out.  An empty
+    untitled tab is skipped altogether — it is the placeholder a first file would
+    replace anyway, and an empty tab that came back as unsaved work would ask a
+    save question about nothing.
     """
     records: list[TabRecord] = []
     dropped = 0
     spent = 0
-    for path, name, text in tabs:
+    for path, name, text, modified in tabs:
         if path:
             records.append(TabRecord(path=str(path), name=str(name)))
             continue
@@ -273,7 +329,7 @@ def session_records(
             dropped += 1
             continue
         spent += len(text)
-        records.append(TabRecord(name=str(name), text=str(text)))
+        records.append(TabRecord(name=str(name), text=str(text), modified=bool(modified)))
     return records, dropped
 
 

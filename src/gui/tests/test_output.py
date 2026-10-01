@@ -120,12 +120,21 @@ def test_the_pane_colours_lines_and_keeps_a_bounded_history() -> None:
         assert colour_of(pane, 1) == pane.kind_colors()[panels.ECHO], "the echo has no colour"
         assert colour_of(pane, 0) == "#000000", "the answer must stay plain: it is the data"
 
-        # A runaway program: the oldest lines go, and the pane says so.
+        # A runaway program: the oldest lines go, and the pane says so.  The
+        # history is trimmed in *bulks* (a tenth of the limit) — one line per
+        # appended line was quadratic and froze the window on a long trace
+        # (task_49) — so the pane may hold that much more until the next trim, and
+        # asking for a limit trims at once.
         for number in range(300):
             pane.feed(f"строка {number}\n")
         assert pane.truncated() is True
         assert pane.document().firstBlock().text() == panels.TRUNCATED_MARK
-        assert pane.document().blockCount() <= pane.line_limit() + 1
+        assert pane.document().blockCount() <= pane.line_limit() + pane.line_limit() // 10
+        pane.set_line_limit(pane.line_limit())
+        assert pane.document().blockCount() <= pane.line_limit() + 1, (
+            "a trimmed history is at its limit"
+        )
+        assert pane.document().firstBlock().text() == panels.TRUNCATED_MARK
 
         # Following the end, until the user scrolls up.
         assert pane.following() is True

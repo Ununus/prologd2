@@ -1,9 +1,10 @@
 # Status tracker
 
 Last updated: after the graphics window of task_45 (protocol 10), the interface
-cleanups of task_48 (icons, the toolbar, the search menu) and the formatter's
-round of task_47 (the lessons in one style, the head on its own line, the mode
-control back on the toolbar).
+cleanups of task_48 (icons, the toolbar, the search menu), the formatter's round of
+task_47 (the lessons in one style, the head on its own line, the mode control back
+on the toolbar) and the four window defects of task_49 (the pause after a stop, the
+starred tab, the trace that froze the window, the main window's geometry).
 
 ## Overall
 
@@ -117,7 +118,7 @@ control back on the toolbar).
 | task_46_interpreter_options_and_limits | in progress | the limits are in: `Limits` + `applyTo` in the engine, `--max-findall`, protocol **9** (`limits` on `load`, a bad field is an `error` instead of a dead session), four dialog rows and a front-end deadline.  The core has **no limits of its own** (0 = «без предела», messages name a limit and its value only — ADR-020) and the window ships 0 / 1 000 000 / 1 000 000 / 0.  Still open: the interpreter path, the process directory, profiles, and `--timeout-ms` (a text-mode deadline would need a clock in the solver).  The last item of task_29's settings list, split out on 2026-10-01 |
 | task_47_lessons_and_formatting | done | the corpus in one style and the formatter's round of fixes: 21 of the 25 shipped programs reformatted by `prologd --format` (soft, 80, one tab) with a new check that every shipped program *is* the standard shape, so the style cannot drift again; the hard mode puts the head of a clause on a line of its own (the first goal was the one glued to the head); the format mode returns to the toolbar right after «Форматировать» (icon `edit-format-set`) and leaves «Правка»; lesson 12's animation is a click away (`%?`) with a two-frame version runs in the check; and the reformat taught the formatter a rule — a **query and a directive are never broken**, because the margin marker that runs them is line-local (the pinned question counts caught it) |
 | task_48_interface_cleanup | done | the round of small things the user asked for: five pictures left the tree (`help-about` — the same drawing as `prologd2`, the two `search-find-selected-*`, `view-toolbar`, `view-line-numbers`), `assets.MISSING` is down to four names, «Сохранить все» left the toolbar, the two «Найти выделенное» commands left «Поиск» with their icons; `Esc` now closes the graphics window → the find bar → the reference dock → the cheat sheet (one handler on the window, by *propagation*, so the completion popup and the find bar's field keep answering for themselves), and the graphics window opens itself on the **first primitive of a run** — once per run, so a window closed during an animation stays closed (task_45's window plus `_graphics_shown`) |
-| task_49_gui_defects | not started | three defects found by using the window: `Шаг → Стоп → Запуск` answers «нет шага, который ждёт ответа» (a finished run leaves `_paused` set), a second unnamed tab comes back modified after a restore, and «Запустить с трассировкой» on a deep recursion freezes the window (the output pane's per-line trim and repaints); plus live output — a countdown should print as it goes, not when the program ends |
+| task_49_gui_defects | in progress | four defects found by using the window, and the live output still open.  `Шаг → Стоп → Запуск` no longer answers «нет шага, который ждёт ответа» (the paused flag is cleared by the events that conclude a run — including the *error* a «Стоп» turns into while a step waits); an untouched unnamed tab comes back clean (the session record carries the unsaved flag; JSON, because a fourth tab-separated field cannot be told apart from text with a tab in it); the format `Запустить с трассировкой` no longer takes the window (the output is handed over once per turn of the event loop, and the pane trims its history in bulks — 200 000 lines: 21.9 s → 3.0 s, a 16 000-line trace: 2.2 s → 0.6 s); and the main window remembers its size and place (`view/window_geometry`), which the graphics window had done since task_45.  Left: the interpreter reporting output per **line** (`IoContext` hook + protocol), so a countdown prints as it counts |
 
 ## Test suite
 
@@ -184,9 +185,11 @@ plain scripts.
    Russian).  Two of the user's ten «недочётов» are written down and both are
    done: `task_47_lessons_and_formatting.md` and
    `task_48_interface_cleanup.md` (its one loose end is the by-hand look at the
-   redrawn icons in the dark theme, the user's own).  What is left of that batch
-   are the three defects of using the window, `task_49_gui_defects.md`, and the
-   live output they ask for.
+   redrawn icons in the dark theme, the user's own).  Of the batch of defects found
+   by using the window (`task_49_gui_defects.md`) four are fixed and pinned by
+   reproductions; what is left there is the live output — an `IoContext` line hook
+   and the protocol event per line, so a countdown prints 3, 2, 1 instead of one
+   block at the end.
 
 ## Open questions for the user
 
@@ -1449,3 +1452,55 @@ Added on 2026-10-02 while implementing task_31:
   а «закрытое окно не открывается снова» — программой `?ТОЧКА(1, 1, 1),
   ЖДИ(200), ТОЧКА(6, 6, 6).`: закрытие приходится *между* двумя фигурами, иначе
   проверка прошла бы и без флага.  267/267 ctest, 21 headless-скрипт GUI, пять PDF.
+* GUI round, part 46: **task_49 — четыре дефекта, найденные работой с окном, и
+  размер главного окна**.  Пользователь добавил одну фразу к просьбе продолжить
+  («Графическое окно сохраняет свой размер и положение, а при этом главное окно не
+  сохраняет») — она и стала пятым пунктом задачи.
+  **`Шаг` → `Стоп` → `Запуск`.**  Окно считало, что прогон всё ещё стоит на точке
+  шага, и «Запуск» шёл по пути «продолжить», то есть посылал `step` в
+  интерпретатор, который никого не ждёт: сессия отвечала именно той ошибкой
+  «нет шага, который ждёт ответа», и программа не запускалась.  Состояние живёт в
+  *сессии* (`_paused`), и снимают его события, которыми прогон кончается:
+  `result`, `loaded`, ошибка и конец процесса.  Репродукция уточнила последнюю
+  пару: вежливое «Стоп» завершает *запрос*, а не процесс, поэтому очищающим
+  событием оказывается ошибка прерванного запроса — без этого случая проверка
+  падает (и она же требует, чтобы процесс был жив, иначе «Стоп» мог бы сойти за
+  конец сессии).
+  **Две вкладки «Без имени».**  Репродукция решила, какое из двух правил было
+  неверным: неверно было восстановление — менять `*` получала вкладка, которую
+  пользователь не трогал (приветственная программа первой вкладки, рядом с ней
+  пустая вторая; с одной вкладкой всё выглядело правильно только потому, что
+  пустая вкладка вообще не запоминается).  Сессия пишется *после* вопросов при
+  закрытии, то есть после того, как каждая правка уже разрешена: вкладка, которая
+  вернулась текстом, — та, которую пользователь не трогал.  Поэтому запись о
+  вкладке везёт признак «есть несохранённое», и он теперь в **JSON** — четвёртое
+  поле через табуляцию не отличить от строки старого образца, в тексте которой
+  табуляция есть (а в тексте программы она есть всегда).
+  **Зависание на трассировке.**  Причину искали измерением, а не догадкой, и табло
+  получилось таким: панель вывода, 20 000 строк — 0,68 с до и 0,26 с после;
+  200 000 строк с пределом 50 000 — **21,9 с** до и **3,0 с** после; трассировка
+  глубокой рекурсии (16 002 строки) целиком — 2,2 с до и 0,6 с после.  Две цены
+  сложились: окно платило вызов Python на *строку*, а панель — подрезку истории
+  по строке на строку, то есть квадрат (удаление из начала документа стоит
+  примерно одинаково, сколько ни удаляй).  Теперь окно отдаёт вывод пачкой раз в
+  оборот цикла событий и склеивает соседей одного вида (это не дроссель: ничего не
+  теряется и ничего не ждёт часов — потерянная строка журнала хуже медленной), а
+  панель режет историю куском в десятую часть предела.  Отрицательный результат
+  тоже записан: сама по себе пачка не спасает (20 000 строк одним вставлением —
+  тоже 27 мкс на строку), прокрутка — не цена (32 мкс на строку с выключенным
+  слежением), и курсор — не цена (новый курсор на вставку: 7 мкс против 5 у
+  постоянного).
+  **Размер главного окна.**  Графическое окно помнит своё с `saveGeometry()` с
+  task_45, а главное — то, которое двигают первым, — не помнило ничего.  Теперь оба
+  ходят через один модуль `prologd_gui.geometry`, и ключ `view/window_geometry` —
+  машинный (это запись окна о себе, а не строка в диалоге).  Проверка ставит окно
+  в 720×520 в (60, 40), закрывает, открывает заново с тем же файлом настроек и
+  требует те же числа, а без записи — прежний размер 1000×700; и она *не* берёт
+  910 точек ширины, потому что экран offscreen-платформы — 800×800, а
+  `restoreGeometry` по-своему правильно зажимает размер, который в экран не влезает.
+  Репродукции закреплены тестами и проверены «наоборот»: со спрятанной правкой
+  каждая из них падает (`git stash` на одном файле), с правкой — проходит.
+  Тесты: 267/267 ctest, 21 headless-скрипт GUI (четыре новых проверки в
+  `test_window.py`, одна в `test_documents.py`, обновлённая в `test_output.py`),
+  пять PDF.  Осталось в task_49: живой вывод — `IoContext` отдаёт строку, сессия
+  шлёт событие на строку, и счёт печатается 3, 2, 1.

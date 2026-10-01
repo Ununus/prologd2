@@ -1,6 +1,7 @@
-# task_49 — Three defects and the live output
+# task_49 — Four defects and the live output
 
-**Status:** not started
+**Status:** in progress (the four defects are done; the live output is the round
+left)
 **Depends on:** task_28 (stepping and the polite stop), task_29 (the session
 restore and its storage), task_02 of the front-end (the output pane), task_46
 (protocol 9, the run limits)
@@ -8,9 +9,9 @@ restore and its storage), task_02 of the front-end (the output pane), task_46
 
 ## Goal
 
-Four things the user ran into while working with the window.  Three are defects
-with a clear reproduction; the fourth is the reason a lesson's animation looks
-like a jump instead of a countdown.
+Five things the user ran into while working with the window.  Four are defects
+with a clear reproduction (the fifth came in with «продолжим task_49»); the last
+item is the reason a lesson's animation looks like a jump instead of a countdown.
 
 ## The defects (found 2026-10-01)
 
@@ -21,21 +22,26 @@ The window's word for «the run is paused at a step point» survives a stop, so
 sends a `step` request into an interpreter that is not paused — the session prints
 exactly that error and the program never runs.  The state is the *session's*
 (`PrologSession._paused`), and the event that proves a pause is over is the one
-that concludes the run: `result`, `loaded`, or the process ending.  Those are the
-places the flag has to be cleared, and a test has to walk the whole sequence
-(`Шаг`, `Стоп`, `Запуск`) rather than the parts.
+that concludes the run: `result`, `loaded`, an error, or the process ending.
+Those are the places the flag has to be cleared, and a test has to walk the whole
+sequence (`Шаг`, `Стоп`, `Запуск`) rather than the parts.  **What the reproduction
+added**: with «Стоп» the process stays (the polite interrupt ends the *query*), so
+the clearing event is the interrupted query's *error* — the reproduction failed
+without that case, and the check says so by asserting the session is still
+running.
 
 ### 2. Two unnamed tabs: the restored one is marked as changed
 
 With one unnamed tab the window comes back clean, with two the surviving one comes
 back `*изменённый`.  The stored session skips an *empty* unnamed tab (task_29's
 rule) and remembers the rest by text; the restore marks every unnamed tab as
-unsaved work.  Which of the two rules is wrong is what the reproduction decides:
-what a user answered «не сохранять» about must not come back, but a tab that came
-back *with its text* is unsaved work and must be asked about on the way out.  The
-bug is in the *pairing* of names, texts and the current tab — the record's name,
-the fresh name from `untitled_name()` and the `session_current` key are three
-names for two tabs.
+unsaved work.  **What the reproduction decided**: it is the restore that was
+wrong — the tab the user never touched is the one that came back starred (the
+welcome program of the first tab, with a second, empty tab beside it; the one-tab
+case looked right only because an empty tab is not stored at all).  A session is
+written *after* the closing questions have resolved every change, so a tab that
+survives as text is one the user left alone: the record now says whether it was
+unsaved work, and the flag is what the next start honours.
 
 ### 3. `Запустить с трассировкой` on a deep recursion freezes the window
 
@@ -61,17 +67,36 @@ is the terminal's business.
 
 ## Deliverables
 
-- [ ] `PrologSession`: the paused flag is cleared by the events that conclude a
-      run, and `window.py`'s «продолжить» paths stop assuming it.
-- [ ] `documents`/`window.py`: the restore pairs each record with *its* tab — name,
-      text and which one was current — and the rule about empty unnamed tabs is
-      written down where it is applied.
-- [ ] `panels.OutputPane` + `window.py`: the output is appended in batches (one
-      append per event-loop turn, however many events arrived), and the trim
-      happens on that batch.
+- [x] `PrologSession`: the paused flag is cleared by the events that conclude a
+      run (`result`, `loaded`, an `error` that is not a warning, the process
+      ending — the last two are what a `Стоп` arrives as while a step waits, and
+      the reproduction needed them: the polite stop ends the *query*, not the
+      process).  `window.py`'s «продолжить» paths follow the flag, which is now
+      true only while a step point is really waiting.
+- [x] `documents`/`window.py`: the restore pairs each record with *its* tab — and
+      what the reproduction decided is that the record carries the **unsaved**
+      flag: with two unnamed tabs the untouched welcome program came back starred
+      (`*Без имени`) and was asked about on the way out, while the one-tab case
+      looked right only because an empty tab is not stored at all.  The record is
+      JSON now (`path`, `name`, `text`, `modified`), because a fourth
+      tab-separated field cannot be told apart from a task_29 line whose text
+      contains a tab — and program text does contain tabs.
+- [x] `panels.OutputPane` + `window.py`: the output is handed over in *batches*
+      (one `feed` per run of one kind, on the next turn of the event loop) and the
+      history is trimmed in *bulks* (a tenth of the limit).
 - [ ] `IoContext` + `protocol.cpp`: an output-line hook, and the session emitting
       an `output` event per completed line inside a run.
-- [ ] Tests for all four, each with the reproduction the user gave.
+- [x] Tests for the first three and for the geometry, each with the reproduction
+      the user gave.
+
+### 5. The main window forgets its size and place (found 2026-10-01)
+
+The user, in one sentence with «продолжим task_49»: «Графическое окно сохраняет
+свой размер и положение, а при этом главное окно не сохраняет».  The graphics
+window has kept a `saveGeometry()` blob since task_45 and the main window — the one
+the user moves first — kept nothing.  Both go through `prologd_gui.geometry` now,
+and the key is `view/window_geometry` (a machine key: a record, not a row in the
+dialog).
 
 ## Design notes
 
@@ -86,15 +111,44 @@ is the terminal's business.
   and the `\n` of a `ВЫВОД` both end a line, and the front-end is the one that
   decides what to do with it (the console does nothing).
 
+## What the measurement said (2026-10-01)
+
+Defect 3 was two costs, and the second was the freeze:
+
+| work | before | after |
+|------|--------|-------|
+| pane, 20 000 lines | 0.68 s (34 µs/line) | 0.26 s (13 µs/line) |
+| pane, 200 000 lines with a 50 000-line limit | **21.9 s** (110 µs/line) | **3.0 s** (15 µs/line) |
+| traced deep recursion, 16 002 trace lines (end to end) | 2.2 s | 0.6 s |
+
+The `.26 s` of the first row is one `feed` per line — the window's batching (task_49)
+removes the rest of it, because the *window* was paying a Python call per line and
+the pane was paying one insertion per line.  The second row is the quadratic trim:
+removing from the front of a `QTextDocument` costs about the same whatever is
+removed, so one line per appended line is O(n²) — and that is what Windows
+noticed (the window was busy, not slow).
+
+A useful negative result: batching alone was *not* the answer (one append of
+20 000 lines still cost 27 µs/line), and neither was the scrollbar (32 µs/line
+with the follow switched off).  The cursor is not the cost either (a fresh
+`QTextCursor` per insert costs 7 µs against 5 µs for a persistent one).  The
+task file had guessed «the per-event append or the trimming»; the numbers said
+«both, and the trimming is the one that explodes».
+
 ## Tests
 
-- [ ] `test_window.py`: `Шаг` → `Стоп` → `Запуск` runs the program (no «нет шага,
-  который ждёт ответа» in the pane, and the answer of the program arrives).
-- [ ] `test_window.py`/`test_settings.py`: two unnamed tabs — what comes back, what
-  their names are, which one is current, and what the close questions ask about.
-- [ ] `test_output.py`/`test_window.py`: 5 000 output lines arrive in one piece;
-  a trace of a deep recursion leaves the window alive (a bounded time is enough —
-  the point is that it finishes).
+- [x] `test_window.py`: `Шаг` → `Стоп` → `Запуск` runs the program (and the
+      process is still alive after the stop, so the pause cannot have been cleared
+      by the session ending).
+- [x] `test_window.py`: two unnamed tabs — the untouched one comes back clean, and
+      the stored record says so; `test_documents.py` covers the record's shape,
+      the flag, and a task_29 line read the old way.
+- [x] `test_output.py`/`test_window.py`: the history is bounded in bulks and comes
+      to its limit on request; 20 000 lines queued through the window arrive in
+      one batch and none of them is lost, and a traced recursion of 1 200 steps
+      arrives in bounded time.
+- [x] `test_window.py`: the window comes back with the size and the place it was
+      closed at, and starts at the default when nothing is remembered.
 - [ ] `test_window.py`: a program that prints three lines with `ЖДИ` between them
       shows them as they are produced — the pane holds the first line while the
       run is still going.
@@ -103,5 +157,6 @@ is the terminal's business.
 
 ## Acceptance
 
-The three reproductions behave, the countdown counts, and a long trace no longer
-takes the window with it.
+The four reproductions behave (the step runs again, the untouched tab comes back
+clean, a long trace no longer takes the window, the window returns where it was),
+the countdown counts, and a long trace no longer takes the window with it.

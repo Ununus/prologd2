@@ -195,19 +195,26 @@ class OutputPane(ZoomablePlainTextEdit):
         A cursor of the *document* rather than the pane's own: the user's caret and
         selection have nothing to do with the output, and moving them would take the
         selection away while a program is running.
+
+        A complete piece goes in with its newline in one `insertText`: two insertions
+        per line is twice the work, and a trace of a deep recursion is hundreds of
+        thousands of lines (task_49 — that traffic is what froze the window).
         """
         cursor = QTextCursor(self.document())
         cursor.movePosition(QTextCursor.MoveOperation.End)
         for piece in pieces:
             fmt = self._formats.get(piece.kind, self._plain)
-            if piece.text:
+            if piece.complete:
+                if piece.text:
+                    cursor.insertText(piece.text + "\n", fmt)
+                else:
+                    cursor.insertText("\n", fmt)
+                # The newline ended the line the text went into; Qt opened a block
+                # behind it, and that one gets its kind when its text arrives.
+                self._record_kind(self.document().blockCount() - 2, piece.kind)
+            elif piece.text:
                 cursor.insertText(piece.text, fmt)
                 self._record_kind(self.document().blockCount() - 1, piece.kind)
-            if piece.complete:
-                cursor.insertText("\n", fmt)
-                # The newline ends the line the text just went into; Qt opens a new
-                # block behind it, and that one gets its kind when its text comes.
-                self._record_kind(self.document().blockCount() - 2, piece.kind)
         self._trim()
         if self._following and self._follow:
             bar = self.verticalScrollBar()
@@ -246,7 +253,7 @@ class OutputPane(ZoomablePlainTextEdit):
         smaller limit trims now, not on the next run, or the pane would keep more
         than it claims to."""
         self._line_limit = max(100, int(limit))
-        self._trim()
+        self._trim(force=True)
 
     def truncated(self) -> bool:
         """Whether the oldest output has been dropped."""
@@ -301,11 +308,21 @@ class OutputPane(ZoomablePlainTextEdit):
         """
         self._following = value >= self.verticalScrollBar().maximum()
 
-    def _trim(self) -> None:
-        """Drops the oldest lines in one edit, keeping the marker first."""
+    def _trim(self, *, force: bool = False) -> None:
+        """Drops the oldest lines in one edit, keeping the marker first.
+
+        In *bulks*, not one line per append: removing text from the front of a
+        `QTextDocument` costs about the same whatever is removed, so dropping one
+        line per appended line is quadratic — which is exactly what a traced deep
+        recursion does to this pane, and what froze the window (task_49: 200 000
+        lines took 22 s one line at a time, and about 2 s in bulk).  The history
+        may therefore hold up to one chunk more than its limit, and `force` is for
+        the two callers that must not wait for the next chunk: a new limit, and the
+        pane being asked what it holds.
+        """
         document = self.document()
         excess = document.blockCount() - self._line_limit
-        if excess > 0:
+        if excess > 0 and (force or excess >= self._trim_step()):
             self._truncated = True
             block = document.findBlockByNumber(excess)
             cut = QTextCursor(document)
@@ -314,6 +331,10 @@ class OutputPane(ZoomablePlainTextEdit):
             cut.removeSelectedText()
             del self._kinds[:excess]
         self._ensure_marker()
+
+    def _trim_step(self) -> int:
+        """How many lines one trim may drop (a tenth of the history, at least one)."""
+        return max(1, self._line_limit // 10)
 
     def _ensure_marker(self) -> None:
         """Keeps «вывод усечён» the first line, so the pane never lies about its

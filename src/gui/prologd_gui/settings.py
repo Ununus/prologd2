@@ -49,6 +49,11 @@ RESTORE_SPLIT = "view/restore_split"
 #: `MACHINE_KEYS`.
 GRAPHICS_VISIBLE = "view/graphics_visible"
 GRAPHICS_GEOMETRY = "view/graphics_geometry"
+#: Where the *main* window stood (task_49).  The graphics window remembered its
+#: own since task_45 and the main window — the one the user moves first — did not,
+#: which is what the user ran into.  A machine key for the same reason: it is a
+#: record the window keeps, not a choice in the dialog.
+WINDOW_GEOMETRY = "view/window_geometry"
 TOOLBAR = "view/toolbar"
 OUTPUT_POSITION = "view/output_position"
 OUTPUT_VISIBLE = "view/output_visible"
@@ -334,6 +339,7 @@ MACHINE_KEYS = (
     RESTORE_SPLIT,
     GRAPHICS_VISIBLE,
     GRAPHICS_GEOMETRY,
+    WINDOW_GEOMETRY,
     OUTPUT_SIZES,
     PANEL_SIZES,
     SHORTCUTS_TABLE,
@@ -770,6 +776,20 @@ class Settings:
     @graphics_geometry.setter
     def graphics_geometry(self, value: str) -> None:
         self._write(GRAPHICS_GEOMETRY, str(value))
+
+    @property
+    def window_geometry(self) -> str:
+        """The main window's geometry as text; "" until it was ever moved.
+
+        The same `saveGeometry()` blob the graphics window keeps (see
+        `prologd_gui.geometry`): the size, the place *and* whether the window was
+        maximised, in a form Qt can put back on a screen that still exists.
+        """
+        return self._text(WINDOW_GEOMETRY, "")
+
+    @window_geometry.setter
+    def window_geometry(self, value: str) -> None:
+        self._write(WINDOW_GEOMETRY, str(value))
 
     # -- the split editor ---------------------------------------------------
     @property
