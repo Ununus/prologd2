@@ -2,7 +2,8 @@
 
 **Status:** done (round B, 2026-10-01) — the dialog, the described table, reset,
 import/export, and the «почти готовые» new keys; the rest of the list is named
-under «What was built» and still open
+under «What was built» and still open: **RU/EN** and the two items that grew into
+`task_45_gui_graphics_window.md` and `task_46_interpreter_options_and_limits.md`
 **Depends on:** task_22 (font, line numbers), task_26 (view actions), task_27 (panels)
 **Milestone:** M11
 
@@ -126,7 +127,9 @@ General
   lesson and a project do not fight over the search path.
 * **Песочница/лимиты** as settings rather than constants: run time, output
   lines, `НАЙТИВСЕ` cap — the three ways a student program can hang the GUI.
-* **Экспорт настроек для класса**: one ini file the teacher can hand out.
+* **Экспорт настроек для класса**: one ini file the teacher can hand out —
+  **сделано** («Экспорт…» выгружает весь файл, «Импорт…» его читает вместе с
+  незнакомыми ключами; профили интерпретатора — `task_46`).
 
 ## Tests
 
@@ -256,15 +259,19 @@ importing file's directory still wins inside the engine.
       подсветки берёт те, что подходят его схеме (`appearance.system_is_dark()` по
       `QStyleHints.colorScheme()`, с запасным чтением палитры платформы).  Раньше
       это была половина темы — тёмные виджеты и светлая подсветка на них.
-- [ ] the colours of Latin vs Cyrillic are *done* (task_22: separate fields, and
-      the dark palette keeps the split);
+- [x] the colours of Latin vs Cyrillic — done (task_22: separate fields, and the
+      dark palette keeps the split);
 - [ ] **RU/EN** — the reference front-end was Russian only, and translating the
       window is a task of its own;
-- [ ] the interpreter profiles, the sandbox limits (run time, `НАЙТИВСЕ` cap),
-      the query timeout and the path to the interpreter (still `--exe`), and the
-      working directory of the process (`ЗАПИСЬ_В`/`ЧТЕНИЕ_ИЗ` are relative to
-      it) — all of them need engine options that do not exist yet;
-- [ ] «сообщать, где искался импорт» (task_32) and the switches that are left
-      need the engine, not a dialog row: where the import search looked is
-      something only the interpreter can say;
+- [ ] **перенесено в отдельные задачи (2026-10-01)**: «путь к интерпретатору,
+      профили, пределы и таймаут» — это `task_46_interpreter_options_and_limits.md`,
+      а «графическое окно» — `task_45_gui_graphics_window.md`.  Ни то, ни другое не
+      строка в этом диалоге: пределам нужен ключ сессии (сегодня `load` несёт
+      только `step`/`trace`/`questions`, хотя `maxSteps`, `maxDepth` и
+      `maxFindAllSolutions` в движке уже есть), а графике — события протокола.
+      Рабочий каталог *процесса* (`ЗАПИСЬ_В`/`ЧТЕНИЕ_ИЗ` считаются от него) — там же.
+- [x] «сообщать, где искался импорт» — сделано в `task_32`: неудачный `ИМПОРТ`
+      называет каталоги, в которых искал, и причину.  Переключателя к этому нет и
+      не нужно: сообщение появляется только при ошибке, когда молчание — худший
+      из ответов.
 - [ ] «проверять обновления» stays off by decision — this is a local tool.

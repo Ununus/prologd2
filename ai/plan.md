@@ -135,7 +135,9 @@ Removed from PrologD:
 | M11 | GUI front-end (PySide6) | 21–33 |
 | M12 | Built-in coverage and the lesson course | 34, 35 |
 | M13 | Editor aids: run one query, look one up | 36, 37 |
-| M14 | Engine limits, diagnostics and the standard surface | 38–43 |
+| M14 | Engine limits, diagnostics and the standard surface | 38–44 |
+| M15 | The graphics window | 45 |
+| M16 | Interpreter options, profiles and limits | 46 |
 
 ## 6. Risks and mitigations
 

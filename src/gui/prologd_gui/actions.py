@@ -183,7 +183,7 @@ ACTIONS: tuple[Action, ...] = (
         "Графическое окно",
         "view-graphics",
         implemented=False,
-        waiting_for="нет задачи (см. Roadmap в src/gui/README.md)",
+        waiting_for="task_45_gui_graphics_window.md (см. Roadmap в src/gui/README.md)",
     ),
     # -- help
     # The reference of a predicate (task_37): the same help picture, because it

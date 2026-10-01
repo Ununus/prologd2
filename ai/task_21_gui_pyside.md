@@ -68,7 +68,9 @@ Front-end (`src/gui`):
 - [ ] Syntax highlighting from the lexer keyword set.
 - [ ] A graphics pane: a `GraphicsBackend` implementation that emits protocol
       events, so `ТОЧКА`/`ЛИНИЯ`/… become visible (task_15 backends are null and
-      recording today).
+      recording today) — **moved out**: it is a task of its own now,
+      `task_45_gui_graphics_window.md` (2026-10-01), because it needs protocol
+      events, a bitmap backend in the engine and a window of its own.
 - [ ] Stepping over the `ТРАССА` stream.
 - [ ] Settings persistence (interpreter path, includes, window layout).
 

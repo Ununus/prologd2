@@ -111,6 +111,8 @@ session.
 | task_42_engine_hot_path | done | the constant tax, measured: the two per-goal lookups stop building strings (`BuiltinKey` keyed by `string_view`; the database is a two-level `name -> (arity -> list)` map looked up with `std::less<>`, no `"name/arity"` key, `key_order_` gone) — interleaved six pairs on a dispatch-bound loop: median 1.45 s → 1.40 s, every pair faster, ≈ 4 %; clause indexing measured and deferred (ADR-017: a 100 000-clause scan costs ≈ 20 ms, lesson predicates have a handful of clauses, and the queens workload is a shape an index cannot prune); term interning bounded by that same ≈ 4 % and deferred; `tools/bench_engine.py` gained the `dispatch`, `structured` and `queens` workloads and `--only` |
 | task_43_language_surface | done | `ВЫП/2..N` (`call/N`): the extra arguments are appended to the goal (callee dereferenced first; the keyword table says `ВЫП/+`; the checker expands the same term; `!` inside the argument stays a parse error and the manual no longer promises it); the module-collision warning — one per predicate fed by two files with no import path between them, silent for the diamond and for extending an imported module (ADR-019); the dead library is gone (`?СКОЛЬКО(НЕ, А)` answers 0; ADR-018) |
 | task_44_names | done | the two names that promised something else: `ИЛИ/2` → `ПЕРВОЕ/2` (`or` → `first`) with the retired spelling removed from the language (a call is a load error naming the replacement), `НАЙТИВСЁ` → `НАЙТИВСЕ` (the spelling of the task and of the reference notes) with the retired spelling kept reserved, so its call is the ordinary suggestion «возможно, НАЙТИВСЕ/3»; the two `ИЛИ` library clauses removed so the old name cannot answer through the database; `doc/help.typ` §4.6, `prologd-diff.typ` §17/§18, lesson 4's section 5 |
+| task_45_gui_graphics_window | not started | the graphics predicates become *visible*: a bitmap backend inside the engine (the source of truth, so `getPixel` and `ЗАКРАСКА` need no round trip), protocol 9 events plus a snapshot, a Qt-free canvas and a window of its own — the last disabled menu entry.  Split out of task_21/task_15 on 2026-10-01 |
+| task_46_interpreter_options_and_limits | not started | the interpreter path, the working directory of the process, named profiles and the limits a student program needs.  Half of it exists already (`maxSteps`, `maxDepth`, `maxNestedDepth`, `maxFindAllSolutions` in `EngineOptions`; `--max-steps`/`--max-depth` on the command line) — what is missing is the session carrying them, a wall-clock timeout, and the GUI rows.  The last item of task_29's settings list, split out on 2026-10-01 |
 
 ## Test suite
 
@@ -168,10 +170,11 @@ plain scripts.
    task_23 the keyword source.  The rest is task_24–task_31, see the board above.
    The settings file is written to `%LOCALAPPDATA%\PrologD\gui\gui.ini`; the
    dialog that edits it is task_29, and `--settings FILE` overrides the path.
-   Open for the next session: the rest of task_27 (the output pane's own
-   behaviour — colour by kind, truncation, auto-scroll, save to a file — the input
-   console and the status-bar details), the graphics window (no task file yet),
-   and the output panel's own font size (task_29).
+   Open for the next session, and no longer part of task_29: the **graphics
+   window** (`task_45_gui_graphics_window.md`) and the **interpreter options,
+   profiles and limits** (`task_46_interpreter_options_and_limits.md`).  What is
+   left of task_29 is RU/EN and «использовать системные цвета» as a choice beyond
+   the three themes.
 
 ## Open questions for the user
 
@@ -1249,3 +1252,19 @@ Added on 2026-10-02 while implementing task_31:
   называется «как в системе — системные цвета»; хинт говорит, что «тёмное» — это
   своя палитра, а «как в системе» берёт цвета рабочего стола.  251/251 ctest,
   20 headless-скриптов GUI, пять PDF.
+* Planning round, part 41: **два пункта списка task_29, которые не были строкой в
+  диалоге, стали задачами** — `task_45_gui_graphics_window.md` (графика: бэкенд с
+  битмапом внутри движка, события протокола 9 и снимок, холст и своё окно) и
+  `task_46_interpreter_options_and_limits.md` (путь к интерпретатору, рабочий
+  каталог процесса, профили и пределы на программу).  Пока писались, выяснилось,
+  что записанное в task_29 было пессимистично: `maxSteps`, `maxDepth`,
+  `maxNestedDepth` и `maxFindAllSolutions` в движке **уже есть** и выведены в
+  `--max-steps`/`--max-depth`, так что `task_46` — это не новые опции движка, а
+  ключ сессии, таймаут по часам и строки в диалоге; а графике нужен не только
+  интерфейс, но и ответ на `getPixel` посреди встроенного предиката — отсюда решение
+  держать пиксели в движке и посылать примитивы.  Заодно починено старое в
+  `doc/gui.typ`: §9.3 обещал 42 нарисованных значка и 7 недостающих (сейчас 43 и 6,
+  `execution-step-over` нарисован 2026-10-01, `view-theme` — картинка подменю
+  «Оформление»), а §10 всё ещё называл отдельный размер шрифта панели вывода
+  невыполненным — он есть с task_29; в §10 встали графическое окно и профили с
+  ссылками на новые задачи, а в README — точные числа аудита (49/43/6).

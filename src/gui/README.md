@@ -232,21 +232,22 @@ The menus are **Файл** (Новый, Открыть…, Последние, �
 Раскомментировать, Форматировать, Формат (подменю: режим и «только выделенное»),
 Настройки…), **Поиск** (Поиск и замена…,
 Далее, Назад, Найти выделенное, Найти выделенное назад), **Вид** (Панель
-инструментов, Панель вывода, Разделить редактор, Объединить редакторы, Сменить
-ориентацию сплита, Номера строк, Увеличить/Уменьшить/Обычный размер шрифта,
-Системная тема, Полный экран), **Выполнение** (Запустить, Запустить с
-трассировкой, Шаг, Остановить, Сохранять перед запуском, Графическое окно) and
+инструментов, Панель вывода, Поле очереди ввода, Разделить редактор, Объединить
+редакторы, Сменить ориентацию сплита, Номера строк, Переносить длинные строки,
+Увеличить/Уменьшить/Обычный размер шрифта, Оформление (подменю: светлое, тёмное,
+как в системе), Полный экран), **Выполнение** (Запустить, Запустить с
+трассировкой, Шаг, Шаг с обходом, Остановить, Сохранять перед запуском, Выводить
+вопросы при запуске, Графическое окно) and
 **Справка** (Справка по предикату, Шпаргалка по вставкам, Руководство
 пользователя, Справка по окну, О программе).
 
 An entry that does not exist yet stays in its menu but is **disabled**, and its
-tooltip names what it waits for: «Настройки…» — task_29; «Графическое окно» has
-**no task file yet** (the roadmap below has the
-plan).  A menu that silently lacks half of the feature list is worse than one that
-says so.  «Поиск» left that list in task_33, the «Выполнение» group in task_28 —
-«Запустить с трассировкой», «Шаг» and «Шаг с обходом» are live — «Форматировать»
-in task_30, and «Настройки…» in task_29.  Only «Графическое окно» still says «ещё
-не реализовано».  The toolbar is
+tooltip names what it waits for: «Графическое окно» is the one left, and it names
+`task_45_gui_graphics_window.md`.  A menu that silently lacks half of the feature
+list is worse than one that says so.  «Поиск» left that list in task_33, the
+«Выполнение» group in task_28 — «Запустить с трассировкой», «Шаг» and «Шаг с
+обходом» are live — «Форматировать» in task_30, and «Настройки…» in task_29: it is
+the last command that left it except the graphics window.  The toolbar is
 grouped as
 the reference front-end had it: file | run/stop/step | editing (comment,
 uncomment, format) | font size | tools (graphics, settings, help), and at the far
@@ -266,12 +267,12 @@ split could not be undone without a restart.
 
 `test_icons.py` is the guard: it fails as soon as a name is misspelled, and it
 also checks that an icon which *does* have a file is not still listed as missing.
-The code references **49** names, **44** of which have a file in
+The code references **49** names, **43** of which have a file in
 `src/gui/assets` (64×64 PNG, transparent background).  A missing file is not an
 error: the action is built without a picture, and the name is reported once on
 stderr (`icons: no view-theme.png — the action will have no picture`).
 
-Present (44): `edit-clear`, `edit-comment`, `edit-copy`, `edit-cut`, `edit-del`,
+Present (43): `edit-clear`, `edit-comment`, `edit-copy`, `edit-cut`, `edit-del`,
 `edit-find-replace`, `edit-format`, `edit-paste`, `edit-redo`, `edit-uncomment`,
 `edit-undo`, `execution-abort`, `execution-execute`, `execution-step-into`,
 `execution-step-over`, `execution-tracing`, `file`, `file-close`,
@@ -783,11 +784,21 @@ failure (for example an interrupted query).
 
 ## Roadmap
 
-* A graphics pane fed by a `GraphicsBackend` that emits protocol events
-  (`ТОЧКА`, `ЛИНИЯ`, … currently reach a null backend).
-* Step-by-step execution over the `ТРАССА` stream.
-* The rest of task_29's list: RU/EN, interpreter profiles and sandbox limits, the
-  path to the interpreter (still `--exe`) and the working directory of the process
-  — the last two need session options rather than a dialog row.  The settings
-  dialog, the live apply, the session restore, the recent files, the theme page
-  (light, dark and system) and the small switches are done.
+Two pieces of work are planned in task files of their own (`ai/task_*.md`):
+
+* **The graphics window** — `ai/task_45_gui_graphics_window.md`.  A
+  `GraphicsBackend` that emits protocol events (`ТОЧКА`, `ЛИНИЯ`, … reach a null
+  backend today), a bitmap backend inside the engine so `getPixel` and
+  `ЗАКРАСКА` stay correct without a round trip, a canvas and the last disabled
+  menu entry.
+* **Interpreter options, profiles and limits** —
+  `ai/task_46_interpreter_options_and_limits.md`.  The path to the interpreter
+  (still `--exe`), the working directory of the process, named profiles, and the
+  limits a student program needs: `--max-steps`/`--max-depth` exist in the engine
+  and on the command line, but the *session* does not carry them, so the dialog
+  cannot reach them; a wall-clock timeout does not exist at all.
+
+The rest of task_29's list (RU/EN, «использовать системные цвета» as a choice of
+its own beyond the three themes) is named in `ai/task_29_gui_settings.md`; the
+settings dialog, the live apply, the session restore, the recent files, the theme
+page and the small switches are done.
