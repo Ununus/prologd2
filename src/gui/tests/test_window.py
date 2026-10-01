@@ -2413,7 +2413,7 @@ def test_the_theme_switch_reaches_the_text_and_the_widgets(executable: str) -> N
     from PySide6.QtGui import QPalette as QtPalette
     from PySide6.QtWidgets import QApplication
 
-    from prologd_gui import panels, theme
+    from prologd_gui import appearance, panels, theme
     from prologd_gui.settings import Settings
 
     window = empty_window(executable)
@@ -2448,6 +2448,17 @@ def test_the_theme_switch_reaches_the_text_and_the_widgets(executable: str) -> N
         assert Settings(settings_path).theme == "dark"
         assert window._theme_actions["dark"].isChecked() is True
         assert window._theme_actions["light"].isChecked() is False
+
+        # «Как в системе»: the widgets come from the desktop *and* so do the colours
+        # of the text — the palette its colour scheme implies (on this machine the
+        # offscreen platform answers «light», so this is a real question and not a
+        # shortcut through one palette).
+        window._settings.theme = appearance.SYSTEM
+        window.apply_settings()
+        expected = appearance.theme_palette(appearance.SYSTEM)
+        assert window.buffers()[0].highlighter.theme is expected.syntax
+        assert window.editor().palette() is expected
+        assert window._output.kind_colors()[panels.ERROR] == expected.error
     finally:
         discard_changes(window)
     print("ok: the dark theme reaches the widgets, the syntax, the bands and the output")

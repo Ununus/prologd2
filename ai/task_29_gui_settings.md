@@ -56,8 +56,9 @@ Highlighting
       Контраст 4.5 проверяется для **обеих** палитр по списку
       `Palette.readable_pairs` против той страницы, на которой цвет рисуется
       (`test_appearance.py`); та же проверка нашла, что цвет трассы светлой темы
-      был 4.48 — на шаг темнее, и он чистый (4.61).  Осталось от этого пункта
-      только «использовать системные цвета» как отдельный выбор.)
+      был 4.48 — на шаг темнее, и он чистый (4.61).  Тогда же сделан и
+      «использовать системные цвета»: выбор «как в системе» берёт цвета рабочего
+      стола и для виджетов, и для подсветки.  Пункт закрыт целиком.)
 
 Formatting
 
@@ -225,7 +226,7 @@ before it: «Отмена» leaves the window open, and a session written on the
 would describe a window that never closed.  Unticking the box opens the welcome
 program instead — the setting is the only switch.
 
-* 2026-10-01, the four switches that were left over — the «малочи» of this list,
+* 2026-10-01, the four switches that were left over,
 all of them switches over behaviour that already existed: «Редактор → Автоотступ»
 (`editor/auto_indent`), «Вид → Следить за выводом» (`view/follow_output`),
 «Вид → Спрашивать ввод» (`view/input_mode`) and «Выполнение → Выводить вопросы
@@ -250,9 +251,11 @@ importing file's directory still wins inside the engine.
 
 **Still open, and why** (each is its own feature, not a dialog row):
 
-- [ ] «использовать системные цвета» — the one item left of the colour page: the
-      widgets' colours for the syntax, against whatever page the platform paints,
-      which means measuring the palette against a background we do not choose;
+- [x] «использовать системные цвета» — сделано 2026-10-01 вместе с тёмной темой:
+      выбор «как в системе» возвращает палитру *и* стиль рабочего стола, а цвета
+      подсветки берёт те, что подходят его схеме (`appearance.system_is_dark()` по
+      `QStyleHints.colorScheme()`, с запасным чтением палитры платформы).  Раньше
+      это была половина темы — тёмные виджеты и светлая подсветка на них.
 - [ ] the colours of Latin vs Cyrillic are *done* (task_22: separate fields, and
       the dark palette keeps the split);
 - [ ] **RU/EN** — the reference front-end was Russian only, and translating the

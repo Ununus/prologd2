@@ -95,12 +95,37 @@ def test_system_leaves_the_platform_palette_alone(app: QApplication) -> None:
     appearance.apply_theme(app, appearance.SYSTEM)
     palette = app.palette()
     # Whatever the platform chose, the roles must be set — this is the option a
-    # light desktop wants, and the hook for a real dark theme (task_29).
+    # light desktop wants.
     assert palette.color(QPalette.ColorRole.Base).isValid()
     assert palette.color(QPalette.ColorRole.Text).isValid()
     print(
         "ok: system keeps the platform palette "
         f"(base {palette.color(QPalette.ColorRole.Base).name()})"
+    )
+
+
+def test_system_colours_the_text_as_well_as_the_widgets(app: QApplication) -> None:
+    """«Использовать системные цвета»: one page for the widgets and the syntax.
+
+    The half-done version of this choice was a platform palette with the *light*
+    syntax colours on top of it — a dark window full of dark-blue keywords.  So the
+    palette `system` resolves to must be the one whose page matches the desktop,
+    and the widget palette must agree with it.
+    """
+    appearance.apply_theme(app, appearance.SYSTEM)
+    palette = appearance.theme_palette(appearance.SYSTEM)
+    expected = theme.DARK if appearance.system_is_dark() else theme.LIGHT
+    assert palette is expected, f"system gave {palette.name}"
+
+    base = app.palette().color(QPalette.ColorRole.Base)
+    page_is_dark = base.lightness() < 128
+    assert page_is_dark == appearance.system_is_dark(), (
+        f"the desktop is {'dark' if appearance.system_is_dark() else 'light'}, "
+        f"the widgets say {base.name()}"
+    )
+    print(
+        f"ok: system — desktop is {'dark' if appearance.system_is_dark() else 'light'}, "
+        f"base {base.name()}, syntax palette {palette.name}"
     )
 
 
@@ -138,15 +163,35 @@ def test_an_unknown_palette_name_is_the_light_one() -> None:
     print("ok: an unknown theme name falls back to the light palette")
 
 
+def test_the_settings_store_resolves_the_three_names(directory: pathlib.Path) -> None:
+    """What the window reads: an explicit theme is itself, `system` is the desktop."""
+    from prologd_gui.settings import Settings
+
+    settings = Settings(directory / "themes.ini")
+    assert settings.palette is theme.LIGHT, "the default is the light palette"
+    settings.theme = "dark"
+    assert settings.palette is theme.DARK
+    settings.theme = "system"
+    assert settings.palette is appearance.theme_palette(appearance.SYSTEM)
+    settings.theme = "полночь"
+    assert settings.palette is theme.LIGHT, "a hand-edited name must not be dark"
+    print("ok: the store resolves «светлое», «тёмное» and «как в системе»")
+
+
 def main() -> int:
+    import tempfile
+
     app = QApplication(sys.argv[:1])
     test_light_gives_a_light_background_and_dark_text(app)
     test_dark_gives_a_dark_background_and_light_text(app)
     test_every_syntax_colour_contrasts_with_the_background(app)
     test_an_unknown_palette_name_is_the_light_one()
     test_system_leaves_the_platform_palette_alone(app)
+    test_system_colours_the_text_as_well_as_the_widgets(app)
     test_an_unknown_theme_is_refused(app)
     test_tooltip_pair_stays_readable(app)
+    with tempfile.TemporaryDirectory(prefix="prologd_theme_") as name:
+        test_the_settings_store_resolves_the_three_names(pathlib.Path(name))
     print("all appearance checks passed")
     del app
     return 0

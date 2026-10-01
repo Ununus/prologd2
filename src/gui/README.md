@@ -50,8 +50,12 @@ measured against the page it is really drawn on (WCAG AA, 4.5, in
 `test_appearance.py`).  Switching the theme re-colours the text already in the
 output pane too, so a dark window never holds light-theme red on a dark page.
 
-`system` keeps the platform widget palette — and the *light* syntax palette, so on
-a dark desktop it is half done by design; that desktop should say `dark`.
+`system` — «как в системе», the last of the three — follows the desktop
+*completely*: the platform's widget palette and style are put back, and the syntax
+colours resolve to the palette that goes with the desktop's colour scheme
+(`appearance.theme_palette`).  A dark desktop therefore gets a dark window **and**
+dark-page colours without anybody choosing `dark`; before that this option was half
+a theme — the widgets dark and the light syntax colours on top of them.
 
 `--settings FILE` chooses the settings file; by default it is
 `%LOCALAPPDATA%\PrologD\gui\gui.ini`, holding the font family and size, line

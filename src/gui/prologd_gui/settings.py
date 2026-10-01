@@ -217,8 +217,8 @@ SETTINGS: tuple[Setting, ...] = (
     # -- view
     Setting(THEME, "Оформление", "Вид", "choice", DEFAULT_THEME,
             choices=(("light", "светлое"), ("dark", "тёмное"),
-                     ("system", "как в системе")),
-            hint="Тёмное — своя палитра подсветки и своя страница, а не инверсия светлой"),
+                     ("system", "как в системе — системные цвета")),
+            hint="Тёмное — своя палитра подсветки и своя страница; «как в системе» — цвета рабочего стола, и виджетов, и подсветки"),
     Setting(TOOLBAR, "Панель инструментов", "Вид", "bool", True),
     Setting(OUTPUT_VISIBLE, "Панель вывода", "Вид", "bool", True),
     Setting(OUTPUT_POSITION, "Панель вывода", "Вид", "choice",
@@ -618,11 +618,14 @@ class Settings:
     def palette(self) -> theme.Palette:
         """The colours of everything: the theme name, resolved (task_29).
 
-        `system` gives the *light* syntax palette: the platform colours the widgets,
-        and its page may be dark, which is exactly the half-done dark mode the
-        `dark` palette exists to avoid — so a user on a dark desktop says `dark`.
+        `system` means the desktop's own colours — the widget palette *and* the page
+        the syntax colours are measured against — so the answer comes from
+        `appearance`, the one module that knows Qt's colour scheme.  The import is
+        local: the store itself has nothing to do with widgets.
         """
-        return theme.palette_for(self.theme)
+        from . import appearance
+
+        return appearance.theme_palette(self.theme)
 
     # -- files -------------------------------------------------------------
     @property
