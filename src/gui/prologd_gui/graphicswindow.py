@@ -279,3 +279,18 @@ class GraphicsWindow(QWidget):
         event.ignore()
         self.hide()
         self.closed.emit()
+
+    def keyPressEvent(self, event) -> None:  # noqa: N802 - Qt spelling
+        """`Esc` closes the picture — the first thing in the window's order (task_48).
+
+        The window has a focus of its own (it can stand on a second screen), so the
+        main window's `Esc` handler never sees this key: the picture is what the
+        reader is looking at, and closing it is what `Esc` means there.  Going
+        through `close()` and not `hide()` keeps the two ways out the same one:
+        the main window is told, and its entry turns itself off.
+        """
+        if event.key() == Qt.Key.Key_Escape:
+            self.close()
+            event.accept()
+            return
+        super().keyPressEvent(event)

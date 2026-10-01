@@ -871,6 +871,125 @@ def test_the_output_can_be_saved(executable: str, directory: pathlib.Path) -> No
         discard_changes(window)
 
 
+def press_escape(widget) -> bool:
+    """One `Esc`, delivered the way a keyboard does: to the widget that has the focus.
+
+    The event is *accepted* only when something dealt with it — that is how the
+    order «the picture, then the bar, then the docks, then nothing» is checked,
+    and the last press has to come back `False`.
+    """
+    from PySide6.QtCore import QEvent, Qt
+    from PySide6.QtGui import QKeyEvent
+    from PySide6.QtWidgets import QApplication
+
+    event = QKeyEvent(
+        QEvent.Type.KeyPress, Qt.Key.Key_Escape, Qt.KeyboardModifier.NoModifier
+    )
+    QApplication.sendEvent(widget, event)
+    return event.isAccepted()
+
+
+def test_escape_closes_the_picture_then_the_bar_then_the_docks(executable: str) -> None:
+    """task_48: one key, four things, in the order the user asked for.
+
+    The order is what makes `Esc` predictable: the picture (the biggest thing on
+    the screen), then the find bar, then the reference, then the cheat sheet.  The
+    completion popup and the find bar's own field are *not* in the list — they
+    answer for themselves, and the window's handler never sees those keys.
+    """
+    window = empty_window(executable)
+    try:
+        picture = window.graphics_window()
+        window._actions["graphics"].setChecked(True)
+        window.show_find()
+        window.show_reference()
+        window.show_shortcuts()
+        assert picture.isVisible() is True
+        assert window.find_open() is True
+        assert window._reference_dock.isHidden() is False
+        assert window._shortcut_dock.isHidden() is False
+
+        view = window.editor()
+        assert press_escape(view) is True
+        assert picture.isVisible() is False, "the picture goes first"
+        assert window._settings.graphics_visible is False, "and the entry says so"
+        assert window.find_open() is True, "one key closes one thing"
+
+        assert press_escape(view) is True
+        assert window.find_open() is False, "then the find bar"
+        assert window._reference_dock.isHidden() is False
+
+        assert press_escape(view) is True
+        assert window._reference_dock.isHidden() is True, "then the reference"
+        assert window._shortcut_dock.isHidden() is False
+
+        assert press_escape(view) is True
+        assert window._shortcut_dock.isHidden() is True, "then the cheat sheet"
+
+        # Nothing is left, so the key is not ours any more.
+        assert press_escape(view) is False
+
+        # The picture has an `Esc` of its own: it has a focus of its own (it can
+        # stand on a second screen), and the window's handler never sees that key.
+        window._actions["graphics"].setChecked(True)
+        assert picture.isVisible() is True
+        assert press_escape(picture) is True
+        assert picture.isVisible() is False
+        assert window._actions["graphics"].isChecked() is False
+    finally:
+        discard_changes(window)
+    print("ok: Escape closes the picture, the bar and the two docks, in that order")
+
+
+def test_a_run_that_draws_opens_the_picture_by_itself(executable: str) -> None:
+    """task_48: the first primitive of a run brings the window up — once per run.
+
+    A student who runs a drawing program should see the picture without being told
+    where the window is — and a student who closed it during a long animation must
+    not be fought by the next hundred primitives.
+    """
+    window = empty_window(executable)
+    try:
+        assert window.graphics_available() is False, "nothing opened the picture yet"
+
+        # A program that draws shows its picture without being asked.
+        window.editor().setPlainText("?ТОЧКА(3, 4, 5).\n")
+        window._actions["run"].trigger()
+        assert pump(window, lambda: window.canvas().pixel(3, 4) == 5), window.output_text()
+        picture = window.graphics_window()
+        assert picture.isVisible() is True, "the first primitive must open the window"
+        assert window._actions["graphics"].isChecked() is True, "and the entry says so"
+        assert window._settings.graphics_visible is True
+
+        # A program that draws nothing must not open a window at all.
+        window._actions["graphics"].setChecked(False)
+        window.editor().setPlainText("?РАВНО(1, 1).\n")
+        window._actions["run"].trigger()
+        assert pump(window, lambda: "ДА" in window.output_text()), window.output_text()
+        assert picture.isVisible() is False, "nothing was drawn, so no window"
+
+        # Closing it during a run is the user's answer, and the rest of the run
+        # must not undo it: the second primitive arrives after the close.
+        window.editor().setPlainText("?ТОЧКА(1, 1, 1), ЖДИ(200), ТОЧКА(6, 6, 6).\n")
+        window._actions["run"].trigger()
+        assert pump(window, lambda: window.canvas().pixel(1, 1) == 1), window.output_text()
+        assert picture.isVisible() is True, "the run opened it"
+        picture.close()
+        assert picture.isVisible() is False
+        assert pump(window, lambda: window.canvas().pixel(6, 6) == 6), window.output_text()
+        assert picture.isVisible() is False, "a window the user closed stays closed"
+
+        # The next run opens it again: «once per run» is not «once per session».
+        window.editor().setPlainText("?ТОЧКА(8, 8, 8).\n")
+        window._actions["run"].trigger()
+        assert pump(window, lambda: window.canvas().pixel(8, 8) == 8), window.output_text()
+        assert picture.isVisible() is True
+        window.stop_program()
+    finally:
+        discard_changes(window)
+    print("ok: a run that draws opens the picture once, and a closed window stays closed")
+
+
 def test_the_menus_come_from_the_action_table(executable: str) -> None:
     """Every menu entry is an action of the table, in the order the table gives.
 
@@ -2661,6 +2780,8 @@ def main(argv: list[str]) -> int:
         test_split_and_merge_follow_the_pane_count(executable)
         test_the_output_panel_moves_and_hides(executable)
         test_the_graphics_window_follows_the_program(executable)
+        test_a_run_that_draws_opens_the_picture_by_itself(executable)
+        test_escape_closes_the_picture_then_the_bar_then_the_docks(executable)
         test_the_menus_come_from_the_action_table(executable)
         test_the_toolbar_reuses_the_actions(executable)
         test_view_switches_are_stored(executable)

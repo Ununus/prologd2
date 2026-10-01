@@ -201,6 +201,12 @@ class MainWindow(QMainWindow):
         #: never opens the window would be work nobody asked for.
         self._canvas: graphics.Canvas | None = None
         self._graphics_window: graphicswindow.GraphicsWindow | None = None
+        #: Whether this run has already had its say about the picture window
+        #: (task_48).  A run that draws shows its picture by itself — the first
+        #: primitive opens the window — but only once per run, so a 250-frame
+        #: animation cannot reopen the window the user just closed.  `run_program`
+        #: clears it; `show_graphics_window` sets it, whoever asked.
+        self._graphics_shown = False
         #: The `format` request that is in flight (task_30): what was sent, where
         #: it came from and where the caret stood.  The answer arrives as an
         #: event, so this state outlives the call that started it.
@@ -1224,6 +1230,9 @@ class MainWindow(QMainWindow):
             self._canvas.clear()
             if self._graphics_window is not None:
                 self._graphics_window.refresh()
+        # The new run may show the picture window again: the decision is taken at
+        # the first primitive of *this* run (task_48).
+        self._graphics_shown = False
         # After `start()`, not before: it stops a live session first, and the
         # `ended` event of that old process (delivered inside the stop) would
         # clear the flags just set — a restart is not an unload, and the new
@@ -1295,10 +1304,17 @@ class MainWindow(QMainWindow):
         Opening a window that is *not* the interpreter's only subscriber is why
         the snapshot exists: the program may have drawn half a picture while this
         window did not exist, and the interpreter still holds every pixel of it.
+
+        Showing it also marks this run as «the window was brought up», whichever
+        way it was shown (the entry, the settings, or the first primitive of a
+        run): that is what keeps a window the user closed closed (task_48).  Hiding
+        it does not clear the mark — closing the window *is* the gesture that must
+        not be answered by reopening it.
         """
         window = self.graphics_window()
         visible = bool(visible)
         if visible:
+            self._graphics_shown = True
             window.restore_geometry(self._settings.graphics_geometry)
             window.show()
             window.raise_()
@@ -1314,9 +1330,25 @@ class MainWindow(QMainWindow):
         )
 
     def _on_drawn(self, event: dict) -> None:
-        """One primitive reached the window (protocol 10)."""
+        """One primitive reached the window (protocol 10).
+
+        A program that draws without being asked shows its picture: the first
+        primitive of a run brings the window up (task_48).  The moment is the
+        first *primitive* rather than the start of the run because it is the first
+        moment there is something to see — a program that draws nothing must not
+        open a window — and the decision is taken once per run: a window the user
+        closed during an animation stays closed, and the next run opens it again.
+
+        What was drawn before this window existed is not lost: the program's
+        pixels live in the interpreter, and opening a window mid-run asks for the
+        snapshot (that is why `show_graphics_window` requests one).
+        """
+        if not self._graphics_shown:
+            self._graphics_shown = True
+            if self._graphics_window is None or not self._graphics_window.isVisible():
+                self.show_graphics_window(True)
         if self._canvas is None:
-            return  # nobody has opened the picture yet; a snapshot will catch up
+            return  # the snapshot is on its way; the next primitive draws
         self._canvas.draw(event)
         if self._graphics_window is not None:
             self._graphics_window.refresh()
@@ -2060,6 +2092,45 @@ class MainWindow(QMainWindow):
                 event.ignore()
         finally:
             self._closing = False
+
+    # -- keys ---------------------------------------------------------------
+    def keyPressEvent(self, event) -> None:  # noqa: N802 - Qt spelling
+        """`Esc` closes what is in the way, in one order (task_48).
+
+        The graphics window, then the find bar, then the reference dock, then the
+        cheat sheet: the thing a reader just put on the screen is the thing they
+        want gone, and the picture is the biggest of them.
+
+        Handled by *propagation*, not by a `QShortcut`.  A shortcut is processed
+        before the focused widget, and it would take `Esc` away from the
+        completion popup (which closes on `Esc`) and from the find bar's own
+        field: those two answer for themselves, and what is left lands here.
+        """
+        if event.key() == Qt.Key.Key_Escape and self._escape_closes_something():
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+    def _escape_closes_something(self) -> bool:
+        """One step of the `Esc` order; False when there is nothing to close.
+
+        The graphics window counts as «in the way» only while it is on screen —
+        closing it is the same gesture as unticking the entry, so the state is
+        remembered the way the entry remembers it.
+        """
+        if self._graphics_window is not None and self._graphics_window.isVisible():
+            self.show_graphics_window(False)
+            return True
+        if self.find_open():
+            self.close_find()
+            return True
+        if not self._reference_dock.isHidden():
+            self._reference_dock.hide()
+            return True
+        if not self._shortcut_dock.isHidden():
+            self._shortcut_dock.hide()
+            return True
+        return False
 
     # -- commands that act on the current tab ------------------------------
     def _comment(self) -> None:

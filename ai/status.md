@@ -116,7 +116,7 @@ control back on the toolbar).
 | task_45_gui_graphics_window | done | the graphics predicates are *visible*: `BitmapGraphicsBackend` inside the engine (a 1024×768 buffer that answers `getPixel` locally and performs `ЗАКРАСКА` itself, reporting every primitive), protocol **10** (`graphics` events and `{"cmd":"graphics","snapshot":true}` → `bitmap`), a Qt-free `graphics.Canvas` with the palette, and `graphicswindow.GraphicsWindow` — a window of its own with «Вписать в окно»/«1 : 1», «Очистить», «Сохранить как PNG…» and a cell readout; the last disabled menu entry is gone (ADR-022).  The by-hand look at `examples/drawing.pld` found two defects (the ellipse was read as a box; an untouched canvas was transparent) |
 | task_46_interpreter_options_and_limits | in progress | the limits are in: `Limits` + `applyTo` in the engine, `--max-findall`, protocol **9** (`limits` on `load`, a bad field is an `error` instead of a dead session), four dialog rows and a front-end deadline.  The core has **no limits of its own** (0 = «без предела», messages name a limit and its value only — ADR-020) and the window ships 0 / 1 000 000 / 1 000 000 / 0.  Still open: the interpreter path, the process directory, profiles, and `--timeout-ms` (a text-mode deadline would need a clock in the solver).  The last item of task_29's settings list, split out on 2026-10-01 |
 | task_47_lessons_and_formatting | done | the corpus in one style and the formatter's round of fixes: 21 of the 25 shipped programs reformatted by `prologd --format` (soft, 80, one tab) with a new check that every shipped program *is* the standard shape, so the style cannot drift again; the hard mode puts the head of a clause on a line of its own (the first goal was the one glued to the head); the format mode returns to the toolbar right after «Форматировать» (icon `edit-format-set`) and leaves «Правка»; lesson 12's animation is a click away (`%?`) with a two-frame version runs in the check; and the reformat taught the formatter a rule — a **query and a directive are never broken**, because the margin marker that runs them is line-local (the pinned question counts caught it) |
-| task_48_interface_cleanup | in progress | the first half is in: five pictures left the tree (`help-about`, the two `search-find-selected-*`, `view-toolbar`, `view-line-numbers`), `assets.MISSING` is down to four names, «Сохранить все» left the toolbar, the two «Найти выделенное» commands left «Поиск».  Still to do: Escape closing the graphics window → the find bar → the reference dock → the shortcut sheet in that order, and the graphics window opening itself on the first primitive of a run |
+| task_48_interface_cleanup | done | the round of small things the user asked for: five pictures left the tree (`help-about` — the same drawing as `prologd2`, the two `search-find-selected-*`, `view-toolbar`, `view-line-numbers`), `assets.MISSING` is down to four names, «Сохранить все» left the toolbar, the two «Найти выделенное» commands left «Поиск» with their icons; `Esc` now closes the graphics window → the find bar → the reference dock → the cheat sheet (one handler on the window, by *propagation*, so the completion popup and the find bar's field keep answering for themselves), and the graphics window opens itself on the **first primitive of a run** — once per run, so a window closed during an animation stays closed (task_45's window plus `_graphics_shown`) |
 | task_49_gui_defects | not started | three defects found by using the window: `Шаг → Стоп → Запуск` answers «нет шага, который ждёт ответа» (a finished run leaves `_paused` set), a second unnamed tab comes back modified after a restore, and «Запустить с трассировкой» on a deep recursion freezes the window (the output pane's per-line trim and repaints); plus live output — a countdown should print as it goes, not when the program ends |
 
 ## Test suite
@@ -181,11 +181,12 @@ plain scripts.
    The graphics window (`task_45_gui_graphics_window.md`) is done, and task_29's
    own list is closed: «использовать системные цвета» was done with the three
    themes, and **RU/EN was dropped** on 2026-10-01 (ADR-021 — the window stays
-   Russian).  Two of the user's ten «недочётов» are written down and half done:
-   `task_47_lessons_and_formatting.md` (done) and
-   `task_48_interface_cleanup.md` (the second half — Escape's order and the
-   graphics window opening itself on the first primitive of a run), and the three
-   defects of using the window are `task_49_gui_defects.md`.
+   Russian).  Two of the user's ten «недочётов» are written down and both are
+   done: `task_47_lessons_and_formatting.md` and
+   `task_48_interface_cleanup.md` (its one loose end is the by-hand look at the
+   redrawn icons in the dark theme, the user's own).  What is left of that batch
+   are the three defects of using the window, `task_49_gui_defects.md`, and the
+   live output they ask for.
 
 ## Open questions for the user
 
@@ -1416,3 +1417,35 @@ Added on 2026-10-02 while implementing task_31:
   с несохранёнными правками, открывает настоящий модальный вопрос и вешает прогон
   — проверять восстановление сессии надо через `_store_session` и второй
   `MainWindow`, а не через закрытие первого.
+* GUI round, part 45: **task_48 — вторая половина: один `Esc` и окно, которое
+  открывается само**.  Просьба была ровно такой: «`Esc` закрывает окна и панели в
+  порядке: графическое окно → поиск и замена → справка по предикату → шпаргалка по
+  вставкам» и «окно графики открывается само при первом рисующем примитиве
+  запуска, и больше в этом запуске никогда».
+  **`Esc`.**  Обработчик один и живёт на главном окне (`MainWindow.keyPressEvent`
+  плюс `_escape_closes_something`), а порядок — это цепочка `if`: графическое окно,
+  полоса поиска, панель справки, шпаргалка; когда ничего из этого нет, клавиша не
+  наша, и событие уходит дальше — тест это различает, потому что нажатие считается
+  обработанным только тогда, когда что-то закрылось.  Сделано **распространением
+  события**, а не `QShortcut`, и это не деталь: сочетание клавиш обрабатывается
+  *раньше* виджета с фокусом и отобрало бы `Esc` у списка подсказок (он закрывается
+  по `Esc`) и у поля «Найти» (там клавишу и нажали, поэтому закрыть полосу — это
+  то, что она значит).  Эти два места отвечают за себя сами, до окна такая клавиша
+  не доходит, и так и записано в `doc/gui.typ` §4.1.  У графического окна свой
+  `Esc`: у него своя клавиатурная фокусность (оно может стоять на втором экране),
+  и до главного окна эта клавиша не доходит; закрывается оно через `close()`, то
+  есть тем же путём, что и крестик, — с галочкой в меню они не расходятся.
+  **Окно, которое открывается само.**  `_on_drawn` показывает окно, если флаг
+  `_graphics_shown` пуст; флаг очищает `run_program`, ставит `show_graphics_window`
+  (кто бы ни показал — галочка, настройки или сам запуск), а скрытие окна его не
+  очищает.  Из этого и получаются обе половины просьбы: рисунок виден без поиска
+  галочки, а окно, закрытое во время длинной анимации, остаётся закрытым до конца
+  прогона.  Момент выбран по первой *фигуре*, а не по началу прогона: программа,
+  которая ничего не рисует, окна не открывает.  Догонять пропущенное не пришлось —
+  `show_graphics_window` и так спрашивает снимок, так что окно, открытое на
+  середине рисунка, получает его целиком.
+  Тесты: два новых в `test_window.py` — по одному на половину.  Порядок `Esc`
+  проверяется настоящим нажатием в *редактор* (чтобы шло распространение события),
+  а «закрытое окно не открывается снова» — программой `?ТОЧКА(1, 1, 1),
+  ЖДИ(200), ТОЧКА(6, 6, 6).`: закрытие приходится *между* двумя фигурами, иначе
+  проверка прошла бы и без флага.  267/267 ctest, 21 headless-скрипт GUI, пять PDF.

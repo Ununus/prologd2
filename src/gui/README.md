@@ -423,6 +423,16 @@ open asks for the whole screen when it opens (`{"cmd":"graphics","snapshot":true
 on first use, and the events of a run nobody watched are simply not needed — the
 snapshot has them.
 
+Since task_48 the run shows its own picture: the **first primitive of a run**
+brings the window up, so a student who runs a drawing program does not have to
+find the entry first.  The moment is the first primitive rather than the start of
+the run because that is when there is something to see — a program that draws
+nothing opens no window — and `_graphics_shown` makes it **once per run**, so the
+next hundred primitives of an animation cannot reopen a window the user closed
+(`run_program` clears the flag; `show_graphics_window(True)` sets it, whoever
+asked).  The window also closes on its own `Esc`: it has a focus of its own — it
+can stand on a second screen — and the main window's handler never sees that key.
+
 ## The output panel
 
 The output — with the input queue under it — is *one* panel inside a single
@@ -563,6 +573,27 @@ would make its own message a lie.  «Заменить всё» is **one undo ste
 (`beginEditBlock` around the whole replacement), so `Ctrl+Z` undoes the lot; the
 count is recomputed while the text is edited under the bar, and that never moves
 the caret — typing in the program must not throw the cursor into the next match.
+
+### One Escape order (task_48)
+
+`Esc` closes what is in the way, in one order: the **graphics window**, then the
+**find bar**, then the **reference dock**, then the **cheat sheet** — the biggest
+thing on the screen first.  With none of them open the key is not ours: the event
+is left alone, and a test can tell the two cases apart (the click is *accepted*
+only when something answered it).
+
+`MainWindow.keyPressEvent` implements it, and that choice is the design: a
+`QShortcut` is processed **before** the focused widget and would take `Esc` away
+from the two places that answer for themselves — the completion popup (which closes
+on `Esc`) and the find bar's own field (where the key was pressed, so closing the
+bar is what it means).  Those two never reach the window's handler; everything
+else propagates up to it.
+
+The graphics window has an `Esc` of its own, because it has a keyboard focus of its
+own — it is a top-level window and can stand on a second screen — and the main
+window's handler never sees keys delivered there.  It closes through `close()`, the
+same path as the title bar's ✕: the picture is kept, and the entry in the menu
+turns itself off.
 
 ## Formatting a program
 
@@ -920,6 +951,11 @@ One piece of work is planned in a task file of its own (`ai/task_*.md`):
   them plus «Предел времени, с», and a run names the rows it goes with before it
   starts.  Still open: the path to the interpreter (still `--exe`), the working
   directory of the process, and named profiles.
+* **Three defects found by using the window** — `ai/task_49_gui_defects.md`:
+  `Шаг → Стоп → Запуск` answering «нет шага, который ждёт ответа», a second
+  unnamed tab coming back modified after a restore, «Запустить с трассировкой»
+  freezing the window on a deep recursion — and the live output they ask for, so a
+  countdown prints as it counts instead of when the program ends.
 
 The graphics window left this list in task_45: the engine keeps the pixels, the
 session draws them and sends every primitive, and `graphicswindow.py` shows the
