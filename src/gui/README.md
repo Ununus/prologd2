@@ -53,7 +53,7 @@ measured against the page it is really drawn on (WCAG AA, 4.5, in
 `test_appearance.py`).  Switching the theme re-colours the text already in the
 output pane too, so a dark window never holds light-theme red on a dark page.
 
-`system` — «как в системе», the last of the three — follows the desktop
+`system` — «системное», the last of the three — follows the desktop
 *completely*: the platform's widget palette and style are put back, and the syntax
 colours resolve to the palette that goes with the desktop's colour scheme
 (`appearance.theme_palette`).  A dark desktop therefore gets a dark window **and**
@@ -237,7 +237,7 @@ The menus are **Файл** (Новый, Открыть…, Последние, �
 инструментов, Панель вывода, Поле очереди ввода, Разделить редактор, Объединить
 редакторы, Сменить ориентацию сплита, Номера строк, Переносить длинные строки,
 Увеличить/Уменьшить/Обычный размер шрифта, Оформление (подменю: светлое, тёмное,
-как в системе), Полный экран), **Выполнение** (Запустить, Запустить с
+системное), Полный экран), **Выполнение** (Запустить, Запустить с
 трассировкой, Шаг, Шаг с обходом, Остановить, Сохранять перед запуском, Выводить
 вопросы при запуске, Графическое окно) and
 **Справка** (Справка по предикату, Шпаргалка по вставкам, Руководство
@@ -709,7 +709,7 @@ every record has a widget and every widget writes its key.
 | Редактор | font family and size, line numbers, the current-line band, word wrap, tabs or spaces and the width, auto-indent, completion (on/off, after how many letters, `Учитывать регистр`) |
 | Вид | theme (light, dark or system), toolbar, the output panel (shown, right or bottom), the input queue field, where a program's input question is asked (console or dialog), the output's font size, its line limit and whether it follows the end |
 | Формат | the formatter's mode, width, indent and unit, «только выделенное» |
-| Выполнение | whether a run answers the program's own `?`-questions, save before run, the four limits (steps, depth, НАЙТИВСЕ solutions, seconds), **the interpreter path** (empty = the one the window was started with), **the process directory** (the running file's folder, the window's folder, or a fixed one — `ЗАПИСЬ_В`/`ЧТЕНИЕ_ИЗ` open relative to it), the shared folder for `ИМПОРТ`, more `-I` folders |
+| Выполнение | whether a run answers the program's own `?`-questions, save before run, the four limits (steps, depth, НАЙТИВСЕ solutions, milliseconds), **the interpreter path** (empty = the one the window was started with), **the process directory** (the running file's folder, the window's folder, or a fixed one — `ЗАПИСЬ_В`/`ЧТЕНИЕ_ИЗ` open relative to it), the `ИМПОРТ` search folders |
 | Файлы | autosave in minutes (0 = off), how many recent files to remember, restoring the open tabs at start-up |
 | Вставки | the live `Ctrl`+key table (task_31), the settings file path, «Вернуть встроенную таблицу» |
 
@@ -882,7 +882,7 @@ the run with a diagnostic that names the limit and its value («Превышен
 nor a dialog row (ADR-020) — so the *window* answers «where do I raise it»: the
 run prints «пределы: «Предел шагов» 5000 — строки в «Выполнении» настроек» before
 it starts, in the words of the rows.  The `НАЙТИВСЕ` cap is a *diagnostic*, never a
-silently shortened list.  The window's «Предел времени, с» is not in this object:
+silently shortened list.  The window's «Предел времени, мс» is not in this object:
 the deadline belongs to the front-end (a timer and the `interrupt` request), which
 keeps a clock out of the solver's hot loop — and a program waiting *outside* the
 solver (a `ВВОД` nobody answers) is not preempted by it at all.  A request with a
@@ -1006,7 +1006,7 @@ One piece of work is planned in a task file of its own (`ai/task_*.md`):
 * **Interpreter options, profiles and limits** —
   `ai/task_46_interpreter_options_and_limits.md`.  The limits are done: the
   session carries them on `load` (protocol 9), the dialog has a row for each of
-  them plus «Предел времени, с», and a run names the rows it goes with before it
+  them plus «Предел времени, мс», and a run names the rows it goes with before it
   starts.  The interpreter path and the process directory are done too (2026-10-02):
   `execution/interpreter` picks the binary (empty = `--exe`, which stays the
   fallback), `execution/process_directory` picks where the child starts, «Применить»

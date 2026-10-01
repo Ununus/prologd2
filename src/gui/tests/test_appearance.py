@@ -175,7 +175,7 @@ def test_the_settings_store_resolves_the_three_names(directory: pathlib.Path) ->
     assert settings.palette is appearance.theme_palette(appearance.SYSTEM)
     settings.theme = "полночь"
     assert settings.palette is theme.LIGHT, "a hand-edited name must not be dark"
-    print("ok: the store resolves «светлое», «тёмное» and «как в системе»")
+    print("ok: the store resolves «светлое», «тёмное» and «системное»")
 
 
 def main() -> int:

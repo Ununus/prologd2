@@ -195,10 +195,10 @@ def test_the_folder_rows_and_the_insert_page(directory: pathlib.Path) -> None:
     remove.click()
     assert editor.paths() == [], "«Убрать» did not remove the selected row"
 
-    # The working folder is a plain field with a «…» button beside it.
-    field = dialog._widgets[keys["execution/working_directory"].key]
+    # The process folder is a plain field with a «…» button beside it.
+    field = dialog._widgets[keys["execution/process_directory_path"].key]
     dialog._ask_directory = lambda: "C:/общие"
-    dialog._browse(keys["execution/working_directory"].key)
+    dialog._browse(keys["execution/process_directory_path"].key)
     assert field.text() == "C:/общие"
 
     # The insert page shows the live table and can put the built-in one back.
@@ -232,6 +232,22 @@ def test_the_interpreter_and_process_directory_rows(directory: pathlib.Path) -> 
     values = [combo.itemData(row) for row in range(combo.count())]
     assert values == ["file", "window", "custom"], values
     print("ok: the interpreter row asks for a file, the directory row is a three-way choice")
+
+
+def test_the_process_directory_path_follows_its_choice(directory: pathlib.Path) -> None:
+    """«Свой каталог процесса» is inactive until «свой каталог» is chosen."""
+    dialog = dialog_for(directory, "dir_switch.ini")
+    keys = {setting.key: setting for setting in settings_module.SETTINGS}
+    combo = dialog._widgets[keys["execution/process_directory"].key]
+    holder = dialog._row_holders[keys["execution/process_directory_path"].key]
+
+    assert combo.currentData() == "file"
+    assert holder.isEnabled() is False, "the path row is active without «свой каталог»"
+    combo.setCurrentIndex(combo.findData("custom"))
+    assert holder.isEnabled() is True, "«свой каталог» did not enable the path row"
+    combo.setCurrentIndex(combo.findData("window"))
+    assert holder.isEnabled() is False
+    print("ok: the process-directory path is inactive until «свой каталог» is chosen")
 
 
 def test_applying_announces_itself(directory: pathlib.Path) -> None:
@@ -289,7 +305,7 @@ def test_the_button_row_and_the_shared_label_column(directory: pathlib.Path) -> 
         )
 
     labels = [label.text() for label in dialog._labels]
-    assert "Шрифт:" in labels and "Рабочая папка (ИМПОРТ):" in labels, labels[:4]
+    assert "Шрифт:" in labels and "Дополнительные каталоги ИМПОРТ:" in labels, labels[:4]
     print(f"ok: the buttons are ordered as asked, and every page's labels take {width} px")
 
 
@@ -310,6 +326,7 @@ def main(argv: list[str]) -> int:
         test_export_writes_a_file_another_store_can_read(directory)
         test_the_folder_rows_and_the_insert_page(directory)
         test_the_interpreter_and_process_directory_rows(directory)
+        test_the_process_directory_path_follows_its_choice(directory)
         test_the_button_row_and_the_shared_label_column(directory)
         test_applying_announces_itself(directory)
     del application

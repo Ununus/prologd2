@@ -34,7 +34,7 @@ THEMES = (LIGHT, DARK, SYSTEM)
 
 #: What the platform installed, read on the first `apply_theme` — before this
 #: module puts anything of its own in place, which is the only moment the answer is
-#: honest.  `system` puts these back, so that choice really is «как в системе» and
+#: honest.  `system` puts these back, so that choice really is «системное» and
 #: not «Fusion with whatever palette was last in place».
 #:
 #: The style is remembered by **name**: installing another style makes Qt *delete*

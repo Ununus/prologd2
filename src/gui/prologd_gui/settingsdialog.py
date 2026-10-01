@@ -78,15 +78,13 @@ class PathListEditor(QWidget):
         self._list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self._list.setMinimumHeight(72)
         add = QToolButton(self)
-        add.setText("Добавить…")
-        add.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        add.setToolTip("Добавить…")
         add_picture = assets.icon(actions.ADD_ICON)
         if add_picture is not None:
             add.setIcon(add_picture)
         add.clicked.connect(self._add)
         remove = QToolButton(self)
-        remove.setText("Убрать")
-        remove.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        remove.setToolTip("Убрать")
         remove_picture = assets.icon(actions.REMOVE_ICON)
         if remove_picture is not None:
             remove.setIcon(remove_picture)
@@ -171,6 +169,10 @@ class SettingsDialog(QDialog):
         #: An imported file that has not been applied yet.  «Отмена» drops it.
         self._staged: dict[str, object] = {}
         self._widgets: dict[str, QWidget] = {}
+        #: The row wrapper of a `directory`/`file` setting — the field *with* its
+        #: «…» button — keyed the same way as `_widgets`, so a row that follows
+        #: another can be enabled and disabled as one piece (task_46).
+        self._row_holders: dict[str, QWidget] = {}
         self._sections: dict[str, int] = {}
         self._build()
         self.reload()
@@ -200,6 +202,7 @@ class SettingsDialog(QDialog):
                 field: QWidget = widget
                 if setting.kind in ("directory", "file"):
                     field = self._with_browse(setting, widget)
+                    self._row_holders[setting.key] = field
                 # Every value fills its column, so the right edge of the fields is
                 # one line on the page; a checkbox stays its own size and sits at
                 # the left edge of that column, which is where it is ticked.
@@ -217,6 +220,14 @@ class SettingsDialog(QDialog):
             self._nav.addItem(section)
         self._build_inserts_page()
         self._align_columns()
+        # «Свой каталог процесса» follows the choice above it: inactive until
+        # «свой каталог» is selected, and `reload` (which fills the combo) then
+        # fires the change signal and settles the state again (task_46).
+        self._sync_process_directory_path()
+        process_combo = self._widgets[settings_module.PROCESS_DIRECTORY]
+        process_combo.currentIndexChanged.connect(
+            lambda _index: self._sync_process_directory_path()
+        )
         self._nav.currentRowChanged.connect(self._pages.setCurrentIndex)
         self._nav.setCurrentRow(0)
 
@@ -260,6 +271,19 @@ class SettingsDialog(QDialog):
 
     def _rows(self, section: str) -> list[settings_module.Setting]:
         return [entry for entry in settings_module.SETTINGS if entry.section == section]
+
+    def _sync_process_directory_path(self) -> None:
+        """`«Свой каталог процесса»` is editable only for the `custom` answer.
+
+        The path row follows the choice above it: `каталог файла` and `рабочая
+        папка окна` leave no path to type, so the field — and its «…» button —
+        is inactive until «свой каталог» is chosen (task_46).
+        """
+        combo = self._widgets.get(settings_module.PROCESS_DIRECTORY)
+        holder = self._row_holders.get(settings_module.PROCESS_DIRECTORY_PATH)
+        if combo is None or holder is None:
+            return
+        holder.setEnabled(combo.currentData() == "custom")
 
     def _make_widget(self, setting: settings_module.Setting) -> QWidget:
         """The widget a record asks for, by its `kind`."""

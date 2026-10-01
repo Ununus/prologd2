@@ -277,7 +277,6 @@ def test_the_new_keys_have_the_documented_defaults(directory: pathlib.Path) -> N
     assert settings.completion_match_case is True
     assert settings.autosave_minutes == 0, "autosave is off until it is asked for"
     assert settings.recent_limit == settings_module.DEFAULT_RECENT_LIMIT
-    assert settings.working_directory == ""
     assert settings.import_paths == []
     assert settings.auto_indent is True, "the editor indents until told otherwise"
     assert settings.follow_output is True, "the pane followed the end before the switch"
@@ -291,9 +290,9 @@ def test_the_new_keys_have_the_documented_defaults(directory: pathlib.Path) -> N
     assert settings_module.DEFAULT_MAX_STEPS == 0, "no step cap out of the box"
     assert settings_module.DEFAULT_MAX_DEPTH == 1_000_000
     assert settings_module.DEFAULT_MAX_FINDALL == 1_000_000
-    assert settings_module.DEFAULT_TIMEOUT_SECONDS == 0, "no clock out of the box"
+    assert settings_module.DEFAULT_TIMEOUT_MILLISECONDS == 0, "no clock out of the box"
     assert settings.max_steps == 0, "no step limit until one is asked for"
-    assert settings.timeout_seconds == 0, "no deadline until one is asked for"
+    assert settings.timeout_milliseconds == 0, "no deadline until one is asked for"
     assert settings.max_depth == settings_module.DEFAULT_MAX_DEPTH
     assert settings.max_findall == settings_module.DEFAULT_MAX_FINDALL
     assert settings.limits() == {
@@ -304,8 +303,8 @@ def test_the_new_keys_have_the_documented_defaults(directory: pathlib.Path) -> N
     assert settings.limits()["maxSteps"] == 5000
     settings.max_steps = -5
     assert settings.max_steps == 0, "a negative limit is not a limit"
-    settings.timeout_seconds = 99_999
-    assert settings.timeout_seconds == settings_module.MAXIMUM_TIMEOUT_SECONDS
+    settings.timeout_milliseconds = 99_999_999
+    assert settings.timeout_milliseconds == settings_module.MAXIMUM_TIMEOUT_MILLISECONDS
     settings.input_mode = "диалог"
     assert settings.input_mode == settings_module.DEFAULT_INPUT_MODE, "junk falls back"
     settings.output_font_size = 100

@@ -78,7 +78,7 @@ The JSON session exposed **none** of the limits until protocol 9: `load` carried
       — the right-hand side of the status bar, next to the run state.
 - [x] **The GUI rows** for the limits: `execution/max_steps` → «Предел шагов»,
       `execution/max_depth` → «Предел глубины», `execution/max_findall` → «Предел
-      решений НАЙТИВСЕ», `execution/timeout_seconds` → «Предел времени, с»; all
+      решений НАЙТИВСЕ», `execution/timeout_milliseconds` → «Предел времени, мс»; all
       four `0 = без предела`, and the three solver limits are sent with every
       `load`.  The window's own defaults are **0 / 1 000 000 / 1 000 000 / 0**: the
       decision about what is safe for a lesson is the window's, since the core
@@ -106,7 +106,7 @@ The JSON session exposed **none** of the limits until protocol 9: `load` carried
   The engine counts steps and never looks at a clock: a `steady_clock::now()` in
   the solver's hot path is a cost paid for every solution, and it is the front-end
   that knows what «too slow for a lesson» means anyway.  So the window arms a
-  `QTimer` for the run and, when it fires, prints «--- предел времени: N с,
+  `QTimer` for the run and, when it fires, prints «--- предел времени: N мс,
   остановлено ---» and sends the ordinary `interrupt` request.  Consequences, both
   pinned by tests: a *computing* program stops on the deadline (the engine polls
   the stop flag at every step, as it already did for «Остановить»), while a

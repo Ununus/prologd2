@@ -172,9 +172,10 @@ class MainWindow(QMainWindow):
         self._stop_grace = QTimer(self)
         self._stop_grace.setSingleShot(True)
         self._stop_grace.timeout.connect(self._stop_expired)
-        #: The deadline of a *run* (task_46): `execution/timeout_seconds` measured
-        #: by the window, because the engine's hot loop must stay clock-free.  When
-        #: it fires the run is asked to stop the same way the button asks.
+        #: The deadline of a *run* (task_46): `execution/timeout_milliseconds`
+        #: measured by the window, because the engine's hot loop must stay
+        #: clock-free.  When it fires the run is asked to stop the same way the
+        #: button asks.
         self._timeout = QTimer(self)
         self._timeout.setSingleShot(True)
         self._timeout.timeout.connect(self._on_timeout)
@@ -688,7 +689,7 @@ class MainWindow(QMainWindow):
         for value, entry_title in (
             (appearance.LIGHT, "Светлое"),
             (appearance.DARK, "Тёмное"),
-            (appearance.SYSTEM, "Как в системе"),
+            (appearance.SYSTEM, "Системное"),
         ):
             entry = menu.addAction(entry_title)
             entry.setCheckable(True)
@@ -1477,8 +1478,8 @@ class MainWindow(QMainWindow):
             (self._settings.max_depth, settings.DEFAULT_MAX_DEPTH, "«Предел глубины»"),
             (self._settings.max_findall, settings.DEFAULT_MAX_FINDALL,
              "«Предел решений НАЙТИВСЕ»"),
-            (self._settings.timeout_seconds, settings.DEFAULT_TIMEOUT_SECONDS,
-             "«Предел времени, с»"),
+            (self._settings.timeout_milliseconds, settings.DEFAULT_TIMEOUT_MILLISECONDS,
+             "«Предел времени, мс»"),
         ):
             if value == default:
                 continue
@@ -1499,17 +1500,17 @@ class MainWindow(QMainWindow):
         keeps waiting — «Остановить» is what ends a program like that.
         """
         self._timeout.stop()
-        seconds = self._settings.timeout_seconds
-        if seconds > 0:
-            self._timeout.start(seconds * 1000)
+        milliseconds = self._settings.timeout_milliseconds
+        if milliseconds > 0:
+            self._timeout.start(milliseconds)
 
     def _on_timeout(self) -> None:
         """The run outlived its deadline: ask the interpreter to stop solving."""
         if not self._busy:
             return
-        seconds = self._settings.timeout_seconds
-        self._append_note(f"--- предел времени: {seconds} с, остановлено ---\n")
-        self._status.setText(f"остановлено по времени (предел {seconds} с)")
+        milliseconds = self._settings.timeout_milliseconds
+        self._append_note(f"--- предел времени: {milliseconds} мс, остановлено ---\n")
+        self._status.setText(f"остановлено по времени (предел {milliseconds} мс)")
         self._session.interrupt()
 
     def format_document(self) -> None:
@@ -2928,16 +2929,13 @@ class MainWindow(QMainWindow):
     def _import_directories(self) -> list[str]:
         """The `-I` directories of the next session: command line, then settings.
 
-        The working folder of task_29 and the list under it are *search*
-        directories for `ИМПОРТ`, not the working directory of the process, and
-        they are passed exactly like `--include`: the engine tries the importing
-        file's own folder first, so a local `lib/x.pld` still wins over a
-        same-named file in the shared folder.
+        «Дополнительные каталоги ИМПОРТ» is a *search* list for `ИМПОРТ`, not the
+        working directory of the process, and it is passed exactly like
+        `--include`: the engine tries the importing file's own folder first, so a
+        local `lib/x.pld` still wins over a same-named file in a shared one
+        (task_46 folded the single «Рабочая папка» row into this list).
         """
         directories = list(self._command_line_includes)
-        working = self._settings.working_directory.strip()
-        if working:
-            directories.append(working)
         directories.extend(self._settings.import_paths)
         seen: set[str] = set()
         result: list[str] = []

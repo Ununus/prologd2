@@ -98,10 +98,9 @@ FOLLOW_OUTPUT = "view/follow_output"
 #: Where the program's own input questions are answered (task_27 has both ways):
 #: in the console field under the output, or in a modal box per question.
 INPUT_MODE = "view/input_mode"
-#: The one folder the user keeps shared sources in (task_29): passed as `-I`
-#: on every session, so `ИМПОРТ("library.pld")` works from any program.
-WORKING_DIRECTORY = "execution/working_directory"
-#: More `-I` folders, in the order the engine will search them.
+#: The folders `ИМПОРТ` searches, in the order the engine tries them (task_29;
+#: task_46 folded the single «Рабочая папка» row into this list in 2026-10-02 —
+#: one list instead of a folder plus a list).
 IMPORT_PATHS = "execution/import_paths"
 #: Whether a run also answers the program's own `?`-statements — the `questions`
 #: flag of `load` (protocol 5).  Off, a lesson is loaded as rules only, which is
@@ -116,11 +115,11 @@ RUN_QUESTIONS = "execution/run_questions"
 MAX_STEPS = "execution/max_steps"
 MAX_DEPTH = "execution/max_depth"
 MAX_FINDALL = "execution/max_findall"
-#: The wall-clock timeout in seconds; `0` is off.  Checked by the *window*, not
-#: by the engine: it is a property of the run, and the front-end already owns the
-#: polite-stop machinery (`interrupt`), which also keeps a clock out of the
+#: The wall-clock timeout in milliseconds; `0` is off.  Checked by the *window*,
+#: not by the engine: it is a property of the run, and the front-end already owns
+#: the polite-stop machinery (`interrupt`), which also keeps a clock out of the
 #: solver's hot loop.
-TIMEOUT_SECONDS = "execution/timeout_seconds"
+TIMEOUT_MILLISECONDS = "execution/timeout_milliseconds"
 #: Which `prologd` the window runs (task_46).  Empty means «the one the window
 #: was started with» — `--exe`, itself auto-detected when left out.  A row that
 #: names another build takes effect at the next session start, and the status
@@ -129,8 +128,9 @@ INTERPRETER = "execution/interpreter"
 #: Where the *process* starts (task_46): `ЗАПИСЬ_В`, `ЧТЕНИЕ_ИЗ` and the other
 #: relative paths open from this folder.  Three answers: the running file's
 #: folder, the window's own folder, or a fixed one (`PROCESS_DIRECTORY_PATH`).
-#: Not the same thing as `WORKING_DIRECTORY` — that row is a search directory
-#: for `ИМПОРТ`, this one is the working directory of the child process.
+#: Not the `-I` search folders of «Дополнительные каталоги ИМПОРТ» — those are
+#: *search* directories for the import; this one is the working directory of the
+#: child process.
 PROCESS_DIRECTORY = "execution/process_directory"
 PROCESS_DIRECTORY_PATH = "execution/process_directory_path"
 
@@ -202,8 +202,8 @@ DEFAULT_MAX_DEPTH = 1_000_000
 MAXIMUM_MAX_DEPTH = 10_000_000
 DEFAULT_MAX_FINDALL = 1_000_000
 MAXIMUM_MAX_FINDALL = 100_000_000
-DEFAULT_TIMEOUT_SECONDS = 0
-MAXIMUM_TIMEOUT_SECONDS = 3_600
+DEFAULT_TIMEOUT_MILLISECONDS = 0
+MAXIMUM_TIMEOUT_MILLISECONDS = 3_600_000
 
 #: task_46's process directory: where a program's relative file paths point.
 #: `file` is the folder of the running file (a new, unsaved buffer falls back to
@@ -277,8 +277,8 @@ SETTINGS: tuple[Setting, ...] = (
     # -- view
     Setting(THEME, "Оформление", "Вид", "choice", DEFAULT_THEME,
             choices=(("light", "светлое"), ("dark", "тёмное"),
-                     ("system", "как в системе — системные цвета")),
-            hint="Тёмное — своя палитра подсветки и своя страница; «как в системе» — цвета рабочего стола, и виджетов, и подсветки"),
+                     ("system", "системное")),
+            hint="Тёмное — своя палитра подсветки и своя страница; «системное» — цвета рабочего стола, и виджетов, и подсветки"),
     Setting(TOOLBAR, "Панель инструментов", "Вид", "bool", True),
     Setting(OUTPUT_VISIBLE, "Панель вывода", "Вид", "bool", True),
     Setting(OUTPUT_POSITION, "Панель вывода", "Вид", "choice",
@@ -311,7 +311,8 @@ SETTINGS: tuple[Setting, ...] = (
     Setting(FORMAT_SELECTION, "Форматировать только выделенное", "Формат", "bool",
             False),
     # -- execution
-    Setting(SAVE_BEFORE_RUN, "Сохранять перед запуском", "Выполнение", "bool", False),
+    Setting(SAVE_BEFORE_RUN, "Сохранять перед запуском", "Выполнение", "bool", False,
+            hint="Сохраняет текущий файл, если в нём есть несохранённые правки"),
     Setting(RUN_QUESTIONS, "Выводить вопросы при запуске", "Выполнение", "bool", True,
             hint="Строки «?цель.» программы отвечают сами; выключено — только правила"),
     Setting(MAX_STEPS, "Предел шагов", "Выполнение", "int", DEFAULT_MAX_STEPS, 0,
@@ -323,13 +324,11 @@ SETTINGS: tuple[Setting, ...] = (
     Setting(MAX_FINDALL, "Предел решений НАЙТИВСЕ", "Выполнение", "int",
             DEFAULT_MAX_FINDALL, 0, MAXIMUM_MAX_FINDALL,
             hint="Столько решений соберёт НАЙТИВСЕ; 0 — без предела.  Предел — ошибка, а не обрезанный список"),
-    Setting(TIMEOUT_SECONDS, "Предел времени, с", "Выполнение", "int",
-            DEFAULT_TIMEOUT_SECONDS, 0, MAXIMUM_TIMEOUT_SECONDS,
-            hint="Остановить программу по часам; 0 — без предела.  Ждущий ввода не прерывается"),
-    Setting(WORKING_DIRECTORY, "Рабочая папка (ИМПОРТ)", "Выполнение", "directory", "",
-            hint="Общие программы: каталог ищется при каждом ИМПОРТ, в любом файле"),
+    Setting(TIMEOUT_MILLISECONDS, "Предел времени, мс", "Выполнение", "int",
+            DEFAULT_TIMEOUT_MILLISECONDS, 0, MAXIMUM_TIMEOUT_MILLISECONDS,
+            hint="Остановить программу по времени; 0 — без предела.  Ждущий ввода не прерывается"),
     Setting(IMPORT_PATHS, "Дополнительные каталоги ИМПОРТ", "Выполнение", "dirs", (),
-            hint="Передаются интерпретатору как -I, в этом порядке"),
+            hint="Каталоги, в которых ИМПОРТ ищет файлы; передаются интерпретатору как -I, в этом порядке"),
     Setting(INTERPRETER, "Интерпретатор", "Выполнение", "file", "",
             hint="Путь к prologd; пусто — тот, с которым окно запущено.  Смена действует со следующего запуска"),
     Setting(PROCESS_DIRECTORY, "Рабочий каталог процесса", "Выполнение", "choice",
@@ -342,7 +341,7 @@ SETTINGS: tuple[Setting, ...] = (
             hint="Используется, когда выше выбран «свой каталог»"),
     # -- files
     Setting(RESTORE_TABS, "Восстанавливать вкладки при старте", "Файлы", "bool", True,
-            hint="Файлы читаются заново с диска; «Без имени» возвращаются как были"),
+            hint="Файлы читаются заново с диска"),
     Setting(AUTOSAVE_MINUTES, "Автосохранение, мин", "Файлы", "int",
             DEFAULT_AUTOSAVE_MINUTES, 0, MAXIMUM_AUTOSAVE_MINUTES,
             hint="0 — выключено.  Сохраняются только файлы с именем"),
@@ -1050,16 +1049,16 @@ class Settings:
         self._write(MAX_FINDALL, int(min(MAXIMUM_MAX_FINDALL, max(0, value))))
 
     @property
-    def timeout_seconds(self) -> int:
-        """The wall-clock cap of a run in seconds; 0 is off."""
+    def timeout_milliseconds(self) -> int:
+        """The wall-clock cap of a run in milliseconds; 0 is off."""
         return int(
-            self._number(TIMEOUT_SECONDS, DEFAULT_TIMEOUT_SECONDS, 0,
-                         MAXIMUM_TIMEOUT_SECONDS)
+            self._number(TIMEOUT_MILLISECONDS, DEFAULT_TIMEOUT_MILLISECONDS, 0,
+                         MAXIMUM_TIMEOUT_MILLISECONDS)
         )
 
-    @timeout_seconds.setter
-    def timeout_seconds(self, value: int) -> None:
-        self._write(TIMEOUT_SECONDS, int(min(MAXIMUM_TIMEOUT_SECONDS, max(0, value))))
+    @timeout_milliseconds.setter
+    def timeout_milliseconds(self, value: int) -> None:
+        self._write(TIMEOUT_MILLISECONDS, int(min(MAXIMUM_TIMEOUT_MILLISECONDS, max(0, value))))
 
     def limits(self) -> dict:
         """The three caps, as the `limits` object of a `load` (protocol 9).
@@ -1077,22 +1076,8 @@ class Settings:
         return {name: value for name, value in asked.items() if value > 0}
 
     @property
-    def working_directory(self) -> str:
-        """The shared folder passed as `-I` on every session; "" means none.
-
-        A *search* directory for `ИМПОРТ`, not the working directory of the
-        process, and it comes after the importing file's own folder, so a local
-        `lib/x.pld` always wins over a same-named file in the shared one.
-        """
-        return self._text(WORKING_DIRECTORY, "")
-
-    @working_directory.setter
-    def working_directory(self, value: str) -> None:
-        self._write(WORKING_DIRECTORY, str(value))
-
-    @property
     def import_paths(self) -> list[str]:
-        """More `-I` folders, in the order the engine will search them."""
+        """The folders `ИМПОРТ` searches, in the order the engine tries them."""
         return self._paths(IMPORT_PATHS)
 
     @import_paths.setter

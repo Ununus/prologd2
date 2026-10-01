@@ -1362,10 +1362,10 @@ def test_the_settings_dialog_changes_the_window_without_a_restart(executable: st
 
 
 def test_the_shared_folder_reaches_the_interpreter(executable: str) -> None:
-    """The «Рабочая папка (ИМПОРТ)» of task_29 is what makes `ИМПОРТ` work everywhere.
+    """«Дополнительные каталоги ИМПОРТ» is what makes `ИМПОРТ` work everywhere.
 
     An untitled buffer has no folder of its own, so `ИМПОРТ("library.pld")`
-    fails until the shared folder is set — and works in every tab afterwards.
+    fails until a search folder is set — and works in every tab afterwards.
     """
     library = pathlib.Path(__file__).resolve().parents[3] / "examples" / "lib"
     if not (library / "library.pld").is_file():
@@ -1385,7 +1385,7 @@ def test_the_shared_folder_reaches_the_interpreter(executable: str) -> None:
         assert pump(window, concluded), ascii(window.output_text())
         assert "Не найден" in window.output_text(), ascii(window.output_text())
 
-        window._settings.working_directory = str(library)
+        window._settings.import_paths = [str(library)]
         window.apply_settings()
         assert str(library) in window._session._includes
 
@@ -1393,7 +1393,7 @@ def test_the_shared_folder_reaches_the_interpreter(executable: str) -> None:
         assert pump(window, concluded), ascii(window.output_text())
         assert window.status_text() == "выполнено", ascii(window.output_text())
         assert "Не найден" not in window.output_text(), ascii(window.output_text())
-        print("ok: the shared folder is passed as -I, and an unnamed buffer imports from it")
+        print("ok: the import folder list is passed as -I, and an unnamed buffer imports from it")
     finally:
         discard_changes(window)
 
@@ -2779,7 +2779,7 @@ def test_the_theme_switch_reaches_the_text_and_the_widgets(executable: str) -> N
         assert window._theme_actions["dark"].isChecked() is True
         assert window._theme_actions["light"].isChecked() is False
 
-        # «Как в системе»: the widgets come from the desktop *and* so do the colours
+        # «Системное»: the widgets come from the desktop *and* so do the colours
         # of the text — the palette its colour scheme implies (on this machine the
         # offscreen platform answers «light», so this is a real question and not a
         # shortcut through one palette).
@@ -2814,7 +2814,7 @@ def test_the_limits_stop_a_runaway_and_name_themselves(executable: str) -> None:
     try:
         window.editor().setPlainText("цикл :- цикл.\n?цикл.\n")
         window._settings.max_steps = 5000
-        window._settings.timeout_seconds = 2
+        window._settings.timeout_milliseconds = 2000
         window._actions["run"].trigger()
 
         notes = window.output_text()
@@ -2830,14 +2830,14 @@ def test_the_limits_stop_a_runaway_and_name_themselves(executable: str) -> None:
 
         # «Предел времени»: the run is asked to stop, and the pane says by what.
         window.editor().setPlainText("?ВВОДЦЕЛ(А).\n")
-        window._settings.timeout_seconds = 1
+        window._settings.timeout_milliseconds = 1000
         window.run_program()
         assert pump(window, lambda: window.status_text().startswith("ждёт ввода")), \
             window.status_text()
         assert window._timeout.isActive() is True
         window._on_timeout()
         assert "остановлено по времени" in window.status_text(), window.status_text()
-        assert "предел времени: 1 с" in window.output_text(), ascii(window.output_text())
+        assert "предел времени: 1000 мс" in window.output_text(), ascii(window.output_text())
         window.stop_program()
     finally:
         discard_changes(window)
