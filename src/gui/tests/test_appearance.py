@@ -5,9 +5,13 @@
 The complaint this pins down: with a dark Windows theme Qt 6 hands the widgets a
 dark palette, and the syntax colours of `theme.py` — chosen against a white
 background — become unreadable.  So the default appearance is forced to light,
-and the colours are checked for contrast against the background they are actually
-drawn on.  This machine has a dark desktop, which is exactly the case the test
-has to survive.
+
+and since task_29 there is a **dark theme** of its own: a second syntax palette,
+a second page and a second set of bands.  Every pair of colours that has to be
+readable is measured here (WCAG AA, 4.5) — for *both* palettes, because a dark
+theme that is a switch over the light one is exactly the half-done thing this
+file exists to prevent.  This machine has a dark desktop, which is the case the
+test has to survive.
 """
 
 from __future__ import annotations
@@ -15,7 +19,6 @@ from __future__ import annotations
 import os
 import pathlib
 import sys
-from dataclasses import fields
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -24,8 +27,8 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 from PySide6.QtGui import QPalette  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
-from prologd_gui import appearance  # noqa: E402
-from prologd_gui.theme import Theme, contrast_ratio  # noqa: E402
+from prologd_gui import appearance, theme  # noqa: E402
+from prologd_gui.theme import contrast_ratio  # noqa: E402
 
 #: WCAG AA for body text.
 MINIMUM_CONTRAST = 4.5
@@ -47,30 +50,45 @@ def test_light_gives_a_light_background_and_dark_text(app: QApplication) -> None
 
 
 def test_every_syntax_colour_contrasts_with_the_background(app: QApplication) -> None:
-    """The property the user noticed by eye, measured.
+    """The property the user noticed by eye, measured — for every palette.
 
-    A colour that fails here is unreadable on the background the editor paints,
-    so this is the check that would have caught the dark-theme problem before a
-    user did.
+    `Palette.readable_pairs` is the list of pairs that must be readable, and the
+    page each one is drawn on comes with it; the widget palette is asserted to
+    paint that same page, so the numbers describe what the user really sees.
     """
-    appearance.apply_theme(app, appearance.LIGHT)
-    background = app.palette().color(QPalette.ColorRole.Base).name()
-    theme = Theme()
-
-    worst = min(
-        ((field.name, getattr(theme, field.name)) for field in fields(Theme)),
-        key=lambda item: contrast_ratio(item[1], background),
-    )
-    for field in fields(Theme):
-        colour = getattr(theme, field.name)
-        ratio = contrast_ratio(colour, background)
-        assert ratio >= MINIMUM_CONTRAST, (
-            f"{field.name} {colour} on {background} has contrast {ratio:.2f}"
+    for palette in theme.PALETTES:
+        appearance.apply_theme(app, palette.name)
+        base = app.palette().color(QPalette.ColorRole.Base).name()
+        assert base == palette.background, (
+            f"{palette.name}: the page is {base}, the palette says {palette.background}"
         )
-    print(
-        f"ok: all {len(fields(Theme))} syntax colours clear {MINIMUM_CONTRAST} "
-        f"on {background} (worst: {worst[0]} at {contrast_ratio(worst[1], background):.2f})"
-    )
+        pairs = palette.readable_pairs()
+        worst = min(pairs, key=lambda item: contrast_ratio(item[1], item[2]))
+        for what, colour, background in pairs:
+            ratio = contrast_ratio(colour, background)
+            assert ratio >= MINIMUM_CONTRAST, (
+                f"{palette.name}: {what} {colour} on {background} has contrast {ratio:.2f}"
+            )
+        print(
+            f"ok: {palette.name} — {len(pairs)} pairs clear {MINIMUM_CONTRAST} "
+            f"(worst: {worst[0]} at {contrast_ratio(worst[1], worst[2]):.2f})"
+        )
+
+
+def test_dark_gives_a_dark_background_and_light_text(app: QApplication) -> None:
+    """The dark theme is a dark one, drawn with Fusion like the light one."""
+    appearance.apply_theme(app, appearance.DARK)
+    palette = app.palette()
+
+    base = palette.color(QPalette.ColorRole.Base)
+    window = palette.color(QPalette.ColorRole.Window)
+    text = palette.color(QPalette.ColorRole.Text)
+
+    assert base.lightness() < 128, f"editor background is not dark: {base.name()}"
+    assert window.lightness() < 128, f"window background is not dark: {window.name()}"
+    assert text.lightness() > 128, f"text is not light: {text.name()}"
+    assert app.style().objectName().lower() == "fusion", app.style().objectName()
+    print(f"ok: dark — base {base.name()}, window {window.name()}, text {text.name()}")
 
 
 def test_system_leaves_the_platform_palette_alone(app: QApplication) -> None:
@@ -99,23 +117,33 @@ def test_an_unknown_theme_is_refused(app: QApplication) -> None:
 def test_tooltip_pair_stays_readable(app: QApplication) -> None:
     """The popup's description label is a tooltip window: check its own pair.
 
-    It takes its colours from the palette's `ToolTip` roles rather than from
-    `theme.py`, so this is the check that covers it — the same WCAG threshold as
-    the syntax colours.
+    It takes its colours from the palette's `ToolTip` roles rather than from the
+    syntax palette, so this is the check that covers it — the same WCAG threshold,
+    in both themes (the pair is in `readable_pairs` too; this one reads the *widget*
+    palette, which is what the label really uses).
     """
-    appearance.apply_theme(app, appearance.LIGHT)
-    palette = app.palette()
-    text = palette.color(QPalette.ColorRole.ToolTipText).name()
-    base = palette.color(QPalette.ColorRole.ToolTipBase).name()
-    ratio = contrast_ratio(text, base)
-    assert ratio >= MINIMUM_CONTRAST, f"tooltip text {text} on {base} is {ratio:.2f}"
-    print(f"ok: the tooltip pair stays readable ({ratio:.2f})")
+    for name in (appearance.LIGHT, appearance.DARK):
+        appearance.apply_theme(app, name)
+        palette = app.palette()
+        text = palette.color(QPalette.ColorRole.ToolTipText).name()
+        base = palette.color(QPalette.ColorRole.ToolTipBase).name()
+        ratio = contrast_ratio(text, base)
+        assert ratio >= MINIMUM_CONTRAST, f"{name}: tooltip text {text} on {base} is {ratio:.2f}"
+        print(f"ok: the {name} tooltip pair stays readable ({ratio:.2f})")
+
+
+def test_an_unknown_palette_name_is_the_light_one() -> None:
+    """A hand-edited file must not take the window down — and must not be dark."""
+    assert theme.palette_for("полночь").name == theme.LIGHT.name
+    print("ok: an unknown theme name falls back to the light palette")
 
 
 def main() -> int:
     app = QApplication(sys.argv[:1])
     test_light_gives_a_light_background_and_dark_text(app)
+    test_dark_gives_a_dark_background_and_light_text(app)
     test_every_syntax_colour_contrasts_with_the_background(app)
+    test_an_unknown_palette_name_is_the_light_one()
     test_system_leaves_the_platform_palette_alone(app)
     test_an_unknown_theme_is_refused(app)
     test_tooltip_pair_stays_readable(app)

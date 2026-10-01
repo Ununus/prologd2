@@ -43,12 +43,21 @@ Editor
 
 Highlighting
 
-- [ ] цвета по видам токенов, отдельно **цвет латиницы** и **цвет кириллицы**
+- [x] цвета по видам токенов, отдельно **цвет латиницы** и **цвет кириллицы**
       (task_22), светлая/тёмная тема, "использовать системные цвета".  `light`
       and `system` exist already (`--theme`, task_22); a **dark** theme is not a
       switch but a second syntax palette — bright colours for a dark background —
       and the palette must keep WCAG contrast 4.5 against its own background
       (there is a helper for that: `theme.contrast_ratio`).
+      (Тёмная тема сделана 2026-10-01: `theme.Palette` — запись «страница +
+      подсветка + полосы + полоса номеров + цвета вывода» на каждую тему,
+      `LIGHT` и `DARK`; `appearance.qt_palette` переводит её в палитру виджетов,
+      а поля редактора, полосы и панель вывода читают цвета из той же записи.
+      Контраст 4.5 проверяется для **обеих** палитр по списку
+      `Palette.readable_pairs` против той страницы, на которой цвет рисуется
+      (`test_appearance.py`); та же проверка нашла, что цвет трассы светлой темы
+      был 4.48 — на шаг темнее, и он чистый (4.61).  Осталось от этого пункта
+      только «использовать системные цвета» как отдельный выбор.)
 
 Formatting
 
@@ -241,9 +250,11 @@ importing file's directory still wins inside the engine.
 
 **Still open, and why** (each is its own feature, not a dialog row):
 
-- [ ] the token colours and the **dark theme** — a dark palette is a second
-      syntax palette that has to keep WCAG 4.5 against its own background;
-- [ ] the colours of Latin vs Cyrillic, «использовать системные цвета»;
+- [ ] «использовать системные цвета» — the one item left of the colour page: the
+      widgets' colours for the syntax, against whatever page the platform paints,
+      which means measuring the palette against a background we do not choose;
+- [ ] the colours of Latin vs Cyrillic are *done* (task_22: separate fields, and
+      the dark palette keeps the split);
 - [ ] **RU/EN** — the reference front-end was Russian only, and translating the
       window is a task of its own;
 - [ ] the interpreter profiles, the sandbox limits (run time, `НАЙТИВСЕ` cap),

@@ -24,6 +24,8 @@ from pathlib import Path
 
 from PySide6.QtCore import QSettings, QStandardPaths
 
+from . import theme
+
 ORGANIZATION = "PrologD"
 APPLICATION = "gui"
 
@@ -214,7 +216,9 @@ SETTINGS: tuple[Setting, ...] = (
             hint="С выключенным: «най» предлагает и «НАЙТИВСЕ», и «найти»"),
     # -- view
     Setting(THEME, "Оформление", "Вид", "choice", DEFAULT_THEME,
-            choices=(("light", "светлое"), ("system", "как в системе"))),
+            choices=(("light", "светлое"), ("dark", "тёмное"),
+                     ("system", "как в системе")),
+            hint="Тёмное — своя палитра подсветки и своя страница, а не инверсия светлой"),
     Setting(TOOLBAR, "Панель инструментов", "Вид", "bool", True),
     Setting(OUTPUT_VISIBLE, "Панель вывода", "Вид", "bool", True),
     Setting(OUTPUT_POSITION, "Панель вывода", "Вид", "choice",
@@ -609,6 +613,16 @@ class Settings:
     @theme.setter
     def theme(self, value: str) -> None:
         self._write(THEME, str(value))
+
+    @property
+    def palette(self) -> theme.Palette:
+        """The colours of everything: the theme name, resolved (task_29).
+
+        `system` gives the *light* syntax palette: the platform colours the widgets,
+        and its page may be dark, which is exactly the half-done dark mode the
+        `dark` palette exists to avoid — so a user on a dark desktop says `dark`.
+        """
+        return theme.palette_for(self.theme)
 
     # -- files -------------------------------------------------------------
     @property

@@ -117,7 +117,7 @@ def test_the_pane_colours_lines_and_keeps_a_bounded_history() -> None:
             cursor.movePosition(QTextCursor.MoveOperation.NextCharacter, cursor.MoveMode.KeepAnchor)
             return cursor.charFormat().foreground().color().name()
 
-        assert colour_of(pane, 1) == panels.KIND_COLORS[panels.ECHO], "the echo has no colour"
+        assert colour_of(pane, 1) == pane.kind_colors()[panels.ECHO], "the echo has no colour"
         assert colour_of(pane, 0) == "#000000", "the answer must stay plain: it is the data"
 
         # A runaway program: the oldest lines go, and the pane says so.

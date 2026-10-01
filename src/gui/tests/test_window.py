@@ -892,6 +892,8 @@ def test_the_menus_come_from_the_action_table(executable: str) -> None:
                     expected.append("Последние файлы")
                 elif key == actions.FORMAT_MODE:
                     expected.append("Формат")
+                elif key == actions.THEME_MODE:
+                    expected.append("Оформление")
                 else:
                     expected.append(actions.BY_KEY[key].title)
             assert [entry.text() for entry in menus[title].actions()] == expected, title
@@ -1582,7 +1584,7 @@ def test_a_warning_is_amber_and_counted(executable: str) -> None:
             number for number, line in enumerate(lines) if line.startswith("*** предупреждение")
         ]
         assert len(amber) == 2, ascii(window.output_text())
-        assert colour_of(window._output, amber[0]) == panels.KIND_COLORS[panels.WARNING]
+        assert colour_of(window._output, amber[0]) == window._output.kind_colors()[panels.WARNING]
         # The run was not disturbed: the query still answered.
         assert "Лена=_1" in window.output_text(), ascii(window.output_text())
     finally:
@@ -1676,7 +1678,7 @@ def test_the_trace_is_coloured_apart_from_the_output(executable: str) -> None:
         )
         lines = window.output_text().splitlines()
         block = next(number for number, line in enumerate(lines) if "Согласуется с" in line)
-        assert colour_of(window._output, block) == panels.KIND_COLORS[panels.TRACE]
+        assert colour_of(window._output, block) == window._output.kind_colors()[panels.TRACE]
     finally:
         discard_changes(window)
     print("ok: the trace is coloured apart from the program's own output")
@@ -2400,6 +2402,57 @@ def test_the_input_switch_chooses_where_to_ask(executable: str) -> None:
     print("ok: «спрашивать ввод» chooses the console or a box, without hiding anything")
 
 
+def test_the_theme_switch_reaches_the_text_and_the_widgets(executable: str) -> None:
+    """«Оформление → Тёмное»: widgets, syntax, bands and output in one move.
+
+    The half-done dark theme is the failure this check exists for: a dark widget
+    palette with light syntax colours, or a dark page with the output still painted
+    in the light theme's red — which is why the three are asserted together, and
+    why the same page is what the contrast check measures against.
+    """
+    from PySide6.QtGui import QPalette as QtPalette
+    from PySide6.QtWidgets import QApplication
+
+    from prologd_gui import panels, theme
+    from prologd_gui.settings import Settings
+
+    window = empty_window(executable)
+    settings_path = window._settings.path
+    try:
+        window.editor().setPlainText("факт(1).\n% комментарий\n")
+        window._append_output("вывод программы\n", panels.OUTPUT)
+        window._append_output("ошибка выполнения\n", panels.ERROR)
+        assert colour_of(window._output, 1) == panels.KIND_COLORS[panels.ERROR]
+
+        window._settings.theme = theme.DARK.name
+        window.apply_settings()
+
+        # The widgets: the *page* the syntax colours are measured against.
+        base = QApplication.instance().palette().color(QtPalette.ColorRole.Base).name()
+        assert base == theme.DARK.background, f"the page is {base}"
+
+        # The syntax and the bands: the document's palette and every view's.
+        assert window.buffers()[0].highlighter.theme is theme.DARK.syntax
+        assert window.editor().palette() is theme.DARK
+        current_line = [
+            selection.format.background().color().name()
+            for selection in window.editor().extraSelections()
+        ]
+        assert theme.DARK.current_line in current_line, current_line
+
+        # The output: the colour of new lines *and* of the lines already there.
+        assert window._output.kind_colors()[panels.ERROR] == theme.DARK.error
+        assert colour_of(window._output, 1) == theme.DARK.error, "the history kept its colours"
+
+        # Stored, and the menu says which one is on.
+        assert Settings(settings_path).theme == "dark"
+        assert window._theme_actions["dark"].isChecked() is True
+        assert window._theme_actions["light"].isChecked() is False
+    finally:
+        discard_changes(window)
+    print("ok: the dark theme reaches the widgets, the syntax, the bands and the output")
+
+
 def main(argv: list[str]) -> int:
     if QApplication is None:
         print("skipped: PySide6 is not installed")
@@ -2479,6 +2532,7 @@ def main(argv: list[str]) -> int:
         test_the_context_menu_reuses_the_shared_actions(executable)
         test_two_font_sizes_and_one_wheel(executable)
         test_the_settings_dialog_changes_the_window_without_a_restart(executable)
+        test_the_theme_switch_reaches_the_text_and_the_widgets(executable)
         test_the_shared_folder_reaches_the_interpreter(executable)
         test_autosave_writes_named_buffers_and_skips_the_rest(executable, files)
         test_saving_before_a_run_writes_the_file(executable, files)

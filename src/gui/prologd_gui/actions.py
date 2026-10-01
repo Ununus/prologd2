@@ -38,6 +38,11 @@ SAVED_ICON = "file-saved"
 MODIFIED_ICON = "file-modified"
 APPLICATION_ICON = "prologd2"
 
+#: The picture of the appearance (`view-theme`).  The theme is a submenu now, so
+#: the name belongs to no action — but it stays in the audit: it is the picture the
+#: reference front-end used for exactly this, and it is still not drawn.
+THEME_ICON = "view-theme"
+
 #: A menu entry that is a separator or a submenu rather than an action.
 SEPARATOR = "-"
 RECENT = "recent"
@@ -51,6 +56,11 @@ FONT_SIZE = "#font"
 #: belongs to one action is looked for.
 FORMAT_MODE = "#format-mode"
 
+#: The appearance (task_29's dark theme): a submenu of «Вид», because a *set* of
+#: three themes is not something one checkable entry can say.  It used to be a
+#: checkable «Системная тема (иначе светлая)», which had exactly two states — and a
+#: third one would have made the title a lie.
+THEME_MODE = "#theme-mode"
 
 @dataclass(frozen=True)
 class Action:
@@ -160,7 +170,6 @@ ACTIONS: tuple[Action, ...] = (
     Action("zoom_in", "Увеличить шрифт", "view-zoom-in", ("Ctrl+Num++",)),
     Action("zoom_out", "Уменьшить шрифт", "view-zoom-out", ("Ctrl+Num+-",)),
     Action("zoom_reset", "Обычный размер шрифта", "view-zoom-reset", ("Ctrl+0",)),
-    Action("theme", "Системная тема (иначе светлая)", "view-theme", checkable=True),
     Action("full_screen", "Полный экран", "view-full-screen", ("F11",), checkable=True),
     # -- execution
     Action("run", "Запустить", "execution-execute", ("F5", "Ctrl+R")),
@@ -198,7 +207,7 @@ BY_KEY: dict[str, Action] = {action.key: action for action in ACTIONS}
 ICON_NAMES: frozenset[str] = frozenset(
     [action.icon for action in ACTIONS if action.icon]
     + [RECENT_ICON, FIND_ICON, REPLACE_ICON, FILE_ICON, SAVED_ICON, MODIFIED_ICON,
-       APPLICATION_ICON]
+       APPLICATION_ICON, THEME_ICON]
 )
 
 #: The menu bar: (title, entries).  `-` is a separator, `recent` the submenu of
@@ -266,7 +275,7 @@ MENUS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "zoom_out",
             "zoom_reset",
             SEPARATOR,
-            "theme",
+            THEME_MODE,
             "full_screen",
         ),
     ),

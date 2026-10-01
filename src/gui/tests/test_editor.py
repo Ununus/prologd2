@@ -22,7 +22,13 @@ from PySide6.QtGui import QTextCursor  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
-from prologd_gui.editor import CURRENT_LINE_BACKGROUND, QUERY_MARKER_WIDTH, CodeEditor  # noqa: E402
+from prologd_gui import theme  # noqa: E402
+from prologd_gui.editor import QUERY_MARKER_WIDTH, CodeEditor  # noqa: E402
+
+#: The band behind the line the caret is on: the editor paints the palette's
+#: colour, and the light one is the default — so the checks below compare against
+#: the same source the editor reads (task_29).
+CURRENT_LINE_BACKGROUND = theme.LIGHT.current_line
 from prologd_gui.keywords import Keywords  # noqa: E402
 
 

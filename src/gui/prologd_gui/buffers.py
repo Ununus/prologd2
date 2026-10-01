@@ -47,7 +47,9 @@ class Buffer(QObject):
         self.document.setDocumentLayout(QPlainTextDocumentLayout(self.document))
         self.document.setPlainText(model.text)
         self.document.setModified(model.modified)
-        self.highlighter = PrologHighlighter(self.document)
+        self.highlighter = PrologHighlighter(
+            self.document, theme=self._settings.palette.syntax
+        )
 
         self.document.modificationChanged.connect(self._on_modification_changed)
 
@@ -65,6 +67,7 @@ class Buffer(QObject):
             indent_character=self._settings.indent_character,
             indent_width=self._settings.indent_width,
             auto_indent=self._settings.auto_indent,
+            palette=self._settings.palette,
             completion=self._settings.completion,
             auto_complete_after=self._settings.auto_complete_after,
             completion_match_case=self._settings.completion_match_case,
@@ -169,6 +172,17 @@ class Buffer(QObject):
     def set_auto_indent(self, enabled: bool) -> None:
         for view in self._views:
             view.set_auto_indent(enabled)
+
+    def set_palette(self, palette) -> None:
+        """Re-colours the syntax and every view (task_29's dark theme).
+
+        The syntax palette is the *document's*: the highlighter is one per buffer
+        and every view of it shows the same colours, so it is set once here and
+        the views only get the chrome (bands, margin, matches).
+        """
+        self.highlighter.set_theme(palette.syntax)
+        for view in self._views:
+            view.set_palette(palette)
 
     def set_completion(self, enabled: bool, after: int, match_case: bool) -> None:
         """The three completion switches of task_29, in one call per view."""

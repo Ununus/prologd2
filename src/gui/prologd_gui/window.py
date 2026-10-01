@@ -229,6 +229,8 @@ class MainWindow(QMainWindow):
             line_limit=self._settings.output_line_limit,
         )
         self._output.set_follow_output(self._settings.follow_output)
+        self._output.set_follow_output(self._settings.follow_output)
+        self._output.set_palette(self._settings.palette)
         self._output.setPlaceholderText("вывод интерпретатора")
         self._output.zoomChanged.connect(self._on_output_zoom)
         # A dropped program opens in a tab wherever it lands (see `dropEvent`).
@@ -467,7 +469,6 @@ class MainWindow(QMainWindow):
             "zoom_in": self._zoom_in,
             "zoom_out": self._zoom_out,
             "zoom_reset": self._reset_zoom,
-            "theme": self._toggle_theme,
             "full_screen": self._toggle_full_screen,
             "run": lambda: self.run_program(),
             "run_trace": lambda: self.run_program(trace=True),
@@ -552,6 +553,48 @@ class MainWindow(QMainWindow):
         self._settings.format_selection = bool(flag)
         self._sync_format_menu()
 
+    def _build_theme_menu(self, title: str) -> QMenu:
+        """The appearance: light, dark or the platform's own (task_29).
+
+        Three choices need a menu of their own — one checkable entry could only say
+        «system or not», which was true while there were two themes.  Each entry is
+        a promise about *all* of the window: the widget palette
+        (`appearance.qt_palette`), the syntax colours and the bands of the editor,
+        and the colours of the output pane, all from one `theme.Palette`.
+        """
+        menu = QMenu(title, self)
+        self._theme_menu = menu
+        group = QActionGroup(self)
+        group.setExclusive(True)
+        self._theme_actions: dict[str, QAction] = {}
+        for value, entry_title in (
+            (appearance.LIGHT, "Светлое"),
+            (appearance.DARK, "Тёмное"),
+            (appearance.SYSTEM, "Как в системе"),
+        ):
+            entry = menu.addAction(entry_title)
+            entry.setCheckable(True)
+            entry.setActionGroup(group)
+            entry.triggered.connect(lambda _checked=False, name=value: self._set_theme(name))
+            self._theme_actions[value] = entry
+        self._sync_theme_menu()
+        return menu
+
+    def _sync_theme_menu(self) -> None:
+        """Shows the stored theme without answering for it."""
+        if not hasattr(self, "_theme_menu"):
+            return
+        for value, entry in self._theme_actions.items():
+            entry.blockSignals(True)
+            entry.setChecked(value == self._settings.theme)
+            entry.blockSignals(False)
+
+    def _set_theme(self, name: str) -> None:
+        """Writes the theme and shows it at once — widgets *and* text."""
+        self._settings.theme = name
+        self._sync_theme_menu()
+        self.apply_settings()
+
     def _build_font_size_box(self) -> QWidget:
         """The font-size control: the same preference `Ctrl`+wheel writes.
 
@@ -624,6 +667,8 @@ class MainWindow(QMainWindow):
                     self._recent_menu.aboutToShow.connect(self._fill_recent_menu)
                 elif key == actions.FORMAT_MODE:
                     menu.addMenu(self._build_format_menu("Формат"))
+                elif key == actions.THEME_MODE:
+                    menu.addMenu(self._build_theme_menu("Оформление"))
                 else:
                     menu.addAction(self._actions[key])
 
@@ -741,7 +786,6 @@ class MainWindow(QMainWindow):
         self._actions["toolbar"].setChecked(not self._toolbar.isHidden())
         self._actions["line_numbers"].setChecked(self._settings.line_numbers)
         self._actions["wrap"].setChecked(self._settings.wrap)
-        self._actions["theme"].setChecked(self._settings.theme == appearance.SYSTEM)
         self._actions["save_before_run"].setChecked(self._settings.save_before_run)
         self._actions["full_screen"].setChecked(self.isFullScreen())
         self._actions["output"].setChecked(self.output_visible())
@@ -816,18 +860,6 @@ class MainWindow(QMainWindow):
             self.showFullScreen()
         else:
             self.showNormal()
-
-    def _toggle_theme(self, checked: bool) -> None:
-        """`system` when checked, the forced light palette otherwise.
-
-        The syntax colours are chosen for a light background, so the light palette
-        is the one that always reads well; `system` is there for a desktop that
-        wants it (task_29 gives it a dark palette of its own).
-        """
-        name = appearance.SYSTEM if checked else appearance.LIGHT
-        self._settings.theme = name
-        appearance.apply_theme(QApplication.instance(), name)
-        self._status.setText(f"оформление: {name}")
 
     def about_text(self) -> str:
         """What «О программе» says.  Separate from the box so a test can read it
@@ -2489,6 +2521,7 @@ class MainWindow(QMainWindow):
             buffer.set_wrap(self._settings.wrap)
             buffer.set_indent(self._settings.indent_character, self._settings.indent_width)
             buffer.set_auto_indent(self._settings.auto_indent)
+            buffer.set_palette(self._settings.palette)
             buffer.set_completion(
                 self._settings.completion,
                 self._settings.auto_complete_after,
@@ -2497,6 +2530,7 @@ class MainWindow(QMainWindow):
         self._apply_output_font()
         self._output.set_line_limit(self._settings.output_line_limit)
         self._output.set_follow_output(self._settings.follow_output)
+        self._output.set_palette(self._settings.palette)
         self._sync_query_line_font()
         self._step_pane.set_font_size(self._settings.font_size)
         self._reference_pane.set_font_size(self._settings.font_size)
@@ -2521,6 +2555,7 @@ class MainWindow(QMainWindow):
         self._trim_recent()
 
         self._sync_format_menu()
+        self._sync_theme_menu()
         self._sync_actions()
         self._status.setText("настройки применены")
 

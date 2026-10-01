@@ -45,14 +45,23 @@ ERROR = "error"
 WARNING = "warning"
 TRACE = "trace"
 
-#: The colours of the kinds that have one.
-KIND_COLORS = {
-    ECHO: theme.Theme().query,  # the query blue: our echo of an answer
-    NOTE: "#555555",  # our own markers (`--- загрузка программы ---`)
-    ERROR: "#a00000",  # diagnostics
-    WARNING: "#b35c00",  # a warning: the same pane, amber instead of red
-    TRACE: "#777777",  # the trace stream (task_28)
-}
+#: The colours of the kinds that have one, from a theme palette (task_29).  The
+#: pane is given a palette, so the dark theme's colours reach it the same way the
+#: editor's do; `KIND_COLORS` is only the light default.
+#:
+#: `output` has no colour on purpose: it is the data being read, and it takes the
+#: text colour of the widget palette.
+def kind_colors(palette: theme.Palette) -> dict[str, str]:
+    return {
+        ECHO: palette.echo,  # our echo of an answer: the query colour
+        NOTE: palette.note,  # our own markers (`--- загрузка программы ---`)
+        ERROR: palette.error,  # diagnostics
+        WARNING: palette.warning,  # a warning: the same pane, amber instead of red
+        TRACE: palette.trace,  # the trace stream (task_28)
+    }
+
+
+KIND_COLORS = kind_colors(theme.LIGHT)
 
 #: How many lines the pane keeps.  A runaway `ВЫВОД` must not eat the machine.
 DEFAULT_LINE_LIMIT = 50_000
@@ -136,14 +145,20 @@ class OutputPane(ZoomablePlainTextEdit):
         font_family: str = "Cascadia Mono",
         font_size: float = 11.0,
         line_limit: int = DEFAULT_LINE_LIMIT,
+        palette: theme.Palette | None = None,
     ) -> None:
         super().__init__(parent, font_family=font_family, font_size=font_size)
         self.setReadOnly(True)
         self._buffer = LineBuffer()
         self._line_limit = max(100, int(line_limit))
-        self._formats = {kind: self._format(color) for kind, color in KIND_COLORS.items()}
+        self._palette = palette or theme.LIGHT
+        self._colors = kind_colors(self._palette)
+        self._formats = {kind: self._format(color) for kind, color in self._colors.items()}
         self._plain = QTextCharFormat()
         self._truncated = False
+        #: The kind of every line in the document, in order (`set_palette` needs
+        #: them to re-colour the history when the theme changes).
+        self._kinds: list[str] = []
         #: True while the view follows the end of the output.
         self._following = True
         #: The preference behind it (task_29's «Следить за выводом»): off, the
@@ -187,17 +202,28 @@ class OutputPane(ZoomablePlainTextEdit):
             fmt = self._formats.get(piece.kind, self._plain)
             if piece.text:
                 cursor.insertText(piece.text, fmt)
+                self._record_kind(self.document().blockCount() - 1, piece.kind)
             if piece.complete:
                 cursor.insertText("\n", fmt)
+                # The newline ends the line the text just went into; Qt opens a new
+                # block behind it, and that one gets its kind when its text comes.
+                self._record_kind(self.document().blockCount() - 2, piece.kind)
         self._trim()
         if self._following and self._follow:
             bar = self.verticalScrollBar()
             bar.setValue(bar.maximum())
 
+    def _record_kind(self, index: int, kind: str) -> None:
+        """Remembers the kind of block `index`, growing the list up to it."""
+        while len(self._kinds) <= index:
+            self._kinds.append(kind)
+        self._kinds[index] = kind
+
     def reset(self) -> None:
         """Empties the pane; the tail and the truncation marker go with it."""
         self.clear()
         self._buffer.reset()
+        self._kinds.clear()
         self._truncated = False
         self._following = True
 
@@ -225,6 +251,30 @@ class OutputPane(ZoomablePlainTextEdit):
     def truncated(self) -> bool:
         """Whether the oldest output has been dropped."""
         return self._truncated
+
+    def kind_colors(self) -> dict[str, str]:
+        """The colours in force, by kind (a theme may have replaced them)."""
+        return dict(self._colors)
+
+    def set_palette(self, palette: theme.Palette) -> None:
+        """Re-colours the pane, the history included (task_29's dark theme).
+
+        The kinds of the lines are kept as they are written (`_kinds`), which is
+        what makes this possible: without them the text already in the pane would
+        keep the colours of the theme it was written in — dark red on a dark page,
+        which is the half-done dark mode this design is meant to avoid.
+        """
+        self._palette = palette
+        self._colors = kind_colors(palette)
+        self._formats = {kind: self._format(color) for kind, color in self._colors.items()}
+        document = self.document()
+        for index, kind in enumerate(self._kinds):
+            block = document.findBlockByNumber(index)
+            if not block.isValid():
+                break
+            cursor = QTextCursor(block)
+            cursor.select(QTextCursor.SelectionType.BlockUnderCursor)
+            cursor.setCharFormat(self._formats.get(kind, self._plain))
 
     def following(self) -> bool:
         """Whether the view is at the end of the output."""
@@ -262,6 +312,7 @@ class OutputPane(ZoomablePlainTextEdit):
             cut.setPosition(0)
             cut.setPosition(block.position(), QTextCursor.MoveMode.KeepAnchor)
             cut.removeSelectedText()
+            del self._kinds[:excess]
         self._ensure_marker()
 
     def _ensure_marker(self) -> None:
@@ -275,6 +326,7 @@ class OutputPane(ZoomablePlainTextEdit):
         cursor = QTextCursor(document)
         cursor.setPosition(0)
         cursor.insertText(TRUNCATED_MARK + "\n", self._formats[ERROR])
+        self._kinds.insert(0, ERROR)
 
 
 #: What a request is called in the console and in the status bar.

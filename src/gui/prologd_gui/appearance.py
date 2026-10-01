@@ -2,13 +2,18 @@
 
 Qt 6 follows the Windows dark theme, and the syntax palette of `theme.py` was
 chosen against a **white** background — on a dark one those colours turn into
-mud, which is exactly what a user with a dark desktop sees.  So the default here
-is a forced light appearance.
+mud, which is exactly what a user with a dark desktop saw.  So the default here is
+a forced light appearance.
 
-`system` keeps whatever the platform chose; it is what a light desktop wants, and
-it is where a real dark theme will hook in.  A dark theme is *not* just this
-switch: it needs its own syntax palette (bright colours), which is task_29's
-colour page — a half-done dark mode would be worse than none.
+A dark theme is not a switch over it: it needs its own syntax palette (bright
+colours) *and* its own chrome.  That is `theme.DARK`, and this module is the thin
+half that turns a palette into a `QPalette` — the colours themselves, and the
+contrast they have to keep, are data in `theme.py` and are checked by
+`test_appearance.py` for every palette there is.
+
+`system` keeps whatever the platform chose.  It is what a light desktop wants;
+a dark one should say `dark`, because the platform palette alone would colour the
+widgets and leave the syntax colours of the light theme on a dark page.
 """
 
 from __future__ import annotations
@@ -16,65 +21,72 @@ from __future__ import annotations
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QApplication, QStyleFactory
 
-#: Accepted values, in the order the CLI help lists them.
-LIGHT = "light"
+from . import theme
+
+#: Accepted values, in the order the CLI help and the settings dialog list them.
+LIGHT = theme.LIGHT.name
+DARK = theme.DARK.name
 SYSTEM = "system"
-THEMES = (LIGHT, SYSTEM)
+THEMES = (LIGHT, DARK, SYSTEM)
 
 
-def light_palette() -> QPalette:
-    """The light palette, built by hand rather than taken from the style.
+def qt_palette(palette: theme.Palette) -> QPalette:
+    """The widget palette of a theme palette.
 
-    `QStyle.standardPalette()` is not usable here: since Qt 6.5 it follows the
-    platform colour scheme, so on a dark desktop it hands back a dark palette.
-    Only the roles that matter are set; Qt fills in the rest, and the test
-    asserts the property that actually matters — a light background with dark
-    text, which is what the syntax colours need.
+    Built rather than taken from the style: `QStyle.standardPalette()` follows the
+    platform colour scheme since Qt 6.5, so on a dark desktop it hands back a dark
+    palette whatever the user asked for.  Only the roles that matter are set; Qt
+    fills in the rest, and the test asserts the relation that matters — the
+    window's `Base` *is* the palette's page, which is what the syntax colours are
+    measured against.
     """
-    text = QColor("#1a1a1a")
-    window = QColor("#f0f0f0")
-    base = QColor("#ffffff")
-    disabled = QColor("#a0a0a0")
+    text = QColor(palette.foreground)
+    window = QColor(palette.window)
 
-    palette = QPalette()
+    result = QPalette()
     for role, color in (
         (QPalette.ColorRole.Window, window),
         (QPalette.ColorRole.WindowText, text),
-        (QPalette.ColorRole.Base, base),
-        (QPalette.ColorRole.AlternateBase, QColor("#f7f7f7")),
-        (QPalette.ColorRole.ToolTipBase, QColor("#ffffe1")),
-        (QPalette.ColorRole.ToolTipText, text),
+        (QPalette.ColorRole.Base, QColor(palette.background)),
+        (QPalette.ColorRole.AlternateBase, QColor(palette.alternate_base)),
+        (QPalette.ColorRole.ToolTipBase, QColor(palette.tooltip_background)),
+        (QPalette.ColorRole.ToolTipText, QColor(palette.tooltip_text)),
         (QPalette.ColorRole.Text, text),
         (QPalette.ColorRole.Button, window),
         (QPalette.ColorRole.ButtonText, text),
-        (QPalette.ColorRole.BrightText, QColor("#d40000")),
-        (QPalette.ColorRole.Link, QColor("#0a22d6")),
-        (QPalette.ColorRole.Highlight, QColor("#0a5fd6")),
-        (QPalette.ColorRole.HighlightedText, QColor("#ffffff")),
-        (QPalette.ColorRole.PlaceholderText, QColor("#8a8a8a")),
+        (QPalette.ColorRole.BrightText, QColor(palette.bright_text)),
+        (QPalette.ColorRole.Link, QColor(palette.link)),
+        (QPalette.ColorRole.Highlight, QColor(palette.highlight)),
+        (QPalette.ColorRole.HighlightedText, QColor(palette.highlighted_text)),
+        (QPalette.ColorRole.PlaceholderText, QColor(palette.placeholder)),
     ):
-        palette.setColor(role, color)
+        result.setColor(role, color)
 
+    disabled = QColor(palette.disabled_text)
     for role in (
         QPalette.ColorRole.WindowText,
         QPalette.ColorRole.Text,
         QPalette.ColorRole.ButtonText,
     ):
-        palette.setColor(QPalette.ColorGroup.Disabled, role, disabled)
-    return palette
+        result.setColor(QPalette.ColorGroup.Disabled, role, disabled)
+    return result
 
 
 def apply_theme(app: QApplication, name: str = LIGHT) -> None:
-    """Sets the widget appearance; `light` is the default and the safe one."""
-    if name == LIGHT:
-        # Fusion draws from the palette on every platform, so the forced colours
-        # are what the user actually gets, instead of a native style ignoring
-        # them on Windows.
-        style = QStyleFactory.create("Fusion")
-        if style is not None:
-            app.setStyle(style)
-        app.setPalette(light_palette())
-        return
+    """Sets the widget appearance; `light` is the default and the safe one.
+
+    `system` is the platform's own palette, which may be dark — the syntax colours
+    then stay the light ones, which is why `dark` exists as a choice of its own.
+    """
     if name == SYSTEM:
         return
-    raise ValueError(f"unknown theme: {name!r}, expected one of {', '.join(THEMES)}")
+    if name not in theme.PALETTE_BY_NAME:
+        raise ValueError(
+            f"unknown theme: {name!r}, expected one of {', '.join(THEMES)}"
+        )
+    # Fusion draws from the palette on every platform, so the chosen colours are
+    # what the user actually gets, instead of a native style ignoring them.
+    style = QStyleFactory.create("Fusion")
+    if style is not None:
+        app.setStyle(style)
+    app.setPalette(qt_palette(theme.PALETTE_BY_NAME[name]))

@@ -36,12 +36,22 @@ Activating the environment is optional: calling `.venv\Scripts\python.exe`
 directly needs no `Set-ExecutionPolicy` and makes it obvious which interpreter is
 meant.
 
-`--theme light|system` chooses the appearance.  **`light` is the default and is
-forced** through the Fusion style with an explicit palette, because Qt 6 follows
-the Windows dark theme and the syntax colours are chosen for a *white*
-background — on a dark one they are unreadable.  `system` keeps the platform
-choice: what a light desktop wants, and the hook for a real dark theme, which
-needs its own syntax palette rather than just this switch (task_29).
+`--theme light|dark|system` chooses the appearance; «Вид → Оформление» is the same
+three in a submenu.  **`light` is the default** and is forced through the Fusion
+style with an explicit palette, because Qt 6 follows the Windows dark theme and
+the syntax colours are chosen for a *white* background — on a dark one they are
+unreadable.
+
+`dark` is a **palette of its own**, not an inversion: a second syntax palette for a
+`#1e1e1e` page, a second set of bands (the error line, the step line, the search
+matches, the current line), the margin and the colours of the output's kinds — all
+of it one `theme.Palette` record, and every pair that has to be readable is
+measured against the page it is really drawn on (WCAG AA, 4.5, in
+`test_appearance.py`).  Switching the theme re-colours the text already in the
+output pane too, so a dark window never holds light-theme red on a dark page.
+
+`system` keeps the platform widget palette — and the *light* syntax palette, so on
+a dark desktop it is half done by design; that desktop should say `dark`.
 
 `--settings FILE` chooses the settings file; by default it is
 `%LOCALAPPDATA%\PrologD\gui\gui.ini`, holding the font family and size, line
@@ -271,7 +281,9 @@ Present (44): `edit-clear`, `edit-comment`, `edit-copy`, `edit-cut`, `edit-del`,
 Still to draw (6 names, listed in `assets.MISSING`) — the «Вид» switches
 `view-toolbar`, `view-split-editor`, `view-output-right`, `view-output-bottom`,
 `view-line-numbers` and `view-theme` — plus `execution-restart`, which nothing
-refers to yet.
+refers to yet.  `view-theme` belongs to the «Оформление» submenu, which is words
+rather than pictures, and it stays in the audit because it is the picture the
+reference front-end used for exactly this.
 
 Five of the names are not buttons at all: `file`, `file-saved` and
 `file-modified` are the states of a tab, `prologd2` is the window icon, and
@@ -548,7 +560,7 @@ every record has a widget and every widget writes its key.
 | Section | What is in it |
 | --- | --- |
 | Редактор | font family and size, line numbers, the current-line band, word wrap, tabs or spaces and the width, auto-indent, completion (on/off, after how many letters, `Учитывать регистр`) |
-| Вид | theme (light or system), toolbar, the output panel (shown, right or bottom), the input queue field, where a program's input question is asked (console or dialog), the output's font size, its line limit and whether it follows the end |
+| Вид | theme (light, dark or system), toolbar, the output panel (shown, right or bottom), the input queue field, where a program's input question is asked (console or dialog), the output's font size, its line limit and whether it follows the end |
 | Формат | the formatter's mode, width, indent and unit, «только выделенное» |
 | Выполнение | whether a run answers the program's own `?`-questions, save before run, the shared folder for `ИМПОРТ`, more `-I` folders |
 | Файлы | autosave in minutes (0 = off), how many recent files to remember, restoring the open tabs at start-up |
@@ -770,7 +782,8 @@ failure (for example an interrupted query).
 * A graphics pane fed by a `GraphicsBackend` that emits protocol events
   (`ТОЧКА`, `ЛИНИЯ`, … currently reach a null backend).
 * Step-by-step execution over the `ТРАССА` stream.
-* The rest of task_29's list: the dark theme (a second syntax palette, WCAG 4.5),
-  RU/EN, interpreter profiles and sandbox limits, «выводить вопросы» and
-  «следить за выводом» as switches.  The settings dialog itself, the live apply,
-  the session restore and the recent files are done.
+* The rest of task_29's list: RU/EN, interpreter profiles and sandbox limits, the
+  path to the interpreter (still `--exe`) and the working directory of the process
+  — the last two need session options rather than a dialog row.  The settings
+  dialog, the live apply, the session restore, the recent files, the theme page
+  (light, dark and system) and the small switches are done.

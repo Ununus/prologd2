@@ -24,48 +24,27 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import QCompleter, QLabel, QPlainTextEdit, QTextEdit, QWidget
 
-from . import completion, queries, search, shortcuts as shortcuts_module, tokens
+from . import completion, queries, search, shortcuts as shortcuts_module, theme, tokens
 from .settings import DEFAULT_FONT_SIZE, MAXIMUM_FONT_SIZE, MINIMUM_FONT_SIZE
 
 #: The comment character of the language: `%` to the end of the line.
 COMMENT_PREFIX = "%"
 
-#: Background of the line a diagnostic points at (task_28).
-ERROR_BACKGROUND = "#ffd9d9"
-ERROR_NUMBER = "#c00000"
-
-#: Backgrounds of the search bar's matches: all of them, and the one the caret is on.
-SEARCH_MATCH = "#ffe9a8"
-SEARCH_CURRENT = "#ffc14d"
-
-#: The line a *step* is on: the same idea as the error line, in a neutral colour,
-#: because where a run stands is information and not a problem.
-TRACE_BACKGROUND = "#d8e6f7"
-TRACE_NUMBER = "#1b4f86"
-
-#: The pale band behind the line the caret is on (task_29).  Painted *first* of
-#: all, so an error line, a step line or a search match still stands out when
-#: they fall on the same line.
-CURRENT_LINE_BACKGROUND = "#f4f6f9"
+#: Every colour the editor paints with lives in a `theme.Palette` (task_29): the
+#: page, the bands of an error and of a step, the search matches, the margin and
+#: the marker of a question.  The editor holds the palette in force and reads it
+#: where it draws, so a dark theme is the same code with another palette — and the
+#: contrast of every one of those colours is checked for *its* page.
 
 #: Background of the other places the selected word appears, and the size of a
 #: document worth scanning for them on every selection change.
-OCCURRENCE_BACKGROUND = "#e8ecf5"
 OCCURRENCE_LIMIT = 200_000
-
-_MARGIN_BACKGROUND = "#f0f0f0"
-_MARGIN_TEXT = "#8a8a8a"
-_MARGIN_CURRENT = "#0a22d6"
 
 #: The margin's icon column: a run marker for every line that is a question
 #: (task_36), and the hit box of the click that runs it.  It sits left of the
 #: numbers, so a marker is never hit while aiming at a digit, and a click on
 #: the numbers themselves does nothing.
 QUERY_MARKER_WIDTH = 14
-
-#: The same blue as a query and as the current line's number: this is the
-#: editor's colour for «a question, and something will run it».
-_QUERY_MARKER = "#0a22d6"
 
 _MIN_FONT_SIZE = MINIMUM_FONT_SIZE
 _MAX_FONT_SIZE = MAXIMUM_FONT_SIZE
@@ -267,6 +246,7 @@ class CodeEditor(ZoomablePlainTextEdit):
         indent_character: str = "\t",
         indent_width: int = 1,
         auto_indent: bool = True,
+        palette: theme.Palette | None = None,
         completion: bool = True,
         auto_complete_after: int = 2,
         completion_match_case: bool = True,
@@ -276,6 +256,9 @@ class CodeEditor(ZoomablePlainTextEdit):
         self._indent_character = indent_character
         self._indent_width = max(1, indent_width)
         self._auto_indent = bool(auto_indent)
+        #: The colours of everything this view paints (task_29); `light` unless the
+        #: window hands over another theme.
+        self._palette = palette or theme.LIGHT
         self._line_numbers = line_numbers
         #: Whether the line the caret is on gets a pale band (task_29).
         self._current_line = bool(current_line)
@@ -367,7 +350,7 @@ class CodeEditor(ZoomablePlainTextEdit):
 
     def paint_line_numbers(self, event) -> None:
         painter = QPainter(self._margin)
-        painter.fillRect(event.rect(), QColor(_MARGIN_BACKGROUND))
+        painter.fillRect(event.rect(), QColor(self._palette.margin_background))
         current = self.textCursor().blockNumber()
         block = self.firstVisibleBlock()
         number = block.blockNumber()
@@ -379,13 +362,13 @@ class CodeEditor(ZoomablePlainTextEdit):
         while block.isValid() and top <= event.rect().bottom():
             if block.isVisible() and bottom >= event.rect().top():
                 if self._error_line == number + 1:
-                    painter.setPen(QColor(ERROR_NUMBER))
+                    painter.setPen(QColor(self._palette.error_text))
                 elif self._trace_line == number + 1:
-                    painter.setPen(QColor(TRACE_NUMBER))
+                    painter.setPen(QColor(self._palette.trace_text))
                 elif number == current:
-                    painter.setPen(QColor(_MARGIN_CURRENT))
+                    painter.setPen(QColor(self._palette.margin_current))
                 else:
-                    painter.setPen(QColor(_MARGIN_TEXT))
+                    painter.setPen(QColor(self._palette.margin_text))
                 painter.drawText(
                     0,
                     top,
@@ -406,7 +389,7 @@ class CodeEditor(ZoomablePlainTextEdit):
         centre = top + height // 2
         painter.save()
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor(_QUERY_MARKER))
+        painter.setBrush(QColor(self._palette.query_marker))
         painter.drawPolygon(
             QPolygon([QPoint(4, centre - 4), QPoint(4, centre + 4), QPoint(11, centre)])
         )
@@ -565,7 +548,7 @@ class CodeEditor(ZoomablePlainTextEdit):
             block = self.textCursor().block()
             if block.isValid():
                 selection = QTextEdit.ExtraSelection()
-                selection.format.setBackground(QColor(CURRENT_LINE_BACKGROUND))
+                selection.format.setBackground(QColor(self._palette.current_line))
                 selection.format.setProperty(QTextFormat.Property.FullWidthSelection, True)
                 cursor = QTextCursor(block)
                 cursor.clearSelection()
@@ -576,7 +559,7 @@ class CodeEditor(ZoomablePlainTextEdit):
             block = self.document().findBlockByNumber(self._error_line - 1)
             if block.isValid():
                 selection = QTextEdit.ExtraSelection()
-                selection.format.setBackground(QColor(ERROR_BACKGROUND))
+                selection.format.setBackground(QColor(self._palette.error_background))
                 selection.format.setProperty(QTextFormat.Property.FullWidthSelection, True)
                 cursor = QTextCursor(block)
                 cursor.clearSelection()
@@ -587,7 +570,7 @@ class CodeEditor(ZoomablePlainTextEdit):
             block = self.document().findBlockByNumber(self._trace_line - 1)
             if block.isValid():
                 selection = QTextEdit.ExtraSelection()
-                selection.format.setBackground(QColor(TRACE_BACKGROUND))
+                selection.format.setBackground(QColor(self._palette.trace_background))
                 selection.format.setProperty(QTextFormat.Property.FullWidthSelection, True)
                 cursor = QTextCursor(block)
                 cursor.clearSelection()
@@ -595,7 +578,8 @@ class CodeEditor(ZoomablePlainTextEdit):
                 selections.append(selection)
 
         for start, length in self._search_ranges:
-            background = SEARCH_CURRENT if (start, length) == self._current_range else SEARCH_MATCH
+            current = (start, length) == self._current_range
+            background = self._palette.search_current if current else self._palette.search_match
             selections.append(self._highlight(start, length, background))
 
         token = self.selected_token()
@@ -610,7 +594,9 @@ class CodeEditor(ZoomablePlainTextEdit):
             and len(text) <= OCCURRENCE_LIMIT
         ):
             for offset in search.matches(text, token, search.Options(match_case=True)):
-                selections.append(self._highlight(offset, len(token), OCCURRENCE_BACKGROUND))
+                selections.append(
+                    self._highlight(offset, len(token), self._palette.occurrence)
+                )
         self.setExtraSelections(selections)
 
     def _highlight(self, start: int, length: int, background: str) -> QTextEdit.ExtraSelection:
@@ -645,6 +631,21 @@ class CodeEditor(ZoomablePlainTextEdit):
         easier to type with the editor out of the way.
         """
         self._auto_indent = bool(enabled)
+
+    def palette(self) -> theme.Palette:
+        """The colours in force — the editor's own bands and margin, not the page."""
+        return self._palette
+
+    def set_palette(self, palette: theme.Palette) -> None:
+        """Re-colours the view (task_29's dark theme), margin included.
+
+        The *syntax* colours are the buffer's business (`Buffer.set_palette`): they
+        belong to the document, which every view of it shares.
+        """
+        self._palette = palette
+        self._refresh_extra_selections()
+        self._margin.update()
+        self.viewport().update()
 
     def indent_selection(self, outdent: bool = False) -> None:
         unit = self._indent_text()
