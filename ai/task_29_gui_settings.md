@@ -1,9 +1,10 @@
 # task_29 — GUI: settings dialog and persistence
 
 **Status:** done (round B, 2026-10-01) — the dialog, the described table, reset,
-import/export, and the «почти готовые» new keys; the rest of the list is named
-under «What was built» and still open: **RU/EN** and the two items that grew into
+import/export, and the «почти готовые» new keys; the two items that grew into
 `task_45_gui_graphics_window.md` and `task_46_interpreter_options_and_limits.md`
+are named under «What was built», and **RU/EN was dropped by decision**
+(2026-10-01, ADR-021: the window stays Russian).
 **Depends on:** task_22 (font, line numbers), task_26 (view actions), task_27 (panels)
 **Milestone:** M11
 
@@ -85,8 +86,11 @@ Output
 
 Execution
 
-- [ ] путь к интерпретатору (`--exe` today), сохранять перед запуском,
+- [x] путь к интерпретатору (`--exe` сегодня), сохранять перед запуском,
       таймаут запроса, лимит числа решений `НАЙТИВСЕ`;
+      (2026-10-01: лимиты сделаны в `task_46` — четыре строки в «Выполнении»
+      (`execution/max_steps`, `max_depth`, `max_findall`, `timeout_seconds`) и
+      ключ `limits` у `load` (протокол 9); путь к интерпретатору остался там же.)
 - [x] **рабочая папка** — the one directory the user keeps shared sources in
       ("общие функции для стандартной реализации").  It is passed as `-I` on
       every session, so `ИМПОРТ("library.pld")` works from any program, saved or
@@ -109,12 +113,13 @@ Execution
 
 General
 
-- [x] язык интерфейса RU/EN (the reference GUI was Russian only),
+- [x] язык интерфейса RU/EN — **отменено 2026-10-01**: решено оставить окно
+      русским (ADR-021), английский остаётся у языка, а не у интерфейса;
       восстанавливать открытые вкладки при старте, недавние файлы (сколько
       помнить), проверять обновления — off, this is a local tool.
       (Сделано «сколько помнить» (`files/recent_limit`) и восстановление
-      вкладок (`files/restore_tabs`, 2026-10-01, см. «What was built»); RU/EN и
-      «проверять обновления» — отдельные задачи.)
+      вкладок (`files/restore_tabs`, 2026-10-01, см. «What was built»);
+      «проверять обновления» — отдельная задача, RU/EN больше не задача.)
 
 ## Proposed beyond the request
 
@@ -261,8 +266,10 @@ importing file's directory still wins inside the engine.
       это была половина темы — тёмные виджеты и светлая подсветка на них.
 - [x] the colours of Latin vs Cyrillic — done (task_22: separate fields, and the
       dark palette keeps the split);
-- [ ] **RU/EN** — the reference front-end was Russian only, and translating the
-      window is a task of its own;
+- [x] **RU/EN — отменено 2026-10-01 (ADR-021).**  Окно остаётся русским: перевод
+      интерфейса не нужен, а половина перевода хуже отказа.  Английские имена
+      встроенных предикатов и английские разделы руководства к этому отношения
+      не имеют и остаются (task_39);
 - [ ] **перенесено в отдельные задачи (2026-10-01)**: «путь к интерпретатору,
       профили, пределы и таймаут» — это `task_46_interpreter_options_and_limits.md`,
       а «графическое окно» — `task_45_gui_graphics_window.md`.  Ни то, ни другое не

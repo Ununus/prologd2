@@ -62,13 +62,15 @@ if(NOT output STREQUAL "ok\n")
   message(FATAL_ERROR "Expected \"ok\", got: ${output}")
 endif()
 
-# The guard: the same runaway recursion under the default limit ends with one
-# diagnostic and exit code 3, not with a crash and not with silence.
+# The guard, when a caller asks for it: the same runaway recursion under
+# `--max-depth` ends with one diagnostic and exit code 3, not with a crash and not
+# with silence.  The flag is spelled out because the interpreter has *no* default
+# depth limit (ADR-020): a runaway program stops when its caller says where.
 set(runaway_program "л(Н) :- СЛОЖЕНИЕ(Н1, 1, Н), л(Н1).\n?л(1).\n")
 file(WRITE "${WORK_DIR}/engine_depth_limit.pld" "${runaway_program}")
 
 execute_process(
-  COMMAND "${PROLOGD_EXE}" -s "${WORK_DIR}/engine_depth_limit.pld"
+  COMMAND "${PROLOGD_EXE}" --max-depth 10000 -s "${WORK_DIR}/engine_depth_limit.pld"
   OUTPUT_VARIABLE output
   ERROR_VARIABLE errors
   RESULT_VARIABLE exit_code)

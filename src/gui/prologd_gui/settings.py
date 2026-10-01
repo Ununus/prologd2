@@ -98,8 +98,10 @@ IMPORT_PATHS = "execution/import_paths"
 #: question, whatever this says.
 RUN_QUESTIONS = "execution/run_questions"
 #: The guards of a run (task_46), sent with every `load` (protocol 9).  `0` means
-#: «без предела» for all of them, and each one names itself in the message the
-#: engine prints when it fires — a limit nobody can name is a mystery.
+#: «без предела» for all of them.  The engine has no limits of its own and its
+#: message names a limit and its value only, so the answer to «where do I raise
+#: it» is the window's: `window._limits_note` prints the rows of a run before it
+#: starts, in the words of the dialog.
 MAX_STEPS = "execution/max_steps"
 MAX_DEPTH = "execution/max_depth"
 MAX_FINDALL = "execution/max_findall"
@@ -163,13 +165,15 @@ MAXIMUM_AUTOSAVE_MINUTES = 120
 DEFAULT_RECENT_LIMIT = 10
 MAXIMUM_RECENT_LIMIT = 50
 
-#: task_46's limits.  The defaults are *no* limit for steps and time, and the
-#: engine's own numbers for depth and НАЙТИВСЕ (`--max-depth`/`--max-findall`
-#: quote the same values): a window that never touches these settings runs a
-#: program exactly as it did before they existed.
+#: task_46's limits.  The engine's own defaults are «без предела», and the window
+#: ships numbers a lesson program cannot notice but a runaway cannot outlive: no
+#: step cap, a million frames of recursion, a million solutions per НАЙТИВСЕ and
+#: no clock.  Depth is the one that matters by default — without a cap a runaway
+#: recursion is stopped by nothing at all, while a million frames is deep enough
+#: that no honest program reaches it.
 DEFAULT_MAX_STEPS = 0
 MAXIMUM_MAX_STEPS = 1_000_000_000
-DEFAULT_MAX_DEPTH = 10_000
+DEFAULT_MAX_DEPTH = 1_000_000
 MAXIMUM_MAX_DEPTH = 10_000_000
 DEFAULT_MAX_FINDALL = 1_000_000
 MAXIMUM_MAX_FINDALL = 100_000_000
@@ -280,10 +284,10 @@ SETTINGS: tuple[Setting, ...] = (
             hint="Строки «?цель.» программы отвечают сами; выключено — только правила"),
     Setting(MAX_STEPS, "Предел шагов", "Выполнение", "int", DEFAULT_MAX_STEPS, 0,
             MAXIMUM_MAX_STEPS,
-            hint="Сколько шагов решателя на один запуск; 0 — без предела.  Сообщение назовёт этот предел"),
+            hint="Сколько шагов решателя на один запуск; 0 — без предела.  Останавливает бесконечный поиск"),
     Setting(MAX_DEPTH, "Предел глубины", "Выполнение", "int", DEFAULT_MAX_DEPTH, 0,
             MAXIMUM_MAX_DEPTH,
-            hint="Глубина рекурсии; 0 — без предела.  Защита от убежавшей программы"),
+            hint="Глубина рекурсии; 0 — без предела.  Без предела убежавшую рекурсию останавливает только память"),
     Setting(MAX_FINDALL, "Предел решений НАЙТИВСЕ", "Выполнение", "int",
             DEFAULT_MAX_FINDALL, 0, MAXIMUM_MAX_FINDALL,
             hint="Столько решений соберёт НАЙТИВСЕ; 0 — без предела.  Предел — ошибка, а не обрезанный список"),
@@ -973,9 +977,9 @@ class Settings:
     def limits(self) -> dict:
         """The three caps, as the `limits` object of a `load` (protocol 9).
 
-        `0` is «без предела» and is therefore *left out*: the engine's own
-        defaults are the ones to use, and a zero on the wire would be a second
-        way of saying «nothing asked for».  The timeout is not here — the window
+        `0` is «без предела» and is therefore *left out*: the engine's own default
+        is «без предела» as well, so a zero on the wire would be a second way of
+        saying «nothing was asked for».  The timeout is not here — the window
         keeps that clock.
         """
         asked = {

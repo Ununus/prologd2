@@ -47,6 +47,7 @@ from . import (
     panels,
     reference,
     search,
+    settings,
     settingsdialog,
     shortcuts,
 )
@@ -1196,10 +1197,9 @@ class MainWindow(QMainWindow):
         # the deadline is the window's own clock — the same answer «Остановить»
         # uses, so a program that computes forever stops on time.
         limits = self._settings.limits()
-        if limits:
-            self._append_note("--- пределы: " +
-                              ", ".join(f"{name} {value}" for name, value in limits.items()) +
-                              " ---\n")
+        note = self._limits_note()
+        if note:
+            self._append_note(note)
         self._arm_timeout()
         if path is not None and not buffer.is_modified():
             # A saved, unmodified buffer is loaded by path: `ИМПОРТ` resolves
@@ -1222,6 +1222,37 @@ class MainWindow(QMainWindow):
             name = pathlib.Path(path).name if path else buffer.title()
             self._status.setText(f"выполняется {name} (есть несохранённые правки)")
         return True
+
+    def _limits_note(self) -> str:
+        """The limits a run goes with, in the words of their rows (task_46).
+
+        This is the window's half of the answer a limit that fires leaves open.
+        The engine's message names the limit and its value («Превышен предел шагов
+        выполнения: 5000») and nothing else — it has no idea that a command line
+        or a settings dialog exists (ADR-020) — while the row that raises a limit
+        is *here*.  So a run whose limits differ from the shipped ones says so
+        before it starts, named the way the dialog names them: a limit nobody can
+        find is the mystery the message alone would leave.
+
+        A value equal to the default is not a choice the user made, and a run of a
+        lesson would otherwise report the same two numbers for ever.
+        """
+        named = []
+        for value, default, label in (
+            (self._settings.max_steps, settings.DEFAULT_MAX_STEPS, "«Предел шагов»"),
+            (self._settings.max_depth, settings.DEFAULT_MAX_DEPTH, "«Предел глубины»"),
+            (self._settings.max_findall, settings.DEFAULT_MAX_FINDALL,
+             "«Предел решений НАЙТИВСЕ»"),
+            (self._settings.timeout_seconds, settings.DEFAULT_TIMEOUT_SECONDS,
+             "«Предел времени, с»"),
+        ):
+            if value == default:
+                continue
+            named.append(f"{label} {value}" if value else f"{label} — без предела")
+        if not named:
+            return ""
+        return ("--- пределы: " + ", ".join(named) +
+                " — строки в «Выполнении» настроек ---\n")
 
     def _arm_timeout(self) -> None:
         """Starts the «Предел времени» clock of a run, if one is set (task_46).

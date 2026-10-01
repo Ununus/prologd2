@@ -717,11 +717,16 @@ left off the wire.
 `load` takes `"limits"` as well (version 9): `{"maxSteps":100000,"maxDepth":10000,
 "maxFindall":1000}`, each `0` for «без предела», applied *before* the load — the
 program's own `?`-statements run during it, and a limit set afterwards would miss
-the run it was meant for.  A limit that fires ends the run with a diagnostic that
-names the limit, its value and the flag or setting that raises it
-(`--max-steps`/«Предел шагов»); the `НАЙТИВСЕ` cap is a *diagnostic*, never a
-silently shortened list.  The window's «Предел времени» is not in this object: the
-deadline belongs to the front-end (a timer and the `interrupt` request), which
+the run it was meant for.  The engine has **no limits of its own**: a limit is
+something a front-end asks for, here or on the command line, so this window sends
+the three it was configured with and leaves the rest out.  A limit that fires ends
+the run with a diagnostic that names the limit and its value («Превышен предел
+шагов выполнения: 5000») and nothing else — the engine knows about neither a flag
+nor a dialog row (ADR-020) — so the *window* answers «where do I raise it»: the
+run prints «пределы: «Предел шагов» 5000 — строки в «Выполнении» настроек» before
+it starts, in the words of the rows.  The `НАЙТИВСЕ` cap is a *diagnostic*, never a
+silently shortened list.  The window's «Предел времени, с» is not in this object:
+the deadline belongs to the front-end (a timer and the `interrupt` request), which
 keeps a clock out of the solver's hot loop — and a program waiting *outside* the
 solver (a `ВВОД` nobody answers) is not preempted by it at all.  A request with a
 field of the wrong type — `"maxSteps":-1`, or a string where a number belongs —
@@ -811,11 +816,12 @@ Two pieces of work are planned in task files of their own (`ai/task_*.md`):
 * **Interpreter options, profiles and limits** —
   `ai/task_46_interpreter_options_and_limits.md`.  The limits are done: the
   session carries them on `load` (protocol 9), the dialog has a row for each of
-  them plus «Предел времени», and each of them names itself when it fires.  Still
-  open: the path to the interpreter (still `--exe`), the working directory of the
-  process, and named profiles.
+  them plus «Предел времени, с», and a run names the rows it goes with before it
+  starts.  Still open: the path to the interpreter (still `--exe`), the working
+  directory of the process, and named profiles.
 
-The rest of task_29's list (RU/EN, «использовать системные цвета» as a choice of
-its own beyond the three themes) is named in `ai/task_29_gui_settings.md`; the
-settings dialog, the live apply, the session restore, the recent files, the theme
-page and the small switches are done.
+task_29's own list is closed: «использовать системные цвета» was done with the
+three themes, and **RU/EN was dropped** (2026-10-01, ADR-021 — the window stays
+Russian, and English belongs to the language, not to the interface); the settings
+dialog, the live apply, the session restore, the recent files, the theme page and
+the small switches are done.

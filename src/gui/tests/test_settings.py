@@ -283,9 +283,15 @@ def test_the_new_keys_have_the_documented_defaults(directory: pathlib.Path) -> N
     assert settings.follow_output is True, "the pane followed the end before the switch"
     assert settings.input_mode == settings_module.DEFAULT_INPUT_MODE == "panel"
     assert settings.run_questions is True, "a lesson is run to see its questions answered"
-    # task_46's guards: steps and time are unlimited out of the box, depth and
-    # НАЙТИВСЕ carry the engine's own numbers — and a limit nobody asked for is
-    # left *off* the wire, so an old engine sees exactly the traffic it saw before.
+    # task_46's guards: the engine itself has no limits at all, and the window
+    # ships numbers a lesson cannot notice but a runaway cannot outlive — no step
+    # cap, a million frames, a million solutions and no clock.  A limit nobody
+    # asked for is left *off* the wire, so an engine that knows nothing about the
+    # record sees exactly the traffic it saw before.
+    assert settings_module.DEFAULT_MAX_STEPS == 0, "no step cap out of the box"
+    assert settings_module.DEFAULT_MAX_DEPTH == 1_000_000
+    assert settings_module.DEFAULT_MAX_FINDALL == 1_000_000
+    assert settings_module.DEFAULT_TIMEOUT_SECONDS == 0, "no clock out of the box"
     assert settings.max_steps == 0, "no step limit until one is asked for"
     assert settings.timeout_seconds == 0, "no deadline until one is asked for"
     assert settings.max_depth == settings_module.DEFAULT_MAX_DEPTH

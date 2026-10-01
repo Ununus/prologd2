@@ -95,7 +95,7 @@ session and the limits of task_46 (protocol 9).
 | task_26_gui_toolbar | done | one action table (48 commands, 12 disabled with a reason) feeding the menu bar, the toolbar and the context menu; icon audit in `src/gui/README.md` (48 names referenced, 42 drawn, 6 left: the «Вид» switches) |
 | task_27_gui_panels | done | movable panel (`F4`, `Ctrl+F4`), output pane (colour by kind, visible half-lines, bounded history, auto-scroll, save to a file), input console with the queue switch, status-bar details and the two-state run/stop |
 | task_28_gui_run_step | done | `EngineOptions::stepHook` + `StepInfo`, protocol 3 (`step`/`trace` events, `step` request, positions on `error`), the step strip with the call stack, the trace line in the editor, `F10`/`Shift+F10`/`F5`, error and trace lines from structured positions |
-| task_29_gui_settings | done | `settings.SETTINGS` — one record per preference (key, label, section, kind, default, bounds, hint) that drives the dialog's row, validation, `«Сбросить»` and the map_positions-style test; `settingsdialog.SettingsDialog` with sections `Редактор/Вид/Формат/Выполнение/Файлы/Вставки`, «ОК»/«Применить»/«Отмена»/«Сбросить»/«Импорт…»/«Экспорт…»; the window applies everything without a restart (`apply_settings`); new keys: `output/font_size` (unset = follow the editor), `output/line_limit`, `editor/completion_match_case`, `editor/current_line`, `execution/working_directory`, `execution/import_paths`, `files/autosave_minutes`, `files/recent_limit`; unknown keys preserved through a foreign file; the dark theme, RU/EN, session restore and the sandbox limits stay open (named in the task file) |
+| task_29_gui_settings | done | `settings.SETTINGS` — one record per preference (key, label, section, kind, default, bounds, hint) that drives the dialog's row, validation, `«Сбросить»` and the map_positions-style test; `settingsdialog.SettingsDialog` with sections `Редактор/Вид/Формат/Выполнение/Файлы/Вставки`, «ОК»/«Применить»/«Отмена»/«Сбросить»/«Импорт…»/«Экспорт…»; the window applies everything without a restart (`apply_settings`); new keys: `output/font_size` (unset = follow the editor), `output/line_limit`, `editor/completion_match_case`, `editor/current_line`, `execution/working_directory`, `execution/import_paths`, `files/autosave_minutes`, `files/recent_limit`; unknown keys preserved through a foreign file; the dark theme and the system colours are done, session restore and the small switches are done, and **RU/EN was dropped** (ADR-021); profiles and limits are `task_46`, the graphics window `task_45` |
 | task_30_gui_formatter | done | `prlib/formatter.cpp` (whitespace-only, everything else copied byte for byte); three modes — **в одну строку**, **мягкое** (строки строятся заново: цели собираются до ширины) and **жёсткое** — chosen in «Правка → Формат»; `prologd --format[=soft|hard|line]` with `--format-width`, `--format-indent` and `--format-unit`; protocol **7**+**8** (`format` → `formatted`/`error`, answerable between queries; `loaded` when a run is over); the window's `Ctrl+I` with one undo step and the caret and selection mapped onto the new text; a source that does not parse is never rewritten |
 | task_31_gui_shortcuts | done | `shortcuts.py` — a Qt-free table of `Ctrl`+**physical key** insertions, matched on `nativeScanCode()`: `:-.`, `()`, `[]`, `#`, `?`, `РАВНО(,)`, `БОЛЬШЕ(,)`, `МЕНЬШЕ(,)`, `СЛОЖЕНИЕ(,,)`, `УМНОЖЕНИЕ(,,)` and the simple symbols `/ - _ ! '' ""`; `:` and `?` carry two chords each (Russian `Shift+6`/`Shift+7`), a selection is *wrapped* by the bracket-like rows, every insert is one undo step, only `Ctrl` (plus `Shift`) is accepted — `Alt` and `Ctrl+Alt` are left to the window; the table is data in the settings file (`shortcuts/table`, JSON, one entry per insert with a list of chords) and «Справка → Шпаргалка по вставкам» lists it from the same object; zoom stays on the keypad, `|` has no chord (merge keeps `Ctrl+Shift+\`) |
 | task_32_import_search_report | done | `ИМПОРТ` failure names the directories tried, with reasons |
@@ -112,7 +112,7 @@ session and the limits of task_46 (protocol 9).
 | task_43_language_surface | done | `ВЫП/2..N` (`call/N`): the extra arguments are appended to the goal (callee dereferenced first; the keyword table says `ВЫП/+`; the checker expands the same term; `!` inside the argument stays a parse error and the manual no longer promises it); the module-collision warning — one per predicate fed by two files with no import path between them, silent for the diamond and for extending an imported module (ADR-019); the dead library is gone (`?СКОЛЬКО(НЕ, А)` answers 0; ADR-018) |
 | task_44_names | done | the two names that promised something else: `ИЛИ/2` → `ПЕРВОЕ/2` (`or` → `first`) with the retired spelling removed from the language (a call is a load error naming the replacement), `НАЙТИВСЁ` → `НАЙТИВСЕ` (the spelling of the task and of the reference notes) with the retired spelling kept reserved, so its call is the ordinary suggestion «возможно, НАЙТИВСЕ/3»; the two `ИЛИ` library clauses removed so the old name cannot answer through the database; `doc/help.typ` §4.6, `prologd-diff.typ` §17/§18, lesson 4's section 5 |
 | task_45_gui_graphics_window | not started | the graphics predicates become *visible*: a bitmap backend inside the engine (the source of truth, so `getPixel` and `ЗАКРАСКА` need no round trip), protocol 10 events (`9` went to task_46's limits) plus a snapshot, a Qt-free canvas and a window of its own — the last disabled menu entry.  Split out of task_21/task_15 on 2026-10-01 |
-| task_46_interpreter_options_and_limits | in progress | the limits are in: `Limits` + `applyTo` in the engine, `--max-findall`, protocol **9** (`limits` on `load`, a bad field is an `error` instead of a dead session), four dialog rows and a front-end deadline.  Still open: the interpreter path, the process directory, profiles, and `--timeout-ms` (a text-mode deadline would need a clock in the solver).  The last item of task_29's settings list, split out on 2026-10-01 |
+| task_46_interpreter_options_and_limits | in progress | the limits are in: `Limits` + `applyTo` in the engine, `--max-findall`, protocol **9** (`limits` on `load`, a bad field is an `error` instead of a dead session), four dialog rows and a front-end deadline.  The core has **no limits of its own** (0 = «без предела», messages name a limit and its value only — ADR-020) and the window ships 0 / 1 000 000 / 1 000 000 / 0.  Still open: the interpreter path, the process directory, profiles, and `--timeout-ms` (a text-mode deadline would need a clock in the solver).  The last item of task_29's settings list, split out on 2026-10-01 |
 
 ## Test suite
 
@@ -173,9 +173,10 @@ plain scripts.
    dialog that edits it is task_29, and `--settings FILE` overrides the path.
    Open for the next session, and no longer part of task_29: the **graphics
    window** (`task_45_gui_graphics_window.md`) and the **interpreter options,
-   profiles and limits** (`task_46_interpreter_options_and_limits.md`).  What is
-   left of task_29 is RU/EN and «использовать системные цвета» as a choice beyond
-   the three themes.
+   profiles and limits** (`task_46_interpreter_options_and_limits.md`).  task_29's
+   own list is closed: «использовать системные цвета» was done with the three
+   themes, and **RU/EN was dropped** on 2026-10-01 (ADR-021 — the window stays
+   Russian).
 
 ## Open questions for the user
 
@@ -1297,3 +1298,32 @@ Added on 2026-10-02 while implementing task_31:
   запросе процесс раньше падал.
   252/252 ctest, 20 headless-скриптов GUI, пять PDF (`gui.pdf` — 27 страниц, §6.3
   на 19–20; `help.pdf` — 30 страниц, §15 на 24).
+* GUI round, part 42 (follow-up после разбора: **архитектура, умолчания и отмена
+  RU/EN**).  Четыре правки одного вечера.
+  (1) **Интерпретатор ничего не знает о GUI**: сообщения пределов больше не
+  называют ни флаг, ни строку настроек — «Превышена глубина рекурсии: 200»,
+  «Превышен предел шагов выполнения: 5000», «Превышен предел решений НАЙТИВСЕ:
+  50».  ADR-020: предел — опция *запуска*, а не знание ядра; «где поднять» говорит
+  тот, кто поставил число — флаг в `--help`, строка в диалоге.  В окне это делает
+  сам прогон: строка «пределы: «Предел шагов» 5000 — строки в «Выполнении»
+  настроек» перед запуском, и только про те пределы, что отличаются от умолчаний
+  (иначе панель сообщала бы одни и те же два числа на каждом запуске).  Тесты
+  стерегут обе стороны: в сообщении есть предел и его значение и нет слова
+  «настройках».
+  (2) **Умолчания ядра — без предела** (0 у шагов, глубины и НАЙТИВСЕ): свежий
+  `prologd` ведёт программу до конца, а `--max-depth 0` перестал быть «снятием»
+  того, чего и не было.  Единственный оставшийся умолчания —
+  `kDefaultMaxNestedDepth`, и он не предел для пользователя, а защита стека
+  вложенных решателей (task_38).  Следствие записано в руководстве честно: без
+  предела убежавшую рекурсию не останавливает ничто, она растёт, пока не кончится
+  память (цепочка кадров освобождается итеративно, так что это память, а не стек
+  C++).  Отсюда и `engine_limits.cmake` теперь сам передаёт `--max-depth 10000`.
+  (3) **Умолчания окна** — 0 / 1 000 000 / 1 000 000 / 0: шаги и часы выключены,
+  глубина и решения ограничены числом, которого не заметит ни одна учебная
+  программа, а убежавшая — не переживёт.  Это окно берёт на себя решение о том,
+  что для урока безопасно, потому что ядро его не принимает.
+  (4) **RU/EN отменяется** (ADR-021): окно остаётся русским, никакого
+  `QTranslator`; английский остаётся у языка (имена встроенных, task_39) и у
+  руководства.  Пункт закрыт в task_29 и в §10 `gui.typ` — теперь он там назван
+  решением, а не долгом.
+  252/252 ctest, 20 headless-скриптов GUI, пять PDF.

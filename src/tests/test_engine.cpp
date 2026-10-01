@@ -156,15 +156,15 @@ TEST_CASE("the depth limit reports runaway recursion") {
   REQUIRE(result.loaded);
   REQUIRE(result.runtimeError);
   REQUIRE(result.error.find("Превышена глубина рекурсии") != std::string::npos);
-  // A limit that fires has to name itself: the value, the flag and the setting
-  // that raises it (task_46).  A message that only says "too deep" leaves the
-  // reader with no way out.
+  // A limit that fires names itself and its value.  It names nothing else on
+  // purpose: raising it is the caller's vocabulary — a flag, a protocol field, a
+  // row of a settings dialog — and the engine knows about none of them (ADR-020).
   REQUIRE(result.error.find("200") != std::string::npos);
-  REQUIRE(result.error.find("--max-depth") != std::string::npos);
-  REQUIRE(result.error.find("Предел глубины") != std::string::npos);
+  REQUIRE(result.error.find("--max-depth") == std::string::npos);
+  REQUIRE(result.error.find("настройках") == std::string::npos);
 }
 
-TEST_CASE("every limit names itself, its value and where to raise it") {
+TEST_CASE("every limit names itself and its value") {
   SECTION("steps") {
     const auto result = runProgram(
         "цикл :- цикл.\n"
@@ -177,8 +177,7 @@ TEST_CASE("every limit names itself, its value and where to raise it") {
     REQUIRE(result.runtimeError);
     REQUIRE(result.error.find("Превышен предел шагов") != std::string::npos);
     REQUIRE(result.error.find("1000") != std::string::npos);
-    REQUIRE(result.error.find("--max-steps") != std::string::npos);
-    REQUIRE(result.error.find("Предел шагов") != std::string::npos);
+    REQUIRE(result.error.find("--max-steps") == std::string::npos);
   }
 
   SECTION("НАЙТИВСЕ") {
@@ -195,9 +194,9 @@ TEST_CASE("every limit names itself, its value and where to raise it") {
           limits.applyTo(engine.options());
         });
     REQUIRE(result.runtimeError);
-    REQUIRE(result.error.find("Предел решений НАЙТИВСЕ") != std::string::npos);
+    REQUIRE(result.error.find("Превышен предел решений НАЙТИВСЕ") != std::string::npos);
     REQUIRE(result.error.find("50") != std::string::npos);
-    REQUIRE(result.error.find("--max-findall") != std::string::npos);
+    REQUIRE(result.error.find("--max-findall") == std::string::npos);
   }
 
   SECTION("a zero means «no limit» for every one of them") {
@@ -218,13 +217,16 @@ TEST_CASE("every limit names itself, its value and where to raise it") {
   }
 
   SECTION("defaults") {
-    // One record, one set of defaults: a front-end that hands in nothing gets
-    // exactly what the engine had before the record existed.
+    // A fresh engine has **no** limits: a limit is something the caller asks
+    // for, and one record carries that request, so the CLI and the protocol
+    // cannot disagree about what «nothing asked for» means (task_46).
     prologd::EngineOptions options;
     prologd::Limits().applyTo(options);
     REQUIRE(options.maxSteps == 0);
-    REQUIRE(options.maxDepth == prologd::kDefaultMaxDepth);
-    REQUIRE(options.maxFindAllSolutions == prologd::kDefaultMaxFindAllSolutions);
+    REQUIRE(options.maxDepth == 0);
+    REQUIRE(options.maxFindAllSolutions == 0);
+    // The nesting guard is the exception, and it is not a limit the user sets:
+    // it keeps a meta-call from growing the C++ stack of nested solvers.
     REQUIRE(options.maxNestedDepth == prologd::kDefaultMaxNestedDepth);
   }
 }

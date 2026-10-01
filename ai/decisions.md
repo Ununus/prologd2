@@ -526,3 +526,77 @@ A program that intends one name across two unrelated files gets a warning it can
 ignore — warnings never change exit codes and `--no-warnings` drops it.
 
 **Status.** Accepted.
+
+---
+
+## ADR-020: A limit is a run option, and the core names no front-end
+
+**Context.** task_46 added the run limits (steps, recursion depth, `НАЙТИВСЕ`
+solutions; the wall-clock deadline is the front-end's, see below).  The first cut
+had the engine's messages quote both the flag and the dialog row that raise the
+limit — «Превышена глубина рекурсии: 10000 (--max-depth; «Предел глубины» в
+настройках окна)» — and the engine's own defaults were 10 000 (depth) and
+1 000 000 (solutions).  prlib is used by the command line, by the protocol
+session, by the tests and by the lessons runner; a message that names a settings
+row of the PySide6 window is a dependency pointing the wrong way, and it goes
+stale the moment a front-end renames a row or disappears.
+
+**Decision.** The core knows no front-end.
+
+* `0` means «no limit» for all three, and a fresh engine has **no limits**: a
+  limit is something the *caller* asks for — `--max-steps`/`--max-depth`/
+  `--max-findall` on the command line, the `limits` object of a protocol `load`,
+  a row of a settings dialog.  `Limits` is the one record that carries that
+  request into `EngineOptions`, so the three callers cannot disagree about what a
+  zero means.
+* A limit that fires prints the limit and its value and stops there:
+  «Превышен предел шагов выполнения: 5000», «Превышена глубина рекурсии: 200»,
+  «Превышен предел решений НАЙТИВСЕ: 50».  No flag, no row, no advice.
+* «Where do I raise it» is answered by whoever put the number there, in their own
+  vocabulary: the CLI's `--help`, and in the window a line the run prints before
+  it starts, in the words of the dialog's rows («пределы: «Предел шагов» 5000 —
+  строки в «Выполнении» настроек»).
+* The **wall-clock deadline is not in the engine at all**: `steady_clock::now()`
+  in the solver's hot loop is a cost per solution, and the front-end owns the
+  clock anyway (a QTimer plus the existing `interrupt` request, the command
+  line's Ctrl+C).  Consequence, documented rather than papered over: a
+  *computing* run stops on the deadline, a run waiting **outside** the solver
+  (`ВВОД` nobody answers) is ended by «Остановить» and not by the deadline.
+* The one default that stands is `kDefaultMaxNestedDepth` — the guard on
+  `НАЙТИВСЕ`/`ВЫП` nesting inside themselves.  It is not a limit a user sets and
+  has no flag or row, because it guards the C++ stack of nested solvers
+  (task_38), not a promise about the program.
+
+**Consequences.** Running `prologd` with no flags runs a program to the end: a
+runaway recursion is stopped by nothing and grows until memory runs out (the
+frame chain is released iteratively, so it is memory and not the C++ stack).  The
+safety therefore lives where the audience does — the window ships 0 / 1 000 000 /
+1 000 000 / 0, numbers no lesson program can notice and a runaway cannot outlive
+— while a script that wants a guard asks for one.  The tests pin the wording in
+both directions: a message contains the limit and its value, and does *not*
+contain a flag or the word «настройках».
+
+**Status.** Accepted.
+
+---
+
+## ADR-021: The window stays Russian
+
+**Context.** task_29's settings list carried «язык интерфейса RU/EN» (the
+reference front-end was Russian only), which would mean a translation layer and a
+second set of every string in the window: menu, dialog, hints, diagnostics
+wrappers, the reference dock.
+
+**Decision.** Not planned — dropped 2026-10-01.  The window is Russian only; no
+`QTranslator`, no string tables, no language setting.  This is about the
+*interface*: the language keeps its English spellings of the built-in predicates
+(task_39) and `doc/help.typ` keeps everything a reader of ordinary Prolog
+expects, because that is the *language*, not the shell.
+
+**Consequences.** Every label, hint and message written in the window stays a
+plain Russian string, which is why `settings.py` can hold the labels of the dialog
+verbatim.  A future translation would start from scratch; nothing is prepared for
+it, and nothing pretends to be.
+
+**Status.** Accepted (task cancelled by the user's decision).
+

@@ -99,8 +99,10 @@ def main(argv: list[str]) -> int:
     assert find(events, "error", kind="parse"), events
     print("ok: parse failure is reported as an event with exit code 2")
 
-    # task_46: the caps travel with the load, and the message names the limit, its
-    # value and the flag that raises it — a limit nobody can name is a mystery.
+    # task_46: the caps travel with the load, and the message names the limit and
+    # its value.  It names nothing else: the interpreter knows nothing about the
+    # window or its command line (ADR-020), so «where do I raise it» is answered
+    # by whichever front-end put the number there.
     code, events = run_session(
         executable,
         [protocol.load_text("цикл :- цикл.\n?цикл.\n", limits={"maxSteps": 1000})],
@@ -110,8 +112,8 @@ def main(argv: list[str]) -> int:
     stopped = find(events, "error", kind="runtime")
     message = stopped["message"]
     assert "предел шагов" in message, message
-    assert "1000" in message and "--max-steps" in message, message
-    assert "Предел шагов" in message, message
+    assert "1000" in message, message
+    assert "--max-steps" not in message and "настройках" not in message, message
     print("ok: a limit travels with the load and names itself when it fires")
 
     # A field of the wrong *type* is the front-end's mistake, not a reason to take

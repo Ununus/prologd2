@@ -2465,13 +2465,17 @@ def test_the_theme_switch_reaches_the_text_and_the_widgets(executable: str) -> N
 
 
 def test_the_limits_stop_a_runaway_and_name_themselves(executable: str) -> None:
-    """task_46: a runaway program stops, and the message says which limit did it.
+    """task_46: a runaway program stops, and the window says which row did it.
 
     The three caps travel with the load (`limits`, protocol 9) and the deadline is
     the window's own clock — the same polite stop «Остановить» uses.  A program the
     deadline cannot reach is pinned too: waiting *outside* the solver is a state the
     request only sees afterwards, which is why «Остановить» is still the answer for
     a program that waits for input nobody gives.
+
+    The engine's message names a limit and its value and stops there — it knows
+    nothing about this window (ADR-020) — so the run itself names the row that
+    raises it, in the words of the dialog, before it starts.
     """
     from prologd_gui.settings import Settings
 
@@ -2483,12 +2487,15 @@ def test_the_limits_stop_a_runaway_and_name_themselves(executable: str) -> None:
         window._settings.timeout_seconds = 2
         window._actions["run"].trigger()
 
-        assert "пределы: maxSteps 5000" in window.output_text(), window.output_text()
+        notes = window.output_text()
+        assert "пределы: «Предел шагов» 5000" in notes, notes
+        # A limit left at the shipped number is not a choice the user made.
+        assert "Предел глубины» 1000000" not in notes, notes
         assert window._timeout.isActive() is True, "the deadline was not armed"
         said = pump(window, lambda: "предел шагов" in window.output_text())
         assert said, f"the run never stopped: {ascii(window.output_text())}"
         text = window.output_text()
-        assert "5000" in text and "Предел шагов" in text, ascii(text)
+        assert "Превышен предел шагов выполнения: 5000" in text, ascii(text)
         assert window._timeout.isActive() is False, "the deadline outlived its run"
 
         # «Предел времени»: the run is asked to stop, and the pane says by what.

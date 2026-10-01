@@ -36,11 +36,13 @@ The JSON session exposed **none** of the limits until protocol 9: `load` carried
 
 ## Deliverables
 
-- [x] **One place that builds the limits.**  `prlib/engine.hpp` has named defaults
-      (`kDefaultMaxDepth`, `kDefaultMaxFindAllSolutions`, …) and a `Limits` struct
-      with `applyTo(EngineOptions&)`; `--max-steps`/`--max-depth`/`--max-findall`
-      all go through it, so a flag and a setting cannot drift apart.  The struct
-      deliberately **has no timeout**: see the note below.
+- [x] **One place that builds the limits.**  `prlib/engine.hpp` has a `Limits`
+      struct with `applyTo(EngineOptions&)`, and `--max-steps`/`--max-depth`/
+      `--max-findall` all go through it, so a flag and a setting cannot drift apart.
+      Its defaults are **no limit** at all (ADR-020): a limit is an option of the
+      run, not a property of the core, and the core's messages name a limit and its
+      value and nothing else — no flag, no dialog row.  The struct deliberately
+      **has no timeout**: see the note below.
 - [x] **CLI parity, half of it**: `--max-findall N` sits next to
       `--max-steps`/`--max-depth` and is documented in `help.typ`.
 - [ ] **CLI parity, the rest**: `--timeout-ms N` — a *text-mode* deadline.  Not
@@ -51,11 +53,11 @@ The JSON session exposed **none** of the limits until protocol 9: `load` carried
 - [x] **Protocol 9**: the `limits` object on `load` (`maxSteps`, `maxDepth`,
       `maxFindall`; `0` = без предела; applied *before* the load, because the
       program's own `?`-statements run during it).  A limit that fires ends the
-      run with a diagnostic that **names the limit, its value and where to raise
-      it** — «Превышен предел шагов выполнения: 5000 (--max-steps; «Предел шагов»
-      в настройках окна)», and the window's row carries the same name.  A request
-      with a field of the wrong type (`"maxSteps":-1`) is an `error` event of
-      kind `protocol` and the session reads the next line; before version 9 such
+      run with a diagnostic that **names the limit and its value** — «Превышен
+      предел шагов выполнения: 5000» (ADR-020; the callers' vocabulary stays with
+      the callers: `--help` names the flag, the window names its own rows).  A
+      request with a field of the wrong type (`"maxSteps":-1`) is an `error` event
+      of kind `protocol` and the session reads the next line; before version 9 such
       a request took the process down.  `timeoutMs` is **not** on the wire (see
       the design notes).
 - [ ] **The GUI rows** (`Выполнение`): `execution/interpreter` (a file path — the
@@ -69,8 +71,11 @@ The JSON session exposed **none** of the limits until protocol 9: `load` carried
       `execution/max_depth` → «Предел глубины», `execution/max_findall` → «Предел
       решений НАЙТИВСЕ», `execution/timeout_seconds` → «Предел времени, с»; all
       four `0 = без предела`, and the three solver limits are sent with every
-      `load`.  The run names them in the output pane («пределы: maxSteps 5000,
-      maxDepth 10000») so a program that stops has an explanation next to it.
+      `load`.  The window's own defaults are **0 / 1 000 000 / 1 000 000 / 0**: the
+      decision about what is safe for a lesson is the window's, since the core
+      refuses to make it.  The run names the rows it differs from in the output
+      pane («пределы: «Предел шагов» 5000 — строки в «Выполнении» настроек»), which
+      is the window's half of «where do I raise it».
 - [ ] **Profiles**: `execution/profiles` — a table of named sets of (the `-I`
       list, the limits, the interpreter path), stored as JSON in the settings file
       the way `shortcuts/table` is; `execution/profile` — the active name; a page
@@ -82,6 +87,12 @@ The JSON session exposed **none** of the limits until protocol 9: `load` carried
 
 ## Design notes
 
+* **The core knows no front-end (ADR-020, 2026-10-01).**  A limit is an option of
+  the *run*: the engine's own defaults are «без предела», its messages name a limit
+  and its value and stop there, and the vocabulary of raising one — a flag, a
+  dialog row — lives with whoever owns it.  So the window carries the numbers that
+  make a lesson safe (0 / 1 000 000 / 1 000 000 / 0) and says, before a run, which
+  of its rows differ from them.
 * **The wall-clock timeout lives in the front-end, by decision (2026-10-01).**
   The engine counts steps and never looks at a clock: a `steady_clock::now()` in
   the solver's hot path is a cost paid for every solution, and it is the front-end
@@ -93,8 +104,7 @@ The JSON session exposed **none** of the limits until protocol 9: `load` carried
   program **waiting for input** (`ВВОД` with nobody answering) is blocked outside
   the solver and the deadline does not reach it — that is what «Остановить» is for.
   A text-mode `--timeout-ms` would need the engine clock back; it stays unwritten
-  until someone wants a deadline outside the window.
-* The **step cap is the cheap guard** for a runaway *search* (it counts work), the
+  until someone wants a deadline outside the window.* The **step cap is the cheap guard** for a runaway *search* (it counts work), the
   **timeout** for a slow computation (it counts wall clock), and the `НАЙТИВСЕ`
   cap is a **diagnostic, not a silent truncation**: reaching it is an error that
   says which setting raised it, because a truncated result set that looks complete

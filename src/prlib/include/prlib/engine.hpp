@@ -71,29 +71,28 @@ enum class StepDecision {
   Stop,      ///< end the query: the engine raises `Interrupted`
 };
 
-/// The default guards of a fresh engine (task_46).  They are named here because
-/// the command line, the protocol and the settings dialog all quote them, and a
-/// default written out in three places is three chances to drift.
+/// The one guard of a fresh engine that is not a limit the user sets: how deep
+/// `НАЙТИВСЕ` and `ВЫП` may nest inside themselves before the solver refuses to go
+/// on.  There is no flag and no setting for it, because it guards the C++ stack
+/// of the nesting itself — every level is a `Solver` — and not a promise about
+/// the program (task_38).
 inline constexpr std::size_t kDefaultMaxNestedDepth = 10'000;
-inline constexpr std::size_t kDefaultMaxFindAllSolutions = 1'000'000;
-inline constexpr std::size_t kDefaultMaxDepth = 10'000;
 
 struct EngineOptions {
   bool trace = false;
   std::size_t maxNestedDepth = kDefaultMaxNestedDepth;
-  std::size_t maxFindAllSolutions = kDefaultMaxFindAllSolutions;
-  std::size_t maxSteps = 0;  // 0 = unlimited
-  /// How deep a clause body may nest before the solver refuses to go on.
-  ///
-  /// The solver itself is a loop — logical depth costs heap, not the C++ stack —
-  /// but a frame chain is still *released* through shared_ptr destructors, and
-  /// a chain of tens of thousands of frames coming down in one go is a real
-  /// stack overflow (measured at ~16 000-32 000 on Windows, where a correct
-  /// program printed its answer and then died with 0xC00000FD).  The chain is
-  /// released iteratively now, so this limit is a *guard against runaway
-  /// programs*, not a workaround: a lesson needs hundreds of levels, and a
-  /// search that needs more asks for it with `--max-depth 0`.
-  std::size_t maxDepth = kDefaultMaxDepth;
+  /// The guards of a run (task_46): a step cap, a recursion-depth cap and a
+  /// `НАЙТИВСЕ` solution cap.  `0` means «no limit» for all three, and **no
+  /// limit** is what a fresh engine has: a limit is something the *caller* asks
+  /// for — `--max-steps`/`--max-depth`/`--max-findall` on the command line, the
+  /// `limits` object of a protocol `load`, a row of the settings dialog — and
+  /// the engine keeps no opinion about who that caller is.
+  std::size_t maxSteps = 0;
+  /// A guard against a runaway program, not a workaround: the solver loops
+  /// instead of recursing, and the chain of frames is released iteratively
+  /// (task_38), so an unlimited run costs memory rather than the C++ stack.
+  std::size_t maxDepth = 0;
+  std::size_t maxFindAllSolutions = 0;
 
   /// Extra stop condition, polled by the solver next to the internal flag.
   /// A front-end uses it to turn the Ctrl+C signal flag or a GUI "Stop" button
@@ -112,17 +111,19 @@ struct EngineOptions {
 
 /// The guards a front-end hands in, in one record (task_46).
 ///
-/// `0` means "no limit" everywhere — the command line, the protocol and the
-/// settings dialog copy them into the options through `applyTo`, so the three
-/// cannot disagree about what a zero means or where a default comes from.  The
-/// wall-clock timeout is deliberately **not** here: it is a property of the run,
-/// not of the solver — the front-end owns the clock (a GUI timer, the command
-/// line's Ctrl+C), which also keeps a `steady_clock::now()` out of the solver's
-/// hot loop.
+/// `0` means «no limit» everywhere, which is also the record's own default: the
+/// command line, the protocol and the settings dialog copy their values into the
+/// options through `applyTo`, so the three cannot disagree about what a zero
+/// means.  A message a limit prints names the limit and its value and stops
+/// there — raising it is the caller's vocabulary (a flag, a dialog row), and the
+/// engine knows about neither.  The wall-clock timeout is deliberately **not**
+/// here: it is a property of the run, not of the solver — the front-end owns the
+/// clock (a GUI timer, the command line's Ctrl+C), which also keeps a
+/// `steady_clock::now()` out of the solver's hot loop.
 struct Limits {
   std::size_t maxSteps = 0;
-  std::size_t maxDepth = kDefaultMaxDepth;
-  std::size_t maxFindAllSolutions = kDefaultMaxFindAllSolutions;
+  std::size_t maxDepth = 0;
+  std::size_t maxFindAllSolutions = 0;
 
   void applyTo(EngineOptions& options) const;
 };

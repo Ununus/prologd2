@@ -115,11 +115,11 @@ int main(int argc, char** argv) {
   app.add_flag("--no-warnings", noWarnings,
                "Do not print warnings (they never change the exit code)");
   app.add_option("--max-depth", maxDepth,
-                 "Recursion depth limit for one query (0 = unlimited, default 10000)");
+                 "Recursion depth limit for one query (0 = unlimited; default: no limit)");
   app.add_option("--max-steps", maxSteps,
-                 "Step limit for one query (0 = unlimited, default unlimited)");
+                 "Step limit for one query (0 = unlimited; default: no limit)");
   app.add_option("--max-findall", maxFindAll,
-                 "Solution limit for one НАЙТИВСЕ (0 = unlimited, default 1000000)");
+                 "Solution limit for one НАЙТИВСЕ (0 = unlimited; default: no limit)");
   app.add_option("--protocol", protocol, "Front-end protocol: text (default) or json")
       ->check(CLI::IsMember({"text", "json"}));
   app.add_flag("--list-keywords", listKeywords,

@@ -476,11 +476,12 @@ void Solver::run(std::span<const Term> goals, const std::function<bool()>& on_so
       engine_.raise(ErrorCode::Interrupted);
     }
     if (engine_.options().maxSteps != 0 && ++steps_ > engine_.options().maxSteps) {
-      engine_.raise(
-          ErrorCode::Interrupted,
-          "Превышен предел шагов выполнения: " +
-              std::to_string(engine_.options().maxSteps) +
-              " (--max-steps; «Предел шагов» в настройках окна)");
+      // A limit that fires names itself and its value and stops there: the
+      // engine has no idea whether the caller is a command line, a protocol
+      // session or a window, so it quotes nothing of theirs (ADR-020).
+      engine_.raise(ErrorCode::Interrupted,
+                    "Превышен предел шагов выполнения: " +
+                        std::to_string(engine_.options().maxSteps));
     }
     // A guard, not a workaround: the solver loops instead of recursing, and the
     // chain release is iterative, so this only stops a runaway program with a
@@ -488,8 +489,7 @@ void Solver::run(std::span<const Term> goals, const std::function<bool()>& on_so
     if (engine_.options().maxDepth != 0 && env_->depth > engine_.options().maxDepth) {
       engine_.raise(ErrorCode::StackOverflow,
                     "Превышена глубина рекурсии: " +
-                        std::to_string(engine_.options().maxDepth) +
-                        " (--max-depth; «Предел глубины» в настройках окна)");
+                        std::to_string(engine_.options().maxDepth));
     }
     if (env_->index >= env_->goals->size()) {
       if (env_->parent == nullptr) {
@@ -825,10 +825,9 @@ std::vector<Term> Engine::collectAll(const Term& goal, const Term& templ,
   if (exceeded) {
     // A limit that fires is a *diagnostic*, never a silent truncation: a list
     // that stops early and looks complete is the one outcome worse than an
-    // error, so the message says the limit, its value and where to raise it.
+    // error.  The message names the limit and its value, nothing more (ADR-020).
     raise(ErrorCode::TooManySolutions,
-          "Превышен предел решений НАЙТИВСЕ: " + std::to_string(limit) +
-              " (--max-findall; «Предел решений НАЙТИВСЕ» в настройках окна)");
+          "Превышен предел решений НАЙТИВСЕ: " + std::to_string(limit));
   }
   return collected;
 }
