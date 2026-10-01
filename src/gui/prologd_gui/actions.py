@@ -49,6 +49,12 @@ APPLICATION_ICON = "prologd2"
 #: reference front-end used for exactly this, and it is still not drawn.
 THEME_ICON = "view-theme"
 
+#: The two buttons beside the «Дополнительные каталоги ИМПОРТ» list (the settings
+#: dialog's `dirs` row): «Добавить…» and «Убрать».  They are controls, not
+#: actions, so they are named here for the audit like the other control pictures.
+ADD_ICON = "settings-add"
+REMOVE_ICON = "settings-remove"
+
 #: A menu entry that is a separator or a submenu rather than an action.
 SEPARATOR = "-"
 RECENT = "recent"
@@ -206,7 +212,7 @@ BY_KEY: dict[str, Action] = {action.key: action for action in ACTIONS}
 ICON_NAMES: frozenset[str] = frozenset(
     [action.icon for action in ACTIONS if action.icon]
     + [RECENT_ICON, FIND_ICON, REPLACE_ICON, FORMAT_ICON, FILE_ICON, SAVED_ICON,
-       MODIFIED_ICON, APPLICATION_ICON, THEME_ICON]
+       MODIFIED_ICON, APPLICATION_ICON, THEME_ICON, ADD_ICON, REMOVE_ICON]
 )
 
 #: The menu bar: (title, entries).  `-` is a separator, `recent` the submenu of

@@ -281,19 +281,20 @@ split could not be undone without a restart.
 
 `test_icons.py` is the guard: it fails as soon as a name is misspelled, and it
 also checks that an icon which *does* have a file is not still listed as missing.
-The code references **45** names, **41** of which have a file in
+The code references **47** names, **43** of which have a file in
 `src/gui/assets` (64×64 PNG, transparent background).  A missing file is not an
 error: the action is built without a picture, and the name is reported once on
 stderr (`icons: no view-theme.png — the action will have no picture`).
 
-Present (41): `edit-clear`, `edit-comment`, `edit-copy`, `edit-cut`, `edit-del`,
+Present (43): `edit-clear`, `edit-comment`, `edit-copy`, `edit-cut`, `edit-del`,
 `edit-find-replace`, `edit-format`, `edit-format-set`, `edit-paste`, `edit-redo`,
 `edit-uncomment`, `edit-undo`, `execution-abort`, `execution-execute`,
 `execution-step-into`, `execution-step-over`, `execution-tracing`, `file`,
 `file-close`, `file-close-all`, `file-exit`, `file-modified`, `file-new`,
 `file-open`, `file-recent`, `file-reload`, `file-save`, `file-save-all`,
 `file-save-as`, `file-saved`, `help`, `prologd2`, `search-find`,
-`search-find-next`, `search-find-prev`, `tools-settings`, `view-full-screen`,
+`search-find-next`, `search-find-prev`, `settings-add`, `settings-remove`,
+`tools-settings`, `view-full-screen`,
 `view-graphics`, `view-zoom-in`, `view-zoom-out`, `view-zoom-reset`.
 
 Still to draw (4 names, listed in `assets.MISSING`) — the «Вид» switches

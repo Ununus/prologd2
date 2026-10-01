@@ -183,6 +183,8 @@ def test_the_folder_rows_and_the_insert_page(directory: pathlib.Path) -> None:
     dialog._ask_directory = lambda: "C:/курс"
 
     add, remove = editor.buttons()
+    assert add.icon().isNull() is False, "«Добавить…» lost its picture"
+    assert remove.icon().isNull() is False, "«Убрать» lost its picture"
     add.click()
     add.click()  # the same folder twice: the list keeps one
     dialog._ask_directory = lambda: None

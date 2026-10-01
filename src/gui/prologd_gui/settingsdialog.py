@@ -53,9 +53,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from . import actions, assets
 from . import settings as settings_module
 from . import shortcuts
-
 #: The page that is not built from the table: the insert table of task_31 is
 #: *data* in the settings file, and what the user needs here is to see it and to
 #: find the file — not a JSON editor.
@@ -79,9 +79,17 @@ class PathListEditor(QWidget):
         self._list.setMinimumHeight(72)
         add = QToolButton(self)
         add.setText("Добавить…")
+        add.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        add_picture = assets.icon(actions.ADD_ICON)
+        if add_picture is not None:
+            add.setIcon(add_picture)
         add.clicked.connect(self._add)
         remove = QToolButton(self)
         remove.setText("Убрать")
+        remove.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        remove_picture = assets.icon(actions.REMOVE_ICON)
+        if remove_picture is not None:
+            remove.setIcon(remove_picture)
         remove.clicked.connect(self.remove_selected)
         buttons = QVBoxLayout()
         buttons.setContentsMargins(0, 0, 0, 0)
