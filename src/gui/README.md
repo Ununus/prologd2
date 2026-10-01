@@ -604,11 +604,15 @@ back with half of its text is worse than one that does not come back at all, and
 an empty untitled tab is not stored, being the placeholder a first file would
 replace anyway.  A stored path whose file has gone is skipped and **named** in the
 status bar («не найдено: …») while the rest of the session opens.  A restored
-untitled tab counts as **unsaved work**, so the next close asks about it.  The
-session is written when the window really closes, and *before* the questions about
-unsaved buffers — «Отмена» leaves the window open, and a session stored on the way
-out would then describe a window that never closed.  Untick the box and the window
-opens on the welcome program instead.
+untitled tab counts as **unsaved work**, so the next close asks about it, and an
+untitled tab that *is* answered with «Не сохранять» is **left out of the session
+altogether** — the answer means the text is not to be seen again, so a session
+written before the questions would make it a lie.  The same rule works the other
+way: a tab the user saves to a file while closing is remembered as the *file* it
+became, not as the unnamed buffer it was.  The session is written when the window
+really closes, and only once the close happened: «Отмена» leaves the window open,
+and a session written on the way out would describe a window that never closed.
+Untick the box and the window opens on the welcome program instead.
 
 `Ctrl+\` splits the editor into two panes side by side — each with its own tab
 bar, both over the *same* document set, so an edit in either pane is the same

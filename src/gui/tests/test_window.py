@@ -2193,9 +2193,12 @@ def test_the_tabs_come_back_on_the_next_start(
     resurrected; an untitled tab comes back with its text and stays unsaved work;
     the tab that was showing is the one that shows again; and a file that has gone
     is named instead of silently missing from the session.
+
+    The unnamed tab is *not* left unsaved here: this check is about the text
+    travelling with the record, and a tab answered with «Не сохранять» does not
+    travel at all (that is `test_an_unnamed_tab_left_unsaved_is_forgotten`).
     """
     from prologd_gui import documents
-    from prologd_gui import window as window_module
     from prologd_gui.settings import Settings
     from prologd_gui.window import MainWindow
 
@@ -2213,10 +2216,9 @@ def test_the_tabs_come_back_on_the_next_start(
         window.editor().insertPlainText("факт(1).\n")
         third = window.current_buffer().model.name
         assert window.tab_count() == 3, window.tab_count()
+        # Nothing is unsaved here, so the close asks no questions.
+        window.buffers()[2].mark_saved()
 
-        # The window closes with that text unsaved — the answer is «не сохранять»,
-        # which is exactly the case the path-not-text rule is about.
-        window._ask_save = lambda name: window_module.DISCARD
         window.close()
     finally:
         window.stop_program()
@@ -2272,6 +2274,70 @@ def test_the_tabs_come_back_on_the_next_start(
     finally:
         discard_changes(reopened)
     print("ok: the open tabs come back on the next start, and can be switched off")
+
+
+def test_an_unnamed_tab_left_unsaved_is_forgotten(
+    executable: str, directory: pathlib.Path
+) -> None:
+    """«Не сохранять» on an unnamed buffer means it is not to be seen again.
+
+    An untitled tab is remembered by its *text*, so a session written before the
+    closing questions would bring back exactly the work the user threw away — the
+    answer would be a lie.  A tab the user saves on the way out goes the other
+    way: it is remembered as the file it became, not as the unnamed buffer it was.
+    """
+    from prologd_gui import documents
+    from prologd_gui import window as window_module
+    from prologd_gui.settings import Settings
+    from prologd_gui.window import MainWindow
+
+    kept = directory / "остаётся.pld"
+    kept.write_text("снег.\n", encoding="utf-8")
+    saved = directory / "сохранённое на выходе.pld"
+
+    window = empty_window(executable)
+    settings_path = window._settings.path
+    try:
+        window.open_path(str(kept))
+        window.new_buffer()
+        window.editor().insertPlainText("черновик.\n")
+        draft = window.current_buffer().model.name
+        window.new_buffer()
+        window.editor().insertPlainText("сохраню.\n")
+        keep = window.current_buffer().model.name
+        assert window.tab_count() == 3, window.tab_count()
+
+        # «Черновик» is thrown away, «сохраню» is written to a file of its own —
+        # the file dialog is replaced the same way the question is.
+        window._ask_save = lambda name: (
+            window_module.SAVE if name == keep else window_module.DISCARD
+        )
+        window._ask_save_path = lambda buffer: str(saved)
+        window.close()
+    finally:
+        window.stop_program()
+
+    settings = Settings(settings_path)
+    stored = documents.decode_tabs(settings.session_tabs)
+    assert [record.name for record in stored] == [kept.name, saved.name], stored
+    assert all(record.path for record in stored), "a saved tab is a file, not text"
+    assert saved.read_text(encoding="utf-8") == "сохраню.\n", saved.read_text("utf-8")
+
+    reopened = MainWindow(executable, [], settings)
+    try:
+        assert [b.model.name for b in reopened.buffers()] == [kept.name, saved.name], [
+            b.model.name for b in reopened.buffers()
+        ]
+        assert reopened.buffers()[1].text() == "сохраню.\n"
+        assert reopened.buffers()[1].is_modified() is False
+        texts = [b.text() for b in reopened.buffers()]
+        assert not any("черновик" in text for text in texts), texts
+    finally:
+        discard_changes(reopened)
+    print(
+        "ok: an unnamed tab answered with «Не сохранять» is dropped from the session, "
+        "and one saved on the way out is remembered as its file"
+    )
 
 
 def main(argv: list[str]) -> int:
@@ -2355,6 +2421,7 @@ def main(argv: list[str]) -> int:
         test_autosave_writes_named_buffers_and_skips_the_rest(executable, files)
         test_saving_before_a_run_writes_the_file(executable, files)
         test_the_tabs_come_back_on_the_next_start(executable, files)
+        test_an_unnamed_tab_left_unsaved_is_forgotten(executable, files)
     print("all window checks passed")
     del application
     return 0

@@ -1189,3 +1189,11 @@ Added on 2026-10-02 while implementing task_31:
   default.  Qt-free record helpers in `documents.py` (round trip, budget, junk
   lines) and a window check that closes one window over three tabs and opens the
   next one over the same settings file; 251/251 ctest, 20 GUI scripts, five PDFs.
+* GUI round, part 37 (follow-up after the first hands-on look): **«Не сохранять»
+  на «Без имени» больше не воскрешает текст**. Первый вариант писал список
+  вкладок *до* вопросов о несохранённом, и отброшенный черновик возвращался на
+  следующем запуске — ответ «не сохранять» превращался в неправду. Теперь список
+  берётся до вопросов (объекты буферов, а не копии), а записывается только после
+  успешного `close_all()`, и буферы, получившие ответ «Не сохранять», из него
+  выбрасываются. Попутно исправилось и обратное: буфер, сохранённый в файл при
+  закрытии окна, запоминается как этот файл, а не как «Без имени» с текстом.

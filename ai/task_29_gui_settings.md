@@ -128,7 +128,10 @@ General
       `test_window.py::test_the_tabs_come_back_on_the_next_start` closes a window
       over three tabs and opens the next one over the same settings file — the
       file read from disk, the untitled tab modified, the showing tab, a file
-      that has gone, and the switch off.
+      that has gone, and the switch off;
+      `test_an_unnamed_tab_left_unsaved_is_forgotten` closes one over two unnamed
+      tabs — «Не сохранять» on one, «Сохранить» (into a file) on the other — and
+      finds only the second one in the session.
 - [ ] Manual checklist: change the font size, the line numbers and the output
       side, restart, confirm the values are back.
 
@@ -197,11 +200,14 @@ than one that does not come back — while an empty untitled tab is not stored a
 all, being the placeholder the first opened file replaces; a stored path whose
 file has gone is skipped and **named** in the status line, because a session that
 is quietly one tab short is worse than one that says so; and a restored untitled
-tab is **unsaved work**, so the next close asks about it.  The store is written in
-`closeEvent` *before* `close_all()`: «Отмена» leaves the window open, and a
-session written on the way out would describe a window that never closed.
-Unticking the box opens the welcome program instead — the setting is the only
-switch.
+tab is **unsaved work**, so the next close asks about it.  An *untitled* tab that
+is answered with «Не сохранять» is not stored at all — the answer means the text is
+not to be seen again, and a session written before the questions would make it a
+lie; a tab saved on the way out is remembered as the file it became.  The session
+is therefore written only once `close_all()` has succeeded, from the tab list taken
+before it: «Отмена» leaves the window open, and a session written on the way out
+would describe a window that never closed.  Unticking the box opens the welcome
+program instead — the setting is the only switch.
 
 The working folder and the `-I` list reach the engine as `-I` arguments on every
 session (`PrologSession.set_includes`), after the command line's own ones; the

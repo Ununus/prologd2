@@ -136,6 +136,11 @@ class MainWindow(QMainWindow):
         #: True while the whole window is closing, so closing the last document does
         #: not open a fresh one on the way out.
         self._closing = False
+        #: Buffers the user refused to save («Не сохранять»), collected while the
+        #: window closes.  An untitled one of these is left out of the session: the
+        #: answer means the text is not to be seen again, and bringing it back on
+        #: the next start would make the question a lie.
+        self._discarded: list[Buffer] = []
         #: Answers taken from the input field, one per request; refilled by every
         #: run (see `run_program`).
         self._queued_input: list[str] = []
@@ -1471,6 +1476,7 @@ class MainWindow(QMainWindow):
         if answer == CANCEL:
             return False
         if answer == DISCARD:
+            self._discarded.append(buffer)
             return True
         # A save that failed must not lose the buffer either.
         return self.save_buffer(buffer)
@@ -1779,22 +1785,26 @@ class MainWindow(QMainWindow):
         self._refresh_titles()
         return opened
 
-    def _store_session(self) -> int:
-        """Remembers the open tabs for the next start; returns what was left out.
+    def _store_session(self, tabs: list[Buffer], current: Buffer | None) -> int:
+        """Remembers the tabs that were open for the next start.
 
-        Called when the window really closes — the one moment the tab list is
-        final — and *before* the questions about unsaved buffers, because a
-        cancelled close has to leave the session as it was.  A file tab is stored
-        by its path (see `documents.TabRecord`) and an untitled one by its text,
-        up to the budget; `session_records` says how many did not fit.
+        `tabs` is the tab list taken *before* the closing questions walked over
+        it, and it holds the buffers themselves rather than copies: a buffer the
+        user saves to a file while closing is then remembered as the file it
+        became, not as the unnamed buffer it was.  An untitled buffer answered
+        with «Не сохранять» is left out (`self._discarded`) — that answer means
+        the text is not to be seen again.
+
+        A file tab is stored by its path (see `documents.TabRecord`) and an
+        untitled one by its text, up to the budget; `session_records` says how
+        many did not fit.
         """
-        tabs = [
+        kept = [buffer for buffer in tabs if buffer not in self._discarded]
+        records, dropped = documents.session_records(
             (buffer.model.path or "", buffer.model.name, buffer.text())
-            for buffer in self._buffers
-        ]
-        records, dropped = documents.session_records(tabs)
+            for buffer in kept
+        )
         self._settings.session_tabs = documents.encode_tabs(records)
-        current = self.current_buffer()
         self._settings.session_current = (
             (current.model.path or current.model.name) if current is not None else ""
         )
@@ -1808,12 +1818,17 @@ class MainWindow(QMainWindow):
         """Closing the window asks about every modified buffer first."""
         self._closing = True
         try:
-            # The session is remembered here, while the tabs are still there:
+            # What the next start should reopen is taken here, while the tabs are
+            # still there, and *written* only once the close really happened:
             # answering «Отмена» to a save question leaves the window open, and a
-            # session stored on the way out would then describe a window that
-            # never closed.
-            self._store_session()
+            # session stored on the way out would then describe a window that never
+            # closed.  The questions may take a buffer out of it — «Не сохранять»
+            # on an unnamed buffer — so the list is not what is in `_buffers` now.
+            self._discarded.clear()
+            tabs = list(self._buffers)
+            current = self.current_buffer()
             if self.close_all():
+                self._store_session(tabs, current)
                 self._save_split_state()
                 self._save_panel_state()
                 # The interpreter is this window's child: an unasked-for close
