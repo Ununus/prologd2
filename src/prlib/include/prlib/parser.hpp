@@ -88,7 +88,11 @@ class Parser {
   /// Warn about every variable of the clause just parsed that appears exactly
   /// once — in the head that usually means a constant was meant.
   void warnSingletonVariables(bool has_body);
+  /// Skip forward to (and including) the statement terminator.
   void recoverToStatementEnd();
+  /// Skip forward to the statement terminator, leaving it for the caller: the
+  /// chain error of task_52 needs the statement to still end where it looks.
+  void skipToTerminator();
 
   // Statements.
   bool parseStatement(ParsedProgram& out);
@@ -104,6 +108,11 @@ class Parser {
 
   // Terms.
   Term parseTerm();
+  /// The infix comparison layer of task_52: `A = B`, `A < B`, `A > B`,
+  /// `A >= B`, `A =< B`, each sugar for a built-in goal.
+  Term parseComparison();
+  /// An operand of a comparison: `#…#` or a primary term.
+  Term parseOperand();
   Term parsePrimary();
   Term parseList();
   Term parseCompoundOrAtom();

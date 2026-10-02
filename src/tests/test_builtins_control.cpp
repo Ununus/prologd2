@@ -120,6 +120,22 @@ TEST_CASE("the choice form takes any number of goals") {
   REQUIRE(bad.error.find("Цель должна быть предикатом") != std::string::npos);
 }
 
+TEST_CASE("`=` is the unification predicate") {
+  // task_52: the sign is sugar — the solver sees `РАВНО/2`, so it binds,
+  // reverses and fails exactly like the long form, and `;` stays the
+  // disjunction around it.
+  const auto result = runProgram(
+      "?X = 1, Y = X.\n"
+      "?1 = 2.\n"
+      "?f(A) = f(2).\n"
+      "?X = #1 + 1#.\n"
+      "?НЕ(X = 1).\n"
+      "?X = 1 ; X = 2.\n");
+  REQUIRE(result.loaded);
+  REQUIRE_FALSE(result.runtimeError);
+  REQUIRE(result.output == "X=1\nY=1\nНЕТ\nA=2\nX=2\nНЕТ\nX=1\nX=2\n");
+}
+
 TEST_CASE("a disjunction tries both branches and yields all their solutions") {
   // `;` is the backtrackable disjunction (task_41), unlike `ПЕРВОЕ`, which
   // commits to the first solution of the first goal that succeeds.

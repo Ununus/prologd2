@@ -1,10 +1,32 @@
 # task_52 — инфиксные операторы: `=`, `<`, `>`, `>=`, `=<` (и решение про `=:=`)
 
-**Status:** not started — the plan is written down (2026-10-02).  The user asked
-for «он же + ISO-сравнения» (the `=` sugar *and* the comparison signs), the
-non-associative rule («xfx, цепочка — синтаксическая ошибка») and the `=` insert
-key in `src/gui/prologd_gui/shortcuts.py`; on the same day `=:=` was **decided
-against** — `#…#` already evaluates, and the manual says so (see below)
+**Status:** done (2026-10-02).  Done as planned — five signs, one table in the
+parser, `xfx`, the advice table, no new names — with five decisions taken while
+doing it (the first one is the only change to the language that no plan
+foresaw):
+
+1. **The `1.` number rule changed with it.**  The ported trailing-dot float
+   (`1.` = 1.0) *swallowed the sentence terminator*, so `?2 > 1.` could not be
+   written at all: the lexer read `1.` as a real and the statement never ended.
+   The user decided on the ISO rule — `1.` is the integer `1` and the dot, a
+   real needs `1.0` — which is also what SWI and GNU Prolog do.  Documented in
+   `help.typ` §3.2 and `prologd-diff.typ`; `#1.#` no longer loads.
+2. **The GUI part is highlighting only.**  The user decided to keep `Ctrl+=` for
+   `РАВНО(`: the signs take the `OPERATOR` kind in `tokens.py` (the colour was
+   already mapped for `mod`/`div`), and `shortcuts.py` is untouched — the
+   `= ` insertion of the plan is dropped.
+3. **The ISO spellings are refused by the *lexer*, not by the parser.**  The
+   table lives in `lexer.cpp` (`kForeignOperators`) because that is where the
+   characters are: the hint carries the sign's own position, and the parser then
+   sees one bad character instead of three good ones.  That is why the advice is
+   the first line of the report instead of the old «Цель не может быть
+   переменной», which still follows it (the cascade is the same as for `:`).
+4. **`\+` stays a prefix** (task_55) and is not a row of the table, and `is`
+   keeps its two hints where they were (`checks.cpp`, `parser.cpp`).
+5. **The operand layer is `parseOperand`.**  The tests found that `parseTerm`
+   returned `parseArithmetic()` early on `#`, so `r(#1 + 1# = 2)` failed with
+   «непарные скобки»: an expression is an *operand* of a comparison, and the
+   early return is gone.
 **Depends on:** task_41 (the `,`/`;` precedence), task_31 (the shortcut table),
 task_37/task_39 (`doc/builtins.json` and the alias table)
 **Milestone:** post-M10
@@ -89,44 +111,52 @@ What that means for this task:
 
 ## Deliverables
 
-- [ ] **Lexer** (`lexer.hpp`, `lexer.cpp:300-360`): tokens for the operators, the
-      longest match first — `=<`, `>=`, `=:=` before `=`, and `<-`/`:-` before `<`/`:`
-      (the pair handling already exists).  `=` and the comparison signs stop being
-      «недопустимый символ» (`ErrorCode::InvalidCharacter`, `diagnostics.cpp:14`).
-      Decide and write down the shape: one `TokenKind::Operator` carrying the text
-      (tidiest with a table) or a kind per sign (the existing style for `,`/`;`).
-- [ ] **A hint for the ISO spellings the dialect does not have** (a table of text →
-      advice, like `retiredNameMessage` in `checks.cpp`): `==`, `\==`, `\=`, `=:=`,
-      `=\=`, `@<`, `@>`, `@=<`, `@>=`, `->`, `\+`, `is` — «такого оператора в
-      Пролог-Д нет; для унификации — `=`» and the like.  The `default:` branch keeps
-      «недопустимый символ» for anything else.
-- [ ] **Parser**: the operator table and one layer between `parsePrimary`/`#…#` and
-      everything above, in `parseTerm`; a chain (`X = Y = Z`) reported at the second
-      operator with its own message; the desugaring in one function so a row of the
-      table is data.
-- [ ] **Formatter**: no code expected (goal boundaries are still `,`/`;` by token
-      kind, `formatter.cpp:346,617,787`) — pin it with a test that a program with the
-      short forms formats and round-trips.
-- [ ] **GUI**:
-      * `tokens.py` — classify the operator signs as `OPERATOR`, so the «Подсветка»
-        role colours them alongside `mod`/`div` (`theme.py:61-68` maps
-        `KEYWORD`/`DIRECTIVE`/`OPERATOR` to the keyword colour).  This changes
-        `src/gui/tests/test_tokens.py:120`, which pins `=` as `PUNCTUATION` today.
-      * `shortcuts.py` — the `= ` insertion next to `:-.` and `РАВНО(,)`, plus its
-        row in «Шпаргалка по вставкам»; check it does not fight the keypad zoom.
-- [ ] **Documentation**:
-      * `doc/help.typ` §4.7 (`=` and the reversible reading), §5.1 (`<`, `>`, `>=`,
-        `=<` and what each desugars to), and one sentence that `#…#` is the
-        «вычисли» marker (that is why there is no `=:=`).
-      * The comparison table at the top of `doc/help.typ` — the rows «Унификация»
-        and «Сравнение чисел» now read `РАВНО(X, Y)` / `X = Y` and
-        `БОЛЬШЕ` / `X > Y`; a note that `<`/`>` also compare texts.
-      * `doc/prologd-diff.typ` (a short subsection: the new spellings and what they
-        desugar to), `doc/technical.typ` (the grammar paragraph), and the
-        `variants` of `РАВНО`, `БОЛЬШЕ`, `МЕНЬШЕ` in `doc/builtins.json` (arities
-        do not change, so `src/gui/tests/test_reference.py` stays green).
-      * Lessons are **not** rewritten; optionally one gets a `%?` example with the
-        short form.
+- [x] **Lexer** (`lexer.hpp`, `lexer.cpp`): one kind per sign (`Equal`, `Less`,
+      `Greater`, `LessEqual`, `GreaterEqual`) — the existing style for `,`/`;`,
+      and it keeps `infixOperator(TokenKind)` a table lookup.  The longest match
+      is the pair branch (`=<`, `>=` before `<`, `>`, and `<-`/`:-` before
+      `<`/`:`); `=`, `<` and `>` stopped being «недопустимый символ».  Dead code
+      note: `Lexer::reported_error_` is still unused — left alone.
+- [x] **A hint for the ISO spellings** — in `lexer.cpp`, see decision 3:
+      `kForeignOperators`, longest first (`=:=`, `=\=`, `\==`, `\=`, `==`,
+      `@=<`, `@>=`, `@<`, `@>`, `->`, `<=`), each with the Пролог-Д spelling of
+      the same thing; `@`-signs share one sentence about the standard order.
+- [x] **Parser**: `InfixOperator`/`kInfixOperators` (`=`→`РАВНО`, `<`→`МЕНЬШЕ`,
+      `>`→`БОЛЬШЕ`, `=<`→`НЕ(БОЛЬШЕ)`, `>=`→`НЕ(МЕНЬШЕ)`), the layer in
+      `parseTerm`/`parseComparison`, the chain reported once at the second sign
+      (`skipToTerminator` keeps it from reporting a second time), operands via
+      `parseOperand` (decision 5).
+- [x] **Formatter**: no code, as expected — `test_formatter.cpp` gained a case
+      that the short forms survive formatting (and the idempotency sweep now
+      skips `examples/lessons/_old`, which the ported originals need).
+- [x] **GUI**:
+      * `tokens.py` — the signs are `OPERATOR`, the pair wins over its first
+        character; the *number* rule follows the lexer too (`1.` is an integer
+        and a dot), which `_scan_number` needed.  `test_tokens.py:120` now pins
+        the new shape and a new case walks all five signs.
+      * `shortcuts.py` — **dropped by decision** (see 2).
+- [x] **Documentation**:
+      * `help.typ` §3.2 (the `1.` rule), §3.3 (`X = #выражение#`, why there is no
+        `=:=`), §4.7 (`=` and the reversible reading), §5.1 (the four signs and
+        the desugaring table, the chain, `=:=`), the two rows of the comparison
+        table at the top, and the appendix needs no change (no new names).
+      * `prologd-diff.typ`: §9 «`=`, `<`, `>`, `>=`, `=<` — короткая запись
+        сравнений» (before/after, the desugaring table, what was *not* added
+        with the ISO row for each), three rows of «Краткая таблица», and the
+        `is/2` section's «почему не добавить» now says the signs *are* sugar over
+        the built-ins while bare `2+3` still needs `#…#`.
+      * `technical.typ`: the number paragraph and the grammar
+        (`Сравнение ::= Операнд Знак Операнд`) with the priority sentence.
+      * `doc/builtins.json`: the `variants` of `РАВНО`, `БОЛЬШЕ`, `МЕНЬШЕ` name
+        the sign (arities unchanged, so `test_reference.py` stays green).
+      * Lessons: not rewritten — two of them *gained* an example with the short
+        form, on the user's choice (2026-10-02): lesson 3 «Арифметика»
+        (`?Х = #2 + 3 * 4#.` beside `?РАВНО(Х, #2 + 3 * 4#).`, and `?5 > 3.`,
+        `?3 =< 5.` in its comparison section) and lesson 4 «Рекурсия, отсечение и
+        отрицание» (`?НЕ(Х = 1).`, `?Х = 1 ; Х = 2.`).  Both files carry their own
+        golden output in `%!` lines, so `test_lessons.cpp` needed no edit — it
+        checks them as they stand — and the statement counts of
+        `test_queries.py` moved (03: 34 → 37, 04: 25 → 27).
 
 ## Tests
 
@@ -142,6 +172,42 @@ What that means for this task:
 - `test_formatter.cpp`: `--format` of a program with the short forms, round-trip.
 - GUI: `test_tokens.py` (`=` → `OPERATOR`), `test_shortcuts.py`,
   `test_highlighter.py`, `test_queries.py` (a query with `=` runs).
+
+*Written:* all of the above, seven new Catch2 cases (285/285).  The lexer file
+pins the tokens, the longest match and every row of the advice table; the parser
+file has four sections (the desugaring, the desugaring wherever a term stands,
+`, `/`;` still binding looser, the chain and its exact message);
+`test_builtins_control.cpp` pins `=` as the unification predicate and
+`test_builtins_arith.cpp` the four signs over the long forms.  `test_engine.cpp`
+needed nothing: both spellings reach the same predicate, which is what the
+control file asserts.  `test_lessons.cpp` lost the trailing-dot case (the rule it
+pinned is gone) and gained one for the new rule, and the formatter's idempotency
+sweep skips `examples/lessons/_old`, where the ported originals keep `;`
+terminators and `1.`.  `test_tokens.py` gained a case for all five signs and the
+new number rule; `test_highlighter.py` pins the colour of `=`.
+
+## What the round found
+
+* **`parseTerm` returned too early on `#`** — decision 5 above.  Found by the new
+  parser test (`r(#1 + 1# = 2)`), not by a probe: the probe of `X = #1 + 1#`
+  passes on its own because a *bare* expression is not an operand of anything.
+* **The chain was reported twice**, the second report about an unclosed bracket.
+  `skipToTerminator()` now leaves the dot to the caller, and the pinned message is
+  the only diagnostic.
+* **`test_queries.py`'s pinned counts were already stale at HEAD.**  task_51
+  edited `examples/lessons/lesson_04.pld` (the `ПЕРВОЕ` examples) and the sweep was
+  not run again, so that script was red before this round started.  Refreshed with
+  `--print` (`24` → `25`, and then `03: 34` → `37`, `04: 25` → `27` for the lesson
+  examples of this round); the rule is now in `ai/conventions.md` — the GUI scripts
+  are run after any edit under `examples/`.
+* **`X < 2+1` reports only «ошибка при разборе предложения».**  The ISO habit gets
+  a careful hint in the `is` case (`kInfixIsHint`) but not in the sign case; a
+  «выражение помечают `#…#`» hint could be added the same way.  Deliberately left
+  out of this round, and the manual says `X < #2+1#` instead.
+* **The `1.` rule is a breaking change** for a program that leaned on the
+  trailing-dot float — the only one in this task.  It is called out in
+  `prologd-diff.typ`'s quick table and in `help.typ` §3.2, and lesson/example
+  corpus needed no change (`test_lessons.cpp` and the formatter sweep agree).
 
 ## What must not change
 

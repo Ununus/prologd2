@@ -67,6 +67,36 @@ bool beginsStatement(TokenKind kind) {
       return false;
   }
 }
+
+/// One row of the infix comparison layer (task_52): the sign, and the built-in
+/// goal it is sugar for.  `negated` rows desugar to `НЕ(имя(A, B))`, which is
+/// how `>=` and `=<` are written without a second built-in, and why a free
+/// operand there is the runtime error of `БОЛЬШЕ`/`МЕНЬШЕ` rather than a
+/// silent failure.
+struct InfixOperator {
+  TokenKind kind;
+  const char* text;
+  const char* functor;
+  bool negated;
+};
+
+constexpr InfixOperator kInfixOperators[] = {
+    {TokenKind::Equal, "=", "РАВНО", false},
+    {TokenKind::Less, "<", "МЕНЬШЕ", false},
+    {TokenKind::Greater, ">", "БОЛЬШЕ", false},
+    {TokenKind::LessEqual, "=<", "БОЛЬШЕ", true},
+    {TokenKind::GreaterEqual, ">=", "МЕНЬШЕ", true},
+};
+
+/// The row for a token kind, `nullptr` when the kind is not an infix operator.
+const InfixOperator* infixOperator(TokenKind kind) {
+  for (const InfixOperator& entry : kInfixOperators) {
+    if (entry.kind == kind) {
+      return &entry;
+    }
+  }
+  return nullptr;
+}
 }  // namespace
 
 Parser::Parser(std::vector<Token> tokens, VarAllocator allocator, DiagnosticSink* sink)
@@ -187,6 +217,19 @@ void Parser::recoverToStatementEnd() {
   }
 }
 
+void Parser::skipToTerminator() {
+  // After the chain error (`X = Y = Z`) the rest of the statement is skipped
+  // *up to* its terminator, not past it: the caller still has to see the dot it
+  // expects, or the same mistake would be reported a second time.
+  while (!atEnd()) {
+    const TokenKind kind = peek().kind;
+    if (kind == TokenKind::Dot || kind == TokenKind::Semicolon) {
+      return;
+    }
+    advance();
+  }
+}
+
 void Parser::beginScope() {
   scope_.clear();
   query_variables_.clear();
@@ -228,14 +271,59 @@ VarId Parser::variableFor(std::string_view name, bool anonymous,
 }
 
 Term Parser::parseTerm() {
-  if (check(TokenKind::Hash)) {
-    return parseArithmetic();
-  }
   if (match(TokenKind::NotGoal)) {
     // ISO's `\+ Ц` — the same goal as `НЕ(Ц)` (task_55).  A prefix at the term
     // level: `,` and `;` still bind looser, so `\+ A, B` is `(\+ A), B`, and
     // `\+ (A, B)` needs the brackets it needs in ISO as well.
     return makeCompound("НЕ", {parseTerm()});
+  }
+  // `#…#` is not special here: it is one of the operands the comparison layer
+  // takes, so `#1 + 1# = 2` parses like any other comparison (task_52).
+  return parseComparison();
+}
+
+Term Parser::parseComparison() {
+  Term left = parseOperand();
+  if (failed_) {
+    return left;
+  }
+  const InfixOperator* row = infixOperator(peek().kind);
+  if (row == nullptr) {
+    return left;
+  }
+  const Token op = advance();
+  Term right = parseOperand();
+  if (failed_) {
+    return left;
+  }
+  // `xfx`, as in ISO: `X = Y = Z` is neither of the nestings a reader might
+  // guess, so it is reported on its own — at the *second* sign, which is where
+  // the reader has to look, and the message quotes that sign.  The two halves of
+  // the suggestion keep their own signs, so a mixed chain (`X = Y < 1`) is not
+  // described with the wrong one.
+  if (infixOperator(peek().kind) != nullptr) {
+    const std::string first = op.text;
+    const std::string second = peek().text;
+    report(ErrorCode::InvalidSentence, peek().location,
+           "«" + second + "» — не цепочка: разбейте на два сравнения, «A " + first +
+               " B, B " + second + " C»");
+    skipToTerminator();
+    return left;
+  }
+  std::vector<Term> arguments;
+  arguments.push_back(std::move(left));
+  arguments.push_back(std::move(right));
+  if (row->negated) {
+    return makeCompound("НЕ", {makeCompound(row->functor, std::move(arguments))});
+  }
+  return makeCompound(row->functor, std::move(arguments));
+}
+
+Term Parser::parseOperand() {
+  // `#…#` marks an expression everywhere a term is expected, including here:
+  // `X = #2 + 3#` evaluates the right side (task_52).
+  if (check(TokenKind::Hash)) {
+    return parseArithmetic();
   }
   return parsePrimary();
 }

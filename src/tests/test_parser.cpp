@@ -244,6 +244,84 @@ TEST_CASE("a statement that lost its dot is told where the dot belongs") {
   }
 }
 
+TEST_CASE("the comparison signs are sugar over the built-ins") {
+  SECTION("`=` is РАВНО/2") {
+    DiagnosticSink sink;
+    const auto program = parse("верно(X) :- X = 1.\n", sink);
+    REQUIRE_FALSE(sink.hasErrors());
+    const Term& goal = program.clauses[0].body[0];
+    REQUIRE(goal.kind == TermKind::Compound);
+    REQUIRE(goal.compound->name == "РАВНО");
+    REQUIRE(goal.compound->args.size() == 2);
+  }
+  SECTION("the comparisons are МЕНЬШЕ/БОЛЬШЕ, `>=` and `=<` their negation") {
+    const struct {
+      std::string source;
+      std::string functor;
+      bool negated;
+    } rows[] = {{"p :- X < 1.", "МЕНЬШЕ", false},
+               {"p :- X > 1.", "БОЛЬШЕ", false},
+               {"p :- X =< 1.", "БОЛЬШЕ", true},
+               {"p :- X >= 1.", "МЕНЬШЕ", true}};
+    for (const auto& row : rows) {
+      INFO("source: " << row.source);
+      DiagnosticSink sink;
+      const auto program = parse(row.source, sink);
+      REQUIRE_FALSE(sink.hasErrors());
+      const Term& goal = program.clauses[0].body[0];
+      REQUIRE(goal.kind == TermKind::Compound);
+      if (row.negated) {
+        REQUIRE(goal.compound->name == "НЕ");
+        REQUIRE(goal.compound->args[0].compound->name == row.functor);
+      } else {
+        REQUIRE(goal.compound->name == row.functor);
+      }
+    }
+  }
+  SECTION("the signs work wherever a term does") {
+    // The layer sits in `parseTerm`, so a negation, a goal argument, a list
+    // element and an arithmetic operand all take one.
+    DiagnosticSink sink;
+    const auto program =
+        parse("p :- НЕ(X = 1), q([A = B]), r(#1 + 1# = 2), ВЫП((X >= 0)).\n", sink);
+    REQUIRE_FALSE(sink.hasErrors());
+    const std::vector<Term>& body = program.clauses[0].body;
+    REQUIRE(body.size() == 4);
+    REQUIRE(body[0].compound->args[0].compound->name == "РАВНО");
+    REQUIRE(body[1].compound->args[0].compound->args[0].compound->name == "РАВНО");
+    // `r(#1 + 1# = 2)`: the argument is `РАВНО($expr(1 + 1), 2)`.
+    const Term& argument = body[2].compound->args[0];
+    REQUIRE(argument.compound->name == "РАВНО");
+    REQUIRE(argument.compound->args[0].compound->name == "$expr");
+    REQUIRE(body[3].compound->name == "ВЫП");
+  }
+  SECTION("`,` and `;` still bind looser") {
+    DiagnosticSink sink;
+    const auto program = parse("p :- X = 1, Y = 2 ; Z = 3.\n", sink);
+    REQUIRE_FALSE(sink.hasErrors());
+    const Term& goal = program.clauses[0].body[0];
+    REQUIRE(goal.compound->name == ";");
+    REQUIRE(goal.compound->args[0].compound->name == ",");
+  }
+  SECTION("a chain is an error at the second sign") {
+    DiagnosticSink sink;
+    parse("p :- X = Y = 1.\n", sink);
+    REQUIRE(sink.hasErrors());
+    const PrologError& error = sink.diagnostics().front();
+    REQUIRE(error.code == ErrorCode::InvalidSentence);
+    REQUIRE(error.message ==
+            "«=» — не цепочка: разбейте на два сравнения, «A = B, B = C»");
+    REQUIRE(error.location.column == 12);  // the second `=`
+    // A mixed chain quotes the sign the position points at — the second one —
+    // and each half of the suggestion keeps the sign it was written with.
+    DiagnosticSink mixed;
+    parse("p :- X = Y < 1.\n", mixed);
+    REQUIRE(mixed.hasErrors());
+    REQUIRE(mixed.diagnostics().front().message ==
+            "«<» — не цепочка: разбейте на два сравнения, «A = B, B < C»");
+  }
+}
+
 TEST_CASE("parser builds lists and arithmetic expressions") {
   DiagnosticSink sink;
   const auto program = parse("список([1,2|T], #1+2*3#).", sink);

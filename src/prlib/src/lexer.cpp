@@ -54,6 +54,56 @@ const std::unordered_set<std::string> kRetiredBuiltinNames = {
     "ИЛИ",
 };
 
+/// Operator spellings borrowed from other Prologs that this dialect does not
+/// have (task_52).  `=` now means unification, so reading `=:=` as three
+/// characters would be worse than useless: the advice names the Пролог-Д
+/// spelling of the same thing.  **Longest first** — `\==` must win over `\=`,
+/// `@=<` over `@<`.
+struct ForeignOperator {
+  std::string_view text;
+  const char* hint;
+};
+
+/// The four `@`-signs of ISO say the same thing, and the row repeats it rather
+/// than hiding it behind a helper: the table stays readable on its own.
+constexpr const char* kStandardOrderHint =
+    "— не оператор: сравнение по стандартному порядку заменяют «<», «>», «=<», «>=»";
+
+constexpr ForeignOperator kForeignOperators[] = {
+    {"=:=",
+     "«=:=» — не оператор: выражение вычисляет «#…#», поэтому «1 + 1 =:= 2» — "
+     "это «#1 + 1# = 2»"},
+    {"=\\=", "«=\\=» — не оператор: «не равно» — это «НЕ(A = B)»"},
+    {"\\==", "«\\==» — не оператор: «термы не совпадают» — это «НЕ(A = B)»"},
+    {"\\=", "«\\=» — не оператор: «не унифицируется» — это «НЕ(A = B)»"},
+    {"==", "«==» — не оператор: сравнение термов записывают унификацией — «A = B»"},
+    {"@=<", "«@=<» "},
+    {"@>=", "«@>=» "},
+    {"@<", "«@<» "},
+    {"@>", "«@>» "},
+    {"->", "«->» — не оператор: выбор в Пролог-Д — это «;» и «ПЕРВОЕ(Ц1, Ц2)»"},
+    {"<=", "«<=» — не оператор: «меньше или равно» записывают «=<»"},
+};
+
+/// The advice for one spelling, with the shared sentence of the `@`-row.
+std::string foreignOperatorHint(const ForeignOperator& entry) {
+  std::string hint(entry.hint);
+  if (entry.text.front() == '@') {
+    hint += kStandardOrderHint;
+  }
+  return hint;
+}
+
+/// The foreign spelling that starts at `offset`, or `nullptr`.
+const ForeignOperator* foreignOperatorAt(std::string_view source, std::size_t offset) {
+  for (const ForeignOperator& entry : kForeignOperators) {
+    if (source.compare(offset, entry.text.size(), entry.text) == 0) {
+      return &entry;
+    }
+  }
+  return nullptr;
+}
+
 }  // namespace
 
 const std::unordered_set<std::string>& reservedBuiltinNames() { return kReservedBuiltins; }
@@ -73,6 +123,20 @@ char Lexer::peek(std::size_t lookahead) const {
 
 SourceLocation Lexer::here() const {
   return SourceLocation{file_name_, line_, column_};
+}
+
+void Lexer::reportInvalidSign(DiagnosticSink* sink, const SourceLocation& location,
+                              std::string_view message) {
+  if (sink == nullptr) {
+    return;
+  }
+  PrologError error;
+  error.code = ErrorCode::InvalidCharacter;
+  error.message = message.empty() ? std::string(errorCodeText(error.code))
+                                  : std::string(message);
+  error.location = location;
+  error.isParseError = true;
+  sink->report(std::move(error));
 }
 
 void Lexer::advanceByte(std::size_t count) {
@@ -133,18 +197,15 @@ Token Lexer::lexNumber(DiagnosticSink* sink) {
       continue;
     }
     if (ch == '.' && !has_dot && !has_exponent) {
-      // `12.3` is a decimal fraction; `12.` (a dot not followed by a digit) is a
-      // trailing-dot float, as in the original PrologD (`1.` means 1.0).  A dot
-      // that follows the closing parenthesis of a clause is lexed separately
-      // because the number has already ended.
+      // A fraction needs a digit after the point: `12.3` is a real, `2.0` too,
+      // while `12.` is the integer 12 followed by the sentence terminator
+      // (task_52, as in ISO).  The trailing-dot float of the original PrologD
+      // (`1.` for 1.0) is gone with it: a statement can now *end* with a number
+      // — `?2 > 1.`, `X = 1.` — and the dot belongs to the terminator there.
       if (isAsciiDigit(static_cast<unsigned char>(peek(1)))) {
         has_dot = true;
         advanceByte(1);
         continue;
-      }
-      if (peek(1) != '.' && peek(1) != '\0') {
-        has_dot = true;
-        advanceByte(1);
       }
       break;
     }
@@ -310,7 +371,19 @@ std::vector<Token> Lexer::tokenizeImpl(DiagnosticSink* sink) {
       case '!': advanceByte(1); tokens.push_back(makeToken(TokenKind::Bang, "!", start)); break;
       case '#': advanceByte(1); tokens.push_back(makeToken(TokenKind::Hash, "#", start)); break;
       case '+': advanceByte(1); tokens.push_back(makeToken(TokenKind::Plus, "+", start)); break;
-      case '-': advanceByte(1); tokens.push_back(makeToken(TokenKind::Minus, "-", start)); break;
+      case '-':
+        // `->` is the if-then of other Prologs; the advice says what to write
+        // instead (task_52).  A lone `-` is the sign it always was.
+        if (const ForeignOperator* foreign = foreignOperatorAt(source_, offset_);
+            foreign != nullptr) {
+          advanceByte(foreign->text.size());
+          reportInvalidSign(sink, start, foreignOperatorHint(*foreign));
+          tokens.push_back(makeToken(TokenKind::Unknown, std::string(foreign->text), start));
+        } else {
+          advanceByte(1);
+          tokens.push_back(makeToken(TokenKind::Minus, "-", start));
+        }
+        break;
       case '*': advanceByte(1); tokens.push_back(makeToken(TokenKind::Star, "*", start)); break;
       case '/': advanceByte(1); tokens.push_back(makeToken(TokenKind::Slash, "/", start)); break;
       case '(': advanceByte(1); tokens.push_back(makeToken(TokenKind::LParen, "(", start)); break;
@@ -324,32 +397,64 @@ std::vector<Token> Lexer::tokenizeImpl(DiagnosticSink* sink) {
           tokens.push_back(makeToken(TokenKind::ColonDash, ":-", start));
         } else {
           advanceByte(1);
-          if (sink != nullptr) {
-            PrologError error;
-            error.code = ErrorCode::InvalidCharacter;
-            error.message = std::string(errorCodeText(error.code));
-            error.location = start;
-            error.isParseError = true;
-            sink->report(std::move(error));
-          }
+          reportInvalidSign(sink, start);
           tokens.push_back(makeToken(TokenKind::Unknown, ":", start));
         }
         break;
       case '<':
+        // `<-` is a rule arrow; `<` is «less»; `<=` is ISO's spelling of «less
+        // or equal», which this dialect writes `=<` (task_52).
         if (peek(1) == '-') {
           advanceByte(2);
           tokens.push_back(makeToken(TokenKind::Arrow, "<-", start));
+        } else if (const ForeignOperator* foreign = foreignOperatorAt(source_, offset_);
+                   foreign != nullptr) {
+          advanceByte(foreign->text.size());
+          reportInvalidSign(sink, start, foreignOperatorHint(*foreign));
+          tokens.push_back(makeToken(TokenKind::Unknown, std::string(foreign->text), start));
         } else {
           advanceByte(1);
-          if (sink != nullptr) {
-            PrologError error;
-            error.code = ErrorCode::InvalidCharacter;
-            error.message = std::string(errorCodeText(error.code));
-            error.location = start;
-            error.isParseError = true;
-            sink->report(std::move(error));
-          }
-          tokens.push_back(makeToken(TokenKind::Unknown, "<", start));
+          tokens.push_back(makeToken(TokenKind::Less, "<", start));
+        }
+        break;
+      case '>':
+        if (peek(1) == '=') {
+          advanceByte(2);
+          tokens.push_back(makeToken(TokenKind::GreaterEqual, ">=", start));
+        } else {
+          advanceByte(1);
+          tokens.push_back(makeToken(TokenKind::Greater, ">", start));
+        }
+        break;
+      case '=':
+        // `=` is unification (task_52) — the sugar over `РАВНО/2`.  Longest
+        // match first: `=<` is «less or equal», while `=:=`, `=\=` and `==`
+        // belong to other Prologs and get advice instead of a token.
+        if (const ForeignOperator* foreign = foreignOperatorAt(source_, offset_);
+            foreign != nullptr) {
+          advanceByte(foreign->text.size());
+          reportInvalidSign(sink, start, foreignOperatorHint(*foreign));
+          tokens.push_back(makeToken(TokenKind::Unknown, std::string(foreign->text), start));
+        } else if (peek(1) == '<') {
+          advanceByte(2);
+          tokens.push_back(makeToken(TokenKind::LessEqual, "=<", start));
+        } else {
+          advanceByte(1);
+          tokens.push_back(makeToken(TokenKind::Equal, "=", start));
+        }
+        break;
+      case '@':
+        // Only the standard-order comparisons of ISO start with `@`; anything
+        // else after it is a sign like any other.
+        if (const ForeignOperator* foreign = foreignOperatorAt(source_, offset_);
+            foreign != nullptr) {
+          advanceByte(foreign->text.size());
+          reportInvalidSign(sink, start, foreignOperatorHint(*foreign));
+          tokens.push_back(makeToken(TokenKind::Unknown, std::string(foreign->text), start));
+        } else {
+          advanceByte(1);
+          reportInvalidSign(sink, start);
+          tokens.push_back(makeToken(TokenKind::Unknown, "@", start));
         }
         break;
       case '\\':
@@ -358,16 +463,14 @@ std::vector<Token> Lexer::tokenizeImpl(DiagnosticSink* sink) {
         if (peek(1) == '+') {
           advanceByte(2);
           tokens.push_back(makeToken(TokenKind::NotGoal, "\\+", start));
+        } else if (const ForeignOperator* foreign = foreignOperatorAt(source_, offset_);
+                   foreign != nullptr) {
+          advanceByte(foreign->text.size());
+          reportInvalidSign(sink, start, foreignOperatorHint(*foreign));
+          tokens.push_back(makeToken(TokenKind::Unknown, std::string(foreign->text), start));
         } else {
           advanceByte(1);
-          if (sink != nullptr) {
-            PrologError error;
-            error.code = ErrorCode::InvalidCharacter;
-            error.message = std::string(errorCodeText(error.code));
-            error.location = start;
-            error.isParseError = true;
-            sink->report(std::move(error));
-          }
+          reportInvalidSign(sink, start);
           tokens.push_back(makeToken(TokenKind::Unknown, "\\", start));
         }
         break;
@@ -379,14 +482,7 @@ std::vector<Token> Lexer::tokenizeImpl(DiagnosticSink* sink) {
         break;
       default:
         advanceByte(1);
-        if (sink != nullptr) {
-          PrologError error;
-          error.code = ErrorCode::InvalidCharacter;
-          error.message = std::string(errorCodeText(error.code));
-          error.location = start;
-          error.isParseError = true;
-          sink->report(std::move(error));
-        }
+        reportInvalidSign(sink, start);
         tokens.push_back(makeToken(TokenKind::Unknown, std::string(1, ch), start));
         break;
     }

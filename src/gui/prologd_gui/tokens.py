@@ -32,7 +32,7 @@ STRING = "string"
 QUOTED_ATOM = "quoted_atom"
 KEYWORD = "keyword"  # a reserved name that is a predicate
 DIRECTIVE = "directive"  # ИМПОРТ
-OPERATOR = "operator"  # mod, div
+OPERATOR = "operator"  # mod, div, and the comparison signs: =, <, >, >=, =<
 VARIABLE = "variable"
 ATOM = "atom"
 INTEGER = "integer"
@@ -186,6 +186,17 @@ def tokenize(line: str, keywords: Keywords | None = None) -> list[Token]:
             tokens.append(Token(PUNCTUATION, pair, index, index + 2))
             index += 2
             continue
+        # The comparison signs are one token each, as in the lexer (task_52),
+        # and the two-character forms win over their first character: `X >= 1`
+        # must not read as `>` followed by `=`.
+        if pair in (">=", "=<"):
+            tokens.append(Token(OPERATOR, pair, index, index + 2))
+            index += 2
+            continue
+        if ch in "=<>":
+            tokens.append(Token(OPERATOR, ch, index, index + 1))
+            index += 1
+            continue
         tokens.append(Token(PUNCTUATION, ch, index, index + 1))
         index += 1
     return tokens
@@ -228,27 +239,24 @@ def _scan_delimited(
 def _scan_number(line: str, start: int) -> int:
     """End offset of a number, following `Lexer::lexNumber`.
 
-    The interesting case is the dot: `12.3` and `12.` are floats, while the dot
-    that ends a clause in `факт(1).` is not part of the number.
+    The interesting case is the dot: it belongs to the number only when a digit
+    follows it.  `12.3` is a real; the dot in `факт(1).` and in `X = 1.` ends the
+    sentence.  The trailing-dot real of the original PrologD (`1.` for 1.0) is
+    gone with the ISO rule of task_52.
     """
     index = start
     length = len(line)
-    has_dot = False
     has_exponent = False
     while index < length:
         ch = line[index]
         if is_ascii_digit(ch):
             index += 1
             continue
-        if ch == "." and not has_dot and not has_exponent:
+        if ch == "." and not has_exponent:
             following = line[index + 1] if index + 1 < length else ""
             if is_ascii_digit(following):
-                has_dot = True
                 index += 1
                 continue
-            if following not in ("", "."):
-                has_dot = True
-                index += 1
             break
         if ch in ("e", "E") and not has_exponent:
             sign = line[index + 1] if index + 1 < length else ""

@@ -36,7 +36,7 @@ class Theme:
     query_comment: str = "#0d6a0d"
     string: str = "#986801"
     quoted_atom: str = "#986801"  # the same brown as a string: one "quoted" colour
-    keyword: str = "#0a22d6"  # reserved names: built-ins, `mod`/`div`, `ИМПОРТ`
+    keyword: str = "#0a22d6"  # reserved: built-ins, `mod`/`div`, `ИМПОРТ`, `=`, `<`, `>`
     integer: str = "#505000"
     float: str = "#505000"
     punctuation: str = "#3f3f3f"

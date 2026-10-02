@@ -109,7 +109,8 @@ def test_numbers() -> None:
     assert kinds("12.5") == [(FLOAT, "12.5")]
     assert kinds("1e3") == [(FLOAT, "1e3")]
     assert kinds("2.5E-2") == [(FLOAT, "2.5E-2")]
-    # `1.` is a float only when the dot is not the clause terminator.
+    # A fraction needs a digit after the dot: `1.` is the integer 1 and then the
+    # dot that ends the sentence (task_52, as in ISO).
     assert kinds("факт(1).") == [
         (ATOM, "факт"),
         (PUNCTUATION, "("),
@@ -117,8 +118,14 @@ def test_numbers() -> None:
         (PUNCTUATION, ")"),
         (PUNCTUATION, "."),
     ]
-    assert kinds("а=1. ") == [(ATOM, "а"), (PUNCTUATION, "="), (FLOAT, "1.")]
-    print("ok: numbers, including the trailing-dot float")
+    assert kinds("а=1. ") == [
+        (ATOM, "а"),
+        (OPERATOR, "="),
+        (INTEGER, "1"),
+        (PUNCTUATION, "."),
+    ]
+    assert kinds("1.0") == [(FLOAT, "1.0")]
+    print("ok: numbers, the dot ending a sentence among them")
 
 
 def test_reserved_names_variables_and_atoms() -> None:
@@ -162,6 +169,24 @@ def test_reserved_names_variables_and_atoms() -> None:
     # so a built-in name is just a variable — the documented fallback.
     assert kinds("НАЙТИВСЕ", None) == [(VARIABLE, "НАЙТИВСЕ")]
     print("ok: reserved names, variables and atoms")
+
+
+def test_comparison_signs() -> None:
+    """The signs of task_52 are operators, and the long ones are one token."""
+    assert kinds("X = Y") == [
+        (VARIABLE, "X"),
+        (OPERATOR, "="),
+        (VARIABLE, "Y"),
+    ]
+    assert kinds("Н =< М") == [
+        (VARIABLE, "Н"),
+        (OPERATOR, "=<"),
+        (VARIABLE, "М"),
+    ]
+    assert kinds("2>=1") == [(INTEGER, "2"), (OPERATOR, ">="), (INTEGER, "1")]
+    assert kinds("1<2") == [(INTEGER, "1"), (OPERATOR, "<"), (INTEGER, "2")]
+    assert kinds(">") == [(OPERATOR, ">")]
+    print("ok: the comparison signs")
 
 
 def test_expression_query_and_arrows() -> None:
@@ -238,6 +263,7 @@ def main() -> int:
     test_strings_and_quoted_atoms()
     test_numbers()
     test_reserved_names_variables_and_atoms()
+    test_comparison_signs()
     test_expression_query_and_arrows()
     test_alphabet_of_identifiers()
     test_tokens_cover_every_example_line()

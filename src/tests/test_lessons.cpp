@@ -136,8 +136,16 @@ TEST_CASE("every lesson prints exactly what its comments promise") {
   }
 }
 
-TEST_CASE("trailing-dot floats parse as in the original") {
-  const auto result = runProgram("?РАВНО(X, #1. + 2.#).\n");
-  REQUIRE(result.loaded);
-  REQUIRE(result.output == "X=3.0\n");
+TEST_CASE("a dot ends a number only after a digit") {
+  // task_52, as in ISO: `1.` is the integer 1 and the sentence terminator — a
+  // statement may now *end* with a number (`?2 > 1.`) — so a real without a
+  // fraction is written `1.0`, inside `#…#` too.
+  const auto real = runProgram("?РАВНО(X, #1.0 + 2.0#).\n");
+  REQUIRE(real.loaded);
+  REQUIRE(real.output == "X=3.0\n");
+
+  // The trailing-dot float of the original PrologD is gone: the dot ends the
+  // number, and there is no closing bracket left for the `)` to match.
+  const auto trailing = runProgram("?РАВНО(X, #1. + 2.#).\n");
+  REQUIRE_FALSE(trailing.loaded);
 }

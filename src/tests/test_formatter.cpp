@@ -227,11 +227,20 @@ TEST_CASE("blank lines collapse between clauses and survive inside one") {
 TEST_CASE("formatting is idempotent for every example program") {
   namespace fs = std::filesystem;
   const fs::path root(PROLOGD_TEST_DATA_DIR);
+  // `examples/lessons/_old` keeps the ported originals as they were written,
+  // so their spellings are the ones the port changed (`;` as a terminator,
+  // `1.` for 1.0 — task_52) and a few of them no longer parse.  The formatter
+  // refuses a source it cannot parse, so they are not its business.
+  const fs::path archived = root / "lessons" / "_old";
   std::vector<fs::path> files;
   for (const auto& entry : fs::recursive_directory_iterator(root)) {
-    if (entry.is_regular_file() && entry.path().extension() == ".pld") {
-      files.push_back(entry.path());
+    if (!entry.is_regular_file() || entry.path().extension() != ".pld") {
+      continue;
     }
+    if (entry.path().string().find(archived.string()) != std::string::npos) {
+      continue;
+    }
+    files.push_back(entry.path());
   }
   REQUIRE(files.size() >= 10);
   for (const fs::path& path : files) {
@@ -245,6 +254,21 @@ TEST_CASE("formatting is idempotent for every example program") {
       REQUIRE(twice.text == once.text);
     }
   }
+}
+
+TEST_CASE("the comparison signs survive formatting") {
+  // task_52: the signs are ordinary tokens to the formatter — the layout is
+  // rewritten, the text of the goals is not.
+  const std::string source =
+      "правило(Х, У):-Х = #1 + 1#, У >= 2, Х =< У, ЛОЖЬ ; Х > 0.\n";
+  const FormatResult once = format(source, hard());
+  REQUIRE(once.ok());
+  REQUIRE(once.text.find("Х = #1 + 1#") != std::string::npos);
+  REQUIRE(once.text.find("У >= 2") != std::string::npos);
+  REQUIRE(once.text.find("Х =< У") != std::string::npos);
+  const FormatResult twice = format(once.text, hard());
+  REQUIRE(twice.ok());
+  REQUIRE(twice.text == once.text);
 }
 
 TEST_CASE("every shipped program is already in the standard shape") {

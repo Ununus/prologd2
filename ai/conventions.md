@@ -115,6 +115,11 @@ Tests are written **together with** the feature, never after.
 
 * Keep the build green: `cmake --build build` and `ctest --test-dir build` must
   pass before a task is marked done.
+* An edit under `examples/` moves pinned numbers elsewhere, so `ctest` alone is
+  not enough: `src/gui/tests/test_queries.py` counts the statements of every
+  example file (refresh the table with `--print` when a lesson changed on purpose)
+  and `test_lessons.cpp` runs them.  A lesson edit has already left that script
+  red for a whole round.
 * Update `ai/status.md` and the task file status after every work session.
 * Any deviation from this plan is recorded in `ai/decisions.md`.
 
@@ -126,6 +131,9 @@ Tests are written **together with** the feature, never after.
   (problem statement, model, algorithm, complexity, limitations).
 * `prologd-diff.typ` lists every syntax/behaviour change relative to PrologD,
   with a short before/after example per item.
+* After editing a document, build the PDFs (`--target docs`) *and look* at the
+  pages that carry the change — Typst reports syntax errors, not a table that
+  overflows the margin or a paragraph that lost its spacing.
 
 ## The original material
 

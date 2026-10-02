@@ -76,7 +76,7 @@ class Coloured:
 
 
 def test_colours_by_kind() -> None:
-    coloured = Coloured("член(X) :- member(X), НАЙТИВСЕ(Y, цель(Y), L), ПС. % привет")
+    coloured = Coloured("член(X) :- member(X), X = 1, НАЙТИВСЕ(Y, цель(Y), L), ПС. % привет")
 
     # Names: atoms and variables have a colour each, shared by both alphabets —
     # the Russian and English spellings look alike since task_50's colour round.
@@ -91,6 +91,9 @@ def test_colours_by_kind() -> None:
     assert coloured.colour("ПС") == THEME.keyword
     assert coloured.colour("% привет") == THEME.comment
     assert coloured.colour(":-") == THEME.punctuation
+    # The comparison signs are reserved too (task_52): `=` is coloured like a
+    # built-in name, while `:-` stays punctuation.
+    assert coloured.colour("=") == THEME.keyword
     print("ok: every kind gets its colour, and names are told from variables")
 
 

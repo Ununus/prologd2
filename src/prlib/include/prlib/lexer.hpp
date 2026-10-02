@@ -29,6 +29,11 @@ enum class TokenKind : std::uint8_t {
   Bang,
   NotGoal,  ///< `\+`, ISO's spelling of `НЕ` (task_55)
   Hash,
+  Equal,         ///< `=`, the sugar for `РАВНО/2` (task_52)
+  Less,          ///< `<`, the sugar for `МЕНЬШЕ/2`
+  Greater,       ///< `>`, the sugar for `БОЛЬШЕ/2`
+  LessEqual,     ///< `=<`, the sugar for `НЕ(МЕНЬШЕ(A, B))`
+  GreaterEqual,  ///< `>=`, the sugar for `НЕ(БОЛЬШЕ(A, B))`
   Plus,
   Minus,
   Star,
@@ -83,6 +88,12 @@ class Lexer {
   Token lexNumber(DiagnosticSink* sink);
   Token lexString(DiagnosticSink* sink);
   Token lexQuotedAtom(DiagnosticSink* sink);
+
+  /// One diagnostic for a sign the dialect cannot read as it stands: `message`
+  /// replaces the generic «недопустимый символ» when the sign is a known
+  /// spelling from another Prolog (task_52).
+  static void reportInvalidSign(DiagnosticSink* sink, const SourceLocation& location,
+                                std::string_view message = {});
 
   std::string_view source_;
   std::string file_name_;

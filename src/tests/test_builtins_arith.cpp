@@ -35,6 +35,28 @@ TEST_CASE("multiplication/3 divides with remainder detection") {
   REQUIRE(result.output == "X=35\nX=5\n");
 }
 
+TEST_CASE("the comparison signs are sugar over the long forms") {
+  // task_52: `<`, `>`, `=<`, `>=`; the last two are `НЕ(МЕНЬШЕ/БОЛЬШЕ)`.
+  const auto result = runProgram(
+      "?2 > 1.\n"
+      "?2 >= 2.\n"
+      "?1 < 2.\n"
+      "?2 =< 1.\n"
+      "?2 > 1.0.\n"
+      "?\"а\" < \"б\".\n");
+  REQUIRE(result.loaded);
+  REQUIRE_FALSE(result.runtimeError);
+  REQUIRE(result.output == "ДА\nДА\nДА\nНЕТ\nДА\nДА\n");
+
+  // A free operand is the runtime error of the predicate the sign names,
+  // exactly as with the long form.
+  const auto free_operand = runProgram("?X >= 1.\n");
+  REQUIRE(free_operand.loaded);
+  REQUIRE(free_operand.runtimeError);
+  REQUIRE(free_operand.error.find("МЕНЬШЕ: Недопустимый тип аргументов") !=
+          std::string::npos);
+}
+
 TEST_CASE("greater-than compares numbers and text") {
   // Two branches: two numbers (integer, float, big integer or an arithmetic
   // expression — `asNumeric` evaluates it) and two strings.  Text is compared

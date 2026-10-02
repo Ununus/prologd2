@@ -102,6 +102,83 @@ TEST_CASE("lexer handles numbers") {
   REQUIRE(tokens[3].kind == TokenKind::Integer);
 }
 
+TEST_CASE("a dot ends a number, not a float") {
+  // task_52, as in ISO: `2.` is the integer 2 and the sentence terminator, so
+  // a real without a fraction is written `2.0`.  The trailing-dot float of the
+  // original PrologD would swallow the statement's own dot.
+  {
+    DiagnosticSink sink;
+    const auto tokens = lex("2.", sink);
+    REQUIRE_FALSE(sink.hasErrors());
+    REQUIRE(tokens[0].kind == TokenKind::Integer);
+    REQUIRE(tokens[0].text == "2");
+    REQUIRE(tokens[1].kind == TokenKind::Dot);
+  }
+  {
+    DiagnosticSink sink;
+    const auto tokens = lex("2.0", sink);
+    REQUIRE_FALSE(sink.hasErrors());
+    REQUIRE(tokens[0].kind == TokenKind::Float);
+    REQUIRE(tokens[0].text == "2.0");
+    REQUIRE(tokens[1].kind == TokenKind::EndOfFile);
+  }
+}
+
+TEST_CASE("the comparison signs are one token each") {
+  // task_52: `=`, `<`, `>`, `=<`, `>=` are the sugar of the comparison layer.
+  const struct {
+    std::string source;
+    TokenKind kind;
+  } signs[] = {{"=", TokenKind::Equal},
+               {"<", TokenKind::Less},
+               {">", TokenKind::Greater},
+               {"=<", TokenKind::LessEqual},
+               {">=", TokenKind::GreaterEqual}};
+  for (const auto& sign : signs) {
+    INFO("sign: " << sign.source);
+    DiagnosticSink sink;
+    const auto tokens = lex(sign.source, sink);
+    REQUIRE_FALSE(sink.hasErrors());
+    REQUIRE(tokens[0].kind == sign.kind);
+    REQUIRE(tokens[0].text == sign.source);
+    REQUIRE(tokens[1].kind == TokenKind::EndOfFile);
+  }
+  // The rule arrows are still two characters, and `=<` must not be read as
+  // `<` followed by `=`.
+  {
+    DiagnosticSink sink;
+    const auto tokens = lex("<- :-", sink);
+    REQUIRE_FALSE(sink.hasErrors());
+    REQUIRE(tokens[0].kind == TokenKind::Arrow);
+    REQUIRE(tokens[1].kind == TokenKind::ColonDash);
+  }
+}
+
+TEST_CASE("an ISO operator the dialect lacks is explained") {
+  // A sign from another Prolog is a lexical error with advice (task_52), not
+  // the bare «недопустимый символ»: the reader is told what to write instead.
+  const struct {
+    std::string source;
+    std::string needle;
+  } cases[] = {{"X == Y", "сравнение термов записывают унификацией"},
+               {"X \\== Y", "термы не совпадают"},
+               {"X \\= Y", "не унифицируется"},
+               {"1 + 1 =:= 2", "выражение вычисляет «#…#»"},
+               {"X =\\= Y", "«не равно»"},
+               {"X @< Y", "сравнение по стандартному порядку"},
+               {"X @>= Y", "сравнение по стандартному порядку"},
+               {"X -> Y", "выбор в Пролог-Д — это «;» и «ПЕРВОЕ(Ц1, Ц2)»"},
+               {"X <= Y", "«меньше или равно» записывают «=<»"}};
+  for (const auto& item : cases) {
+    INFO("source: " << item.source);
+    DiagnosticSink sink;
+    lex(item.source, sink);
+    REQUIRE(sink.hasErrors());
+    const std::string& message = sink.diagnostics().front().message;
+    REQUIRE(message.find(item.needle) != std::string::npos);
+  }
+}
+
 TEST_CASE("lexer reports malformed numbers") {
   DiagnosticSink sink;
   const auto tokens = lex("12.123.123", sink);

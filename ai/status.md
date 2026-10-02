@@ -122,7 +122,7 @@ where its files go).
 | task_49_gui_defects | done | five defects found by using the window, all fixed.  `Шаг → Стоп → Запуск` no longer answers «нет шага, который ждёт ответа» (the paused flag is cleared by the events that conclude a run — including the *error* a «Стоп» turns into while a step waits); an untouched unnamed tab comes back clean (the session record carries the unsaved flag; JSON, because a fourth tab-separated field cannot be told apart from text with a tab in it); the format `Запустить с трассировкой` no longer takes the window (the output is handed over once per turn of the event loop, and the pane trims its history in bulks — 200 000 lines: 21.9 s → 3.0 s, a 16 000-line trace: 2.2 s → 0.6 s); the main window remembers its size and place (`view/window_geometry`), which the graphics window had done since task_45; and the **output arrives as it is written** — `IoContext::setOutputLineSink` fires at a line end and the session emits one `output` event per line, so a lesson's countdown counts 3, 2, 1 instead of arriving as one block when the program is over |
 | task_50_panel_tabs | done | the output panel is one `QTabWidget`: **Проблемы** (errors and warnings), **Вывод** (program output, the `>` echo, the trace), **Система** (the window's notes) and **Ввод** (the prepared answers with the per-request console under them).  Each title carries its count (`Вывод:5`, `Проблемы:0` …), «Проблемы» is painted by state (ordinary with none, orange warnings-only, red with an error), a run brings up «Вывод» and a diagnostic «Проблемы»; the panel defaults to the **bottom**; «Поле очереди ввода» is gone (the queue is a tab now); a full load writes `--- база знаний загружена (N мс) ---` into «Система», measured by the window's clock from «Запустить» to `loaded` |
 | task_51_variadic_first | done | `ПЕРВОЕ` берёт любое число целей, начиная с одной: `builtinFirst` — цикл по `args` с `callOnce`, а вариадические имена собраны в одну таблицу `kVariadicNames` (`ВЫВОД`/`write`, `ПЕРВОЕ`/`first`), из которой читают `findBuiltin`, `builtinArities` и `builtinNames`; строки `add("ПЕРВОЕ", 2, …)` больше нет, `isVariadicBuiltin` (два сравнения имён) тоже.  Разбора, движка, лексера и `checks.cpp` не касается: `variadic` уже значит «от арности 1».  Одноаргументное `ПЕРВОЕ(Ц)` — это фиксация на первом решении, **не** `ВЫП(Ц)` (`?НАЙТИВСЕ(X, ПЕРВОЕ(p(X)), L).` → `L=[1]`, у `ВЫП(p(X))` — `L=[1,2]`); арность 0 — ошибка загрузки («ПЕРВОЕ не имеет арности 0»).  Проверки: новый случай Catch2 на вариадику (+1 CLI-тест `--list-keywords` → `ПЕРВОЕ/+`), ctest 278/278; `--list-keywords` печатает `ПЕРВОЕ/+` и `first/+` и больше не печатает `ПЕРВОЕ/2`; `doc/builtins.json` (`arities: []`, `variadic`), `help.typ` §4.5/§4.6, `technical.typ`, `prologd-diff.typ` (§«ПЕРВОЕ» и строка таблицы), `ai/porting_notes.md`, `gui/README.md` |
-| task_52_infix_operators | not started | `X = Y`, `X < Y`, `X > Y`, `X >= Y`, `X =< Y` — сахар над `РАВНО`/`МЕНЬШЕ`/`БОЛЬШЕ` (не новые имена), один слой в парсере с таблицей операторов, `xfx` (цепочка — ошибка разбора), подсказки для ISO-операторов, которых в диалекте нет, и клавиша вставки `= ` в GUI.  `=:=` не вводим (2026-10-02): `#…#` уже вычисляет, и это сказано в §4.7; план — `ai/task_52_infix_operators.md` |
+| task_52_infix_operators | done | Знаки сравнения — сахар над `РАВНО`/`МЕНЬШЕ`/`БОЛЬШЕ`, а не новые имена: `InfixOperator`/`kInfixOperators` в `parser.cpp` (`=`→`РАВНО`, `<`→`МЕНЬШЕ`, `>`→`БОЛЬШЕ`, `=<`→`НЕ(БОЛЬШЕ)`, `>=`→`НЕ(МЕНЬШЕ)`), один слой в `parseTerm`/`parseComparison`, цепочка (`0 < X < 10`) — ошибка разбора одним сообщением (`skipToTerminator`), операнды через `parseOperand` — поэтому `#…#` тоже операнд (`r(#1 + 1# = 2)`).  Лексер: по одному виду на знак и таблица подсказок `kForeignOperators` (`=:=`, `=\=`, `\==`, `\=`, `==`, `@<`…, `->`, `<=`) — чужая запись объясняется в месте знака, а не сообщением про переменную-цель.  `=:=` не введён: `#…#` вычисляет, и вместо `1 + 1 =:= 2` пишут `#1 + 1# = 2`.  Вместе с этим принято правило ISO для числа: `1.` — целое `1` и точка, вещественное — `1.0` (перенесённая запись с точкой на конце съедала терминатор, и `?2 > 1.` не разбиралось).  GUI: знаки — вид `OPERATOR` (`tokens.py`, цвет уже был), `shortcuts.py` не тронут (решение пользователя: `Ctrl+=` остаётся за `РАВНО(`).  Документы: `help.typ` §3.2/§3.3/§4.7/§5.1 и строки таблицы, `prologd-diff.typ` §9 и три строки «Краткой таблицы», `technical.typ` (число и грамматика), варианты в `doc/builtins.json`.  Проверки: 285/285 ctest (семь новых случаев), 21 набор GUI (`test_*.py`) и `protocol_smoke.py`; уроки 3 и 4 получили пример с короткой записью, счётчики `test_queries.py` освежены (урок 4: 24 → 25 после task_51, плюс 03: 34 → 37 и 04: 25 → 27) |
 | task_53_writeln | not started | `ВЫВОДПС(Аргумент, ...)` / `writeln` — `ВЫВОД` с переводом строки: тело — `builtinWrite` плюс `newline()`, имя — строка в таблице вариадических имён из `task_51` (тот поэтому идёт первым), плюс `kEnglishNames`, `kReservedBuiltins` в лексере и запись в `doc/builtins.json`; в руководстве новая §6.2 со сдвигом номеров.  План — `ai/task_53_writeln.md` |
 | task_54_input_stream | not started | Ответ оболочки — кусок входного потока: интерпретатор сам режет его на строки, как файл, поэтому `ВВОДСТР`/`ВВОДСИМВ`/`ВВКОД` в окне ведут себя как с файлом, а многострочная консоль остаётся и значит «несколько строк ввода»; плюс BOM в начале потока или куска — не данные (как у исходников).  Заодно правится устаревший абзац про ввод в `doc/gui.typ` (окно до task_50).  Объединение `ВВОДСИМВ`/`ВВОДСТР` в `ВВОД` — отложено.  План — `ai/task_54_input_stream.md` |
 | task_55_iso_negation_and_is_hint | done | `\+` — вторая запись `НЕ/1`, а не новое имя: один токен в лексере (`TokenKind::NotGoal`), префикс уровня терма в `parseTerm`, поэтому он работает в теле, в запросе, в директиве и в аргументах `ВЫП`/`НАЙТИВСЕ`, а приоритет — ISO (`\+ A, B` — это `(\+ A), B`, `\+ (A, B)` — отрицание всей конъюнкции, `\+ \+ Ц` — двойное отрицание); `НЕ` остаётся основным именем, в таблицу операторов task_52 `\+` не входит (он префиксный).  `is` **не добавлен**: `#…#` уже помечает и вычисляет выражение, поэтому вместо оператора — две подсказки, называющие замену (`kForeignSpellings` в `checks.cpp` для вызова `is/2`; `kInfixIsHint` в `parser.cpp` для `X is 2+3`).  Руководство: §3.3, §4.4, строки «Арифметика»/«Отрицание» сравнительной таблицы, приложение; `prologd-diff.typ` §19/§20 и две строки в §14 |
@@ -130,7 +130,7 @@ where its files go).
 
 ## Test suite
 
-278 tests, about five seconds: 263 Catch2 cases plus 15 command-line and
+285 tests, about five seconds: 270 Catch2 cases plus 15 command-line and
 integration tests (seven option tests, three `--list-keywords` tests, the
 import-search report, the JSON protocol session, the formatter round-trip and the
 engine-limit and diagnostics cases). Groups:
@@ -1881,6 +1881,46 @@ Added on 2026-10-02 while implementing task_31:
   Catch2 на вариадику и CLI-тест `ПЕРВОЕ/+`), шесть GUI-наборов
   (`test_reference`, `test_completion`, `test_keywords`, `test_queries`,
   `test_tokens`, `test_queryline`) зелёные, три документа собираются Typst.
+
+* Interpreter round, part 62: **знаки сравнения — сахар над встроенными**
+  (task_52, 2026-10-02).  Ответ на «он же + ISO-сравнения»: `=`, `<`, `>`, `>=`,
+  `=<` — не новые имена, а вторая запись `РАВНО`, `МЕНЬШЕ`, `БОЛЬШЕ`.  В
+  `parser.cpp` одна таблица `kInfixOperators` (`=`→`РАВНО`, `<`→`МЕНЬШЕ`,
+  `>`→`БОЛЬШЕ`, `=<`→`НЕ(БОЛЬШЕ)`, `>=`→`НЕ(МЕНЬШЕ)`) и один слой между `#…#` и
+  всем остальным: знаки связывают крепче `,` и `;` и слабее `#…#`, цепочка
+  `0 < X < 10` — ошибка разбора с одним сообщением (««<» — не цепочка: разбейте
+  на два сравнения, «A < B, B < C»»), а `skipToTerminator` не даёт парсеру
+  сказать то же второй раз про «непарные скобки».  Всё, что ниже, о знаках не
+  знает: диспетчер, проверка вызовов, `--list-keywords`, протокол и
+  `doc/builtins.json` видят те же предикаты, поэтому `НЕ(X = 1)`,
+  `НАЙТИВСЕ(X, (X = 1), L)`, `ВЫП((X = A))` и `r([A = B])` разбираются без
+  единой правки в движке.  Четыре вещи нашлись по ходу.  (1) **Правило числа.**
+  Перенесённая запись `1.` = 1.0 съедала терминатор: `?2 > 1.` не разбиралось
+  вовсе.  Решение пользователя — правило ISO: `1.` это целое `1` и точка,
+  вещественное пишут `1.0`; это единственное место задачи, где меняется язык
+  (`#1.#` больше не загружается), и оно записано в `help.typ` §3.2 и в
+  `prologd-diff.typ`.  (2) **`#…#` — операнд.**  `parseTerm` возвращал
+  `parseArithmetic()` раньше времени на `#`, и `r(#1 + 1# = 2)` падало с
+  «непарные скобки»; теперь операнд берёт `parseOperand`, и тест на это есть.
+  (3) **Подсказки — в лексере** (`kForeignOperators`, длинные записи первыми:
+  `=:=`, `=\=`, `\==`, `\=`, `==`, `@=<`, `@>=`, `@<`, `@>`, `->`, `<=`): чужая
+  запись объясняется там, где стоит знак, и `?X <= 1.` начинается с ««<=» — не
+  оператор: «меньше или равно» записывают «=<»», а не с «Цель не может быть
+  переменной».  (4) **GUI — только подсветка**: знаки стали видом `OPERATOR`, а
+  `Ctrl+=` остался за `РАВНО(`, как решил пользователь, поэтому `shortcuts.py` не
+  изменился.  Слабое место, оставленное нарочно: `X < 2+1` (без `#…#`) даёт общее
+  «ошибка при разборе предложения» — подсказку про `#…#` там можно добавить
+  отдельно, как у `is`.  Руководство: `help.typ` §3.2/§3.3/§4.7/§5.1 и строки
+  таблицы, `prologd-diff.typ` §9 и три строки «Краткой таблицы»,
+  `technical.typ`, варианты в `doc/builtins.json`; уроки 3 и 4 получили пример
+  с короткой записью (решение пользователя: «и урок 3, и урок 4») — их `%!`
+  строки сами себе золотой ответ, поэтому `test_lessons.cpp` не менялся.
+  Проверки: 285/285 ctest (семь новых случаев), 21 набор GUI (`test_*.py`) и
+  `protocol_smoke.py`, шесть PDF;
+  счётчики `test_queries.py` пришлось освежить — правка урока 4 в task_51
+  добавила вопрос (`24` → `25`), и набор был красным уже на HEAD, а примеры
+  этого раунда сдвинули ещё два (`03`: `34` → `37`, `04`: `25` → `27`): наборы
+  GUI надо гонять после любой правки `examples/`.
 
 
 
