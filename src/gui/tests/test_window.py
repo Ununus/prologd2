@@ -496,6 +496,34 @@ def test_the_console_appears_only_when_it_is_asked(executable: str) -> None:
     print("ok: the console appears for a question and goes away with the answer")
 
 
+def test_a_request_keeps_the_panel_on_the_output(executable: str) -> None:
+    """task_50: the per-request console is under the goal line, and the panel
+    stays on Вывод — a question never pulls the eye off the output it belongs to."""
+    window = empty_window(executable)
+    try:
+        window.editor().setPlainText("?ВВОДЦЕЛ(А),ВЫВОД(А),ПС.\n")
+        window.run_program()
+        assert pump(window, lambda: window._input_console.waiting()), window.status_text()
+
+        # The question appears in the editor column, not in the Ввод tab — and
+        # the panel stays where the run left it (Вывод).
+        assert window._input_console.parent() is not window._input_tab, (
+            "the console stayed inside the Ввод tab"
+        )
+        assert (
+            window.panel_tabs().currentIndex()
+            == window.panel_tabs().indexOf(window._output)
+        ), "a request moved the panel off the Вывод tab"
+
+        window._input_console._line.setText("5")
+        window._input_console.send()
+        wait_for_result(window)
+        assert printed_lines(window) == ["5", "А=5"], printed_lines(window)
+    finally:
+        discard_changes(window)
+    print("ok: a request shows the console under the goal line and leaves the panel on Вывод")
+
+
 def test_the_panel_has_four_tabs_with_counts(executable: str) -> None:
     """task_50: Проблемы, Вывод, Система, Ввод, each titled with its count.
 
@@ -3146,6 +3174,7 @@ def main(argv: list[str]) -> int:
         test_the_input_switch_chooses_where_to_ask(executable)
         test_the_limits_stop_a_runaway_and_name_themselves(executable)
         test_the_console_appears_only_when_it_is_asked(executable)
+        test_a_request_keeps_the_panel_on_the_output(executable)
         test_the_panel_has_four_tabs_with_counts(executable)
         test_a_run_focuses_the_output_and_the_system_notes_the_time(executable)
         test_cancelling_input_stops_the_run(executable)

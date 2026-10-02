@@ -581,16 +581,16 @@ none left the window saying `выполняется` with `Запустить` d
 
 ### The input console
 
-The **Ввод** tab holds the prepared answers and, under them, the **console**: the
-field the program's question goes into.  It is hidden while nothing is asked — an
-idle strip would take room from the queue for nothing — and appears with the
-question, framed in yellow (`#e0b400`) and with the answer's own key in its
-placeholder (`Слово — Enter`, `Строка — Ctrl+Enter`, `Символ — Enter`; the
-one-line field sends on `Enter`, the text area for a `line` keeps `Enter` as a
-newline, because an answer to `ВВОДСТР` may be a sentence).  `Отправить` is there
-for the mouse.  The answer is echoed into «Вывод» with `>`, like the prepared
-lines, and the strip disappears again.  The tab comes up by itself when the
-program asks, so the question is actually seen.
+The **Ввод** tab holds the prepared answers.  The **console** — the field the
+program's question goes into — sits under the goal line, in the editor column: it
+is hidden while nothing is asked and appears with the question, framed in yellow
+(`#e0b400`) and with the answer's own key in its placeholder (`Слово — Enter`,
+`Строка — Ctrl+Enter`, `Символ — Enter`; the one-line field sends on `Enter`, the
+text area for a `line` keeps `Enter` as a newline, because an answer to `ВВОДСТР`
+may be a sentence).  `Отправить` is there for the mouse.  The answer is echoed
+into «Вывод» with `>`, like the prepared lines, and the strip disappears again.
+The panel stays on the tab the reader chose — a question never pulls the eye off
+the output it belongs to.
 
 Answers are taken in this order: the **prepared lines** (one per request), then
 the console, and the **modal dialog** only when the whole panel is hidden by `F4`

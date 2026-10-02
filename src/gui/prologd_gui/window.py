@@ -334,7 +334,8 @@ class MainWindow(QMainWindow):
         self._input_pane.textChanged.connect(self._refresh_panel_tabs)
 
         # The console: what the program asks once the prepared lines run out.
-        # It sits under the queue, in the same tab.  `Ctrl+Enter` sends;
+        # It sits under the goal field (task_50: moved out of the Ввод tab, so
+        # a request appears without leaving the Вывод tab).  `Ctrl+Enter` sends;
         # «Остановить» is how a run that waits for an answer is abandoned.
         self._input_console = panels.InputPane(
             font_family=self._settings.font_family,
@@ -431,6 +432,9 @@ class MainWindow(QMainWindow):
         editor_layout.addWidget(self._editor_splitter)
         editor_layout.addWidget(self._step_pane)
         editor_layout.addWidget(self._query_line)
+        # The per-request console lives under the goal line: it appears where the
+        # question is answered, without moving the panel off the Вывод tab.
+        editor_layout.addWidget(self._input_console)
 
         # The tabbed output panel (task_50): one `QTabWidget` with the three
         # read-only panes and the Ввод tab.  `F4` hides the whole panel, `Ctrl+F4`
@@ -442,7 +446,6 @@ class MainWindow(QMainWindow):
         input_layout.setContentsMargins(0, 0, 0, 0)
         input_layout.setSpacing(2)
         input_layout.addWidget(self._input_pane, 1)
-        input_layout.addWidget(self._input_console)
 
         self._panel_tabs = QTabWidget()
         self._panel_tabs.setDocumentMode(True)
@@ -2686,10 +2689,10 @@ class MainWindow(QMainWindow):
             self._status.setText(f"ввод из поля, осталось строк — {len(self._queued_input)}")
             return
         if not self._panel_tabs.isHidden() and self._settings.input_mode == "panel":
+            # The console appears under the goal line, and the panel stays on
+            # the tab the reader chose (usually Вывод) — the question never pulls
+            # the eye off the output it belongs to (task_50).
             self._input_console.ask(kind)
-            # The console lives in the Ввод tab (task_50): bring it up so the
-            # question is actually seen.
-            self._show_panel_tab(panels.TAB_INPUT)
             self._status.setText(f"ждёт ввода: {panels.INPUT_PROMPTS.get(kind, 'значение')}")
             return
         answer = self._ask_input(kind)
