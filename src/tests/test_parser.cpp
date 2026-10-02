@@ -179,14 +179,14 @@ TEST_CASE("a `;` where the dialect used to accept one is an error") {
     REQUIRE(sink.hasErrors());
     REQUIRE(program.clauses.empty());
     const std::string message = sink.diagnostics().front().message;
-    REQUIRE(message == "«;» — дизъюнкция; предложение не заканчивается точкой");
+    REQUIRE(message == "«;» — дизъюнкция; предложение должно заканчиваться точкой");
   }
   SECTION("after a body, before the end") {
     DiagnosticSink sink;
     parse("a(1) :- b(1);", sink);
     REQUIRE(sink.hasErrors());
     REQUIRE(sink.diagnostics().front().message ==
-            "«;» — дизъюнкция; предложение не заканчивается точкой");
+            "«;» — дизъюнкция; предложение должно заканчиваться точкой");
   }
   SECTION("in a list") {
     DiagnosticSink sink;
@@ -201,6 +201,46 @@ TEST_CASE("a `;` where the dialect used to accept one is an error") {
     REQUIRE(sink.hasErrors());
     REQUIRE(sink.diagnostics().front().message ==
             "«;» — дизъюнкция; заключите её в скобки: (A ; B)");
+  }
+}
+
+TEST_CASE("a statement that lost its dot is told where the dot belongs") {
+  SECTION("a fact written before the next one") {
+    DiagnosticSink sink;
+    parse("студент(вова, корчагин)\nстудент(данил, ахмеров).\n", sink);
+    REQUIRE(sink.hasErrors());
+    const PrologError& error = sink.diagnostics().front();
+    REQUIRE(error.code == ErrorCode::InvalidSentence);
+    REQUIRE(error.message == "предложение должно заканчиваться точкой");
+    // The end of the first line, where the dot belongs: `студент(вова, корчагин)`
+    // is 41 bytes long, so the `)` sits in the 42nd column (columns count bytes).
+    REQUIRE(error.location.line == 1);
+    REQUIRE(error.location.column == 42);
+  }
+  SECTION("a rule written before a fact") {
+    DiagnosticSink sink;
+    parse("a(X) :- b(X)\na(2).\n", sink);
+    REQUIRE(sink.hasErrors());
+    REQUIRE(sink.diagnostics().front().message ==
+            "предложение должно заканчиваться точкой");
+  }
+  SECTION("a query written before a fact") {
+    DiagnosticSink sink;
+    parse("?- a(1)\nb(2).\n", sink);
+    REQUIRE(sink.hasErrors());
+    REQUIRE(sink.diagnostics().front().message ==
+            "предложение должно заканчиваться точкой");
+  }
+  SECTION("a dot ends every statement") {
+    DiagnosticSink sink;
+    parse("a(1).\nb(2).\n", sink);
+    REQUIRE_FALSE(sink.hasErrors());
+  }
+  SECTION("what cannot begin a statement keeps the generic wording") {
+    DiagnosticSink sink;
+    parse("a(1), b(2).\n", sink);
+    REQUIRE(sink.hasErrors());
+    REQUIRE(sink.diagnostics().front().message == "ошибка при разборе предложения");
   }
 }
 

@@ -32,9 +32,10 @@ Term commaGoal(std::vector<Term>& goals) {
 }
 
 /// The wording of a `;` found where the original dialect accepted it as a
-/// sentence terminator (task_41) — the message says what changed.
+/// sentence terminator (task_41) — the message says what changed and what the
+/// statement needs instead of the `;`.
 constexpr const char* kRetiredTerminator =
-    "«;» — дизъюнкция; предложение не заканчивается точкой";
+    "«;» — дизъюнкция; предложение должно заканчиваться точкой";
 
 /// The wording of an ISO `is` written as an infix operator (`X is 2+3`).  The
 /// dialect has no `is`: `#…#` marks an expression, and `РАВНО` evaluates it
@@ -42,6 +43,30 @@ constexpr const char* kRetiredTerminator =
 /// переменной».
 constexpr const char* kInfixIsHint =
     "«is» — не оператор: выражение помечают «#…#», например «РАВНО(X, #2+3#)»";
+
+/// Tokens that can open a term, a fact, a rule or a query.  When one of them
+/// follows a *complete* statement, what is missing is the dot of that
+/// statement — saying so points at the end of the finished line instead of at
+/// the start of the next statement, which is where the generic parse error
+/// used to land (task_56).
+bool beginsStatement(TokenKind kind) {
+  switch (kind) {
+    case TokenKind::Identifier:
+    case TokenKind::Variable:
+    case TokenKind::Integer:
+    case TokenKind::Float:
+    case TokenKind::String:
+    case TokenKind::QuotedAtom:
+    case TokenKind::Hash:
+    case TokenKind::Question:
+    case TokenKind::NotGoal:
+    case TokenKind::LParen:
+    case TokenKind::LBracket:
+      return true;
+    default:
+      return false;
+  }
+}
 }  // namespace
 
 Parser::Parser(std::vector<Token> tokens, VarAllocator allocator, DiagnosticSink* sink)
@@ -102,10 +127,11 @@ void Parser::reportUnclosedBracket(char open, const SourceLocation& location) {
 
 void Parser::reportMissingDot() {
   // The dot belongs right after the last token of the statement, and that is
-  // where a reader has to look.  The message says what is *wrong* with the
-  // statement: "предложение заканчивается точкой" reads as a statement of fact.
+  // where a reader has to look.  The message says what the statement *needs*:
+  // "предложение заканчивается точкой" read as a statement of fact, and
+  // "не заканчивается" only named the defect.
   report(ErrorCode::InvalidSentence, previous().location,
-         "предложение не заканчивается точкой");
+         "предложение должно заканчиваться точкой");
 }
 
 void Parser::warn(ErrorCode code, const SourceLocation& location, std::string message) {
@@ -593,6 +619,10 @@ bool Parser::parseClause(ParsedProgram& out) {
       report(ErrorCode::UnpairedBracket, peek().location);
     } else if (kind == TokenKind::RParen) {
       report(ErrorCode::UnpairedBracket, peek().location);
+    } else if (!failed_ && beginsStatement(kind)) {
+      // The statement is complete and something new begins: the dot is what
+      // the reader is missing.
+      reportMissingDot();
     } else {
       report(ErrorCode::InvalidSentence, peek().location);
     }
@@ -627,7 +657,8 @@ bool Parser::parseQueryOrDirective(ParsedProgram& out) {
   if (!check(TokenKind::Dot)) {
     if (check(TokenKind::Semicolon)) {
       report(ErrorCode::InvalidSentence, peek().location, kRetiredTerminator);
-    } else if (check(TokenKind::EndOfFile) && !failed_) {
+    } else if ((check(TokenKind::EndOfFile) || beginsStatement(peek().kind)) &&
+               !failed_) {
       reportMissingDot();
     } else {
       report(ErrorCode::InvalidSentence, peek().location);

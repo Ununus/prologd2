@@ -80,7 +80,19 @@ TEST_CASE("a missing final dot is reported at the end of the clause") {
   REQUIRE(error.severity == Severity::Error);
   REQUIRE(error.location.line == 1);
   REQUIRE(error.location.column == 11);  // the `)` the dot belongs after
-  REQUIRE(error.message == "предложение не заканчивается точкой");
+  REQUIRE(error.message == "предложение должно заканчиваться точкой");
+}
+
+TEST_CASE("a missing dot before the next clause is reported at the end of the first") {
+  const std::vector<PrologError> diagnostics =
+      diagnosticsOf("студент(вова, корчагин)\nстудент(данил, ахмеров).\n");
+  REQUIRE_FALSE(diagnostics.empty());
+  const PrologError& error = diagnostics.front();
+  REQUIRE(error.code == ErrorCode::InvalidSentence);
+  REQUIRE(error.severity == Severity::Error);
+  REQUIRE(error.message == "предложение должно заканчиваться точкой");
+  REQUIRE(error.location.line == 1);
+  REQUIRE(error.location.column == 42);  // the `)` of the first line, in bytes
 }
 
 TEST_CASE("an unclosed string points at its opening quote") {
@@ -250,5 +262,5 @@ TEST_CASE("a `;` where a sentence ends says what changed") {
   // Byte columns: `прим` is four letters of two bytes each, so the `;` sits in
   // the twelfth column.
   REQUIRE(error.location.column == 12);
-  REQUIRE(error.message == "«;» — дизъюнкция; предложение не заканчивается точкой");
+  REQUIRE(error.message == "«;» — дизъюнкция; предложение должно заканчиваться точкой");
 }
