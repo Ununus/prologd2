@@ -585,12 +585,21 @@ The **Ввод** tab holds the prepared answers.  The **console** — the field 
 program's question goes into — sits under the goal line, in the editor column: it
 is hidden while nothing is asked and appears with the question, framed in yellow
 (`#e0b400`) and with the answer's own key in its placeholder (`Слово — Enter`,
-`Строка — Ctrl+Enter`, `Символ — Enter`; the one-line field sends on `Enter`, the
+`Строки — Ctrl+Enter`, `Символ — Enter`; the one-line field sends on `Enter`, the
 text area for a `line` keeps `Enter` as a newline, because an answer to `ВВОДСТР`
-may be a sentence).  `Отправить` is there for the mouse.  The answer is echoed
+may be several lines).  `Отправить` is there for the mouse.  The answer is echoed
 into «Вывод» with `>`, like the prepared lines, and the strip disappears again.
 The panel stays on the tab the reader chose — a question never pulls the eye off
 the output it belongs to.
+
+An answer typed there is a **piece of the program's input stream**, not one line
+(task_54): the interpreter splits it on `\n` itself, exactly as it splits a file.
+Two lines in the field therefore answer two `ВВОДСТР` while the window is asked
+once, the remainder rule of `ВВОДСИМВ` works in the window too, and the separator
+never reaches the program's text (`ВВОДСТР` does not see the `\n`, `ВВКОД` never
+reads code 10 between two lines).  Nothing in the front-end splits the answer; the
+queue below is split because the `>` echo and the «осталось строк» counter need it,
+and its lines are one per request anyway.
 
 Answers are taken in this order: the **prepared lines** (one per request), then
 the console, and the **modal dialog** only when the whole panel is hidden by `F4`

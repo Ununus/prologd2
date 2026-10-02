@@ -191,7 +191,10 @@ void addLocation(Json& event, const SourceLocation& location) {
 }
 
 /// One JSON-line session: the request loop, event emission and the bridge that
-/// turns `ВВОДСТР`/`ВВОДСИМВ`/`ВВКОД` into `input_request`/`input` pairs.
+/// turns `ВВОДСТР`/`ВВОДСИМВ`/`ВВКОД` into `input_request`/`input` pairs.  The
+/// reply's `text` is a piece of the input stream and is handed over as it came —
+/// the interpreter is what splits it on `\n` (task_54), so a front-end may send
+/// several lines in one answer.
 class Session {
  public:
   Session(Engine& engine, ModuleLoader& loader, std::istream& in, std::ostream& out)
@@ -574,6 +577,10 @@ class Session {
     return StepDecision::Stop;  // the stream is over: nothing more will arrive
   }
 
+  /// One answer from the front-end: its `text` is returned exactly as it came,
+  /// `\n`s and all.  Nothing is parsed or split here — the interpreter empties
+  /// the piece line by line, which is what makes «две строки в поле — две
+  /// строки ввода» true (task_54); the `kind` only says which widget to show.
   std::optional<std::string> answerInputRequest(InputRequestKind kind) {
     flush();  // keep the event order: the output so far, then the prompt
     emit(Json{{"event", "input_request"}, {"kind", inputKindName(kind)}});

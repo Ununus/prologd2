@@ -60,6 +60,36 @@ if(NOT exit_code EQUAL 0)
   message(FATAL_ERROR "Session exit code ${exit_code}, stderr: ${cli_errors}")
 endif()
 
+# --- one answer, two lines: the reply is a piece of the input stream ----------
+# task_54: the answer's `text` is handed over whole and the interpreter splits it
+# on `\n`, so two `ВВОДСТР` cost one `input_request`, not two.  The program reads
+# twice and prints what it got, which is what makes the split visible.
+file(WRITE "${session}"
+  "{\"cmd\":\"load\",\"text\":\"?ТИХО, ВВОДСТР(A), ВВОДСТР(B), ВЫВОД(\\\"<\\\", A, \\\"|\\\", B, \\\">\\\"), ПС.\\n\"}\n"
+  "{\"cmd\":\"input\",\"text\":\"one\\ntwo\"}\n"
+  "{\"cmd\":\"quit\"}\n")
+
+execute_process(
+  COMMAND "${PROLOGD_EXE}" --protocol json
+  INPUT_FILE "${session}"
+  OUTPUT_VARIABLE events
+  RESULT_VARIABLE exit_code)
+
+string(REGEX MATCHALL "\\{\"event\":\"input_request\"" requests "${events}")
+list(LENGTH requests request_count)
+if(NOT request_count EQUAL 1)
+  message(FATAL_ERROR "Two lines of one answer must be one request, got ${request_count}\n--- got ---\n${events}")
+endif()
+
+string(FIND "${events}" "{\"event\":\"output\",\"text\":\"<one|two>\\n\"}" position)
+if(position EQUAL -1)
+  message(FATAL_ERROR "The two lines of the answer did not reach the two reads\n--- got ---\n${events}")
+endif()
+
+if(NOT exit_code EQUAL 0)
+  message(FATAL_ERROR "Chunk session exit code ${exit_code}, stderr: ${cli_errors}")
+endif()
+
 # --- a quiet load: the program's own `?`-statements do not run ----------------
 # This is how the editor's margin answers one clicked query alone (task_36): the
 # program is loaded for its clauses, and only the query that was asked for runs.

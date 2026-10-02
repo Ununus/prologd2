@@ -374,7 +374,9 @@ class OutputPane(ZoomablePlainTextEdit):
 #: What a request is called in the console and in the status bar.
 INPUT_PROMPTS = {
     "token": "Слово",
-    "line": "Строка",
+    # «Строки», not «Строка»: an answer is a piece of the program's input stream,
+    # so two lines in the field are two answers to two reads (task_54).
+    "line": "Строки",
     "codepoint": "Символ",
 }
 
@@ -386,8 +388,10 @@ ARMED_BORDER = "QLineEdit, QPlainTextEdit { border: 2px solid #e0b400; }"
 class AnswerEdit(QPlainTextEdit):
     """The text area for a `line` request, where `Ctrl+Enter` sends.
 
-    Plain `Enter` is a newline here on purpose: an answer to `ВВОДСТР` may be a
-    sentence, and a control that sends on the first `Enter` cannot type one.
+    Plain `Enter` is a newline here on purpose: an answer may be several lines,
+    and since task_54 they are several lines *of the program's input* — a `\n`
+    inside the field separates two reads, exactly as it would in a file.  A
+    control that sent on the first `Enter` could not type one.
     """
 
     submitted = Signal()

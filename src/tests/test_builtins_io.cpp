@@ -1,12 +1,52 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include <deque>
 #include <filesystem>
+#include <fstream>
+#include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 
 #include "test_helpers.hpp"
 
 using prologd::test::runProgram;
+
+namespace {
+
+/// Stand-in for a front-end: hands out scripted *answers* and counts the asks.
+/// An answer is a piece of the input stream, so one of them may carry several
+/// lines (task_54).
+class ChunkScript {
+ public:
+  void queue(std::string answer) { answers_.push_back(std::move(answer)); }
+
+  std::optional<std::string> operator()() {
+    ++calls_;
+    if (answers_.empty()) {
+      return std::nullopt;
+    }
+    std::string answer = answers_.front();
+    answers_.pop_front();
+    return answer;
+  }
+
+  [[nodiscard]] std::size_t calls() const noexcept { return calls_; }
+
+ private:
+  std::deque<std::string> answers_;
+  std::size_t calls_ = 0;
+};
+
+/// The `configure` hook that puts `script` behind every read.
+std::function<void(prologd::Engine&)> withChunks(ChunkScript& script) {
+  return [&script](prologd::Engine& engine) {
+    engine.io().setInputRequestHandler(
+        [&script](prologd::InputRequestKind) { return script(); });
+  };
+}
+
+}  // namespace
 
 TEST_CASE("output writes terms without a newline") {
   const auto result = runProgram("?ВЫВОД(1, 2, 3).\n");
@@ -88,6 +128,85 @@ TEST_CASE("file write and read round-trip") {
   const auto result = runProgram(source);
   REQUIRE(result.loaded);
   REQUIRE(result.output == "X=данные\n");
+}
+
+TEST_CASE("one answer may carry two lines of input") {
+  ChunkScript script;
+  script.queue("первая\nвторая");
+  const auto result = runProgram(
+      "?ТИХО, ВВОДСТР(А), ВВОДСТР(Б), ВЫВОД(А, \"|\", Б), ПС.\n", "", nullptr, withChunks(script));
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "первая|вторая\n");
+  REQUIRE(script.calls() == 1);  // both reads came out of one answer
+}
+
+TEST_CASE("the end of an answer ends its last line instead of adding an empty one") {
+  ChunkScript script;
+  script.queue("а\n");
+  script.queue("б");
+  const auto result = runProgram(
+      "?ТИХО, ВВОДСТР(А), ВВОДСТР(Б), ВЫВОД(А, \"|\", Б), ПС.\n", "", nullptr, withChunks(script));
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "а|б\n");
+  REQUIRE(script.calls() == 2);  // the piece was used up: the second read asked again
+}
+
+TEST_CASE("a token and the rest of its line are read out of one answer") {
+  ChunkScript script;
+  script.queue("имя остаток строки\nвторая строка");
+  const auto result = runProgram(
+      "?ТИХО, ВВОДСИМВ(С), ВВОДСТР(О), ВВОДСТР(В), ВЫВОД(С, \"|\", О, \"|\", В), ПС.\n",
+      "", nullptr, withChunks(script));
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "имя| остаток строки|вторая строка\n");
+  REQUIRE(script.calls() == 1);
+}
+
+TEST_CASE("a number read after a string comes from the same answer") {
+  ChunkScript script;
+  script.queue("слово\n42");
+  const auto result = runProgram("?ТИХО, ВВОДСТР(С), ВВОДЦЕЛ(Ч), ВЫВОД(С, \"|\", Ч), ПС.\n",
+                                 "", nullptr, withChunks(script));
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "слово|42\n");
+  REQUIRE(script.calls() == 1);
+}
+
+TEST_CASE("the separator of an answer is never read as a code point") {
+  ChunkScript script;
+  script.queue("ab\ncd");
+  const auto result = runProgram(
+      "?ТИХО, ВВКОД(К1), ВВКОД(К2), ВВКОД(К3), ВВКОД(К4), "
+      "ВЫВОД(К1, \" \", К2, \" \", К3, \" \", К4), ПС.\n",
+      "", nullptr, withChunks(script));
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "97 98 99 100\n");
+  REQUIRE(script.calls() == 1);  // code 10 would have been a fifth ask
+}
+
+TEST_CASE("a byte order mark at the start of an answer is not data") {
+  const std::string mark = "\xEF\xBB\xBF";  // U+FEFF in UTF-8
+  ChunkScript script;
+  script.queue(mark + "первая\nвторая");
+  const auto result = runProgram(
+      "?ТИХО, ВВОДСТР(А), ВВОДСТР(Б), ВЫВОД(А, \"|\", Б), ПС.\n", "", nullptr, withChunks(script));
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "первая|вторая\n");  // the mark is gone, the lines are not
+}
+
+TEST_CASE("a byte order mark at the start of a data file is not data") {
+  const auto path = (std::filesystem::temp_directory_path() / "prologd_io_bom_test.txt");
+  {
+    std::ofstream file(path, std::ios::binary | std::ios::trunc);
+    file << "\xEF\xBB\xBF" << "строка\n";
+  }
+  const std::string source = "?ТИХО, ЧТЕНИЕ_ИЗ(\"" + path.string() +
+                             "\"), ВВОДСТР(С), ВЫВОД(С), ПС, ЧТЕНИЕ_ИЗ(\"\").\n";
+  const auto result = runProgram(source);
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "строка\n");
+  std::error_code ignored;
+  std::filesystem::remove(path, ignored);
 }
 
 TEST_CASE("the code writer writes the character of a code point") {

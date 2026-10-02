@@ -53,6 +53,11 @@ class IoContext {
   /// it to emit an `input_request` event and wait for the reply.  Redirection
   /// set up by `ЧТЕНИЕ_ИЗ` still wins, and preloaded lines are consumed first.
   /// Pass an empty function to read the base stream again.
+  ///
+  /// An answer is a *piece of the input stream*, not a line: a `\n` inside it
+  /// separates lines and its end ends its last line, exactly as the end of a
+  /// file does (task_54).  `a\nb` is two lines, `a\n` is one, and the separator
+  /// itself is never handed out as text.
   void setInputRequestHandler(InputRequestHandler handler);
   [[nodiscard]] bool hasInputRequestHandler() const noexcept {
     return static_cast<bool>(input_handler_);
@@ -98,6 +103,7 @@ class IoContext {
 
  private:
   bool fetchLine(std::string& line, InputRequestKind kind);
+  bool fetchChunkLine(std::string& line, InputRequestKind kind);
   [[nodiscard]] static bool isSpace(char ch);
 
   InputRequestHandler input_handler_;
@@ -120,6 +126,18 @@ class IoContext {
   std::string current_line_;
   std::size_t current_pos_ = 0;
   bool has_current_line_ = false;
+
+  /// What is left of the front-end's last answer; `pending_pos_` is how much of
+  /// it has been handed out.  A piece that is used up asks the front-end for
+  /// another one — including the piece `"a\n"`, whose separator ends a line
+  /// rather than opening an empty one.
+  std::string pending_;
+  std::size_t pending_pos_ = 0;
+
+  /// Whether the first line of a stream has been read yet: a byte order mark is
+  /// stripped there and nowhere else.
+  bool base_stream_started_ = false;
+  bool file_stream_started_ = false;
 
   bool at_line_start_ = true;
 };

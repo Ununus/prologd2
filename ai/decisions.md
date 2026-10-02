@@ -650,3 +650,44 @@ it compares pictures rather than calls.
 
 **Status.** Accepted.
 
+## ADR-023: An answer is a piece of the input stream
+
+**Context.** Every source of input is supposed to behave the same — a file (`-i`,
+`ЧТЕНИЕ_ИЗ`), stdin, a `$`-line of the source, and the answer a front-end gives
+through `setInputRequestHandler`.  They did not.  The answer was put into the
+interactive buffer whole, so an answer holding a `\n` was *one* line however many
+separators it had: `ВВОДСТР` returned the separators as text, a `ВВОДСИМВ` followed
+by `ВВОДСТР` left a remainder starting with `\n`, and `ВВКОД` read code 10 between
+the lines.  The window's answer was the one source where a program written against
+a file behaved differently, which is what made the multi-line console a trap.
+
+**Decision.**
+
+* An answer is a **piece of the input stream**.  `IoContext` keeps what is left of
+  it and hands out one line at a time: up to the first `\n` (a `\r` before it is
+  dropped, as in a file), or all that is left when there is no separator, since the
+  end of a piece ends its last line.  A new piece is asked for only when the one in
+  hand is used up — so `a\n` is one line and not one plus an empty one.
+* An empty answer stays one empty line, which is what a one-line front-end and a
+  file holding an empty line already agreed on.
+* The **front-end's queue keeps its split**: the `>` echo and the «осталось строк»
+  counter need one line per answer.  That split is bookkeeping, not reading — each
+  queued line is a one-line piece anyway.
+* A **byte order mark is a marker at the start of a stream**, not data: the first
+  line of the base stream, the first line of each file opened by `ЧТЕНИЕ_ИЗ`, and
+  the start of each answer are stripped with the same helper the lexer uses on a
+  source (`Notepad` writes the mark into a new data file by default).  Anywhere
+  else it is text; `$`-lines need nothing, coming from the lexer.
+* The protocol does not change: `input.text` was always free to contain `\n`, and
+  the interpreter is now what splits it.
+
+**Consequences.** A program written against a file behaves the same in the window,
+so a lesson can be checked by running it (`-i file`) before running it by hand.
+The multi-line console keeps its reason to exist and gains a precise meaning —
+several lines of *input* — and `Ctrl+Enter` stays the key that sends it, with the
+placeholder saying «Строки».  The price is that a front-end which used to send one
+line per answer and lean on `ВВОДСТР` returning everything must now send the
+separators itself — that is the only behaviour that was ever portable.
+
+**Status.** Accepted.
+

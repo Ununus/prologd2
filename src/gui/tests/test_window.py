@@ -412,6 +412,36 @@ def test_the_input_field_feeds_the_program(executable: str) -> None:
         discard_changes(window)
 
 
+def test_a_two_line_answer_answers_two_reads(executable: str) -> None:
+    """task_54: an answer is a piece of the input stream, not one line.
+
+    The interpreter splits what the console hands over, so two `ВВОДСТР` are
+    answered by one `Ctrl+Enter` and the window is asked once.  The dialog is
+    armed to fail loudly: a second question must not reach it.
+    """
+    window = empty_window(executable)
+    try:
+        window.editor().setPlainText("?ТИХО,ВВОДСТР(А),ВВОДСТР(Б),ВЫВОД(А,\"|\",Б),ПС.\n")
+        asked: list[str] = []
+        window._ask_input = lambda kind: asked.append(kind) or "нет"
+
+        window.run_program()
+        assert pump(window, lambda: window._input_console.waiting()), window.status_text()
+        assert window._input_console.kind() == "line", window._input_console.kind()
+        assert window._input_console._text.placeholderText() == "Строки — Ctrl+Enter"
+
+        window._input_console._text.setPlainText("первая\nвторая")
+        window._input_console.send()  # the same call `Ctrl+Enter` makes
+        wait_for_result(window)
+
+        assert asked == [], "the second read went to the dialog: the answer was split"
+        assert window._input_console.waiting() is False, "the console stayed armed"
+        assert "первая|вторая" in window.output_text(), ascii(window.output_text())
+        print("ok: one answer, two lines, two reads and one question")
+    finally:
+        discard_changes(window)
+
+
 def test_the_console_answers_once_the_prepared_lines_run_out(executable: str) -> None:
     """The queue first, then the console under the output — `Ctrl+Enter` sends.
 

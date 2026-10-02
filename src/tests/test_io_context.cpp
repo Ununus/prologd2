@@ -160,6 +160,187 @@ TEST_CASE("input redirection wins over the input request handler") {
   REQUIRE(script.calls() == 1);
 }
 
+TEST_CASE("an answer is a piece of the input stream, not a line") {
+  // The whole point of task_54: an answer with a separator in it is several
+  // lines, and both of them come out of one ask.
+  std::istringstream input;
+  std::ostringstream output;
+  std::ostringstream error;
+  IoContext io(input, output, error);
+
+  ScriptedInput script;
+  script.queue("первая\nвторая");
+  io.setInputRequestHandler([&script](InputRequestKind kind) { return script(kind); });
+
+  const auto first = io.readWholeLine();
+  REQUIRE(first == std::optional<std::string>("первая"));
+  const auto second = io.readWholeLine();
+  REQUIRE(second == std::optional<std::string>("вторая"));
+  REQUIRE(script.calls() == 1);
+
+  // The piece is used up now, so the third read asks the front-end again.
+  script.queue("третья");
+  const auto third = io.readWholeLine();
+  REQUIRE(third == std::optional<std::string>("третья"));
+  REQUIRE(script.calls() == 2);
+}
+
+TEST_CASE("the end of a piece ends its last line, it does not open an empty one") {
+  std::istringstream input;
+  std::ostringstream output;
+  std::ostringstream error;
+  IoContext io(input, output, error);
+
+  ScriptedInput script;
+  script.queue("а\n");
+  io.setInputRequestHandler([&script](InputRequestKind kind) { return script(kind); });
+
+  const auto line = io.readWholeLine();
+  REQUIRE(line == std::optional<std::string>("а"));
+  REQUIRE(script.calls() == 1);
+
+  // Not an empty line: the next read waits for the user, as it does at the end
+  // of a file whose last line had a terminator.
+  script.queue("б");
+  const auto next = io.readWholeLine();
+  REQUIRE(next == std::optional<std::string>("б"));
+  REQUIRE(script.calls() == 2);
+
+  REQUIRE_FALSE(io.readWholeLine().has_value());  // the script is exhausted
+}
+
+TEST_CASE("an empty answer is one empty line, and only one") {
+  std::istringstream input;
+  std::ostringstream output;
+  std::ostringstream error;
+  IoContext io(input, output, error);
+
+  ScriptedInput script;
+  script.queue("");
+  io.setInputRequestHandler([&script](InputRequestKind kind) { return script(kind); });
+
+  const auto empty = io.readWholeLine();
+  REQUIRE(empty.has_value());
+  REQUIRE(empty->empty());
+  REQUIRE(script.calls() == 1);
+
+  script.queue("после пустой");
+  const auto next = io.readWholeLine();
+  REQUIRE(next == std::optional<std::string>("после пустой"));
+  REQUIRE(script.calls() == 2);
+}
+
+TEST_CASE("an empty line in the middle of a piece is a line of its own") {
+  std::istringstream input;
+  std::ostringstream output;
+  std::ostringstream error;
+  IoContext io(input, output, error);
+
+  ScriptedInput script;
+  script.queue("а\n\nб");
+  io.setInputRequestHandler([&script](InputRequestKind kind) { return script(kind); });
+
+  REQUIRE(io.readWholeLine() == std::optional<std::string>("а"));
+  const auto middle = io.readWholeLine();
+  REQUIRE(middle.has_value());
+  REQUIRE(middle->empty());
+  REQUIRE(io.readWholeLine() == std::optional<std::string>("б"));
+  REQUIRE(script.calls() == 1);
+
+  // A file holding the same bytes agrees: `а`, an empty line, `б`, and then the
+  // end of the stream rather than a fourth line.
+  const TempFile file("а\n\nб\n");
+  REQUIRE(io.openInput(file.path()));
+  REQUIRE(io.readWholeLine() == std::optional<std::string>("а"));
+  const auto file_middle = io.readWholeLine();
+  REQUIRE(file_middle.has_value());
+  REQUIRE(file_middle->empty());
+  REQUIRE(io.readWholeLine() == std::optional<std::string>("б"));
+  REQUIRE_FALSE(io.readWholeLine().has_value());
+}
+
+TEST_CASE("a token and the rest of its line come out of one piece") {
+  std::istringstream input;
+  std::ostringstream output;
+  std::ostringstream error;
+  IoContext io(input, output, error);
+
+  ScriptedInput script;
+  script.queue("имя остаток строки\nследующая");
+  io.setInputRequestHandler([&script](InputRequestKind kind) { return script(kind); });
+
+  REQUIRE(io.readToken() == std::optional<std::string>("имя"));
+  // «Остаток строки» is a line's tail, not the piece's: the separator is still
+  // a separator, so the space is kept but the `\n` is not part of the text.
+  REQUIRE(io.readWholeLine() == std::optional<std::string>(" остаток строки"));
+  REQUIRE(io.readWholeLine() == std::optional<std::string>("следующая"));
+  REQUIRE(script.calls() == 1);
+}
+
+TEST_CASE("the separator of a piece is never handed out as a code point") {
+  std::istringstream input;
+  std::ostringstream output;
+  std::ostringstream error;
+  IoContext io(input, output, error);
+
+  ScriptedInput script;
+  script.queue("ab\ncd");
+  io.setInputRequestHandler([&script](InputRequestKind kind) { return script(kind); });
+
+  std::string read;
+  for (int index = 0; index < 4; ++index) {
+    const auto code_point = io.readCodePoint();
+    REQUIRE(code_point.has_value());
+    REQUIRE(*code_point != U'\n');
+    read.push_back(static_cast<char>(*code_point));
+  }
+  REQUIRE(read == "abcd");
+  REQUIRE(script.calls() == 1);  // code 10 would have been a fifth call
+}
+
+TEST_CASE("a carriage return before a separator is not part of the line") {
+  std::istringstream input;
+  std::ostringstream output;
+  std::ostringstream error;
+  IoContext io(input, output, error);
+
+  ScriptedInput script;
+  script.queue("а\r\nб\r\n");
+  io.setInputRequestHandler([&script](InputRequestKind kind) { return script(kind); });
+
+  REQUIRE(io.readWholeLine() == std::optional<std::string>("а"));
+  REQUIRE(io.readWholeLine() == std::optional<std::string>("б"));
+  REQUIRE(script.calls() == 1);
+}
+
+TEST_CASE("a byte order mark is a marker at the start of a stream only") {
+  const std::string mark = "\xEF\xBB\xBF";  // U+FEFF in UTF-8
+  std::istringstream input;
+  std::ostringstream output;
+  std::ostringstream error;
+  IoContext io(input, output, error);
+
+  ScriptedInput script;
+  io.setInputRequestHandler([&script](InputRequestKind kind) { return script(kind); });
+
+  // The start of a piece: the mark goes, the text stays.
+  script.queue(mark + "первая\n" + mark + "вторая");
+  REQUIRE(io.readWholeLine() == std::optional<std::string>("первая"));
+  // The second line is not the start of the piece, so its mark is data.
+  REQUIRE(io.readWholeLine() == std::optional<std::string>(mark + "вторая"));
+
+  // The start of a file, and of the base stream, are the same kind of start.
+  const TempFile file(mark + "из файла\n");
+  REQUIRE(io.openInput(file.path()));
+  REQUIRE(io.readWholeLine() == std::optional<std::string>("из файла"));
+
+  std::istringstream marked(mark + "из потока\n");
+  std::ostringstream sink;
+  std::ostringstream errors;
+  IoContext stream(marked, sink, errors);
+  REQUIRE(stream.readWholeLine() == std::optional<std::string>("из потока"));
+}
+
 TEST_CASE("without a handler the base stream is read") {
   std::istringstream input("из потока\n");
   std::ostringstream output;
@@ -204,7 +385,8 @@ TEST_CASE("a written line tells its owner that it ended") {
   REQUIRE(quiet_output.str() == "молча\n");
 }
 
-TEST_CASE("the external stop hook interrupts a running query") {  const auto result = runProgram(
+TEST_CASE("the external stop hook interrupts a running query") {
+  const auto result = runProgram(
       "цикл :- цикл.\n"
       "?цикл.\n",
       {}, nullptr,

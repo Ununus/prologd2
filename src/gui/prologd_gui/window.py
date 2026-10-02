@@ -2673,6 +2673,13 @@ class MainWindow(QMainWindow):
         are echoed with `>` so it stays visible what the program was given.  Only
         when that list is empty does the window ask the user.
 
+        An answer typed here is a *piece of the program's input stream*, not one
+        line: since task_54 the interpreter splits it on `\n` itself, so two lines
+        in the console answer two `ВВОДСТР` and the window is asked once.  The
+        queue below still gives one line per request — it is where the `>` echo
+        and the «осталось строк» counter come from, and it is typed one line at a
+        time anyway.
+
         Where it asks is the «Спрашивать ввод» switch (task_29): in the console
         under the output — the field takes the answer and the box is what is left
         when that panel is hidden — or in a box every time.
@@ -2735,7 +2742,7 @@ class MainWindow(QMainWindow):
         does in the query line, and a whole line of program input is rarely a
         paragraph.
         """
-        prompt = {"token": "Слово", "line": "Строка", "codepoint": "Символ"}.get(kind, "Ввод")
+        prompt = {"token": "Слово", "line": "Строки", "codepoint": "Символ"}.get(kind, "Ввод")
         answer, accepted = QInputDialog.getText(self, "Ввод", prompt + ":")
         return answer if accepted else None
 

@@ -1,10 +1,9 @@
 # task_54 — ответ оболочки — кусок входного потока (и BOM — не данные)
 
-**Status:** not started — the plan is written down (2026-10-02).  The user chose
-points 1–3 of the discussion: the window's answer is a *chunk of the input
-stream*, the multi-line console field stays, and a leading BOM is stripped the way
-the lexer strips it from sources.  Point 4 (merging `ВВОДСИМВ`/`ВВОДСТР` into
-`ВВОД(Пер, Терминатор)`) is **not** part of this task — see «Отложено» below
+**Status:** done (2026-10-03) — все три пункта в языке и в окне: ответ оболочки —
+кусок входного потока, BOM — марка в начале потока, многострочная консоль осталась
+и получила точный смысл.  Четвёртый пункт (объединение `ВВОДСИМВ`/`ВВОДСТР` в
+`ВВОД(Пер, Терминатор)`) не входил и остаётся отложенным — см. «Отложено»
 **Depends on:** task_50 (the console moved under the goal line, the queue became
 the «Ввод» tab), task_29 (the «Спрашивать ввод» switch), task_11 (the reading
 built-ins)
@@ -66,45 +65,45 @@ Consequences, all of them wanted:
 
 ## Deliverables
 
-- [ ] `src/prlib/include/prlib/io.hpp`, `src/prlib/src/io.cpp`: the pending buffer
+- [x] `src/prlib/include/prlib/io.hpp`, `src/prlib/src/io.cpp`: the pending buffer
       and the drain rule above, in `fetchLine`; a comment that states the rule, so
       the next reader does not have to derive it.  The rest of `IoContext`
       (`readToken`, `readWholeLine`, `readCodePoint` over `current_line_` /
       `current_pos_`) does not change — that is what keeps «остаток строки»
       working inside a chunk's line.
-- [ ] **BOM**: strip one leading UTF-8 BOM with `stripByteOrderMark`
+- [x] **BOM**: strip one leading UTF-8 BOM with `stripByteOrderMark`
       (`utf8.cpp:165` — the same helper the lexer, the formatter and the module
       loader use) at the *start* of a stream: the first line of the base stream,
       the first line of each file opened by `ЧТЕНИЕ_ИЗ`, and the start of every
       chunk (an answer is a stream of its own).  A `U+FEFF` anywhere else stays
       data.  `$`-lines need nothing: they come from the lexer, which already
       strips the mark.
-- [ ] `src/cli/protocol.cpp`: comment only — `answerInputRequest` hands over the
+- [x] `src/cli/protocol.cpp`: comment only — `answerInputRequest` hands over the
       reply's `text` as a chunk (the JSON string already carries `\n`, nothing to
       parse or split).
-- [ ] `src/gui/prologd_gui/panels.py`: the hint of the multi-line console says what
+- [x] `src/gui/prologd_gui/panels.py`: the hint of the multi-line console says what
       the field now means — «Строки — Ctrl+Enter» (`INPUT_PROMPTS`/`ask`, `panels.py:375,468`).
-- [ ] `src/gui/prologd_gui/window.py`: no behaviour change (`_input_lines` and the
+- [x] `src/gui/prologd_gui/window.py`: no behaviour change (`_input_lines` and the
       `>` echo stay), but the doc-comment of `_on_input_request` must say that an
       answer is a chunk: a multi-line answer is several input lines.
-- [ ] `src/gui/README.md`: the input section — what an answer is, and that the
+- [x] `src/gui/README.md`: the input section — what an answer is, and that the
       window never splits it for the interpreter (it splits the *queue* for its
       own counter and echo).
-- [ ] `doc/help.typ`:
+- [x] `doc/help.typ`:
       * §6.8 gains one sentence: the window hands the answer over as a piece of
         the input, so several lines in the field are read one by one, as from a
         file (this is what makes §6.7's «остаток строки» true in the window too);
       * §6.5/§6.8 gain one sentence about the BOM: a byte-order mark at the start
         of a data file is not data (it is stripped, like the one in a source).
-- [ ] `doc/gui.typ`: the input paragraph (lines ~548–585) is rewritten — it still
+- [x] `doc/gui.typ`: the input paragraph (lines ~548–585) is rewritten — it still
       describes the window **before** task_50 («поле ввода под панелью вывода»,
       «Пункт «Вид → Поле очереди ввода» прячет поле очереди», the console
       «под панелью» instead of under the goal line), and its «ответ на `ВВОДСТР`
       может быть фразой» becomes the new, precise meaning: one answer is a piece
       of the input, several lines = several answers.
-- [ ] `ai/decisions.md`: **ADR-023** — «the front-end's answer is a piece of the
+- [x] `ai/decisions.md`: **ADR-023** — «the front-end's answer is a piece of the
       input stream; a BOM is a file marker, not data» (ADR-022 is the last one).
-- [ ] `ai/status.md`: the row and the board sentence after the work.
+- [x] `ai/status.md`: the row and the board sentence after the work.
 
 ## Tests
 
@@ -123,6 +122,44 @@ Consequences, all of them wanted:
   request) and `src/gui/tests/protocol_smoke.py`.
 - Nothing to change in `test_keywords`/`test_reference`: no name, arity or record
   is touched by this task.
+
+## Решения
+
+1. **Строку выдаёт `IoContext`, а не оболочка.**  Кусок — состояние *потока*
+   (`pending_` + `pending_pos_`), поэтому правило живёт в `fetchChunkLine`, а
+   оболочка просто отдаёт ответ целиком.  Одна правка накрывает все предикаты
+   чтения сразу: `ВВОДСТР`, `ВВОДСИМВ`, `ВВКОД` и `ВВОДЦЕЛ` читают через
+   `current_line_`/`current_pos_` и о кусках не знают.
+2. **Конец куска заканчивает строку.**  Отсюда всё остальное: `a\n` — одна строка
+   (следующее чтение спрашивает заново, а не выдумывает пустую), `""` — одна
+   пустая строка (как и было), `a\n\n` — две (как в файле).  Считать перевод
+   строки частью текста — и была прежняя ошибка.
+3. **«Кусок исчерпан» — по позиции, не по флагу.**  `pending_pos_ <
+   pending_.size()`; поэтому пустой ответ обрабатывается отдельно (одна пустая
+   строка), и следующий запрос снова идёт к оболочке.
+4. **BOM — на входе потока.**  Один и тот же `stripByteOrderMark` в трёх местах:
+   первая строка базового потока, первая строка каждого файла `ЧТЕНИЕ_ИЗ`, начало
+   каждого куска; флаги `base_stream_started_`/`file_stream_started_`, второй
+   сбрасывается в `openInput`.  `$`-строки не трогали: их уже чистит лексер.
+5. **Оболочка свой кусок всё равно режет.**  Очередь — вкладка «Ввод», и режется
+   она ради `>` и «осталось строк — N»: это бухгалтерия, а не чтение.
+
+## Что нашёл раунд
+
+* **Правка оказалась ровно в одном месте.**  Ни решатель, ни проверки вызовов, ни
+  протокол не изменились: `input.text` всегда мог содержать `\n`, а `IoContext` уже
+  был единственной дверью для всех источников.
+* **Старый тест этого не ловил.**  `interactive reads go through the input request
+  handler` написан про куски, но каждая его запись — одна строка, так что баг жил
+  мимо него.  Нужен ответ с переводом строки внутри — таких проверок не было.
+* **Пустая строка в середине сверяется с файлом.**  Тест читает `а\n\nб` из куска
+  и те же байты из временного файла: поведение обязано совпасть, иначе правка
+  бессмысленна.
+* **BOM в середине куска — данные**, и это тоже закреплено: чистится только начало.
+* **Окно спрашивает один раз на кусок.**  GUI-проверка ставит диалог-«предателя»: если
+  вторая строка ушла бы в диалог, тест упал бы, а не промолчал.
+* **Мелочь по пути:** подсказка настройки «Спрашивать ввод» описывала окно до
+  task_50 («строки в поле под выводом»); теперь она называет консоль под строкой цели.
 
 ## What must not change
 

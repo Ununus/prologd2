@@ -63,17 +63,72 @@ bool IoContext::fetchLine(std::string& line, InputRequestKind kind) {
     return true;
   }
   if (input_from_file_) {
-    return static_cast<bool>(std::getline(file_input_, line));
-  }
-  if (input_handler_) {
-    const std::optional<std::string> answer = input_handler_(kind);
-    if (!answer) {
+    if (!std::getline(file_input_, line)) {
       return false;
     }
-    line = *answer;
+    // A byte order mark at the very start of a stream is a marker, not data —
+    // the same helper strips it from a source (Notepad writes the mark into a
+    // data file just as readily).  Anywhere but the start it is text.
+    if (!file_stream_started_) {
+      file_stream_started_ = true;
+      line.assign(stripByteOrderMark(line));
+    }
     return true;
   }
-  return static_cast<bool>(std::getline(*base_input_, line));
+  if (input_handler_) {
+    return fetchChunkLine(line, kind);
+  }
+  if (!std::getline(*base_input_, line)) {
+    return false;
+  }
+  if (!base_stream_started_) {
+    base_stream_started_ = true;
+    line.assign(stripByteOrderMark(line));
+  }
+  return true;
+}
+
+/// One line out of the front-end's answer (task_54).
+///
+/// The answer is a *piece of the input stream*, so the rules are the file's:
+/// a `\n` separates lines, the end of the piece ends its last line, and the
+/// separator is never text.  That is why the `\n`s do not reach `ВВОДСТР` (nor
+/// code 10 `ВВКОД`), why `a\n` is one line and not one plus an empty one — the
+/// next read asks the front-end instead — and why the remainder rules inside a
+/// line («остаток строки») keep working: only `current_line_` above ever sees
+/// a line, never the piece.
+bool IoContext::fetchChunkLine(std::string& line, InputRequestKind kind) {
+  if (pending_pos_ < pending_.size()) {
+    // The piece in hand still has a line to give: its separator, or its end.
+    const std::size_t separator = pending_.find('\n', pending_pos_);
+    if (separator == std::string::npos) {
+      line = pending_.substr(pending_pos_);
+      pending_pos_ = pending_.size();
+      return true;
+    }
+    std::size_t end = separator;
+    if (end > pending_pos_ && pending_[end - 1] == '\r') {
+      --end;  // CRLF is one separator, as it is for a file
+    }
+    line = pending_.substr(pending_pos_, end - pending_pos_);
+    pending_pos_ = separator + 1;
+    return true;
+  }
+
+  const std::optional<std::string> answer = input_handler_(kind);
+  if (!answer) {
+    return false;  // end of input, as before
+  }
+  // An answer is a stream of its own, so it may begin with a mark too.
+  pending_.assign(stripByteOrderMark(*answer));
+  pending_pos_ = 0;
+  if (pending_.empty()) {
+    // An empty answer is one empty line — the behaviour a one-line front-end
+    // and a file holding an empty line already shared.
+    line.clear();
+    return true;
+  }
+  return fetchChunkLine(line, kind);
 }
 
 std::optional<std::string> IoContext::readToken() {
@@ -144,6 +199,10 @@ bool IoContext::openInput(const std::string& path) {
   input_from_file_ = false;
   input_name_.clear();
   has_current_line_ = false;
+  // Each newly opened file may begin with a mark of its own.  A piece waiting
+  // from the front-end is deliberately *not* dropped: it is read again when
+  // the input returns to the base stream.
+  file_stream_started_ = false;
   if (path.empty() || path == "con:" || path == "con") {
     return true;
   }
