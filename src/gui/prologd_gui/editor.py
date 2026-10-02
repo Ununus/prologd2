@@ -22,7 +22,7 @@ from PySide6.QtGui import (
     QTextFormat,
     QWheelEvent,
 )
-from PySide6.QtWidgets import QCompleter, QLabel, QPlainTextEdit, QTextEdit, QWidget
+from PySide6.QtWidgets import QCompleter, QLabel, QLineEdit, QPlainTextEdit, QTextEdit, QWidget
 
 from . import completion, queries, search, shortcuts as shortcuts_module, theme, tokens
 from .settings import DEFAULT_FONT_SIZE, MAXIMUM_FONT_SIZE, MINIMUM_FONT_SIZE
@@ -1075,3 +1075,205 @@ class CodeEditor(ZoomablePlainTextEdit):
         cursor.beginEditBlock()
         cursor.insertText("\n" + indent)
         cursor.endEditBlock()
+
+
+class QueryLine(QLineEdit):
+    """The goal field under the editor: its own history and the editor's completion.
+
+    `Up`/`Down` walk the submitted commands (up to `HISTORY_LIMIT`), and the
+    popup offers the *same* names as the editor — the reserved names and the
+    current document's predicates, with the same call-form insertion — so a goal
+    is typed with the same help as the program it asks about (task_50).
+
+    The document the completion scans is provided by `document_text`, a callable:
+    the query line is not a buffer of its own, and the names a goal may call are
+    those of the file it will run against.
+    """
+
+    #: How many commands the history keeps (task_50).
+    HISTORY_LIMIT = 20
+
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        document_text=None,
+    ) -> None:
+        super().__init__(parent)
+        self._document_text = document_text or (lambda: "")
+        self._history: list[str] = []
+        self._history_cursor: int | None = None
+        self._draft = ""
+        self._auto_complete_after = 2
+        self._model = completion.CompletionModel(None, case_sensitive=True)
+        self._offers: list[completion.Candidate] = []
+        self._offer_list = QStringListModel(self)
+        self._completer = QCompleter(self)
+        self._completer.setModel(self._offer_list)
+        self._completer.setWidget(self)
+        self._completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
+        self._completer.setCaseSensitivity(Qt.CaseSensitivity.CaseSensitive)
+        self._completer.popup().clicked.connect(self._accept_index)
+
+    # -- configuration ------------------------------------------------------
+    def set_completion_keywords(self, keywords) -> None:
+        """The reserved names; the document's own come from `document_text`."""
+        self._model.set_keywords(keywords)
+
+    def set_auto_complete_after(self, letters: int) -> None:
+        self._auto_complete_after = max(1, int(letters))
+
+    def set_completion_match_case(self, flag: bool) -> None:
+        self._model.set_case_sensitive(flag)
+
+    def set_document_text(self, text: str) -> None:
+        self._document_text = lambda: text
+
+    # -- history -----------------------------------------------------------
+    def history(self) -> list[str]:
+        """The submitted commands, oldest first (what a test reads)."""
+        return list(self._history)
+
+    def _commit_history(self) -> None:
+        """Remembers the goal being submitted; an empty or a repeated one is not."""
+        text = self.text().strip()
+        self._history_cursor = None
+        if not text:
+            return
+        if self._history and self._history[-1] == text:
+            return
+        self._history.append(text)
+        if len(self._history) > self.HISTORY_LIMIT:
+            del self._history[: len(self._history) - self.HISTORY_LIMIT]
+
+    def _history_step(self, direction: int) -> None:
+        """`Up` (older) and `Down` (newer); past the newest is the draft again."""
+        if not self._history:
+            return
+        if self._history_cursor is None:
+            if direction > 0:
+                return  # `Down` before `Up` has nowhere to go.
+            self._draft = self.text()
+            self._history_cursor = len(self._history) - 1
+        else:
+            self._history_cursor += direction
+            if self._history_cursor >= len(self._history):
+                self._history_cursor = None
+                self.setText(self._draft)
+                self.setCursorPosition(len(self._draft))
+                return
+            if self._history_cursor < 0:
+                self._history_cursor = 0
+        text = self._history[self._history_cursor]
+        self.setText(text)
+        self.setCursorPosition(len(text))
+
+    # -- completion --------------------------------------------------------
+    def completion_visible(self) -> bool:
+        return self._completer.popup().isVisible()
+
+    def completion_labels(self) -> list[str]:
+        """What the popup is showing; empty when it is closed."""
+        if not self.completion_visible():
+            return []
+        return [offer.label for offer in self._offers]
+
+    def show_completion(self) -> None:
+        self._maybe_complete(force=True)
+
+    def _maybe_complete(self, force: bool = False) -> None:
+        text = self.text()
+        position = self.cursorPosition()
+        prefix = completion.word_before(text, position)
+        if not force and len(prefix) < self._auto_complete_after:
+            self._completer.popup().hide()
+            return
+        self._model.update(self._document_text())
+        self._offers = self._model.candidates(prefix)
+        if not self._offers:
+            self._completer.popup().hide()
+            return
+        self._offer_list.setStringList([offer.label for offer in self._offers])
+        popup = self._completer.popup()
+        rect = self.cursorRect()
+        rect.setWidth(
+            popup.sizeHintForColumn(0) + popup.verticalScrollBar().sizeHint().width()
+        )
+        self._completer.complete(rect)
+        popup.setCurrentIndex(self._offer_list.index(0, 0))
+
+    def _accept_index(self, index) -> None:
+        """A click in the popup takes that row."""
+        if 0 <= index.row() < len(self._offers):
+            self._accept(self._offers[index.row()])
+
+    def _accept_completion(self) -> bool:
+        row = self._completer.popup().currentIndex().row()
+        if not 0 <= row < len(self._offers):
+            return False
+        self._accept(self._offers[row])
+        return True
+
+    def _accept(self, offer: completion.Candidate) -> None:
+        """Replaces the word being typed with the call form, caret after `(`."""
+        self._completer.popup().hide()
+        text, caret = offer.call_form
+        prefix = completion.word_before(self.text(), self.cursorPosition())
+        start = self.cursorPosition() - len(prefix)
+        whole = self.text()
+        self.setText(whole[:start] + text + whole[self.cursorPosition() :])
+        self.setCursorPosition(start + caret)
+
+    def _move_popup(self, delta: int) -> None:
+        popup = self._completer.popup()
+        row = popup.currentIndex().row() + delta
+        row = max(0, min(row, len(self._offers) - 1))
+        popup.setCurrentIndex(self._offer_list.index(row, 0))
+
+    # -- keys ---------------------------------------------------------------
+    def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802 - Qt spelling
+        key = event.key()
+        modifiers = event.modifiers()
+
+        if key == Qt.Key.Key_Space and modifiers == Qt.KeyboardModifier.ControlModifier:
+            self._maybe_complete(force=True)
+            event.accept()
+            return
+
+        if self._completer.popup().isVisible():
+            if key in _COMPLETION_ACCEPT_KEYS and not (
+                modifiers & Qt.KeyboardModifier.ShiftModifier
+            ):
+                if self._accept_completion():
+                    event.accept()
+                    return
+            elif key == Qt.Key.Key_Escape:
+                self._completer.popup().hide()
+                event.accept()
+                return
+            elif key in (Qt.Key.Key_Up, Qt.Key.Key_Down):
+                self._move_popup(1 if key == Qt.Key.Key_Down else -1)
+                event.accept()
+                return
+            elif key in _POPUP_CLOSE_KEYS:
+                self._completer.popup().hide()
+        else:
+            if key == Qt.Key.Key_Up:
+                self._history_step(-1)
+                event.accept()
+                return
+            if key == Qt.Key.Key_Down:
+                self._history_step(1)
+                event.accept()
+                return
+
+        # `Enter` with the popup closed submits the goal: remember it first, and
+        # let `QLineEdit` emit `returnPressed` as usual.
+        if (
+            key in (Qt.Key.Key_Return, Qt.Key.Key_Enter)
+            and not self._completer.popup().isVisible()
+        ):
+            self._commit_history()
+
+        super().keyPressEvent(event)
+        if event.text() and tokens.is_name_character(event.text()[-1]):
+            self._maybe_complete()

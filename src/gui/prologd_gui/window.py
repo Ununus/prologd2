@@ -58,7 +58,7 @@ from . import (
     shortcuts,
 )
 from .buffers import Buffer
-from .editor import CodeEditor, ZoomablePlainTextEdit
+from .editor import CodeEditor, QueryLine, ZoomablePlainTextEdit
 from .panes import Pane
 from .session import PrologSession, read_keywords
 from .settings import OUTPUT_FONT_SIZE, Settings
@@ -342,11 +342,19 @@ class MainWindow(QMainWindow):
         )
         self._input_console.submitted.connect(self._send_input)
 
-        self._query_line = QLineEdit()
+        # The goal field (task_50): its own history (Up/Down, twenty commands)
+        # and the editor's completion — the reserved names and the current
+        # document's predicates, with the same call-form insertion.
+        self._query_line = QueryLine(document_text=lambda: self._current_document_text())
         # The same face as the program, because a goal is typed like one;
         # `_sync_query_line_font` keeps it in step with the editor's size.
         self._sync_query_line_font()
-        self._query_line.setPlaceholderText("?цель(X). — Enter, чтобы выполнить")
+        self._query_line.setPlaceholderText(
+            "?цель(X). — Enter: выполнить · ↑/↓: история · Ctrl+Пробел: подсказки"
+        )
+        self._query_line.set_completion_keywords(self._session.keywords)
+        self._query_line.set_auto_complete_after(self._settings.auto_complete_after)
+        self._query_line.set_completion_match_case(self._settings.completion_match_case)
         self._query_line.returnPressed.connect(self._run_query)
 
         # The step pane (task_28): what a stepped run is doing, where it stands and
@@ -2766,6 +2774,14 @@ class MainWindow(QMainWindow):
         buffer = self.current_buffer()
         return buffer.text() if buffer is not None else ""
 
+    def _current_document_text(self) -> str:
+        """The text the query line's completion scans: the showing buffer's.
+
+        A goal names predicates of the file it will run against, so the query
+        line offers them from here rather than from its own one line (task_50).
+        """
+        return self.editor_text()
+
     def output(self) -> ZoomablePlainTextEdit:
         """The read-only output pane (task_27 gives it a place of its own)."""
         return self._output
@@ -2879,6 +2895,8 @@ class MainWindow(QMainWindow):
         for buffer in self._buffers:
             buffer.set_keywords(self._session.keywords)
             buffer.set_reference(self._reference)
+        # The goal field offers the same names (task_50).
+        self._query_line.set_completion_keywords(self._session.keywords)
         self._status.setText(f"PrologD {version} готов")
         self._refresh_titles()
         self._sync_run_actions()
@@ -2985,6 +3003,9 @@ class MainWindow(QMainWindow):
                 self._settings.auto_complete_after,
                 self._settings.completion_match_case,
             )
+        # The goal field follows the same two knobs (task_50).
+        self._query_line.set_auto_complete_after(self._settings.auto_complete_after)
+        self._query_line.set_completion_match_case(self._settings.completion_match_case)
         self._apply_output_font()
         for pane in (self._output, self._problems, self._system):
             pane.set_line_limit(self._settings.output_line_limit)

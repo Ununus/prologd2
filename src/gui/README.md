@@ -167,6 +167,22 @@ actually sits in the US and the Russian layouts (`VkKeyScanExW`, `MapVirtualKeyW
 which is the part that cannot be reasoned about.  With a Russian layout on, walk
 the table once by hand — that is the one check no test replaces.
 
+## The goal field
+
+The line under the editor is where one goal — `?цель(X).` — is typed and run
+with `Enter`.  It has the two things a goal needs beside the language itself:
+
+* **History** — `Up`/`Down` walk the goals already submitted (up to twenty, the
+  oldest dropped; an empty or an immediately repeated goal is not recorded).
+  `Down` past the newest brings back what was being typed.
+* **The editor's completion** — `Ctrl+Space`, or typing, opens the same popup as
+  the program editor: the reserved names and the *current document's* predicates,
+  with their arities, and `Enter`/`Tab` insert the call form (`НАЙТИВСЕ(, , )`)
+  with the caret after the opening parenthesis.
+
+The placeholder spells the three: `?цель(X). — Enter: выполнить · ↑/↓: история ·
+Ctrl+Пробел: подсказки`.
+
 ## Questions in the margin
 
 Every question of a lesson — a `?Цель.` line, and also a query parked in a
