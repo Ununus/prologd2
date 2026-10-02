@@ -449,6 +449,11 @@ class InputPane(QWidget):
         layout.addLayout(row)
         layout.addWidget(self._text)
         self.set_font_size(font_size)
+        # The console is a strip, not a pane: it never grows past its contents,
+        # so it stays the height of one field however the editor column shares
+        # space (task_50 — it used to stretch and centre its line in the middle
+        # of a tall empty strip).
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         self.idle()
 
     # -- what the window drives --------------------------------------------
@@ -507,6 +512,9 @@ class InputPane(QWidget):
         font.setPointSizeF(self._size)
         self._line.setFont(font)
         self._text.setFont(font)
+        # The text area of a `line` request keeps a few lines, not the whole
+        # default of a `QPlainTextEdit` (~192 px) — the console stays minimal.
+        self._text.setFixedHeight(QFontMetrics(font).lineSpacing() * 4 + 8)
 
 
 #: What a step point is called in the panel.  The words are the ones the
