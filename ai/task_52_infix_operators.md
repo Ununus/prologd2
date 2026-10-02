@@ -72,6 +72,36 @@ manual.
    (task_55, 2026-10-02): it is a *prefix* at the term level in `parseTerm`, it
    desugars to `НЕ/1` with no two-argument call, and it needs no row here.
    Whoever writes this table should leave `\+` where it is.
+7. **The signs are ISO's, letter for letter — which is why «less or equal» is
+   `=<` and not `<=`.**  ISO (and SWI, and GNU — see the comparison table of
+   `help.typ`) spell it `=<`; `<=` is the habit of other languages and appears in
+   no Prolog.  Taking ISO's set as it stands is the whole point of the task — a
+   reader pasting ISO code or reading an ISO text should not meet a deviation of
+   ours.  Two more arguments for it, both local: `<=` sits one character from
+   `<-`, the rule arrow this dialect keeps, and it is the only comparison sign
+   that would look like an arrow in a file; and a spelling that *looks* like two
+   signs (`<` then `=`) is a trap in a language that reports chains (`0 < X = 10`
+   is an error on purpose).  The asymmetry with `>=` is ISO's own (it goes back
+   to DEC-10 Prolog) — we inherit it rather than invent a symmetric pair.
+   `<=` is still *recognised*: the lexer answers ««<=» — не оператор: «меньше или
+   равно» записывают «=<»», and `prologd-diff.typ`'s ISO table has the row
+   `<= → =<`.
+8. **`->` is *not* added (2026-10-03, after the `<=` question).**  Unlike `=`,
+   `<` and `\+`, `->` is not a second spelling of something the dialect has — it
+   is a *control construct*, and its meaning lives in the pairing with `;`: in ISO
+   `(Условие -> Тогда ; Иначе)` that `;` is not a disjunction but «иначе», and a
+   solved condition with a failed consequence makes the whole thing fail instead
+   of trying «иначе».  Making it work would mean the parser keeping `->` and `;`
+   as one unit, a new goal form for the solver and the checker, and a formatter
+   rule — for a spelling that `ПЕРВОЕ`, `!` and `;` already say: `(Условие ->
+   Тогда)` is `ПЕРВОЕ(Условие), Тогда` (the condition is cut *before* the
+   consequence, exactly as ISO asks) and if-then-else is the two-clause `если/3`
+   now shown in `prologd-diff.typ`.  It stays an advice row, like `is` and `=:=`,
+   but the hint names the translation rather than the toolbox: ««->» — не
+   оператор: «если-то» — это «ПЕРВОЕ(Условие), Тогда», а «;» после «->» — не
+   дизъюнкция, а «иначе»» (the old wording, «выбор — это «;» и «ПЕРВОЕ(Ц1, Ц2)»»,
+   would have sent a reader of ISO code to a plain disjunction, which backtracks
+   into the else branch).
 
 ## Semantics (verified 2026-10-02 with the built interpreter)
 
@@ -137,14 +167,22 @@ What that means for this task:
       * `shortcuts.py` — **dropped by decision** (see 2).
 - [x] **Documentation**:
       * `help.typ` §3.2 (the `1.` rule), §3.3 (`X = #выражение#`, why there is no
-        `=:=`), §4.7 (`=` and the reversible reading), §5.1 (the four signs and
-        the desugaring table, the chain, `=:=`), the two rows of the comparison
-        table at the top, and the appendix needs no change (no new names).
+        `=:=`), §4.6 (the illustrative `p/1` became `цена/2`, and the ISO
+        `->`/`;` if-then(-else) is shown as `ПЕРВОЕ((Условие, Тогда), Иначе)` with
+        a runnable example), §4.7 (`=` and the reversible reading), §5.1 (the four
+        signs and the desugaring table, the chain, `=:=`), three rows of the
+        comparison table at the top («Унификация», «Сравнение чисел»,
+        «Арифметика») and a fourth for the ISO operators the dialect lacks
+        (`=:=`, `=\=`, `==`, `\==`, `\=`, `@<`…`@>=`, `->`) — that row names them
+        and says what to write instead in the same order; the appendix needs no
+        change (no new names).
       * `prologd-diff.typ`: §9 «`=`, `<`, `>`, `>=`, `=<` — короткая запись
-        сравнений» (before/after, the desugaring table, what was *not* added
-        with the ISO row for each), three rows of «Краткая таблица», and the
-        `is/2` section's «почему не добавить» now says the signs *are* sugar over
-        the built-ins while bare `2+3` still needs `#…#`.
+        сравнений» (before/after, the desugaring table, what was *not* added),
+        three rows of «Краткая таблица», the table of foreign spellings — named
+        «Чужая запись», not «Запись ISO», since `<=` and `->` are habits of
+        other languages rather than ISO spellings — and the `is/2` section's
+        «почему не добавить» now says the signs *are* sugar over the built-ins
+        while bare `2+3` still needs `#…#`.
       * `technical.typ`: the number paragraph and the grammar
         (`Сравнение ::= Операнд Знак Операнд`) with the priority sentence.
       * `doc/builtins.json`: the `variants` of `РАВНО`, `БОЛЬШЕ`, `МЕНЬШЕ` name
@@ -204,6 +242,14 @@ new number rule; `test_highlighter.py` pins the colour of `=`.
   a careful hint in the `is` case (`kInfixIsHint`) but not in the sign case; a
   «выражение помечают `#…#`» hint could be added the same way.  Deliberately left
   out of this round, and the manual says `X < #2+1#` instead.
+* **The ISO note in §4.6 promised too much (found 2026-10-03).**  It said «Смысл тот
+  же» about `ПЕРВОЕ((Условие, Тогда), Иначе)` — but that form searches the *pair*
+  (so a failed consequence makes it retry the condition) and falls through to
+  «иначе», while ISO's `->` commits the condition and fails.  Verified side by side
+  with the built interpreter on prices 40 and 20: `?ПЕРВОЕ((цена(Т, Ц), Ц < 30),
+  Т = нет).` → `Т=молоко`, `Ц=20`; `?ПЕРВОЕ(цена(Т, Ц)), Ц < 30.` → `НЕТ`.
+  §4.6 now names the exact translation, and the details moved to
+  `prologd-diff.typ` (§ «`->` («если-то») — не оператор») — see decision 8.
 * **The `1.` rule is a breaking change** for a program that leaned on the
   trailing-dot float — the only one in this task.  It is called out in
   `prologd-diff.typ`'s quick table and in `help.typ` §3.2, and lesson/example

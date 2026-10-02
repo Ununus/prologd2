@@ -81,7 +81,9 @@ constexpr ForeignOperator kForeignOperators[] = {
     {"@>=", "«@>=» "},
     {"@<", "«@<» "},
     {"@>", "«@>» "},
-    {"->", "«->» — не оператор: выбор в Пролог-Д — это «;» и «ПЕРВОЕ(Ц1, Ц2)»"},
+    {"->",
+     "«->» — не оператор: «если-то» — это «ПЕРВОЕ(Условие), Тогда», а «;» после «->» "
+     "— не дизъюнкция, а «иначе»"},
     {"<=", "«<=» — не оператор: «меньше или равно» записывают «=<»"},
 };
 
@@ -402,8 +404,9 @@ std::vector<Token> Lexer::tokenizeImpl(DiagnosticSink* sink) {
         }
         break;
       case '<':
-        // `<-` is a rule arrow; `<` is «less»; `<=` is ISO's spelling of «less
-        // or equal», which this dialect writes `=<` (task_52).
+        // `<-` is a rule arrow and `<` is «less»; `<=` is the habit of other
+        // languages, while ISO — and this dialect with it — spells «less or
+        // equal» as `=<` (task_52), so `<=` only gets the advice.
         if (peek(1) == '-') {
           advanceByte(2);
           tokens.push_back(makeToken(TokenKind::Arrow, "<-", start));
