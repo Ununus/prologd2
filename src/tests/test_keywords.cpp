@@ -112,6 +112,19 @@ TEST_CASE("keyword arities come from the dispatch table") {
   REQUIRE(firstEnglish->variadic);
   REQUIRE(firstEnglish->arities.empty());
 
+  // `ВЫВОДПС` is the third variadic name (task_53): `ВЫВОД` plus `ПС`.  The
+  // zero-argument «just a newline» case stays `ПС`/`nl`, so this one starts at
+  // one argument like the other two.
+  const prologd::KeywordInfo* writeLine = findKeyword(keywords, "ВЫВОДПС");
+  REQUIRE(writeLine != nullptr);
+  REQUIRE(writeLine->kind == prologd::KeywordKind::Predicate);
+  REQUIRE(writeLine->variadic);
+  REQUIRE(writeLine->arities.empty());
+  const prologd::KeywordInfo* writeLineEnglish = findKeyword(keywords, "writeln");
+  REQUIRE(writeLineEnglish != nullptr);
+  REQUIRE(writeLineEnglish->variadic);
+  REQUIRE(writeLineEnglish->arities.empty());
+
   // A latin name that is both a type word and a unary predicate.  The dialect
   // has two such checks: `integer` is the strict type test (a whole-valued real
   // is not an integer), `is_whole` asks whether a value *can* be taken as one.

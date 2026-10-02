@@ -123,15 +123,15 @@ where its files go).
 | task_50_panel_tabs | done | the output panel is one `QTabWidget`: **Проблемы** (errors and warnings), **Вывод** (program output, the `>` echo, the trace), **Система** (the window's notes) and **Ввод** (the prepared answers with the per-request console under them).  Each title carries its count (`Вывод:5`, `Проблемы:0` …), «Проблемы» is painted by state (ordinary with none, orange warnings-only, red with an error), a run brings up «Вывод» and a diagnostic «Проблемы»; the panel defaults to the **bottom**; «Поле очереди ввода» is gone (the queue is a tab now); a full load writes `--- база знаний загружена (N мс) ---` into «Система», measured by the window's clock from «Запустить» to `loaded` |
 | task_51_variadic_first | done | `ПЕРВОЕ` берёт любое число целей, начиная с одной: `builtinFirst` — цикл по `args` с `callOnce`, а вариадические имена собраны в одну таблицу `kVariadicNames` (`ВЫВОД`/`write`, `ПЕРВОЕ`/`first`), из которой читают `findBuiltin`, `builtinArities` и `builtinNames`; строки `add("ПЕРВОЕ", 2, …)` больше нет, `isVariadicBuiltin` (два сравнения имён) тоже.  Разбора, движка, лексера и `checks.cpp` не касается: `variadic` уже значит «от арности 1».  Одноаргументное `ПЕРВОЕ(Ц)` — это фиксация на первом решении, **не** `ВЫП(Ц)` (`?НАЙТИВСЕ(X, ПЕРВОЕ(p(X)), L).` → `L=[1]`, у `ВЫП(p(X))` — `L=[1,2]`); арность 0 — ошибка загрузки («ПЕРВОЕ не имеет арности 0»).  Проверки: новый случай Catch2 на вариадику (+1 CLI-тест `--list-keywords` → `ПЕРВОЕ/+`), ctest 278/278; `--list-keywords` печатает `ПЕРВОЕ/+` и `first/+` и больше не печатает `ПЕРВОЕ/2`; `doc/builtins.json` (`arities: []`, `variadic`), `help.typ` §4.5/§4.6, `technical.typ`, `prologd-diff.typ` (§«ПЕРВОЕ» и строка таблицы), `ai/porting_notes.md`, `gui/README.md` |
 | task_52_infix_operators | done | Знаки сравнения — сахар над `РАВНО`/`МЕНЬШЕ`/`БОЛЬШЕ`, а не новые имена: `InfixOperator`/`kInfixOperators` в `parser.cpp` (`=`→`РАВНО`, `<`→`МЕНЬШЕ`, `>`→`БОЛЬШЕ`, `=<`→`НЕ(БОЛЬШЕ)`, `>=`→`НЕ(МЕНЬШЕ)`), один слой в `parseTerm`/`parseComparison`, цепочка (`0 < X < 10`) — ошибка разбора одним сообщением (`skipToTerminator`), операнды через `parseOperand` — поэтому `#…#` тоже операнд (`r(#1 + 1# = 2)`).  Лексер: по одному виду на знак и таблица подсказок `kForeignOperators` (`=:=`, `=\=`, `\==`, `\=`, `==`, `@<`…, `->`, `<=`) — чужая запись объясняется в месте знака, а не сообщением про переменную-цель.  `=:=` не введён: `#…#` вычисляет, и вместо `1 + 1 =:= 2` пишут `#1 + 1# = 2`.  Вместе с этим принято правило ISO для числа: `1.` — целое `1` и точка, вещественное — `1.0` (перенесённая запись с точкой на конце съедала терминатор, и `?2 > 1.` не разбиралось).  GUI: знаки — вид `OPERATOR` (`tokens.py`, цвет уже был), `shortcuts.py` не тронут (решение пользователя: `Ctrl+=` остаётся за `РАВНО(`).  Документы: `help.typ` §3.2/§3.3/§4.7/§5.1 и строки таблицы, `prologd-diff.typ` §9 и три строки «Краткой таблицы», `technical.typ` (число и грамматика), варианты в `doc/builtins.json`.  Проверки: 285/285 ctest (семь новых случаев), 21 набор GUI (`test_*.py`) и `protocol_smoke.py`; уроки 3 и 4 получили пример с короткой записью, счётчики `test_queries.py` освежены (урок 4: 24 → 25 после task_51, плюс 03: 34 → 37 и 04: 25 → 27) |
-| task_53_writeln | not started | `ВЫВОДПС(Аргумент, ...)` / `writeln` — `ВЫВОД` с переводом строки: тело — `builtinWrite` плюс `newline()`, имя — строка в таблице вариадических имён из `task_51` (тот поэтому идёт первым), плюс `kEnglishNames`, `kReservedBuiltins` в лексере и запись в `doc/builtins.json`; в руководстве новая §6.2 со сдвигом номеров.  План — `ai/task_53_writeln.md` |
+| task_53_writeln | done | `ВЫВОДПС(Аргумент, ...)` / `writeln` — `ВЫВОД` с переводом строки: тело `builtinWriteLine` рядом с `builtinWrite` (тот же цикл плюс один `newline()`), две строки в таблицах `builtins.cpp`, слово в `kReservedBuiltins` и запись в `doc/builtins.json`.  В руководстве новая §6.3 (место выбрал пользователь: сразу после `ПС`), и всё с 6.3 по 6.9 сдвинулось на один — номера поправлены и там, где они были процитированы: `prologd-diff.typ`, урок 7, план task_54.  `--list-keywords`: 108 → 110 имён; ctest 290/290 |
 | task_54_input_stream | not started | Ответ оболочки — кусок входного потока: интерпретатор сам режет его на строки, как файл, поэтому `ВВОДСТР`/`ВВОДСИМВ`/`ВВКОД` в окне ведут себя как с файлом, а многострочная консоль остаётся и значит «несколько строк ввода»; плюс BOM в начале потока или куска — не данные (как у исходников).  Заодно правится устаревший абзац про ввод в `doc/gui.typ` (окно до task_50).  Объединение `ВВОДСИМВ`/`ВВОДСТР` в `ВВОД` — отложено.  План — `ai/task_54_input_stream.md` |
 | task_55_iso_negation_and_is_hint | done | `\+` — вторая запись `НЕ/1`, а не новое имя: один токен в лексере (`TokenKind::NotGoal`), префикс уровня терма в `parseTerm`, поэтому он работает в теле, в запросе, в директиве и в аргументах `ВЫП`/`НАЙТИВСЕ`, а приоритет — ISO (`\+ A, B` — это `(\+ A), B`, `\+ (A, B)` — отрицание всей конъюнкции, `\+ \+ Ц` — двойное отрицание); `НЕ` остаётся основным именем, в таблицу операторов task_52 `\+` не входит (он префиксный).  `is` **не добавлен**: `#…#` уже помечает и вычисляет выражение, поэтому вместо оператора — две подсказки, называющие замену (`kForeignSpellings` в `checks.cpp` для вызова `is/2`; `kInfixIsHint` в `parser.cpp` для `X is 2+3`).  Руководство: §3.3, §4.4, строки «Арифметика»/«Отрицание» сравнительной таблицы, приложение; `prologd-diff.typ` §19/§20 и две строки в §14 |
 | task_56_missing_dot_between_statements | done | пропущенную точку видно и тогда, когда причина не в конце файла: `beginsStatement(TokenKind)` в `parser.cpp` (Identifier, Variable, Integer, Float, String, QuotedAtom, Hash, Question, NotGoal, LParen, LBracket) — если после законченного предложения идёт такой токен, сообщение «предложение должно заканчиваться точкой» с позицией на *конце своего* предложения (`студент(вова, корчагин)` перед следующей строкой — `1:42` вместо `2:1: ошибка при разборе предложения`); общая формулировка осталась там, где новое предложение начаться не может (`a(1), b(2).`).  Проверки: два новых случая Catch2 — в парсере (четыре раздела: факт, правило, запрос, «точка везде») и через загрузчик; ctest 276/276 |
 
 ## Test suite
 
-285 tests, about five seconds: 270 Catch2 cases plus 15 command-line and
-integration tests (seven option tests, three `--list-keywords` tests, the
+290 tests, about five seconds: 273 Catch2 cases plus 17 command-line and
+integration tests (seven option tests, five `--list-keywords` tests, the
 import-search report, the JSON protocol session, the formatter round-trip and the
 engine-limit and diagnostics cases). Groups:
 BigInt, lexer, keywords, parser, unification, engine, every built-in group,
@@ -1921,6 +1921,25 @@ Added on 2026-10-02 while implementing task_31:
   добавила вопрос (`24` → `25`), и набор был красным уже на HEAD, а примеры
   этого раунда сдвинули ещё два (`03`: `34` → `37`, `04`: `25` → `27`): наборы
   GUI надо гонять после любой правки `examples/`.
+
+* Interpreter round, part 63: **`ВЫВОДПС`/`writeln`** (task_53, 2026-10-03).
+  Третий вариадический предикат — и первая проверка того, что таблица имён из
+  task_51 действительно данные: имя, английская пара и «хотя бы один аргумент»
+  стоят двух строк в `builtins.cpp` плюс слова в `kReservedBuiltins`, а тело —
+  `builtinWriteLine` рядом с `builtinWrite` (тот же цикл плюс один `newline()`;
+  второй вызов цели не нужен, `ВЫВОД` не отказывает).  Нулевая арность осталась
+  за `ПС`, поэтому второй записи для «просто перевод строки» нет.  Дороже всего
+  обошлась не программа, а нумерация: §6.3 — новая (место выбрал пользователь:
+  сразу после `ПС`), всё с 6.3 по 6.9 сдвинулось на один, а номера жили ещё в
+  трёх местах — ссылка в `prologd-diff.typ` («таблица кодов»), комментарии урока
+  7 и план `task_54_input_stream.md`.  Все три поправлены в этом же раунде: `section`
+  каждой записи `doc/builtins.json` обязан быть заголовком руководства, так что
+  расхождение поймал бы `test_reference.py` — но поймал бы уже после правки.
+  Урок 7 показывает короткую запись (`?ВЫВОДПС("Сумма: ", 5).`), его счётчик в
+  `test_queries.py` — `19` → `20`; в приложении английских имён запись встала
+  сама (`ВЫВОДПС — writeln`).  Проверки: 290/290 ctest (три новых случая Catch2
+  и два CLI), `--list-keywords` — 110 имён, 21 набор GUI и `protocol_smoke.py`,
+  шесть PDF, страницы 16–18 и 33 просмотрены.
 
 
 

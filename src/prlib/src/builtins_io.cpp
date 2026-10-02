@@ -43,6 +43,18 @@ BuiltinResult builtinWrite(Engine& engine, std::span<const Term> args) {
   return BuiltinResult::Continue;
 }
 
+BuiltinResult builtinWriteLine(Engine& engine, std::span<const Term> args) {
+  // `ВЫВОДПС` is the two built-ins in one goal: the arguments exactly as
+  // `ВЫВОД` writes them (task_11), then one `ПС`.  `ВЫВОД` cannot fail, so the
+  // line break is written unconditionally rather than through a second call —
+  // no `ВЫП`-like indirection and no chance of the newline being skipped.
+  for (const Term& argument : args) {
+    engine.io().write(engine.format(argument));
+  }
+  engine.io().newline();
+  return BuiltinResult::Continue;
+}
+
 BuiltinResult builtinWriteCode(Engine& engine, std::span<const Term> args) {
   const auto value = asNumeric(engine, args[0]);
   if (value && !value->is_float) {

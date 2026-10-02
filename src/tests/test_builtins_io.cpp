@@ -26,6 +26,31 @@ TEST_CASE("writes a newline") {
   REQUIRE(result.output == "а\nб\nДА\n");
 }
 
+TEST_CASE("the line writer is the writer plus one newline") {
+  // The newline comes from the built-in itself, so the next `ВЫВОД` starts a new
+  // line without a `ПС` between them — and exactly one line break, not two.
+  const auto result = runProgram("?ВЫВОДПС(\"а\", 1), ВЫВОД(\"б\"), ПС.\n");
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "а1\nб\nДА\n");
+}
+
+TEST_CASE("the line writer prints arguments exactly as the writer does") {
+  // No separator is inserted and the terms are formatted by the same code: a
+  // list, an unbound variable and a string are not special-cased here.
+  const auto result = runProgram(
+      "?ВЫВОДПС(\"без\", \" пробелов\").\n"
+      "?ВЫВОДПС(\"Ёё\", [1,2], _).\n"
+      "?ВЫВОДПС(1, 2, 3, 4, 5).\n");
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "без пробелов\nДА\nЁё[1,2]_1\nДА\n12345\nДА\n");
+}
+
+TEST_CASE("writeln is the line writer under its English spelling") {
+  const auto result = runProgram("?writeln(\"ок\"), writeln(7).\n");
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "ок\n7\nДА\n");
+}
+
 TEST_CASE("reads integers") {
   const auto result = runProgram(
       "?ВВОДЦЕЛ(2).\n"

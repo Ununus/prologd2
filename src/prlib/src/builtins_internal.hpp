@@ -85,6 +85,7 @@ BuiltinResult builtinStringLength(Engine&, std::span<const Term>);
 
 // ---- input/output ----
 BuiltinResult builtinWrite(Engine&, std::span<const Term>);
+BuiltinResult builtinWriteLine(Engine&, std::span<const Term>);
 BuiltinResult builtinWriteCode(Engine&, std::span<const Term>);
 BuiltinResult builtinReadInt(Engine&, std::span<const Term>);
 BuiltinResult builtinReadFloat(Engine&, std::span<const Term>);

@@ -51,7 +51,7 @@ TEST_CASE("every alias is wired to the function its Russian name reaches") {
 }
 
 TEST_CASE("the variadic built-ins are variadic under both spellings") {
-  for (const std::string_view russian : {"ВЫВОД", "ПЕРВОЕ"}) {
+  for (const std::string_view russian : {"ВЫВОД", "ВЫВОДПС", "ПЕРВОЕ"}) {
     const std::string_view english = englishOf(russian);
     REQUIRE_FALSE(english.empty());
     for (const std::size_t arity : {std::size_t{1}, std::size_t{3}, std::size_t{9}}) {

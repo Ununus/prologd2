@@ -120,6 +120,12 @@ Tests are written **together with** the feature, never after.
   example file (refresh the table with `--print` when a lesson changed on purpose)
   and `test_lessons.cpp` runs them.  A lesson edit has already left that script
   red for a whole round.
+* Inserting one section into `help.typ` renumbers every section after it, and those
+  numbers are quoted outside the manual: `section` in `doc/builtins.json`, prose in
+  `prologd-diff.typ` («таблица кодов, раздел 6.4»), the `%`-comments of the
+  lessons, and the plans of tasks that have not started.  Grep the old numbers
+  across the tree in the same change: `test_reference.py` only checks that a
+  `section` is *some* heading of the manual, not that it is the right one.
 * Update `ai/status.md` and the task file status after every work session.
 * Any deviation from this plan is recorded in `ai/decisions.md`.
 

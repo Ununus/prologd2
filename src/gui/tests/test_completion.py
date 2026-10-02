@@ -37,6 +37,7 @@ RESERVED = Keywords.from_event(
         "keywords": [
             {"name": "НАЙТИВСЕ", "kind": "predicate", "arities": [3]},
             {"name": "ВЫВОД", "kind": "predicate", "arities": [], "variadic": True},
+            {"name": "ВЫВОДПС", "kind": "predicate", "arities": [], "variadic": True},
             {"name": "mod", "kind": "operator", "arities": []},
         ]
     }
@@ -85,7 +86,11 @@ def test_lists_do_not_inflate_the_arity() -> None:
 
 def test_reserved_names_come_with_their_arity() -> None:
     assert labels("НАЙ") == ["НАЙТИВСЕ/3"]
-    assert labels("ВЫ") == ["ВЫВОД/+"]
+    # A shorter name that is a prefix of a longer one goes first, and the longer
+    # one is still offered: `ВЫВОД` is not a prefix match that hides `ВЫВОДПС`
+    # (task_53 added the second variadic name).
+    assert labels("ВЫ") == ["ВЫВОД/+", "ВЫВОДПС/+"]
+    assert labels("ВЫВОДП") == ["ВЫВОДПС/+"]
     assert labels("mo") == ["mod"], "an operator is offered as the bare name"
     assert labels("чле") == ["член/2"]
     assert labels("дожд") == ["дождь"]
@@ -98,6 +103,7 @@ def test_the_call_form_is_inserted_with_the_caret_after_the_paren() -> None:
     assert offers["НАЙТИВСЕ"].label == "НАЙТИВСЕ/3"
     assert offers["НАЙТИВСЕ"].call_form == ("НАЙТИВСЕ(, , )", 9), offers["НАЙТИВСЕ"].call_form
     assert offers["ВЫВОД"].call_form == ("ВЫВОД()", 6), offers["ВЫВОД"].call_form
+    assert offers["ВЫВОДПС"].call_form == ("ВЫВОДПС()", 8), offers["ВЫВОДПС"].call_form
     print("ok: accepting inserts the call form, with the caret after the opening parenthesis")
 
 

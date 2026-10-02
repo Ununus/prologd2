@@ -91,10 +91,10 @@ Consequences, all of them wanted:
       window never splits it for the interpreter (it splits the *queue* for its
       own counter and echo).
 - [ ] `doc/help.typ`:
-      * §6.7 gains one sentence: the window hands the answer over as a piece of
+      * §6.8 gains one sentence: the window hands the answer over as a piece of
         the input, so several lines in the field are read one by one, as from a
-        file (this is what makes §6.6's «остаток строки» true in the window too);
-      * §6.4/§6.7 gain one sentence about the BOM: a byte-order mark at the start
+        file (this is what makes §6.7's «остаток строки» true in the window too);
+      * §6.5/§6.8 gain one sentence about the BOM: a byte-order mark at the start
         of a data file is not data (it is stripped, like the one in a source).
 - [ ] `doc/gui.typ`: the input paragraph (lines ~548–585) is rewritten — it still
       describes the window **before** task_50 («поле ввода под панелью вывода»,
@@ -151,7 +151,7 @@ Consequences, all of them wanted:
    reads as if the mark were not there.
 4. GUI suites (`PYTHONUTF8=1`, `QT_QPA_PLATFORM=offscreen`), then
    `cmake --build build/windows-msvc --config Release --target docs` and a look at
-   §6.7 and at the input pages of the window manual.
+   §6.8 and at the input pages of the window manual.
 
 ## Отложено (point 4, not this task)
 

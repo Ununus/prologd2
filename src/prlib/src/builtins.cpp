@@ -262,9 +262,9 @@ using BuiltinTable = std::unordered_map<BuiltinKey, BuiltinFn, BuiltinKeyHash>;
 /// Names that are not listed are already English (`abs`, `sqrt`, `sin`, `cos`,
 /// `tan`, `exp`, `mod`, `div`) or are answered outside the dispatch table
 /// (`ВЫП`/`call`, handled by the solver; `ИМПОРТ`/`import`, handled by the
-/// parser) — see `keywords.cpp` and `parser.cpp`.  `ПЕРВОЕ`/`first` and
-/// `ВЫВОД`/`write` are here for their English spelling, but they are registered
-/// by `kVariadicNames`, not by `add`.
+/// parser) — see `keywords.cpp` and `parser.cpp`.  `ПЕРВОЕ`/`first`,
+/// `ВЫВОД`/`write` and `ВЫВОДПС`/`writeln` are here for their English spelling,
+/// but they are registered by `kVariadicNames`, not by `add`.
 constexpr std::pair<std::string_view, std::string_view> kEnglishNames[] = {
     {"ЛОЖЬ", "fail"},         {"ТРАССА", "trace"},
     {"НЕТ_ТРАССЫ", "no_trace"}, {"ТИХО", "quiet"},
@@ -281,15 +281,15 @@ constexpr std::pair<std::string_view, std::string_view> kEnglishNames[] = {
     {"СТРСПИС", "str_to_list"},   {"БУКВА", "is_letter"},
     {"ЦИФРА", "is_digit"},      {"СЦЕП", "concat"},
     {"КОПИЯ", "substring"},     {"ДЛИНА", "strlen"},
-    {"ВЫВОД", "write"},        {"ВВКОД", "put_code"},
-    {"ВВОДЦЕЛ", "read_int"},     {"ВВОДВЕЩ", "read_float"},
-    {"ВВОДСИМВ", "read_char"},   {"ВВОДСТР", "read_string"},
-    {"ЧТЕНИЕ_ИЗ", "see"},       {"ЗАПИСЬ_В", "tell"},
-    {"СКОЛЬКО", "clause_count"},  {"ПРЕДЛ", "clause_at"},
-    {"ТЕРМ", "univ"},         {"ДОБ", "assert"},
-    {"УДАЛЕНИЕ", "retract"},    {"ТОЧКА", "point"},
-    {"ЛИНИЯ", "line"},         {"ОКРУЖНОСТЬ", "circle"},
-    {"ЗАКРАСКА", "fill"},
+    {"ВЫВОД", "write"},         {"ВЫВОДПС", "writeln"},
+    {"ВВКОД", "put_code"},      {"ВВОДЦЕЛ", "read_int"},
+    {"ВВОДВЕЩ", "read_float"},  {"ВВОДСИМВ", "read_char"},
+    {"ВВОДСТР", "read_string"}, {"ЧТЕНИЕ_ИЗ", "see"},
+    {"ЗАПИСЬ_В", "tell"},       {"СКОЛЬКО", "clause_count"},
+    {"ПРЕДЛ", "clause_at"},     {"ТЕРМ", "univ"},
+    {"ДОБ", "assert"},          {"УДАЛЕНИЕ", "retract"},
+    {"ТОЧКА", "point"},         {"ЛИНИЯ", "line"},
+    {"ОКРУЖНОСТЬ", "circle"},   {"ЗАКРАСКА", "fill"},
 };
 
 /// English spelling of `name`, empty when it has none (already English, or
@@ -306,18 +306,20 @@ std::string_view englishName(std::string_view name) {
 /// The variadic names: every positive arity is legal, so they have no table
 /// entry to enumerate — `findBuiltin` looks here first.
 ///
-/// `ВЫВОД`/`write` prints every argument (task_11); `ПЕРВОЕ`/`first` tries every
-/// argument as a goal and commits to the first one that succeeds (task_51).
-/// Both spellings of a name are listed: `add` registers the English spelling
-/// with the table, and these names never reach it.
+/// `ВЫВОД`/`write` prints every argument (task_11); `ВЫВОДПС`/`writeln` does the
+/// same and ends the line (task_53); `ПЕРВОЕ`/`first` tries every argument as a
+/// goal and commits to the first one that succeeds (task_51).  Both spellings
+/// of a name are listed: `add` registers the English spelling with the table,
+/// and these names never reach it.
 struct VariadicName {
   std::string_view name;
   BuiltinFn function;
 };
 
 constexpr VariadicName kVariadicNames[] = {
-    {"ВЫВОД", builtinWrite}, {"write", builtinWrite},
-    {"ПЕРВОЕ", builtinFirst}, {"first", builtinFirst},
+    {"ВЫВОД", builtinWrite},     {"write", builtinWrite},
+    {"ВЫВОДПС", builtinWriteLine}, {"writeln", builtinWriteLine},
+    {"ПЕРВОЕ", builtinFirst},    {"first", builtinFirst},
 };
 
 /// The function behind a variadic name, `nullptr` when the name is not variadic.
@@ -434,7 +436,7 @@ const BuiltinTable& builtinTable() {
 }  // namespace
 
 BuiltinFn findBuiltin(std::string_view name, std::size_t arity) {
-  // The variadic names accept any positive arity (`ВЫВОД`, `ПЕРВОЕ`).
+  // The variadic names accept any positive arity (`ВЫВОД`, `ВЫВОДПС`, `ПЕРВОЕ`).
   if (BuiltinFn variadic = variadicBuiltin(name); variadic != nullptr && arity >= 1) {
     return variadic;
   }
