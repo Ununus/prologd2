@@ -19,20 +19,34 @@ import pathlib
 from dataclasses import dataclass
 
 from PySide6.QtCore import QSize, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QTextCharFormat, QTextCursor
+from PySide6.QtGui import (
+    QColor,
+    QFont,
+    QFontMetrics,
+    QPainter,
+    QPen,
+    QTextCharFormat,
+    QTextCursor,
+    QWheelEvent,
+)
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QLineEdit,
     QPlainTextEdit,
     QPushButton,
     QSizePolicy,
+    QTableWidget,
+    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
 
-from . import assets, documents, theme
+from . import answers, assets, documents, theme
 from .editor import ZoomablePlainTextEdit
+from .settings import MAXIMUM_FONT_SIZE, MINIMUM_FONT_SIZE
 
 #: What a line is, which is what decides its colour.  The window knows the kind —
 #: it feeds program output, its own notes, the echo of an answer and the
@@ -53,6 +67,10 @@ TAB_PROBLEMS = "problems"
 TAB_OUTPUT = "output"
 TAB_SYSTEM = "system"
 TAB_INPUT = "input"
+#: The answer table (task_59) — the *fifth* tab, and the only one that is not a
+#: view of the text: it is built from the answer of a single goal, so no `kind`
+#: belongs to it and `KIND_TAB` has no entry for it.
+TAB_TABLE = "table"
 
 #: What a kind belongs to.  The program's own output, the echo of an answer and
 #: the trace are all *the output*; the window's notes are system talk; the
@@ -760,3 +778,208 @@ class StepPane(QWidget):
         font.setPointSizeF(float(size))
         for label in (self._action, self._goal, self._depth, self._where, self._stack):
             label.setFont(font)
+
+
+#: The header of the one column a word-answer is shown in.  `ДА` and `НЕТ` are the
+#: answer of a query without variables, and a table needs a column: naming it
+#: «Ответ» says what the single cell is, instead of leaving a bare box (task_59).
+VERDICT_COLUMN = "Ответ"
+
+#: How wide a column may grow when it is fitted to its content.  A value is
+#: printed as the interpreter printed it and may be long; the full text is in
+#: «Выводе», so the table elides what does not fit rather than scrolling sideways
+#: past the end of the answer.
+MAX_COLUMN_WIDTH = 480
+
+
+class TablePane(QTableWidget):
+    """The answer of one goal as a grid: variables are columns, solutions rows.
+
+    Only a *single* goal is tabulated (task_59): a whole run answers all of its
+    `?`-questions into one stream of text with no separator, so nothing could say
+    where one question's answer ends — `answers.py` has the rules and the reason.
+
+    The pane is a `QTableWidget` with the three things the other panes have: the
+    output's font size (the answer is read next to the log it came from), the
+    `zoomChanged` signal and `Ctrl`+wheel, so the window's zoom handling stays one
+    code path.  Values are text, exactly as printed: nothing is parsed out of them.
+    """
+
+    #: Emitted after `Ctrl`+wheel; carries the new point size.
+    zoomChanged = Signal(float)
+
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        *,
+        font_family: str = "Cascadia Mono",
+        font_size: float = 11.0,
+    ) -> None:
+        super().__init__(parent)
+        self._family = font_family
+        #: The colour of the lines between the cells, from the theme (`set_palette`).
+        #: Drawn by `paintEvent`: Qt's own grid follows no palette role we could set
+        #: (its colour is the style's, and on the dark page it came out one unit
+        #: away from the background — no line at all), so the pane draws them.
+        self._grid = theme.LIGHT.grid
+        self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
+        self.setWordWrap(False)
+        self.setSortingEnabled(False)
+        self.setShowGrid(False)
+        # Solutions are in the order the interpreter found them, so the row header
+        # is hidden and the tab's title carries the count.
+        self.verticalHeader().setVisible(False)
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self.horizontalHeader().setMaximumSectionSize(MAX_COLUMN_WIDTH)
+        self.set_answer(None)
+        self.set_font_size(font_size)
+
+    # -- what the window drives --------------------------------------------
+    def set_answer(self, answer: answers.Answer | None) -> None:
+        """Shows one answer: its columns and rows, or one word, or nothing.
+
+        `None` (and an empty answer) empties the table: a new run starts with its
+        own output, and the table is a view of the last answer, not a history.
+        """
+        self.clear()
+        if answer is None or answer.is_empty():
+            self.setColumnCount(0)
+            self.setRowCount(0)
+            return
+        if answer.rows:
+            titles = answer.columns
+            rows = answer.rows
+        else:
+            # `ДА`/`НЕТ`: the word *is* the answer, so it gets one cell.
+            titles = (VERDICT_COLUMN,)
+            rows = ((answer.verdict,),)
+        self.setColumnCount(len(titles))
+        self.setHorizontalHeaderLabels(list(titles))
+        self.setRowCount(len(rows))
+        for number, row in enumerate(rows):
+            for column, value in enumerate(row):
+                item = QTableWidgetItem(value)
+                item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+                self.setItem(number, column, item)
+        self.resizeColumnsToContents()
+
+    def solution_count(self) -> int:
+        """How many rows are showing — the count in the tab's title."""
+        return self.rowCount()
+
+    def set_palette(self, palette: theme.Palette) -> None:
+        """Takes the grid's colour from the theme (task_59).
+
+        The table is chrome around the answer, so the line is a shade of the page
+        rather than a colour of its own: `theme.Palette.grid`.  It is *drawn* (see
+        `paintEvent`) because Qt's own grid does not follow the palette — its colour
+        comes from the style, and on the dark page it was `#1f1f20` on `#1e1e1e`,
+        which is a table whose columns are told apart by whitespace alone.
+        """
+        self._grid = palette.grid
+        self.viewport().update()
+
+    def column_titles(self) -> list[str]:
+        """The names over the columns, left to right (what a test reads)."""
+        return [
+            self.horizontalHeaderItem(column).text()
+            for column in range(self.columnCount())
+            if self.horizontalHeaderItem(column) is not None
+        ]
+
+    def cells(self) -> list[list[str]]:
+        """The table as plain lists of strings (what a test reads)."""
+        return [
+            [
+                item.text() if (item := self.item(row, column)) is not None else ""
+                for column in range(self.columnCount())
+            ]
+            for row in range(self.rowCount())
+        ]
+
+    # -- font and zoom ------------------------------------------------------
+    @property
+    def font_size(self) -> float:
+        return self.font().pointSizeF()
+
+    def set_font_size(self, size: float) -> None:
+        clamped = min(MAXIMUM_FONT_SIZE, max(MINIMUM_FONT_SIZE, float(size)))
+        if abs(clamped - self.font_size) < 1e-6:
+            return
+        font = QFont(self._family)
+        font.setPointSizeF(clamped)
+        self.setFont(font)
+        self.horizontalHeader().setFont(font)
+        # Row heights follow the font through one default size, not through a walk
+        # over every row: a runaway `?цель(X)` may answer with thousands of them.
+        self.verticalHeader().setDefaultSectionSize(QFontMetrics(font).lineSpacing() + 6)
+        self.resizeColumnsToContents()
+        self.zoomChanged.emit(clamped)
+
+    def wheelEvent(self, event: QWheelEvent) -> None:  # noqa: N802 - Qt spelling
+        if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            delta = event.angleDelta().y()
+            if delta:
+                self.set_font_size(self.font_size + (1 if delta > 0 else -1))
+            event.accept()
+            return
+        super().wheelEvent(event)
+
+    # -- the lines between the cells ----------------------------------------
+    def paintEvent(self, event) -> None:  # noqa: N802 - Qt spelling
+        """Draws the grid over the cells, in the theme's colour.
+
+        The lines go only *between* cells: the right edge of the last column and the
+        bottom of the last row are the end of the table, not a boundary, and the
+        empty room beside a narrow table stays page-coloured.  Positions come from
+        `visualRect` and `columnViewportPosition`, so a scrolled table stays right,
+        and only the rows on screen are walked — an answer may have thousands.
+        """
+        super().paintEvent(event)
+        rows = self.rowCount()
+        columns = self.columnCount()
+        if not rows or not columns:
+            return
+        painter = QPainter(self.viewport())
+        painter.setPen(QPen(QColor(self._grid)))
+        first = self.rowAt(0)
+        last = self.rowAt(max(0, self.viewport().height() - 1))
+        first = 0 if first < 0 else first
+        last = rows - 1 if last < 0 else last
+        right = self.columnViewportPosition(columns - 1) + self.columnWidth(columns - 1)
+        right = min(right, self.viewport().width())
+        bottom = self.visualRect(self.model().index(last, 0)).bottom()
+        bottom = min(max(bottom, 0), self.viewport().height())
+        for column in range(columns - 1):
+            x = self.columnViewportPosition(column) + self.columnWidth(column)
+            if 0 <= x <= self.viewport().width():
+                painter.drawLine(x, 0, x, bottom)
+        for row in range(first, last):
+            y = self.visualRect(self.model().index(row, 0)).bottom()
+            painter.drawLine(0, y, right, y)
+        painter.end()
+
+    # -- copying ------------------------------------------------------------
+    def copy_selection(self) -> str:
+        """The selected cells as text: `Tab` between columns, one line per row.
+
+        That is the shape a spreadsheet wants, and it is why the table has a copy
+        of its own at all: the window's `Ctrl+C` copies from *where the user is
+        looking*, and a pane it does not know would have sent the command to the
+        editor behind the table (task_59).
+        """
+        items = self.selectedItems()
+        if not items:
+            return ""
+        rows = sorted({item.row() for item in items})
+        columns = sorted({item.column() for item in items})
+        lines = []
+        for row in rows:
+            cells = []
+            for column in columns:
+                item = self.item(row, column)
+                cells.append(item.text() if item is not None and item.isSelected() else "")
+            lines.append("\t".join(cells))
+        return "\n".join(lines)

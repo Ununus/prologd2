@@ -116,6 +116,13 @@ RUN_QUESTIONS = "execution/run_questions"
 #: `printQuestions` flag of `load` (protocol 11, task_46: the old `questions` was
 #: split into *run* and *print*).
 PRINT_QUESTIONS = "execution/print_questions"
+#: Whether the answer of a *single* goal is shown as a table in the «Таблица» tab
+#: as well (task_59): columns are the goal's variables, rows are the solutions.
+#: The text in «Выводе» does not change — the table is an addition, and it is
+#: built for a margin marker or a goal typed into the query line, never for a
+#: whole run: the answers of several questions cannot be told apart in the text
+#: (`answers.py`).
+ANSWER_TABLE = "execution/answer_table"
 #: The guards of a run (task_46), sent with every `load` (protocol 9).  `0` means
 #: «без предела» for all of them.  The engine has no limits of its own and its
 #: message names a limit and its value only, so the answer to «where do I raise
@@ -321,6 +328,8 @@ SETTINGS: tuple[Setting, ...] = (
     # -- execution
     Setting(SAVE_BEFORE_RUN, "Сохранять перед запуском", "Выполнение", "bool", False,
             hint="Сохраняет текущий файл, если в нём есть несохранённые правки"),
+    Setting(ANSWER_TABLE, "Формировать таблицу", "Выполнение", "bool", False,
+            hint="Ответ отдельного запроса показывается ещё и таблицей: переменные — столбцы, решения — строки.  Текст в «Выводе» не меняется"),
     Setting(RUN_QUESTIONS, "Выполнять вопросы при запуске", "Выполнение", "bool", True,
             hint="Строки «?цель.» программы выполняются сами; выключено — только правила"),
     Setting(PRINT_QUESTIONS, "Печатать вопросы при запуске", "Выполнение", "bool", False,
@@ -1057,6 +1066,21 @@ class Settings:
     @print_questions.setter
     def print_questions(self, value: bool) -> None:
         self._write(PRINT_QUESTIONS, bool(value))
+
+    @property
+    def answer_table(self) -> bool:
+        """Whether a single goal's answer is also shown as a table (task_59).
+
+        Off by default: the text of the answer is the main way it is read, and the
+        table moves the panel to its own tab — something to ask for, not to be
+        surprised by.  A single goal is the goal line or a margin marker; a whole
+        run is never tabulated.
+        """
+        return self._flag(ANSWER_TABLE, False)
+
+    @answer_table.setter
+    def answer_table(self, value: bool) -> None:
+        self._write(ANSWER_TABLE, bool(value))
 
     @property
     def max_steps(self) -> int:

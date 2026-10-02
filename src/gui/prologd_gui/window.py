@@ -40,6 +40,7 @@ from PySide6.QtWidgets import (
 
 from . import (
     actions,
+    answers,
     appearance,
     assets,
     documents,
@@ -206,6 +207,11 @@ class MainWindow(QMainWindow):
         self._results_in_load = 0
         self._failed_in_load = False
         self._awaiting_query = False
+        #: The text of the answer being collected for the table (task_59), as the
+        #: chunks arrived; `None` unless a single goal is being answered.  A chunk
+        #: may end in the middle of a line, so splitting belongs to `answers.parse`
+        #: and not here — the list holds what the interpreter sent, verbatim.
+        self._answer_text: list[str] | None = None
         #: The picture of the graphics predicates (task_45).  The interpreter
         #: keeps its own pixels, so this canvas mirrors the screen: it is created
         #: the first time the graphics window is opened, and what happened before
@@ -341,6 +347,21 @@ class MainWindow(QMainWindow):
         )
         self._input_console.submitted.connect(self._send_input)
 
+        # The answer table (task_59): a grid of the answer to a *single* goal —
+        # columns are the goal's variables, rows are the solutions.  It is not a
+        # view of the text (no `kind` reaches it), but it is read next to the log
+        # it came from, so it takes the output's font and the same wheel.
+        self._table = panels.TablePane(
+            font_family=self._settings.font_family,
+            font_size=self._settings.output_font_size,
+        )
+        self._table.setToolTip(
+            "Таблица ответа: столбцы — переменные цели, строки — решения.\n"
+            "Строится для отдельного запроса: цели в строке запроса или клика по маркеру."
+        )
+        self._table.set_palette(self._settings.palette)
+        self._table.zoomChanged.connect(self._on_output_zoom)
+
         # The goal field (task_50): its own history (Up/Down, twenty commands)
         # and the editor's completion — the reserved names and the current
         # document's predicates, with the same call-form insertion.
@@ -435,9 +456,10 @@ class MainWindow(QMainWindow):
         editor_layout.addWidget(self._input_console)
 
         # The tabbed output panel (task_50): one `QTabWidget` with the three
-        # read-only panes and the Ввод tab.  `F4` hides the whole panel, `Ctrl+F4`
-        # moves it — the pair of commands the reference front-end had, now arranged
-        # as "one splitter with two orientations" around a tab widget.
+        # read-only panes, the Ввод tab and, since task_59, the answer table.
+        # `F4` hides the whole panel, `Ctrl+F4` moves it — the pair of commands the
+        # reference front-end had, now arranged as "one splitter with two
+        # orientations" around a tab widget.
         self._editor_area = editor_area
         self._input_tab = QWidget()
         input_layout = QVBoxLayout(self._input_tab)
@@ -451,6 +473,7 @@ class MainWindow(QMainWindow):
         self._panel_tabs.addTab(self._output, "Вывод")
         self._panel_tabs.addTab(self._system, "Система")
         self._panel_tabs.addTab(self._input_tab, "Ввод")
+        self._panel_tabs.addTab(self._table, "Таблица")
         self._refresh_panel_tabs()
 
         # One splitter, two orientations: side by side when the panel is on the
@@ -623,6 +646,7 @@ class MainWindow(QMainWindow):
             "save_before_run": self._toggle_save_before_run,
             "run_questions": self._toggle_run_questions,
             "print_questions": self._toggle_print_questions,
+            "answer_table": self._toggle_answer_table,
             "help_doc": lambda: self._open_document("help"),
             "help_gui": lambda: self._open_document("gui"),
             "about": self._about,
@@ -914,6 +938,7 @@ class MainWindow(QMainWindow):
         self._actions["save_before_run"].setChecked(self._settings.save_before_run)
         self._actions["run_questions"].setChecked(self._settings.run_questions)
         self._actions["print_questions"].setChecked(self._settings.print_questions)
+        self._actions["answer_table"].setChecked(self._settings.answer_table)
         self._actions["full_screen"].setChecked(self.isFullScreen())
         self._actions["output"].setChecked(self.output_visible())
         self._actions["graphics"].setChecked(self._settings.graphics_visible)
@@ -937,9 +962,19 @@ class MainWindow(QMainWindow):
         The command is a window-wide shortcut, so it fires while the *output*
         pane has the focus — and copying the editor's selection there copied text
         the user was not looking at, or nothing at all.  The output is read-only,
-        so copying out of it is the one operation it owes beside reading.
+        so copying out of it is the one operation it owes beside reading.  The
+        answer table (task_59) is the same case with another shape: its cells are
+        not a document, so its selection is turned into text here — columns with
+        `Tab`, rows with a newline, which is what a spreadsheet reads.
         """
         focused = QApplication.focusWidget()
+        if isinstance(focused, panels.TablePane):
+            # Nothing selected, nothing copied — like the panes, and unlike the
+            # editor, whose `copy()` would then copy *its* selection.
+            text = focused.copy_selection()
+            if text:
+                QApplication.clipboard().setText(text)
+            return
         if focused is not None and focused is not self.editor() and isinstance(
             focused, (ZoomablePlainTextEdit, QLineEdit)
         ):
@@ -997,6 +1032,17 @@ class MainWindow(QMainWindow):
     def _toggle_print_questions(self, checked: bool) -> None:
         """The menu switch of «Печатать вопросы при запуске» (task_58)."""
         self._settings.print_questions = checked
+
+    def _toggle_answer_table(self, checked: bool) -> None:
+        """The menu switch of «Формировать таблицу» (task_59).
+
+        Like its two neighbours, it writes the setting the dialog shows
+        (`execution/answer_table`), so the two doors cannot drift apart.  The
+        switch changes what the *next* single goal does: the table of the answer
+        already on the screen is left as it is — it is a record of what happened,
+        not a view that has to agree with a preference.
+        """
+        self._settings.answer_table = checked
 
     def _toggle_full_screen(self, checked: bool) -> None:
         if checked:
@@ -1204,7 +1250,7 @@ class MainWindow(QMainWindow):
 
     # -- the panel tabs (task_50) ------------------------------------------
     def panel_tabs(self) -> QTabWidget:
-        """The tab widget that carries Проблемы, Вывод, Система and Ввод."""
+        """The tab widget that carries Проблемы, Вывод, Система, Ввод and Таблица."""
         return self._panel_tabs
 
     def _tab_index(self, tab: str) -> int:
@@ -1214,6 +1260,7 @@ class MainWindow(QMainWindow):
             panels.TAB_OUTPUT: self._output,
             panels.TAB_SYSTEM: self._system,
             panels.TAB_INPUT: self._input_tab,
+            panels.TAB_TABLE: self._table,
         }[tab]
         return self._panel_tabs.indexOf(widget)
 
@@ -1239,9 +1286,10 @@ class MainWindow(QMainWindow):
     def _refresh_panel_tabs(self) -> None:
         """Names the tabs with their counts, and paints «Проблемы» by its state.
 
-        `Вывод:5`, `Проблемы:0`, `Система:3`, `Ввод:2` — the title is the pane's
-        contents in one word.  «Проблемы» is the ordinary colour with none,
-        orange with warnings only, red once an error has arrived (task_50).
+        `Вывод:5`, `Проблемы:0`, `Система:3`, `Ввод:2`, `Таблица:3` — the title is
+        the pane's contents in one word: lines of text, and the table's row count,
+        which is its number of solutions (task_59).  «Проблемы» is the ordinary
+        colour with none, orange with warnings only, red once an error has arrived.
         """
         bar = self._panel_tabs.tabBar()
         bar.setTabText(self._tab_index(panels.TAB_PROBLEMS),
@@ -1252,6 +1300,8 @@ class MainWindow(QMainWindow):
                        f"Система:{self._line_count(self._system)}")
         bar.setTabText(self._tab_index(panels.TAB_INPUT),
                        f"Ввод:{self._input_count()}")
+        bar.setTabText(self._tab_index(panels.TAB_TABLE),
+                       f"Таблица:{self._table.solution_count()}")
         if self._error_count:
             colour = self._settings.palette.error
         elif self._warning_count:
@@ -1701,6 +1751,7 @@ class MainWindow(QMainWindow):
             if not self._start_session():
                 return
         self._busy = True
+        self._arm_answer_table()
         self._session.run_query(text)
         self._sync_run_actions()
         self._update_details()
@@ -1730,6 +1781,7 @@ class MainWindow(QMainWindow):
         self._query_line.setText(statement)
         if not self.run_program(questions=False):
             return
+        self._arm_answer_table()
         self._session.run_query(statement)
         # The run is over when this question answers, not when the load does:
         # the `loaded` event of the quiet load is ignored while this is set.
@@ -2023,6 +2075,8 @@ class MainWindow(QMainWindow):
         self._stopping = True
         self._busy = False
         self._loaded = False
+        # A stopped query answers nothing, so nothing is left to tabulate.
+        self._answer_text = None
         self._session.stop()
         self._input_console.idle()
         self._step_pane.idle()
@@ -2039,6 +2093,8 @@ class MainWindow(QMainWindow):
         self._stop_grace.stop()
         self._stopping = False
         self._busy = False
+        # The interrupted query answers nothing: there is no table to build.
+        self._answer_text = None
         self._input_console.idle()
         self._step_pane.idle()
         self._step_stack.clear()
@@ -2048,15 +2104,19 @@ class MainWindow(QMainWindow):
         self._update_details()
 
     def clear_output(self) -> None:
-        """Empties the three read-only panes; the input queue is user data.
+        """Empties the read-only panes and the table; the input queue is user data.
 
         «Очистить вывод» clears what a run produced — the program's output, the
         diagnostics and the window's own notes — but never the prepared answers.
+        The table is a view of the same answer, so it goes with the text: leaving
+        it behind would show a table whose source is gone (task_59).
         """
         self._discard_output()
         self._output.reset()
         self._problems.reset()
         self._system.reset()
+        self._table.set_answer(None)
+        self._answer_text = None
         self._error_count = 0
         self._warning_count = 0
         self._refresh_panel_tabs()
@@ -2927,7 +2987,7 @@ class MainWindow(QMainWindow):
         `size` is for the case where the output is *following* the editor: the size
         is then applied with the panes' signals blocked, so the key that means «the
         output has a size of its own» stays unwritten until the output itself is
-        resized.  The block is the whole point: the four panes report `zoomChanged`,
+        resized.  The block is the whole point: the five panes report `zoomChanged`,
         their own handler (`_on_output_zoom`) reads that as «the user resized me» and
         writes the key — which is how the very first editor zoom used to freeze the
         follow.
@@ -2935,7 +2995,7 @@ class MainWindow(QMainWindow):
         following = size is not None
         if size is None:
             size = self._settings.output_font_size
-        panes = (self._output, self._problems, self._system, self._input_pane)
+        panes = (self._output, self._problems, self._system, self._input_pane, self._table)
         if following:
             for pane in panes:
                 pane.blockSignals(True)
@@ -3014,6 +3074,9 @@ class MainWindow(QMainWindow):
         for pane in (self._output, self._problems, self._system):
             pane.set_line_limit(self._settings.output_line_limit)
             pane.set_palette(self._settings.palette)
+        # The table has no line limit of its own and its own colour: the grid comes
+        # from the theme, and Qt's default is a light-palette one (task_59).
+        self._table.set_palette(self._settings.palette)
         self._output.set_follow_output(self._settings.follow_output)
         self._sync_query_line_font()
         self._step_pane.set_font_size(self._settings.font_size)
@@ -3154,6 +3217,10 @@ class MainWindow(QMainWindow):
         self._busy = False
         self._results_in_load += 1
         self._awaiting_query = False
+        # The answer is complete now, so the table is built from it (task_59).  A
+        # `result` of the program's own questions finds nothing collected and does
+        # nothing: only a single goal arms the collection.
+        self._finish_answer_table()
         text = "решение найдено" if found else "решения нет"
         if self._warning_count:
             text += f" · предупреждений: {self._warning_count}"
@@ -3165,6 +3232,36 @@ class MainWindow(QMainWindow):
             self._step_stack.clear()
         self._sync_run_actions()
         self._update_details()
+
+    # -- the answer table (task_59) ----------------------------------------
+    def _arm_answer_table(self) -> None:
+        """Starts collecting the output for the table — if the switch asks for it.
+
+        Called where a *single* goal is sent (the goal line, a margin marker), and
+        never by `run_program`: a whole run answers all of its `?`-questions into
+        one stream where nothing tells the answers apart, so there is no table to
+        build (task_59, §5).  With the switch off nothing is collected at all.
+        """
+        self._answer_text = [] if self._settings.answer_table else None
+
+    def _finish_answer_table(self) -> None:
+        """Shows the answer of the goal that just concluded — and disarms.
+
+        The table is emptied when there is nothing to show, so the tab never keeps
+        a table of a question the user has moved on from.  A diagnostic of this run
+        keeps the panel on «Проблемы» (`_show_panel_tab` there): an error is what
+        is looked for after a bad run, and a table must not push it aside.
+        """
+        collected = self._answer_text
+        self._answer_text = None
+        if collected is None:
+            return
+        answer = answers.parse("".join(collected))
+        self._table.set_answer(answer)
+        self._refresh_panel_tabs()
+        if answer.is_empty() or self._error_count or self._warning_count:
+            return
+        self._show_panel_tab(panels.TAB_TABLE)
 
     def _on_loaded(self) -> None:
         """The load and the program's own `?`-statements are over (protocol 8).
@@ -3252,6 +3349,8 @@ class MainWindow(QMainWindow):
         self._busy = False
         self._failed_in_load = True
         self._awaiting_query = False
+        # The query ended in an error, not in an answer: nothing to tabulate.
+        self._answer_text = None
         self._step_pane.idle()
         self._step_stack.clear()
         self._show_panel_tab(panels.TAB_PROBLEMS)
@@ -3420,6 +3519,9 @@ class MainWindow(QMainWindow):
         # A process that died while a `format` request was in flight will not
         # answer it: the buffer keeps its text and the state is dropped.
         self._format_pending = None
+        # The same goes for a query that was in flight: nothing more is coming,
+        # so a half-collected answer must not be picked up by the next run.
+        self._answer_text = None
         # A process *we* killed has no meaningful code: Windows reports the
         # termination status as a number nobody can read (62097), so the message
         # stays «остановлено» and the status bar keeps the last real code.
@@ -3452,7 +3554,13 @@ class MainWindow(QMainWindow):
         next turn of the event loop (`_flush_output`), and everything that *reads*
         the pane flushes first, so no caller can see the delay — only the cost per
         line, which is what a trace of a deep recursion cannot afford (task_49).
+
+        This is also the one funnel the answer of a single goal passes through, so
+        it is where the table collects it (task_59): only `OUTPUT` counts — the
+        window's notes, the diagnostics and the echo of an answer are other kinds.
         """
+        if self._answer_text is not None and kind == panels.OUTPUT:
+            self._answer_text.append(text)
         self._output_pending.append((kind, text))
         if not self._output_timer.isActive():
             self._output_timer.start()
@@ -3497,10 +3605,17 @@ class MainWindow(QMainWindow):
         self._refresh_panel_tabs()
 
     def _reset_panels(self) -> None:
-        """Empties the three read-only panes; the input queue is user data."""
+        """Empties the read-only panes and the table; the input queue is user data.
+
+        The table goes with them: it is a view of the answer of the *last* run, so
+        a new run begins with an empty one — «таблица ответа», not a history of
+        answers (`answers.py` keeps nothing).  A half-collected answer goes too.
+        """
         self._output.reset()
         self._problems.reset()
         self._system.reset()
+        self._table.set_answer(None)
+        self._answer_text = None
         self._error_count = 0
         self._warning_count = 0
         self._refresh_panel_tabs()

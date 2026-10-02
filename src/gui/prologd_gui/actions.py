@@ -193,6 +193,12 @@ ACTIONS: tuple[Action, ...] = (
     Action("step_over", "Шаг с обходом", "execution-step-over", ("Shift+F10",)),
     Action("stop", "Остановить", "execution-abort", ("Shift+F5",)),
     Action("save_before_run", "Сохранять перед запуском", None, checkable=True),
+    # The answer table (task_59): the answer of a *single* goal — a goal typed into
+    # the query line or a click on a question's margin marker — is shown as a grid
+    # in the «Таблица» tab as well: columns are the goal's variables, rows are the
+    # solutions.  Text-only, like the two switches under it: a checkable entry says
+    # what it does in words, and a picture would have to say «table» twice.
+    Action("answer_table", "Формировать таблицу", None, checkable=True),
     # The two switches of a run (task_46 split the one `questions` flag in two):
     # the load may run the program's own `?`-statements, and may print each one
     # before its answer.  They are settings (`execution/run_questions`,
@@ -311,6 +317,7 @@ MENUS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "step_over",
             "stop",
             SEPARATOR,
+            "answer_table",
             "run_questions",
             "print_questions",
             SEPARATOR,

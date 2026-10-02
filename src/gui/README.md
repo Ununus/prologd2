@@ -90,7 +90,7 @@ version does not know are left alone (task_29 adds the dialog).
 | `Ctrl+F3` / `Ctrl+Shift+F3` | find the word under the caret, forwards and backwards |
 | `Esc` | close the find bar, the focus goes back to the editor |
 | `Enter` / `Shift+Enter` in the find field | the same as `F3` / `Shift+F3` |
-| `F4` | show or hide the output panel (Проблемы, Вывод, Система, Ввод — one tab widget) |
+| `F4` | show or hide the output panel (Проблемы, Вывод, Система, Ввод, Таблица — one tab widget) |
 | `Ctrl+F4` | move that panel between the right side and the bottom |
 | `F1` | **Справка по предикату** — the record of the word under the caret, in a dock |
 | `Shift+F1` | **Руководство пользователя** — the built PDF (`doc/help.pdf`) |
@@ -98,6 +98,7 @@ version does not know are left alone (task_29 adds the dialog).
 | `Enter` / `Tab` / `Esc` | take the highlighted completion / close the popup |
 | | taking a predicate inserts `имя(` with the caret after the `(`, and a comma per extra argument — `НАЙТИВСЕ(, , )` |
 | `Ctrl`+wheel, `Ctrl`+keypad `+`/`-`, `Ctrl+0` | font size (6…72 pt) and its reset |
+| `Ctrl+C` over the answer table | the selected cells, `Tab` between columns and a newline between rows |
 | `Tab` / `Shift+Tab` | indent / outdent the selected lines |
 | `Enter` | starts the new line at the indentation of the one above, one step deeper after `,`, `:-` or `<-` (with «Автоотступ» unticked, it starts at the margin) |
 
@@ -268,16 +269,20 @@ The menus are **Файл** (Новый, Открыть…, Последние, �
 редакторы, Сменить ориентацию сплита, Номера строк, Переносить длинные строки,
 Увеличить/Уменьшить/Обычный размер шрифта, Оформление (подменю: светлое, тёмное,
 системное), Полный экран), **Выполнение** (Запустить, Запустить с
-трассировкой, Шаг, Шаг с обходом, Остановить, Выполнять вопросы при запуске,
+трассировкой, Шаг, Шаг с обходом, Остановить, Формировать таблицу, Выполнять
+вопросы при запуске,
 Печатать вопросы при запуске, Очистить вывод, Графическое окно) and
 **Справка** (Справка по предикату, Руководство пользователя, Шпаргалка по
 вставкам, Справка по окну, О программе).
 
 «Сохранять перед запуском» is a settings row now, not a menu entry (task_58): it is
-decided once, while the two switches about the program's own `?`-statements are
-flipped while working, so they are the ones that earn a place in «Выполнение».  The
+decided once, while the switches about the program's own `?`-statements are flipped
+while working, so they are the ones that earn a place in «Выполнение».  «Формировать
+таблицу» (task_59) stands above them: it is turned on before asking a single goal,
+and it is the same setting in the dialog (`execution/answer_table`).  The
 menu entry and the dialog write the same setting (`execution/run_questions`,
-`execution/print_questions`), and `_sync_actions` puts the setting back into the
+`execution/print_questions`, `execution/answer_table`), and `_sync_actions` puts
+the setting back into the
 check mark — one switch in two places, never two switches.
 
 An entry that does not exist yet stays in its menu but is **disabled**, and its
@@ -490,7 +495,8 @@ can stand on a second screen — and the main window's handler never sees that k
 
 ## The output panel
 
-The panel is **one tab widget** — **Проблемы**, **Вывод**, **Система**, **Ввод** —
+The panel is **one tab widget** — **Проблемы**, **Вывод**, **Система**, **Ввод**,
+**Таблица** —
 inside a single `QSplitter` whose orientation is the only thing that changes: side
 by side with the editor when the panel is on the right, stacked under it when the
 panel is at the bottom (the default).  `Ctrl+F4` turns it, `F4` shows and hides
@@ -501,7 +507,8 @@ on the next start.  A pane cannot be dragged away to nothing —
 squeezed to zero pixels looks like a lost window rather than a hidden one.
 
 Each tab's title carries its count — `Вывод:5`, `Проблемы:0`, `Система:3`,
-`Ввод:2` (Ввод counts the prepared lines) — and the «Проблемы» word is painted by
+`Ввод:2` (Ввод counts the prepared lines), `Таблица:3` (the table counts solutions) —
+and the «Проблемы» word is painted by
 the state of the run: the ordinary colour with nothing, orange with warnings
 only, red once an error has arrived.  A run brings up «Вывод»; a diagnostic
 (warning or error) brings up «Проблемы».  What goes where is decided by the
@@ -533,6 +540,41 @@ The pane is read-only, so the one operation it owes beside reading is copying te
 whichever text widget has the focus — the output, the input queue, the console
 line or the editor — instead of always the editor's (the command is a window
 shortcut and used to do exactly that).
+
+### The answer table (task_59)
+
+The fifth tab shows the answer of **one goal** as a grid: columns are the goal's
+variables, rows are the solutions, a cell is the value exactly as the interpreter
+printed it.  «Выполнение → Формировать таблицу» (`execution/answer_table`, off by
+default) turns it on for the goal line and for a margin marker.  A whole run is
+never tabulated, and that is a property of the answer rather than a shortage of
+effort: a program's own `?`-questions answer into one stream of text where nothing
+marks where one answer ends.  `X=вова`, `Y=корчагин`, `X=данил`, `Y=ахмеров` is
+*one* goal with two solutions — the repeated name is all that says so — and `F5`
+simply appends the next question's answer to it (`doc/gui.typ` §6.5 has the prose,
+`answers.py` the rules and `test_answers.py` the checks — Qt-free, like
+`test_queries.py`).
+
+`prologd_gui/answers.py` is Qt-free and holds the whole rule: a line is a binding
+when it is `Имя=значение` with a name the lexer would call a variable
+(`is_upper_letter` or a leading `_`), the value is the rest of the line verbatim,
+and a repeated name begins the next solution.  Everything else is *ignored* — a
+program printing inside its answer stays where it always was, in «Вывод».  A query
+without variables answers `ДА`/`НЕТ`; a word and bindings never mix inside one
+query, so the word gets one cell under the header «Ответ».
+
+The pane takes the output's font and the wheel (the answer is read next to the log
+it came from), and `Ctrl+C` over it copies the selected cells — `Tab` between
+columns, a newline between rows, which is what a spreadsheet reads; without that
+case the window-wide `Ctrl+C` would copy the *editor's* selection while the user
+looks at the table.  The table is emptied wherever the text is — a new run and
+«Очистить вывод» both clear it — because it is a view of the last answer and not a
+history of answers.  A diagnostic keeps the panel on «Проблемы»: the table is
+built and waits on its tab.  The lines between the cells are **drawn by the pane**
+in `theme.Palette.grid`: Qt's own grid takes its colour from the style and not
+from the palette, and on the dark page that came out one unit of lightness from
+the background — a table whose columns are told apart by whitespace alone.
+`test_appearance.py` measures the distance from the page for both palettes.
 
 ### A trace must not take the window (task_49)
 

@@ -181,6 +181,31 @@ def test_the_occurrence_band_stands_out_from_the_page(app: QApplication) -> None
     print("ok: the occurrence band is visible in both palettes")
 
 
+def test_the_table_grid_is_visible_in_both_palettes() -> None:
+    """task_59: the answer table's grid has to be seen, and stay quiet.
+
+    The measure is not readability — a grid line is chrome, not text — but it is
+    the same kind of count the occurrence band gets: how far the line sits from the
+    page.  `QTableWidget`'s own line is a light-palette colour, and on the dark
+    page it came out one unit away from the background, which is no line at all;
+    that is why the palette names the colour (`theme.Palette.grid`) and the pane
+    hands it to the table.
+    """
+    for palette in (theme.LIGHT, theme.DARK):
+        page = QColor(palette.background).lightness()
+        line = QColor(palette.grid).lightness()
+        text = QColor(palette.foreground).lightness()
+        assert abs(line - page) >= 12, (
+            f"{palette.name}: the grid {palette.grid} is {abs(line - page)} units of "
+            f"lightness from the page {palette.background}"
+        )
+        assert abs(line - text) >= 60, (
+            f"{palette.name}: the grid {palette.grid} is as loud as the text "
+            f"{palette.foreground}"
+        )
+    print("ok: the table's grid is visible on both pages, and quieter than the text")
+
+
 def test_an_unknown_palette_name_is_the_light_one() -> None:
     """A hand-edited file must not take the window down — and must not be dark."""
     assert theme.palette_for("полночь").name == theme.LIGHT.name
@@ -210,6 +235,7 @@ def main() -> int:
     test_dark_gives_a_dark_background_and_light_text(app)
     test_every_syntax_colour_contrasts_with_the_background(app)
     test_the_occurrence_band_stands_out_from_the_page(app)
+    test_the_table_grid_is_visible_in_both_palettes()
     test_an_unknown_palette_name_is_the_light_one()
     test_system_leaves_the_platform_palette_alone(app)
     test_system_colours_the_text_as_well_as_the_widgets(app)

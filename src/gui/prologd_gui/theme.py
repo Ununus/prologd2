@@ -242,6 +242,12 @@ class Palette:
     search_current: str
     current_line: str
     occurrence: str
+    #: The lines between the cells of the answer table (task_59).  Chrome like the
+    #: margin's numbers and the placeholder, so it is deliberately *not* in
+    #: `readable_pairs`: a grid line at WCAG AA would be a grid line that shouts.
+    #: It has to be *seen* all the same — `QTableWidget` draws its own lines with a
+    #: colour that is invisible on a dark page, which `test_appearance.py` measures.
+    grid: str
     margin_background: str
     margin_text: str
     margin_current: str
@@ -309,6 +315,7 @@ LIGHT = Palette(
     # colour): clearly *there* on the page, and still quieter than the search's
     # amber — the occurrences are a hint, the matches are the answer to a question.
     occurrence="#cfe0f7",
+    grid="#c8c8c8",
     margin_background="#f0f0f0",
     margin_text="#8a8a8a",
     margin_current="#0a22d6",
@@ -352,6 +359,10 @@ DARK = Palette(
     # sank into it — and the dark palette is what a dark desktop gets through the
     # «system» appearance, so the highlight was invisible by default there.
     occurrence="#3a4a63",
+    # The grid of the answer table (task_59): `QTableWidget`'s own line is drawn
+    # with a colour of the *light* palette, which on this page (`#1e1e1e`) is
+    # `#1f1f20` — one unit of lightness, that is, no line at all.
+    grid="#3a3a3c",
     margin_background="#252526",
     margin_text="#a6a6a6",
     margin_current="#4fc1ff",

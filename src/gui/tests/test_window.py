@@ -586,20 +586,20 @@ def test_a_request_keeps_the_panel_on_the_output(executable: str) -> None:
     print("ok: a request shows the console under the goal line and leaves the panel on Вывод")
 
 
-def test_the_panel_has_four_tabs_with_counts(executable: str) -> None:
-    """task_50: Проблемы, Вывод, Система, Ввод, each titled with its count.
+def test_the_panel_has_five_tabs_with_counts(executable: str) -> None:
+    """task_50: Проблемы, Вывод, Система, Ввод and, since task_59, Таблица.
 
     The «Проблемы» word is painted by the state of the run: the ordinary colour
     with nothing, orange with warnings only, red once an error has arrived.  The
     «Ввод» count follows the prepared lines as they are typed, blank lines
-    dropped.
+    dropped; the «Таблица» count is the number of solutions in it.
     """
     window = empty_window(executable)
     bar = window.panel_tabs().tabBar()
     try:
-        assert window.panel_tabs().count() == 4, window.panel_tabs().count()
-        titles = [bar.tabText(i) for i in range(4)]
-        assert titles == ["Проблемы:0", "Вывод:0", "Система:0", "Ввод:0"], titles
+        assert window.panel_tabs().count() == 5, window.panel_tabs().count()
+        titles = [bar.tabText(i) for i in range(5)]
+        assert titles == ["Проблемы:0", "Вывод:0", "Система:0", "Ввод:0", "Таблица:0"], titles
         problems = window.panel_tabs().indexOf(window._problems)
         assert not bar.tabTextColor(problems).isValid(), "no problems, no colour"
 
@@ -628,7 +628,7 @@ def test_the_panel_has_four_tabs_with_counts(executable: str) -> None:
         assert not bar.tabTextColor(problems).isValid(), "the colour outlived the clear"
     finally:
         discard_changes(window)
-    print("ok: four tabs, titled with counts, and «Проблемы» painted by its state")
+    print("ok: five tabs, titled with counts, and «Проблемы» painted by its state")
 
 
 def test_a_run_focuses_the_output_and_the_system_notes_the_time(executable: str) -> None:
@@ -1357,6 +1357,293 @@ def test_the_run_switches_are_in_the_menu_and_in_the_settings(executable: str) -
         print("ok: the two run switches are one setting each, in the menu and in the dialog")
     finally:
         discard_changes(window)
+
+
+# -- the answer table (task_59) --------------------------------------------
+#: Two facts and a question about both: one goal, two solutions.  Only a *single*
+#: goal is tabulated — a whole run answers all of its questions into one stream of
+#: text where nothing tells the answers apart (`answers.py` has the reason).
+TWO_STUDENTS = "студент(вова, корчагин).\nстудент(данил, ахмеров).\n?студент(X, Y).\n"
+
+
+def wait_for_the_run(window) -> None:
+    """Waits until the interpreter is not computing any more.
+
+    The status bar is not enough for a *second* question in one test: it keeps the
+    word of the previous answer («решение найдено»), so the wait would return the
+    moment the question is sent — the check would then read a table that is not
+    there yet.  `_busy` is the state the window keeps for exactly this.
+    """
+    assert pump(window, lambda: not window._busy), "the run never finished"
+
+
+def ask_from_the_margin(window, statement: str) -> None:
+    """Clicks a question's margin marker and waits for its answer."""
+    window.editor().queryRequested.emit(statement)
+    wait_for_the_run(window)
+
+
+def test_the_answer_table_switch_is_in_the_menu_and_in_the_settings(executable: str) -> None:
+    """task_59: «Формировать таблицу» is one switch in two places, off by default.
+
+    Like the two switches of a run (task_58), the menu entry and the settings row
+    read and write the same key (`execution/answer_table`), and the entry stands
+    above «Выполнять вопросы при запуске» — the order the user asked for.
+    """
+    from prologd_gui import actions, settings as settings_module
+
+    window = empty_window(executable)
+    try:
+        entries = dict(actions.MENUS)["Выполнение"]
+        assert "answer_table" in entries, entries
+        assert entries.index("answer_table") < entries.index("run_questions"), entries
+        assert settings_module.ANSWER_TABLE == "execution/answer_table"
+
+        switch = window._actions["answer_table"]
+        assert switch.isCheckable() is True
+        assert switch.isChecked() is False, "off by default: the text is the answer"
+        assert window._settings.answer_table is False
+
+        switch.setChecked(True)
+        assert window._settings.answer_table is True, "the menu did not write the setting"
+        window._settings.answer_table = False
+        window._sync_actions()
+        assert switch.isChecked() is False, "the setting did not reach the menu"
+        print("ok: «Формировать таблицу» is one setting, in the menu and in the dialog")
+    finally:
+        discard_changes(window)
+
+
+def test_a_marker_builds_the_answer_table(executable: str) -> None:
+    """lesson_04's `?сумма(5, С).` answers `С=15`: one column, one row.
+
+    The text answer stays in «Выводе» — the table is an addition, not a
+    replacement — and the panel moves to the «Таблица» tab, because a table is
+    what the switch was turned on for.
+    """
+    window = empty_window(executable)
+    try:
+        window._actions["answer_table"].setChecked(True)
+        assert window.open_path(str(LESSON_04))
+        view = window.editor()
+        line = next(
+            number
+            for number, content in enumerate(view.toPlainText().splitlines(), 1)
+            if content.strip() == "?сумма(5, С)."
+        )
+        statement = view.query_statements().get(line)
+        assert statement == "?сумма(5, С).", (line, statement)
+
+        ask_from_the_margin(window, statement)
+        assert printed_lines(window) == ["С=15"], ascii(window.output_text())
+        assert window._table.column_titles() == ["С"], window._table.column_titles()
+        assert window._table.cells() == [["15"]], window._table.cells()
+        bar = window.panel_tabs().tabBar()
+        index = window.panel_tabs().indexOf(window._table)
+        assert bar.tabText(index) == "Таблица:1", bar.tabText(index)
+        assert window.panel_tabs().currentIndex() == index, "the table was not brought up"
+    finally:
+        discard_changes(window)
+    print("ok: a question's answer becomes a table of its variables")
+
+
+def test_the_table_separates_two_solutions(executable: str) -> None:
+    """The user's example: two facts answer as two rows.
+
+    In the text — `X=вова`, `Y=корчагин`, `X=данил`, `Y=ахмеров` — the solutions
+    are told apart only by the name that repeats; the table says it in columns and
+    rows, which is the whole point of the round.
+    """
+    window = empty_window(executable)
+    try:
+        window._actions["answer_table"].setChecked(True)
+        window.editor().setPlainText(TWO_STUDENTS)
+        ask_from_the_margin(window, "?студент(X, Y).")
+        assert window._table.column_titles() == ["X", "Y"], window._table.column_titles()
+        assert window._table.cells() == [
+            ["вова", "корчагин"],
+            ["данил", "ахмеров"],
+        ], window._table.cells()
+        assert window._table.solution_count() == 2
+    finally:
+        discard_changes(window)
+    print("ok: two solutions of one goal are two rows of the table")
+
+
+def test_the_table_shows_a_word_for_a_ground_query(executable: str) -> None:
+    """`ДА`/`НЕТ`: a query without variables answers with a word, and a table
+    needs a column — so the word gets one cell of its own, named «Ответ»."""
+    window = empty_window(executable)
+    try:
+        window._actions["answer_table"].setChecked(True)
+        window.editor().setPlainText("факт(1).\n")
+        ask_from_the_margin(window, "?факт(1).")
+        assert window._table.column_titles() == ["Ответ"], window._table.column_titles()
+        assert window._table.cells() == [["ДА"]], window._table.cells()
+
+        ask_from_the_margin(window, "?факт(2).")
+        assert window._table.cells() == [["НЕТ"]], window._table.cells()
+    finally:
+        discard_changes(window)
+    print("ok: ДА and НЕТ are one cell, not an empty table")
+
+
+def test_the_goal_line_builds_the_table_too(executable: str) -> None:
+    """The other way to ask one goal: the query line under the editor.
+
+    `F5` first, so the program is loaded and the file's own `?студент(X, Y).` has
+    answered *before* the goal is typed — and that answer leaves no table behind:
+    only a single goal is collected.
+    """
+    window = empty_window(executable)
+    try:
+        window._actions["answer_table"].setChecked(True)
+        window.editor().setPlainText(TWO_STUDENTS)
+        window.run_program()
+        wait_for_the_run(window)
+        assert window._table.cells() == [], "a whole run built a table"
+
+        window._query_line.setText("?студент(X, Y).")
+        window._run_query()
+        wait_for_the_run(window)
+        assert window._table.cells() == [
+            ["вова", "корчагин"],
+            ["данил", "ахмеров"],
+        ], window._table.cells()
+    finally:
+        discard_changes(window)
+    print("ok: a goal typed into the query line is tabulated the same way")
+
+
+def test_the_table_stays_off_until_it_is_asked_for(executable: str) -> None:
+    """With the switch off the answer stays text, and no tab moves."""
+    window = empty_window(executable)
+    try:
+        window.editor().setPlainText(TWO_STUDENTS)
+        ask_from_the_margin(window, "?студент(X, Y).")
+        assert "X=вова" in window.output_text(), ascii(window.output_text())
+        assert window._table.cells() == [], window._table.cells()
+        assert window._table.solution_count() == 0
+        assert (
+            window.panel_tabs().currentIndex()
+            == window.panel_tabs().indexOf(window._output)
+        ), "the panel moved off «Вывод» with the table switched off"
+        bar = window.panel_tabs().tabBar()
+        assert bar.tabText(window.panel_tabs().indexOf(window._table)) == "Таблица:0"
+    finally:
+        discard_changes(window)
+    print("ok: with the switch off the answer stays text and no tab moves")
+
+
+def test_a_diagnostic_keeps_the_panel_on_the_problems(executable: str) -> None:
+    """A warning does not end the run, and it does not lose the panel either.
+
+    The table is still built — the answer is there to read on its tab — but a
+    diagnostic is what the user looks for after a run that said something about
+    the program, so the table does not take the panel from «Проблемы».
+    """
+    window = empty_window(executable)
+    try:
+        window._actions["answer_table"].setChecked(True)
+        # `мама(Лена, Таня).` is the porting trap: two warnings at load, and the
+        # question still answers.
+        window.editor().setPlainText(
+            "студент(вова, корчагин).\nмама(Лена, Таня).\n?студент(X, Y).\n"
+        )
+        ask_from_the_margin(window, "?студент(X, Y).")
+        assert window._table.cells() == [["вова", "корчагин"]], window._table.cells()
+        assert window._warning_count == 2, window._warning_count
+        assert (
+            window.panel_tabs().currentIndex()
+            == window.panel_tabs().indexOf(window._problems)
+        ), "the table pushed the diagnostics aside"
+    finally:
+        discard_changes(window)
+    print("ok: a diagnostic keeps the panel on «Проблемы», and the table is still built")
+
+
+def test_a_new_run_empties_the_table(executable: str) -> None:
+    """The table is a view of the last answer, not a history of answers.
+
+    A new run starts with its own output, so it starts with an empty table — and
+    «Очистить вывод», which clears the text the table was built from, clears it
+    too (a table whose source is gone would be a lie).
+    """
+    window = empty_window(executable)
+    try:
+        window._actions["answer_table"].setChecked(True)
+        window.editor().setPlainText(TWO_STUDENTS)
+        ask_from_the_margin(window, "?студент(X, Y).")
+        assert window._table.solution_count() == 2, window._table.cells()
+
+        window.run_program()
+        wait_for_the_run(window)
+        assert window._table.cells() == [], "the previous answer outlived the run"
+
+        ask_from_the_margin(window, "?студент(X, Y).")
+        assert window._table.solution_count() == 2, window._table.cells()
+        window.clear_output()
+        assert window._table.cells() == [], "«Очистить вывод» left the table behind"
+    finally:
+        discard_changes(window)
+    print("ok: a run and «Очистить вывод» empty the table with the text")
+
+
+def test_the_table_follows_the_output_font(executable: str) -> None:
+    """The table is read next to the log it came from, so it takes its size.
+
+    A wheel over the table calls exactly this `set_font_size`, which is the path
+    checked here: the pane reports `zoomChanged`, the window writes
+    `output/font_size` and pushes the size into every pane — the table included.
+    """
+    window = empty_window(executable)
+    try:
+        assert window._table.font_size == window._output.font_size, "one size at the start"
+        window.output().set_font_size(9)
+        assert window._settings.output_font_size == 9.0
+        assert window._table.font_size == 9.0, window._table.font_size
+
+        window._settings.output_font_size = 13
+        window._apply_output_font()
+        assert window._table.font_size == 13.0, window._table.font_size
+    finally:
+        discard_changes(window)
+    print("ok: the answer table takes the output's font size")
+
+
+def test_copy_over_the_table_takes_the_cells(executable: str) -> None:
+    """`Ctrl+C` over the table copies its cells, not the editor behind it.
+
+    The command copies «from where the user is looking», and the table is a pane
+    it did not know: without a case of its own it would have copied the editor's
+    selection — text the user is not looking at (task_59).
+    """
+    window = empty_window(executable)
+    try:
+        window._actions["answer_table"].setChecked(True)
+        window.editor().setPlainText(TWO_STUDENTS + "мусор(1).\n")
+        window.editor().selectAll()
+        ask_from_the_margin(window, "?студент(X, Y).")
+        assert window._table.solution_count() == 2, window._table.cells()
+
+        window.show()
+        window._table.setFocus()
+        QApplication.processEvents()
+        assert window.focusWidget() is window._table, window.focusWidget()
+        window._table.item(0, 0).setSelected(True)
+        window._table.item(0, 1).setSelected(True)
+        window._copy()
+        copied = QApplication.clipboard().text()
+        assert copied == "вова\tкорчагин", ascii(copied)
+
+        # The whole table: rows separated by a newline, columns by a tab.
+        window._table.selectAll()
+        window._copy()
+        copied = QApplication.clipboard().text()
+        assert copied == "вова\tкорчагин\nданил\tахмеров", ascii(copied)
+    finally:
+        discard_changes(window)
+    print("ok: Ctrl+C over the table copies the selected cells, tab-separated")
 
 
 def test_the_toolbar_reuses_the_actions(executable: str) -> None:
@@ -3319,7 +3606,7 @@ def main(argv: list[str]) -> int:
         test_the_console_appears_only_when_it_is_asked(executable)
         test_the_console_stays_one_field_high(executable)
         test_a_request_keeps_the_panel_on_the_output(executable)
-        test_the_panel_has_four_tabs_with_counts(executable)
+        test_the_panel_has_five_tabs_with_counts(executable)
         test_a_run_focuses_the_output_and_the_system_notes_the_time(executable)
         test_cancelling_input_stops_the_run(executable)
         test_a_run_uses_the_tab_that_is_showing(executable)
@@ -3335,6 +3622,16 @@ def main(argv: list[str]) -> int:
         test_the_menus_come_from_the_action_table(executable)
         test_the_toolbar_reuses_the_actions(executable)
         test_the_run_switches_are_in_the_menu_and_in_the_settings(executable)
+        test_the_answer_table_switch_is_in_the_menu_and_in_the_settings(executable)
+        test_a_marker_builds_the_answer_table(executable)
+        test_the_table_separates_two_solutions(executable)
+        test_the_table_shows_a_word_for_a_ground_query(executable)
+        test_the_goal_line_builds_the_table_too(executable)
+        test_the_table_stays_off_until_it_is_asked_for(executable)
+        test_a_diagnostic_keeps_the_panel_on_the_problems(executable)
+        test_a_new_run_empties_the_table(executable)
+        test_the_table_follows_the_output_font(executable)
+        test_copy_over_the_table_takes_the_cells(executable)
         test_view_switches_are_stored(executable)
         test_the_recent_menu_lists_what_is_still_there(executable, files)
         test_the_recent_menu_and_the_window_carry_the_pictures(executable, files)
