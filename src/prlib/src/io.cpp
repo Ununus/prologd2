@@ -219,8 +219,13 @@ bool IoContext::openOutput(const std::string& path) {
   file_output_.close();
   output_to_file_ = false;
   output_name_.clear();
+  // The stream that was just closed must not stay the current one.  A redirect
+  // that fails returns the output to the base stream, the way a failed
+  // `ЧТЕНИЕ_ИЗ` returns the input to the keyboard — otherwise everything written
+  // afterwards (the program's own output *and* the interpreter's answers) goes
+  // into a closed file and disappears without a word.
+  output_ = base_output_;
   if (path.empty() || path == "con:" || path == "con") {
-    output_ = base_output_;
     return true;
   }
   file_output_.open(path);

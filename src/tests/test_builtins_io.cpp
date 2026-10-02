@@ -379,6 +379,27 @@ TEST_CASE("the prompt of a read is written before the read") {
   }
 }
 
+TEST_CASE("a failed redirect returns the output to the screen") {
+  // The switch is attempted after the current stream was closed, so a failure
+  // used to leave the output on a closed file: the program's own output *and* the
+  // interpreter's answers disappeared without a word until the next successful
+  // `ЗАПИСЬ_В`.  A failed `ЧТЕНИЕ_ИЗ` returns the input to the keyboard; this is
+  // the same rule for the output.
+  const auto path =
+      (std::filesystem::temp_directory_path() / "prologd_io_redirect_test.txt").string();
+  const std::string source = "?ЗАПИСЬ_В(\"" + path + "\").\n"                  // to the file
+                             "?ЗАПИСЬ_В(\"нет_такого_каталога/файл.txt\").\n"  // fails
+                             "?ЗАПИСЬ_В(Имя).\n"                               // no stream is open
+                             "?ВЫВОД(\"после\"), ПС.\n"                        // the reader sees it
+                             "?ЗАПИСЬ_В(\"\").\n";
+  const auto result = runProgram(source);
+  REQUIRE(result.loaded);
+  REQUIRE_FALSE(result.runtimeError);
+  REQUIRE(result.output == "НЕТ\nИмя=\nпосле\nДА\nДА\n");
+  std::error_code ignored;
+  std::filesystem::remove(path, ignored);
+}
+
 TEST_CASE("the stream built-ins report the current stream, or fail") {
   // A free argument asks for the name of the stream that is open now: the
   // standard streams have no name.

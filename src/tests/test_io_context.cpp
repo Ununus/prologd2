@@ -353,6 +353,30 @@ TEST_CASE("without a handler the base stream is read") {
   REQUIRE(*line == "из потока");
 }
 
+TEST_CASE("a redirect that fails leaves the output on the base stream") {
+  const TempFile file("старое\n");
+  std::istringstream input;
+  std::ostringstream output;
+  std::ostringstream error;
+  IoContext io(input, output, error);
+
+  REQUIRE(io.openOutput(file.path()));
+  io.write("в файл");
+
+  REQUIRE_FALSE(io.openOutput("нет_такого_каталога/файл.txt"));
+  // Not into the file that was just closed: the next write is on the screen, and
+  // no file is current any more.
+  io.write("на экран");
+  REQUIRE(output.str() == "на экран");
+  REQUIRE(io.outputName().empty());
+
+  // A redirect that succeeds still works after a failed one.
+  REQUIRE(io.openOutput(file.path()));
+  io.write("снова в файл");
+  REQUIRE(output.str() == "на экран");
+  REQUIRE(io.outputName() == file.path());
+}
+
 TEST_CASE("a written line tells its owner that it ended") {
   std::istringstream input;
   std::ostringstream output;
