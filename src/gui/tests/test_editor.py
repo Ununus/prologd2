@@ -133,6 +133,77 @@ def test_tab_and_backtab_keys() -> None:
     print("ok: Tab inserts the indent unit, Shift+Tab removes it")
 
 
+def test_shift_delete_takes_the_whole_line() -> None:
+    editor = make_editor("первый\nвторой\nтретий\n")
+    cursor = editor.textCursor()
+    cursor.setPosition(editor.document().findBlockByNumber(1).position() + 1)
+    editor.setTextCursor(cursor)
+
+    # The *key*, not the method: `QTextControl` claims the platform's «cut»
+    # sequence (`Shift+Del` is Windows' other spelling of `Ctrl+X`), so the action's
+    # shortcut never fires while the editor has focus — the key arrives in
+    # `keyPressEvent` and the editor has to run the command itself.  Without that
+    # the key did nothing at all while the same entry in the «Правка» menu worked,
+    # which is exactly what the user found (task_58's follow-up).
+    QTest.keyClick(editor, Qt.Key.Key_Delete, Qt.KeyboardModifier.ShiftModifier)
+    assert editor.toPlainText() == "первый\nтретий\n"
+    # In the first column of the line that slid up: a run of `Shift+Del` walks on
+    # instead of standing at the end of the previous line.
+    assert editor.textCursor().blockNumber() == 1
+    assert editor.textCursor().positionInBlock() == 0
+
+    # One Ctrl+Z brings the text back: the command is one edit block.
+    editor.undo()
+    assert editor.toPlainText() == "первый\nвторой\nтретий\n"
+
+    # `Shift+Del` is the platform's other spelling of «Вырезать», so the removed
+    # line is on the clipboard and can be pasted back — a cut that could not be
+    # pasted would be the surprise (task_58's follow-up).
+    assert QApplication.clipboard().text() == "второй\n", QApplication.clipboard().text()
+    print("ok: Shift+Del takes the line whole, copies it, and one Ctrl+Z brings it back")
+
+
+def test_shift_delete_takes_the_lines_of_a_selection() -> None:
+    editor = make_editor("первый\nвторой\nтретий\nчетвёртый\n")
+    cursor = editor.textCursor()
+    # From the middle of «второй» to the middle of «третий».  Both lines go, and
+    # the lines around them keep their own text.
+    cursor.setPosition(editor.document().findBlockByNumber(1).position() + 2)
+    cursor.setPosition(
+        editor.document().findBlockByNumber(2).position() + 2,
+        QTextCursor.MoveMode.KeepAnchor,
+    )
+    editor.setTextCursor(cursor)
+    QTest.keyClick(editor, Qt.Key.Key_Delete, Qt.KeyboardModifier.ShiftModifier)
+    assert editor.toPlainText() == "первый\nчетвёртый\n"
+
+    # A selection that stops at a line's first column does not take that line with
+    # it: a drag from a line's middle into the next line means «эти строки».
+    cursor = editor.textCursor()
+    cursor.setPosition(editor.document().findBlockByNumber(0).position())
+    cursor.setPosition(
+        editor.document().findBlockByNumber(1).position(), QTextCursor.MoveMode.KeepAnchor
+    )
+    editor.setTextCursor(cursor)
+    QTest.keyClick(editor, Qt.Key.Key_Delete, Qt.KeyboardModifier.ShiftModifier)
+    assert editor.toPlainText() == "четвёртый\n"
+    print("ok: a selection deletes its own lines, and stops at the line its end stands on")
+
+
+def test_shift_delete_on_the_last_line_leaves_an_empty_one() -> None:
+    editor = make_editor("первый\nвторой")
+    cursor = editor.textCursor()
+    cursor.movePosition(QTextCursor.MoveOperation.End)
+    editor.setTextCursor(cursor)
+
+    QTest.keyClick(editor, Qt.Key.Key_Delete, Qt.KeyboardModifier.ShiftModifier)
+    assert editor.toPlainText() == "первый\n"
+    # A document cannot lose its last block: what is left is the empty line.
+    assert editor.document().blockCount() == 2, editor.document().blockCount()
+    assert editor.textCursor().blockNumber() == 1
+    print("ok: the last line of a document is emptied, not removed")
+
+
 def test_enter_continues_the_clause_with_an_indent() -> None:
     editor = make_editor("правило :- цель1,")
     cursor = editor.textCursor()
@@ -374,6 +445,9 @@ def main() -> int:
     test_uncommenting_removes_only_the_first_character()
     test_indent_and_outdent_a_selection()
     test_tab_and_backtab_keys()
+    test_shift_delete_takes_the_whole_line()
+    test_shift_delete_takes_the_lines_of_a_selection()
+    test_shift_delete_on_the_last_line_leaves_an_empty_one()
     test_enter_continues_the_clause_with_an_indent()
     test_auto_indent_can_be_switched_off()
     test_zoom_is_bounded_and_reported()

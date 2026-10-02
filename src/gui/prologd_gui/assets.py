@@ -28,13 +28,13 @@ DEFAULT_DIRECTORY = pathlib.Path(__file__).resolve().parent.parent / "assets"
 #: for restarting a session after «Остановить», which nothing uses yet.
 #: `view-toolbar` and `view-line-numbers` left the list in task_48: their entries
 #: are text-only switches now, and a drawing list that keeps a picture nobody asks
-#: for is a to-do that lies.
+#: for is a to-do that lies.  task_58 took three more names out: `view-output`,
+#: `view-output-change-orient` and `view-split-editor` are drawn (the first two
+#: replaced `view-output-right`/`view-output-bottom`), and `view-unite-editor`
+#: and `select-all` arrived with them.
 MISSING = frozenset(
     {
         "execution-restart",
-        "view-output-bottom",
-        "view-output-right",
-        "view-split-editor",
         "view-theme",
     }
 )

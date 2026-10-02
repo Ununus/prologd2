@@ -17,13 +17,11 @@ from PySide6.QtGui import (
     QColor,
     QDesktopServices,
     QFont,
-    QIntValidator,
     QKeySequence,
     QTextCursor,
 )
 from PySide6.QtWidgets import (
     QApplication,
-    QComboBox,
     QDockWidget,
     QFileDialog,
     QInputDialog,
@@ -591,6 +589,7 @@ class MainWindow(QMainWindow):
             "copy": self._copy,
             "paste": self._paste,
             "delete": self._delete,
+            "delete_line": self._delete_line,
             "select_all": self._select_all,
             "comment": self._comment,
             "uncomment": self._uncomment,
@@ -622,6 +621,8 @@ class MainWindow(QMainWindow):
             "step_over": self.step_over,
             "stop": self.stop_program,
             "save_before_run": self._toggle_save_before_run,
+            "run_questions": self._toggle_run_questions,
+            "print_questions": self._toggle_print_questions,
             "help_doc": lambda: self._open_document("help"),
             "help_gui": lambda: self._open_document("gui"),
             "about": self._about,
@@ -638,8 +639,6 @@ class MainWindow(QMainWindow):
         for key in actions.TOOLBAR:
             if key == actions.SEPARATOR:
                 self._toolbar.addSeparator()
-            elif key == actions.FONT_SIZE:
-                self._toolbar.addWidget(self._build_font_size_box())
             elif key == actions.FORMAT_MODE:
                 self._toolbar.addWidget(self._build_format_button())
             else:
@@ -761,60 +760,6 @@ class MainWindow(QMainWindow):
         self._settings.theme = name
         self._sync_theme_menu()
         self.apply_settings()
-
-    def _build_font_size_box(self) -> QWidget:
-        """The font-size control: the same preference `Ctrl`+wheel writes.
-
-        Editable on purpose.  The wheel produces sizes that are not in any list
-        (23 pt, say), and a control that shows `20` while the text is 23 pt is a
-        small lie; typing a size is a bonus.  The validator keeps it inside the
-        range the editor itself enforces.
-        """
-        self._font_size_box = QComboBox()
-        for size in (8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 32):
-            self._font_size_box.addItem(f"{size}", float(size))
-        self._font_size_box.setEditable(True)
-        self._font_size_box.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
-        self._font_size_box.lineEdit().setValidator(QIntValidator(6, 72, self))
-        self._font_size_box.setToolTip("Размер шрифта всех панелей, 6…72 pt")
-        self._font_size_box.currentIndexChanged.connect(self._on_font_size_chosen)
-        self._font_size_box.lineEdit().editingFinished.connect(self._on_font_size_typed)
-        self._show_font_size(self._settings.font_size)
-        return self._font_size_box
-
-    def _show_font_size(self, size: float) -> None:
-        """Shows the size in the box without answering for it.
-
-        The box is a *view* of the preference, so its signals are blocked while it
-        is set: answering would write the setting back on every repaint.
-        """
-        if not hasattr(self, "_font_size_box"):
-            return
-        box = self._font_size_box
-        box.blockSignals(True)
-        box.lineEdit().blockSignals(True)
-        index = box.findData(float(size))
-        if index < 0:
-            box.setEditText(f"{size:.0f}")
-        else:
-            box.setCurrentIndex(index)
-        box.lineEdit().blockSignals(False)
-        box.blockSignals(False)
-
-    def _on_font_size_chosen(self, index: int) -> None:
-        size = self._font_size_box.itemData(index)
-        if size:
-            self._on_zoom_changed(float(size))
-
-    def _on_font_size_typed(self) -> None:
-        """A size typed into the box; the validator keeps it 6…72."""
-        text = self._font_size_box.currentText().strip()
-        try:
-            size = float(text)
-        except ValueError:
-            return  # the validator should not have let this through
-        if abs(size - self._settings.font_size) > 0.01:
-            self._on_zoom_changed(size)
 
     def _build_menus(self) -> None:
         """The menu bar, from `actions.MENUS`."""
@@ -967,13 +912,14 @@ class MainWindow(QMainWindow):
         self._actions["line_numbers"].setChecked(self._settings.line_numbers)
         self._actions["wrap"].setChecked(self._settings.wrap)
         self._actions["save_before_run"].setChecked(self._settings.save_before_run)
+        self._actions["run_questions"].setChecked(self._settings.run_questions)
+        self._actions["print_questions"].setChecked(self._settings.print_questions)
         self._actions["full_screen"].setChecked(self.isFullScreen())
         self._actions["output"].setChecked(self.output_visible())
         self._actions["graphics"].setChecked(self._settings.graphics_visible)
         self._sync_pane_actions()
         self._sync_undo_actions()
         self._sync_run_actions()
-        self._show_font_size(self._settings.font_size)
 
     # -- editing commands of the current view ------------------------------
     def _undo(self) -> None:
@@ -1007,6 +953,9 @@ class MainWindow(QMainWindow):
     def _delete(self) -> None:
         self.editor().textCursor().removeSelectedText()
 
+    def _delete_line(self) -> None:
+        self.editor().delete_lines()
+
     def _select_all(self) -> None:
         self.editor().selectAll()
 
@@ -1035,6 +984,20 @@ class MainWindow(QMainWindow):
     def _toggle_save_before_run(self, checked: bool) -> None:
         self._settings.save_before_run = checked
 
+    def _toggle_run_questions(self, checked: bool) -> None:
+        """The menu switch of «Выполнять вопросы при запуске» (task_58).
+
+        It writes the same setting the dialog shows (`execution/run_questions`),
+        so the two are one switch in two places and cannot drift: the dialog
+        re-reads the file when it is opened, and `_sync_actions` puts the setting
+        back into the menu.
+        """
+        self._settings.run_questions = checked
+
+    def _toggle_print_questions(self, checked: bool) -> None:
+        """The menu switch of «Печатать вопросы при запуске» (task_58)."""
+        self._settings.print_questions = checked
+
     def _toggle_full_screen(self, checked: bool) -> None:
         if checked:
             self.showFullScreen()
@@ -1043,12 +1006,24 @@ class MainWindow(QMainWindow):
 
     def about_text(self) -> str:
         """What «О программе» says.  Separate from the box so a test can read it
-        without a modal window it cannot close."""
+        without a modal window it cannot close.
+
+        The title names the shell, not the interpreter: the window is one of the
+        front-ends of Пролог-Д, and which interpreter answers is the line below it
+        (`ready`'s version, so it is the live one).  The names are the people who
+        wrote the previous implementation — «АБВГД» is their five initials — and
+        they are printed as they were given; the `--` column is padded with spaces,
+        which is as straight as a proportional font allows (task_58).
+        """
         return (
-            "PrologD 2.0 — графическая оболочка (PySide6).\n\n"
-            f"Интерпретатор: {self._version or 'ещё не ответил'}\n"
-            f"Панелей редактора: {len(self._panes)}\n"
-            f"Настройки: {self._settings.path}"
+            "Графическая оболочка Пролог-Д 2.0\n"
+            f"Интерпретатор: {self._version or 'ещё не ответил'}\n\n"
+            "Эту реализацию Пролога-Д разработали АБВГД:\n"
+            "Алексеев Михаил Николаевич   – прораб,\n"
+            "Балдин Виктор Михайлович     – топкодер до 2008,\n"
+            "Воронин Алексей Вячеславович – топкодер с 2017,\n"
+            "Григорьев Сергей Георгиевич  – идеолог,\n"
+            "Данил Адисонович Ахмеров     – топкодер с 2023."
         )
 
     def _about(self) -> None:
@@ -2926,17 +2901,18 @@ class MainWindow(QMainWindow):
         # The output has no size of its own until someone gives it one: while the
         # key is unwritten it follows the editor, exactly as it did before task_29
         # split the two.  A wheel over the panel writes the key, and from then on
-        # the two are apart for good.
+        # the two are apart for good.  The follow applies the size *without*
+        # writing it: writing the key here froze the pair on the very first zoom,
+        # which nobody asked for — and after task_58 took the size box off the
+        # toolbar, zooming is the everyday way to change the size.
         if not self._settings.has(OUTPUT_FONT_SIZE):
-            self._settings.output_font_size = size
-            self._apply_output_font()
+            self._apply_output_font(size)
         # The step strip and the two help panes show program text, so they read
         # at the program's size; the query line is typed like one, too.
         self._step_pane.set_font_size(size)
         self._reference_pane.set_font_size(size)
         self._shortcut_pane.set_font_size(size)
         self._sync_query_line_font()
-        self._show_font_size(size)
         self._status.setText(f"шрифт редактора: {size:.0f} pt")
 
     def _on_output_zoom(self, size: float) -> None:
@@ -2945,14 +2921,32 @@ class MainWindow(QMainWindow):
         self._apply_output_font()
         self._status.setText(f"шрифт вывода: {size:.0f} pt")
 
-    def _apply_output_font(self) -> None:
-        """Pushes the output's size into the panes and the input widgets."""
-        size = self._settings.output_font_size
-        self._output.set_font_size(size)
-        self._problems.set_font_size(size)
-        self._system.set_font_size(size)
-        self._input_pane.set_font_size(size)
-        self._input_console.set_font_size(size)
+    def _apply_output_font(self, size: float | None = None) -> None:
+        """Pushes the output's size into the panes and the input widgets.
+
+        `size` is for the case where the output is *following* the editor: the size
+        is then applied with the panes' signals blocked, so the key that means «the
+        output has a size of its own» stays unwritten until the output itself is
+        resized.  The block is the whole point: the four panes report `zoomChanged`,
+        their own handler (`_on_output_zoom`) reads that as «the user resized me» and
+        writes the key — which is how the very first editor zoom used to freeze the
+        follow.
+        """
+        following = size is not None
+        if size is None:
+            size = self._settings.output_font_size
+        panes = (self._output, self._problems, self._system, self._input_pane)
+        if following:
+            for pane in panes:
+                pane.blockSignals(True)
+        try:
+            for pane in panes:
+                pane.set_font_size(size)
+            self._input_console.set_font_size(size)
+        finally:
+            if following:
+                for pane in panes:
+                    pane.blockSignals(False)
 
     def _sync_query_line_font(self) -> None:
         """The query line reads like the program it asks about, not like the log."""
@@ -3185,7 +3179,15 @@ class MainWindow(QMainWindow):
         """
         if self._awaiting_query or self._stopping:
             # A question still has to answer (the margin's click), or a stop of
-            # our own is in flight; both conclude with their own event.
+            # our own is in flight; both conclude with their own event.  The line
+            # about the load is not one of those things: the knowledge base is
+            # loaded by now, whoever asked for it, and a click on a margin marker
+            # gets the same line `F5` gets (task_58).  It goes *before* the answer,
+            # which is the order `F5` produces as well.
+            if self._awaiting_query and not self._failed_in_load:
+                self._append_note(
+                    f"--- база знаний загружена ({self._run_clock.elapsed()} мс) ---\n"
+                )
             return
         self._busy = False
         if not self._failed_in_load:

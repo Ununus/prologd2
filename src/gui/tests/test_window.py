@@ -851,7 +851,24 @@ def test_the_recent_menu_and_the_window_carry_the_pictures(
 
         assert window.windowIcon().isNull() is False, "the window has no application icon"
         text = window.about_text()
-        assert "PrologD" in text and str(window._settings.path) in text
+        # task_58: the shell is named, the interpreter answers below it, and the
+        # people who wrote the previous implementation are listed.
+        assert text.startswith("Графическая оболочка Пролог-Д 2.0"), ascii(text)
+        assert "Интерпретатор: " in text, ascii(text)
+        for name in (
+            "Алексеев Михаил Николаевич",
+            "Балдин Виктор Михайлович",
+            "Воронин Алексей Вячеславович",
+            "Григорьев Сергей Георгиевич",
+            "Данил Адисонович Ахмеров",
+        ):
+            assert name in text, ascii(text)
+        # «прораб», «топкодер» и «идеолог» стоят в одном столбце: у каждой строки
+        # списка `--` на одном и том же месте (выравнивание пробелами — решение
+        # пользователя).
+        columns = {line.index("–") for line in text.splitlines() if "–" in line}
+        assert len(columns) == 1, columns
+        assert "Панелей редактора" not in text and "Настройки:" not in text, ascii(text)
         print("ok: the recent menu and the window carry their pictures")
     finally:
         discard_changes(window)
@@ -1300,6 +1317,48 @@ def test_the_menus_come_from_the_action_table(executable: str) -> None:
         discard_changes(window)
 
 
+def test_the_run_switches_are_in_the_menu_and_in_the_settings(executable: str) -> None:
+    """task_58: «Выполнять вопросы» and «Печатать вопросы» are one switch in two
+    places.
+
+    The menu entry and the settings dialog read and write the same setting
+    (`execution/run_questions`, `execution/print_questions`), so neither can say
+    something the other does not: the menu writes the file, and `_sync_actions`
+    puts the setting back into the check mark.
+    """
+    from prologd_gui import actions
+
+    window = empty_window(executable)
+    try:
+        entries = dict(actions.MENUS)["Выполнение"]
+        assert "run_questions" in entries and "print_questions" in entries, entries
+        assert "save_before_run" not in entries, "the entry left the menu in task_58"
+        assert dict(actions.MENUS)["Справка"][:2] == ("reference", "help_doc"), "Справка"
+
+        run_questions = window._actions["run_questions"]
+        print_questions = window._actions["print_questions"]
+        assert run_questions.isCheckable() and print_questions.isCheckable()
+        assert run_questions.isChecked() is True, "«Выполнять вопросы» is on by default"
+        assert print_questions.isChecked() is False
+
+        run_questions.setChecked(False)
+        assert window._settings.run_questions is False, "the menu did not write the setting"
+        print_questions.setChecked(True)
+        assert window._settings.print_questions is True
+
+        window._settings.run_questions = True
+        window._sync_actions()
+        assert run_questions.isChecked() is True, "the setting did not reach the menu"
+
+        # «Сохранять перед запуском» is a setting without a menu entry now: it is
+        # changed in the dialog, and it still works.
+        window._settings.save_before_run = True
+        assert window._settings.save_before_run is True
+        print("ok: the two run switches are one setting each, in the menu and in the dialog")
+    finally:
+        discard_changes(window)
+
+
 def test_the_toolbar_reuses_the_actions(executable: str) -> None:
     from prologd_gui import actions
 
@@ -1308,12 +1367,19 @@ def test_the_toolbar_reuses_the_actions(executable: str) -> None:
         toolbar = window._toolbar
         assert toolbar.iconSize().width() == 24, "icons are drawn at 24 px"
         shown = [entry.text() for entry in toolbar.actions() if not entry.isSeparator()]
-        for key in ("new", "open", "save", "run", "stop", "comment", "clear_output"):
+        for key in ("new", "open", "save", "run", "stop", "comment"):
             assert actions.BY_KEY[key].title in shown, (key, shown)
-        # «Очистить вывод» is the last button on the right: it acts on the output,
-        # not on the program, so it is kept away from the editing group.
-        assert shown[-1] == actions.BY_KEY["clear_output"].title, shown
-        assert window._font_size_box.parent() is not None, "the size control is on the toolbar"
+        # task_58: «Очистить вывод» left the toolbar for the «Выполнение» menu, and
+        # the size control left it too (see `test_two_font_sizes_and_one_wheel`).
+        # «Настройки…» is the last button now, and the one empty-text entry is the
+        # formatter's mode control — the only widget left on the toolbar.
+        labels = [entry.text() for entry in toolbar.actions() if not entry.isSeparator()]
+        assert actions.BY_KEY["help_doc"].title not in labels, labels
+        assert actions.BY_KEY["clear_output"].title not in labels, labels
+        assert labels[-1] == actions.BY_KEY["settings"].title, labels
+        widgets = [index for index, label in enumerate(labels) if not label]
+        assert len(widgets) == 1, labels
+        assert widgets[0] == labels.index(actions.BY_KEY["format"].title) + 1, labels
         # The toolbar keeps the three file buttons that act on the tab in front of
         # the user; «Сохранить все» acts on every tab and belongs in «Файл» (task_48).
         assert actions.BY_KEY["save_all"].title not in shown, shown
@@ -1403,24 +1469,32 @@ def test_the_context_menu_reuses_the_shared_actions(executable: str) -> None:
 def test_two_font_sizes_and_one_wheel(executable: str) -> None:
     """The editor and the output keep sizes of their own (task_29).
 
-    One number used to cover both panels.  The toolbar's box and the wheel over
-    the editor move the *editor's* size; the wheel over the output moves the
-    output's, and the query line goes with the editor, because a goal is typed
-    like a program rather than read like a log.
+    One number used to cover both panels.  The zoom commands and the wheel over the
+    editor move the *editor's* size; the wheel over the output moves the output's,
+    and the query line goes with the editor, because a goal is typed like a program
+    rather than read like a log.  The toolbar kept a size box until task_58: the
+    three commands and the wheel cover the everyday change, and an exact value is a
+    row of the settings dialog.
     """
     window = empty_window(executable)
     try:
-        box = window._font_size_box
-        assert box.currentData() == float(window._settings.font_size), box.currentData()
-        assert window.output().font_size == window.editor().font_size, "one size out of the box"
+        from prologd_gui import settings as settings_module
 
-        box.setCurrentIndex(box.findData(20.0))
-        assert window.editor().font_size == 20.0
-        assert window._settings.font_size == 20.0
-        # The output follows until it is given a size of its own: that is how it
-        # behaved before task_29 split the two numbers.
-        assert window.output().font_size == 20.0
-        assert window._query_line.font().pointSizeF() == 20.0, "a goal is typed like a program"
+        assert window.output().font_size == window.editor().font_size, "one size at the start"
+        assert window._settings.font_size == window.editor().font_size
+
+        for _ in range(9):
+            window._actions["zoom_in"].trigger()
+        assert window.editor().font_size == window._settings.font_size, "the setting lagged behind"
+        assert window.output().font_size == window.editor().font_size
+        assert window._query_line.font().pointSizeF() == window.editor().font_size, (
+            "a goal is typed like a program"
+        )
+        size = window.editor().font_size
+        window._actions["zoom_out"].trigger()
+        assert window.editor().font_size == size - 1
+        window._actions["zoom_reset"].trigger()
+        assert window.editor().font_size == settings_module.DEFAULT_FONT_SIZE
 
         # A wheel over the output separates them for good.
         window.output().set_font_size(9)
@@ -1429,7 +1503,10 @@ def test_two_font_sizes_and_one_wheel(executable: str) -> None:
         window.editor().set_font_size(23)
         assert window.output().font_size == 9.0, "the output followed the editor again"
         assert window._settings.output_font_size == 9.0
-        assert box.currentText() == "23", box.currentText()
+        # The status bar is where the size is read now that the box is gone.
+        window._actions["zoom_in"].trigger()
+        assert window.editor().font_size == 24.0
+        assert "24" in window.status_text(), window.status_text()
         print("ok: the output follows the editor until it gets a size of its own")
     finally:
         discard_changes(window)
@@ -1482,7 +1559,7 @@ def test_the_settings_dialog_changes_the_window_without_a_restart(executable: st
         assert window.output().font_size == 20.0
         assert window.output().line_limit() == 1000
         assert window.output_position() == "bottom"
-        assert window._font_size_box.currentData() == 14.0, "the toolbar box is a view of it too"
+        assert window._actions["zoom_in"].isEnabled(), "the size commands are live"
         assert "C:/общие" in window.session._includes
         assert window.session is window._session
         print("ok: «Применить» reaches the editor, the output and the session at once")
@@ -2107,6 +2184,10 @@ def test_a_question_parked_in_a_comment_runs_from_the_margin(executable: str) ->
         wait_for_result(window)
         printed = printed_lines(window)
         assert any(line.startswith("PrologD ") for line in printed), ascii(window.output_text())
+        # task_58: the quiet load says so in «Система», like `F5` does.  The line
+        # used to be swallowed by the early return that waits for the answer.
+        assert "--- база знаний загружена (" in window.system_text(), ascii(window.system_text())
+        assert " мс) ---" in window.system_text(), ascii(window.system_text())
     finally:
         discard_changes(window)
     print("ok: a question parked in a comment answers from the margin (appendix)")
@@ -3253,6 +3334,7 @@ def main(argv: list[str]) -> int:
         test_escape_closes_the_picture_then_the_bar_then_the_docks(executable)
         test_the_menus_come_from_the_action_table(executable)
         test_the_toolbar_reuses_the_actions(executable)
+        test_the_run_switches_are_in_the_menu_and_in_the_settings(executable)
         test_view_switches_are_stored(executable)
         test_the_recent_menu_lists_what_is_still_there(executable, files)
         test_the_recent_menu_and_the_window_carry_the_pictures(executable, files)

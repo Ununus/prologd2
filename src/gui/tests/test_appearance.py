@@ -24,7 +24,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-from PySide6.QtGui import QPalette  # noqa: E402
+from PySide6.QtGui import QColor, QPalette  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from prologd_gui import appearance, theme  # noqa: E402
@@ -157,6 +157,30 @@ def test_tooltip_pair_stays_readable(app: QApplication) -> None:
         print(f"ok: the {name} tooltip pair stays readable ({ratio:.2f})")
 
 
+def test_the_occurrence_band_stands_out_from_the_page(app: QApplication) -> None:
+    """task_58: the other occurrences of the selected word have to be *seen*.
+
+    The measure is not readability, because the band is a background and not text:
+    it is how far the colour sits from the page and from the current-line band.
+    The dark palette is the one that mattered — it is what a dark desktop gets
+    through the «системное» оформление — and `#2d3038` on `#1e1e1e` was 15 units
+    away, which is why the highlight could not be found in that theme at all.
+    """
+    for palette in (theme.LIGHT, theme.DARK):
+        page = QColor(palette.background).lightness()
+        band = QColor(palette.occurrence).lightness()
+        current = QColor(palette.current_line).lightness()
+        assert abs(band - page) >= 25, (
+            f"{palette.name}: {palette.occurrence} is {abs(band - page)} units of "
+            f"lightness from the page {palette.background}"
+        )
+        assert abs(band - current) >= 15, (
+            f"{palette.name}: the occurrence band {palette.occurrence} and the "
+            f"current-line band {palette.current_line} are {abs(band - current)} apart"
+        )
+    print("ok: the occurrence band is visible in both palettes")
+
+
 def test_an_unknown_palette_name_is_the_light_one() -> None:
     """A hand-edited file must not take the window down — and must not be dark."""
     assert theme.palette_for("полночь").name == theme.LIGHT.name
@@ -185,6 +209,7 @@ def main() -> int:
     test_light_gives_a_light_background_and_dark_text(app)
     test_dark_gives_a_dark_background_and_light_text(app)
     test_every_syntax_colour_contrasts_with_the_background(app)
+    test_the_occurrence_band_stands_out_from_the_page(app)
     test_an_unknown_palette_name_is_the_light_one()
     test_system_leaves_the_platform_palette_alone(app)
     test_system_colours_the_text_as_well_as_the_widgets(app)

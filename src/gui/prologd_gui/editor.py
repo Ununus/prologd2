@@ -22,7 +22,15 @@ from PySide6.QtGui import (
     QTextFormat,
     QWheelEvent,
 )
-from PySide6.QtWidgets import QCompleter, QLabel, QLineEdit, QPlainTextEdit, QTextEdit, QWidget
+from PySide6.QtWidgets import (
+    QApplication,
+    QCompleter,
+    QLabel,
+    QLineEdit,
+    QPlainTextEdit,
+    QTextEdit,
+    QWidget,
+)
 
 from . import completion, queries, search, shortcuts as shortcuts_module, theme, tokens
 from .settings import DEFAULT_FONT_SIZE, MAXIMUM_FONT_SIZE, MINIMUM_FONT_SIZE
@@ -683,6 +691,53 @@ class CodeEditor(ZoomablePlainTextEdit):
 
         self._transform_lines(transform)
 
+    def delete_lines(self) -> None:
+        """`Shift+Del`: the whole line under the caret, or every line the selection
+        touches.
+
+        The *whole* line goes, not its tail — that is what the command says — and
+        the caret lands in the first column of the line that slid up, so a run of
+        `Shift+Del` walks down the text.  A selection that stops at a line's first
+        column does not take that line with it: a drag from the middle of one line
+        to the start of the next means «these lines», not «and one more».
+
+        A document cannot lose its last block, so the last line of a file is
+        emptied rather than removed: what is left is an empty line, as in every
+        editor with this key.  One edit block, like `comment`, so one `Ctrl+Z`
+        brings the text back at once.
+        """
+        document = self.document()
+        selection = self.textCursor()
+        if selection.hasSelection():
+            first = document.findBlock(selection.selectionStart())
+            last = document.findBlock(selection.selectionEnd())
+            if last != first and selection.selectionEnd() == last.position():
+                last = last.previous()
+        else:
+            first = last = selection.block()
+        cursor = self.textCursor()
+        cursor.beginEditBlock()
+        cursor.setPosition(first.position())
+        if last.next().isValid():
+            # Up to the start of the line below: the newline ends the line being
+            # removed, and taking it is what makes the line below slide up.
+            cursor.setPosition(last.next().position(), QTextCursor.MoveMode.KeepAnchor)
+        else:
+            # The last line of the document has no newline after it, so only its
+            # text goes: the empty line stays where it is.
+            cursor.setPosition(
+                last.position() + last.length() - 1, QTextCursor.MoveMode.KeepAnchor
+            )
+        text = cursor.selection().toPlainText()
+        cursor.removeSelectedText()
+        cursor.endEditBlock()
+        # `Shift+Del` is Windows' other spelling of `Ctrl+X`, so the removed lines go
+        # to the clipboard as well — the key borrowed the platform's meaning, and a
+        # cut that cannot be pasted back is a surprise (task_58's follow-up).
+        if text:
+            QApplication.clipboard().setText(text)
+        self.setTextCursor(cursor)
+
     def _selected_lines(self) -> QTextCursor:
         """A cursor covering whole lines: the selection, or the current line."""
         cursor = self.textCursor()
@@ -965,6 +1020,17 @@ class CodeEditor(ZoomablePlainTextEdit):
     def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802 - Qt spelling
         key = event.key()
         modifiers = event.modifiers()
+
+        if key == Qt.Key.Key_Delete and modifiers == Qt.KeyboardModifier.ShiftModifier:
+            # `Shift+Del` never reaches the action's shortcut while the editor has
+            # focus: `QTextControl` claims the platform's «cut» sequence (Windows
+            # spells `Ctrl+X` as `Shift+Del`), so the key arrives *here* — and with
+            # nothing selected it did nothing at all, while the same command from the
+            # menu worked (task_58's follow-up).  One command, two doors: this and
+            # the `delete_line` action both run `delete_lines`.
+            self.delete_lines()
+            event.accept()
+            return
 
         if self._insert_shortcut(event):
             return

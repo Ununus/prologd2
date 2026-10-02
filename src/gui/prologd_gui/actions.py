@@ -9,6 +9,12 @@ Entries with `implemented=False` stay visible but disabled, and their tooltip sa
 what they wait for.  The feature list is long, and a menu that silently lacks half
 of it is worse than one that admits it — `doc/gui.typ`, section 9, has the same
 list in prose.
+
+**The ellipsis in a title means «the command asks for something first»**: a file
+name (`Открыть…`, `Сохранить как…`, `Сохранить вывод…`), a folder and a set of
+settings (`Настройки…`), or a query (`Поиск и замена…`).  A command that acts at
+once gets none, even when it opens a window of its own (`Руководство пользователя`,
+`О программе`, `Графическое окно`): the ellipsis promises a question, not a window.
 """
 
 from __future__ import annotations
@@ -59,14 +65,15 @@ REMOVE_ICON = "settings-remove"
 SEPARATOR = "-"
 RECENT = "recent"
 
-#: The font-size control, not an action either: the window puts it here.
-FONT_SIZE = "#font"
-
 #: The formatter's mode (task_30, moved back to the toolbar in task_47): a
 #: control of the toolbar, right after «Форматировать» — it carries the mode and
 #: the «только выделенное» switch the action reads.  It lived in the «Правка»
 #: submenu for a while; a mode is switched *while looking at the code*, so it
 #: belongs next to the command it changes.
+#:
+#: The font-size box was a marker here too (`#font`) until task_58; it left the
+#: toolbar, so the marker went with it.  A size is changed by `Ctrl`+wheel and the
+#: three zoom commands, and an exact value is a row of the settings dialog.
 FORMAT_MODE = "#format-mode"
 
 #: The appearance (task_29's dark theme): a submenu of «Вид», because a *set* of
@@ -117,10 +124,17 @@ ACTIONS: tuple[Action, ...] = (
     Action("copy", "Копировать", "edit-copy", ("Ctrl+C",)),
     Action("paste", "Вставить", "edit-paste", ("Ctrl+V",)),
     Action("delete", "Удалить", "edit-del", ("Del",)),
-    Action("select_all", "Выделить всё", None, ("Ctrl+A",)),
+    # `Shift+Del` takes the whole line, not the tail of it: the command says
+    # «строка», and it is what every editor with this key does.  No picture: the
+    # `edit-del` drawing belongs to «Удалить» above, and two commands in one menu
+    # wearing the same picture read as one command.
+    Action("delete_line", "Удалить строку", None, ("Shift+Del",)),
+    Action("select_all", "Выделить всё", "select-all", ("Ctrl+A",)),
     Action("comment", "Закомментировать", "edit-comment", ("Ctrl+K",)),
     Action("uncomment", "Раскомментировать", "edit-uncomment", ("Ctrl+U",)),
-    Action("clear_output", "Очистить вывод", "edit-clear", ("Ctrl+L",)),
+    # Text-only by decision (task_58): the `edit-clear` picture was drawn and
+    # thrown away — it read as something other than «clear the output».
+    Action("clear_output", "Очистить вывод", None, ("Ctrl+L",)),
     Action("format", "Форматировать", "edit-format", ("Ctrl+I",)),
     # «Настройки…» was the last disabled entry that named a task file (task_29).
     # No key of its own: the menu is where it is looked for, and every `Ctrl`
@@ -154,12 +168,12 @@ ACTIONS: tuple[Action, ...] = (
     # The output panel: `F4` shows and hides it, `Ctrl+F4` moves it between the
     # right side and the bottom (`split_orientation` keeps the reference's name
     # for the command; the icon hints at the *other* position).
-    Action("output", "Панель вывода", "view-output-right", ("F4",), checkable=True),
+    Action("output", "Панель вывода", "view-output", ("F4",), checkable=True),
     Action("split", "Разделить редактор", "view-split-editor", ("Ctrl+\\",)),
-    Action("merge", "Объединить редакторы", None, ("Ctrl+Shift+\\",)),
+    Action("merge", "Объединить редакторы", "view-unite-editor", ("Ctrl+Shift+\\",)),
     Action("next_tab", "Следующая вкладка", None, ("Ctrl+Tab",)),
     Action("previous_tab", "Предыдущая вкладка", None, ("Ctrl+Shift+Tab",)),
-    Action("split_orientation", "Сменить ориентацию сплита", "view-output-bottom", ("Ctrl+F4",)),
+    Action("split_orientation", "Сменить ориентацию сплита", "view-output-change-orient", ("Ctrl+F4",)),
     Action("line_numbers", "Номера строк", None, checkable=True),
     # Long clauses are easier to read wrapped, but a log line cut in the middle is
     # not — so this switch is the *editor's*, and the output stays as it is.
@@ -179,6 +193,15 @@ ACTIONS: tuple[Action, ...] = (
     Action("step_over", "Шаг с обходом", "execution-step-over", ("Shift+F10",)),
     Action("stop", "Остановить", "execution-abort", ("Shift+F5",)),
     Action("save_before_run", "Сохранять перед запуском", None, checkable=True),
+    # The two switches of a run (task_46 split the one `questions` flag in two):
+    # the load may run the program's own `?`-statements, and may print each one
+    # before its answer.  They are settings (`execution/run_questions`,
+    # `execution/print_questions`) with the same titles, and the menu is the
+    # second door to them — a switch of a run is flipped *while working*, which is
+    # why these two moved here from the dialog (task_58).  «Сохранять перед
+    # запуском» stayed a setting: that one is decided once.
+    Action("run_questions", "Выполнять вопросы при запуске", None, checkable=True),
+    Action("print_questions", "Печатать вопросы при запуске", None, checkable=True),
     # The window the graphics predicates draw into (task_45): a window of its own,
     # so the picture can go to a second screen and does not take space from the
     # code.  Checkable, like the output panel: its state is the window's
@@ -243,6 +266,7 @@ MENUS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "copy",
             "paste",
             "delete",
+            "delete_line",
             SEPARATOR,
             "select_all",
             SEPARATOR,
@@ -287,20 +311,28 @@ MENUS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "step_over",
             "stop",
             SEPARATOR,
-            "save_before_run",
+            "run_questions",
+            "print_questions",
             SEPARATOR,
+            "clear_output",
             "graphics",
         ),
     ),
-    ("Справка", ("reference", SEPARATOR, "shortcuts", SEPARATOR, "help_doc", "help_gui", "about")),
+    (
+        "Справка",
+        ("reference", "help_doc", SEPARATOR, "shortcuts", SEPARATOR, "help_gui", "about"),
+    ),
 )
 
 #: The toolbar, grouped as the reference front-end had it: files, run/stop/step,
 #: editing (with the format *mode* control right after «Форматировать»), then the
-#: size control, then the tools — and, at the far right, «Очистить вывод», which
-#: acts on the output rather than on the program.  «Сохранить все» is not here:
-#: a command that acts on every tab belongs in «Файл», and the toolbar keeps the
-#: three file buttons that act on the tab in front of the user (task_48).
+#: tools, and the size control between them and «Очистить вывод» — it acts on the
+#: text, not on the run, so it sits after «Настройки…» rather than among the
+#: commands of a run (task_58).  The manual left the toolbar in task_58 as well: a
+#: button for a PDF nobody opens in the middle of a run only takes room, and the
+#: menu keeps it.  «Сохранить все» is not here either: a command that acts on every
+#: tab belongs in «Файл», and the toolbar keeps the three file buttons that act on
+#: the tab in front of the user (task_48).
 TOOLBAR: tuple[str, ...] = (
     "new",
     "open",
@@ -315,14 +347,9 @@ TOOLBAR: tuple[str, ...] = (
     "format",
     FORMAT_MODE,
     SEPARATOR,
-    FONT_SIZE,
-    SEPARATOR,
     "graphics",
     SEPARATOR,
     "settings",
-    "help_doc",
-    SEPARATOR,
-    "clear_output",
 )
 
 #: The editor's context menu, built from the same actions.

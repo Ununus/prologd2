@@ -84,6 +84,7 @@ version does not know are left alone (task_29 adds the dialog).
 | `Ctrl+Q` | exit (asks about every modified buffer) |
 | `Ctrl+L` | clear the output pane |
 | `Ctrl+K` / `Ctrl+U` | comment / uncomment the selection or the current line |
+| `Shift+Del` | **Удалить строку** — the lines the caret is on, or that the selection touches; the last line of a file is emptied, not removed |
 | `Ctrl+F` | the find bar over the editor, with the selection or the word at the caret |
 | `F3` / `Shift+F3` | next, previous match — also with the find bar closed |
 | `Ctrl+F3` / `Ctrl+Shift+F3` | find the word under the caret, forwards and backwards |
@@ -99,6 +100,14 @@ version does not know are left alone (task_29 adds the dialog).
 | `Ctrl`+wheel, `Ctrl`+keypad `+`/`-`, `Ctrl+0` | font size (6…72 pt) and its reset |
 | `Tab` / `Shift+Tab` | indent / outdent the selected lines |
 | `Enter` | starts the new line at the indentation of the one above, one step deeper after `,`, `:-` or `<-` (with «Автоотступ» unticked, it starts at the margin) |
+
+A selected word is shown everywhere it occurs: `_refresh_extra_selections` paints the
+other occurrences with the palette's `occurrence` band, which is quiet on purpose —
+the search's amber is the answer to a question, this is the hint «такое имя есть ещё
+здесь» — and the band is painted only while the find bar is closed, because then the
+matches *are* the occurrences (task_33).  The colour was raised in task_58: `#2d3038`
+on the dark page `#1e1e1e` was 15 units of lightness, which is invisible, and the dark
+palette is what a dark desktop gets through the «системное» appearance.
 
 Long lines are wrapped only when **Вид → Переносить длинные строки** is on (no
 key, stored as `editor/wrap`): a program line is read as a whole, and a wrapped one
@@ -252,17 +261,24 @@ optional last argument is wired through a lambda (`"find": lambda: self.show_fin
 
 The menus are **Файл** (Новый, Открыть…, Последние, Сохранить, Сохранить как…,
 Сохранить все, Перечитать с диска, Закрыть вкладку, Закрыть все, Выход),
-**Правка** (Отменить … Удалить, Выделить всё, Закомментировать,
+**Правка** (Отменить … Удалить, Удалить строку, Выделить всё, Закомментировать,
 Раскомментировать, Форматировать, Настройки…), **Поиск** (Поиск и замена…,
 Далее, Назад), **Вид** (Панель
 инструментов, Панель вывода, Разделить редактор, Объединить
 редакторы, Сменить ориентацию сплита, Номера строк, Переносить длинные строки,
 Увеличить/Уменьшить/Обычный размер шрифта, Оформление (подменю: светлое, тёмное,
 системное), Полный экран), **Выполнение** (Запустить, Запустить с
-трассировкой, Шаг, Шаг с обходом, Остановить, Сохранять перед запуском, Выводить
-вопросы при запуске, Графическое окно) and
-**Справка** (Справка по предикату, Шпаргалка по вставкам, Руководство
-пользователя, Справка по окну, О программе).
+трассировкой, Шаг, Шаг с обходом, Остановить, Выполнять вопросы при запуске,
+Печатать вопросы при запуске, Очистить вывод, Графическое окно) and
+**Справка** (Справка по предикату, Руководство пользователя, Шпаргалка по
+вставкам, Справка по окну, О программе).
+
+«Сохранять перед запуском» is a settings row now, not a menu entry (task_58): it is
+decided once, while the two switches about the program's own `?`-statements are
+flipped while working, so they are the ones that earn a place in «Выполнение».  The
+menu entry and the dialog write the same setting (`execution/run_questions`,
+`execution/print_questions`), and `_sync_actions` puts the setting back into the
+check mark — one switch in two places, never two switches.
 
 An entry that does not exist yet stays in its menu but is **disabled**, and its
 tooltip names what it waits for.  **That list is empty now**: «Графическое окно»
@@ -275,11 +291,15 @@ The toolbar is grouped as
 the reference front-end had it: file | run/stop/step | editing (comment,
 uncomment, format and, right beside it, the formatter's **mode control** — a
 `QToolButton` with the three modes and «только выделенное», where a mode is
-switched while looking at the code) | font size | tools (graphics, settings,
-help), and at the far
-right **Очистить вывод**, which acts on the output rather than on the program;
+switched while looking at the code) | tools (graphics, settings);
 `QToolBar.setIconSize(QSize(24, 24))` is set explicitly so the layout does not
-depend on the style.
+depend on the style.  The right end lost three buttons in task_58.  «Руководство
+пользователя» went first: a button that opens a PDF takes room in the middle of the
+work, and «Справка» keeps the command.  «Очистить вывод» moved into «Выполнение»,
+next to «Графическое окно» — both are about what is on the screen rather than about
+the run.  And the font-size box went with them: `Ctrl`+wheel and the three zoom
+commands cover the everyday change, and an exact value is the «Размер шрифта» row of
+the settings dialog.
 
 Two commands left the toolbar in this round.  «Сохранить все» acts on *every*
 tab, so it lives in «Файл» where the rest of them are: the toolbar keeps the
@@ -302,28 +322,27 @@ split could not be undone without a restart.
 
 `test_icons.py` is the guard: it fails as soon as a name is misspelled, and it
 also checks that an icon which *does* have a file is not still listed as missing.
-The code references **47** names, **43** of which have a file in
+The code references **48** names, **47** of which have a file in
 `src/gui/assets` (64×64 PNG, transparent background).  A missing file is not an
 error: the action is built without a picture, and the name is reported once on
 stderr (`icons: no view-theme.png — the action will have no picture`).
 
-Present (43): `edit-clear`, `edit-comment`, `edit-copy`, `edit-cut`, `edit-del`,
+Present (47): `edit-comment`, `edit-copy`, `edit-cut`, `edit-del`,
 `edit-find-replace`, `edit-format`, `edit-format-set`, `edit-paste`, `edit-redo`,
 `edit-uncomment`, `edit-undo`, `execution-abort`, `execution-execute`,
 `execution-step-into`, `execution-step-over`, `execution-tracing`, `file`,
 `file-close`, `file-close-all`, `file-exit`, `file-modified`, `file-new`,
 `file-open`, `file-recent`, `file-reload`, `file-save`, `file-save-all`,
 `file-save-as`, `file-saved`, `help`, `prologd2`, `search-find`,
-`search-find-next`, `search-find-prev`, `settings-add`, `settings-remove`,
-`tools-settings`, `view-full-screen`,
-`view-graphics`, `view-zoom-in`, `view-zoom-out`, `view-zoom-reset`.
+`search-find-next`, `search-find-prev`, `select-all`, `settings-add`,
+`settings-remove`, `tools-settings`, `view-full-screen`, `view-graphics`,
+`view-output`, `view-output-change-orient`, `view-split-editor`,
+`view-unite-editor`, `view-zoom-in`, `view-zoom-out`, `view-zoom-reset`.
 
-Still to draw (4 names, listed in `assets.MISSING`) — the «Вид» switches
-`view-split-editor`, `view-output-right`, `view-output-bottom` and `view-theme` —
-plus `execution-restart`, whose file is drawn but which nothing refers to yet.
-`view-theme` belongs to the «Оформление» submenu, which is words
-rather than pictures, and it stays in the audit because it is the picture the
-reference front-end used for exactly this.
+Still to draw (1 name, listed in `assets.MISSING`): `view-theme`, the picture of
+the «Оформление» submenu, which is words rather than pictures.  `MISSING` also
+lists `execution-restart`, whose file is *drawn* but which nothing refers to yet —
+the list is the drawing list, so a picture with no user waits there.
 
 Three pictures left the audit.  `help-about` was the same drawing as
 `prologd2`, and two files for one picture drift apart, so «О программе» now wears
@@ -332,6 +351,17 @@ the application icon; `search-find-selected-next` and
 `view-toolbar` and `view-line-numbers` were dropped because those two switches
 are words now.  `edit-format-set` — the formatter's mode — is the one that
 *joined* the set, and it is what the mode control on the toolbar wears.
+
+task_58 redrew and renamed a few.  The two pictures of the output panel say what
+they show rather than where they put the panel now — `view-output` and
+`view-output-change-orient`, which were `view-output-right` and
+`view-output-bottom`.  `view-split-editor` left `MISSING` for good: it is drawn.
+Two names joined the set and found their owners at last — `view-unite-editor` on
+«Объединить редакторы» and `select-all` on «Выделить всё», both text-only
+before.  One name *left* the set with its file: `edit-clear` on «Очистить вывод»
+turned out to be an unsuccessful drawing — it read as something else — so the menu
+entry is text-only now, and a word is clearer than a picture that has to be
+decoded.
 
 Five of the names are not buttons at all: `file`, `file-saved` and
 `file-modified` are the states of a tab, `prologd2` is the window icon and

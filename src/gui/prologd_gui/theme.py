@@ -305,7 +305,10 @@ LIGHT = Palette(
     search_match="#ffe9a8",
     search_current="#ffc14d",
     current_line="#f4f6f9",
-    occurrence="#e8ecf5",
+    # The other occurrences of the selected word (task_33's highlight, task_58's
+    # colour): clearly *there* on the page, and still quieter than the search's
+    # amber — the occurrences are a hint, the matches are the answer to a question.
+    occurrence="#cfe0f7",
     margin_background="#f0f0f0",
     margin_text="#8a8a8a",
     margin_current="#0a22d6",
@@ -345,7 +348,10 @@ DARK = Palette(
     search_match="#5c4a00",
     search_current="#8a6d1f",
     current_line="#26262b",
-    occurrence="#2d3038",
+    # Task_58: `#2d3038` was 15 units of lightness above the page (`#1e1e1e`) and
+    # sank into it — and the dark palette is what a dark desktop gets through the
+    # «system» appearance, so the highlight was invisible by default there.
+    occurrence="#3a4a63",
     margin_background="#252526",
     margin_text="#a6a6a6",
     margin_current="#4fc1ff",
