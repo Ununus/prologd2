@@ -19,6 +19,7 @@ Three promises hold for a hand-edited or foreign file:
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -68,6 +69,12 @@ FORMAT_SELECTION = "format/selection"
 #: a string rather than a parsed table: a file a human edited may hold nonsense,
 #: and turning nonsense into the built-in table is `Shortcuts.from_json`'s job.
 SHORTCUTS_TABLE = "shortcuts/table"
+#: The syntax colours the user changed (task_50): a JSON object `field: "#rrggbb"`
+#: per theme, holding only the fields that differ from the shipped palette.  Two
+#: keys, one per *actual* palette — the `system` theme resolves to one of them,
+#: so its override follows whichever page the desktop chose.
+SYNTAX_LIGHT = "syntax/light"
+SYNTAX_DARK = "syntax/dark"
 #: The output panel has a size of its own since task_29: a log is read at a
 #: different distance from the program, and the two used to share one number.
 OUTPUT_FONT_SIZE = "output/font_size"
@@ -377,6 +384,8 @@ MACHINE_KEYS = (
     WINDOW_GEOMETRY,
     PANEL_SIZES,
     SHORTCUTS_TABLE,
+    SYNTAX_LIGHT,
+    SYNTAX_DARK,
     SESSION_TABS,
     SESSION_CURRENT,
 )
@@ -712,10 +721,50 @@ class Settings:
         the syntax colours are measured against — so the answer comes from
         `appearance`, the one module that knows Qt's colour scheme.  The import is
         local: the store itself has nothing to do with widgets.
+
+        The syntax colours the user changed (task_50) are layered over the
+        resolved palette: the override is read for the palette that was actually
+        chosen, so a `system` desktop gets the dark override when the desktop is
+        dark.
         """
         from . import appearance
 
-        return appearance.theme_palette(self.theme)
+        resolved = appearance.theme_palette(self.theme)
+        overrides = self.syntax_overrides(resolved.name)
+        if not overrides:
+            return resolved
+        return theme.apply_syntax_overrides(resolved, overrides)
+
+    # -- syntax colours (task_50) -------------------------------------------
+    def syntax_overrides(self, name: str) -> dict[str, str]:
+        """The changed syntax colours of one palette, `field -> #rrggbb`.
+
+        `name` is `light` or `dark` — the *actual* palette, not the `system`
+        choice.  A file that holds nonsense falls back to nothing; only known
+        field names with valid hex survive (`theme.clean_hex`).
+        """
+        key = SYNTAX_LIGHT if name == theme.LIGHT.name else SYNTAX_DARK
+        text = self._text(key, "").strip()
+        if not text:
+            return {}
+        try:
+            raw = json.loads(text)
+        except json.JSONDecodeError:
+            return {}
+        if not isinstance(raw, dict):
+            return {}
+        known = set(theme.Theme.__dataclass_fields__)
+        cleaned: dict[str, str] = {}
+        for field, value in raw.items():
+            hex_value = theme.clean_hex(str(value))
+            if field in known and hex_value is not None:
+                cleaned[field] = hex_value
+        return cleaned
+
+    def set_syntax_overrides(self, name: str, overrides: dict[str, str]) -> None:
+        """Writes the changed syntax colours of one palette as JSON (task_50)."""
+        key = SYNTAX_LIGHT if name == theme.LIGHT.name else SYNTAX_DARK
+        self._write(key, json.dumps(overrides, ensure_ascii=False))
 
     # -- files -------------------------------------------------------------
     @property

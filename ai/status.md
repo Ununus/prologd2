@@ -1687,6 +1687,38 @@ Added on 2026-10-02 while implementing task_31:
   обе темы, первый ряд — комментарий).  `test_appearance.py`/`test_settings.py`
   зелёные.
 
+* GUI round, part 55: **«Подсветка» стала изменяемой**.  Пользователь спросил
+  «сможем сделать изменяемые?» — да, смогли.
+  Каждая hex-ячейка на странице «Подсветка» теперь **кнопка-свотч**: клик
+  открывает выбор цвета (заменяемый `_ask_color` — модальный `QColorDialog`
+  вешает headless-тест), и выбранный hex красится на кнопке.  «Применить» пишет
+  в настройки **только изменённые** роли, по теме: ключи `syntax/light` и
+  `syntax/dark` (JSON `поле: "#rrggbb"`, в `MACHINE_KEYS`); «Вернуть встроенные
+  цвета» сбрасывает оба.  Чтение чистит мусор: `Settings.syntax_overrides`
+  берёт только известные поля с валидным hex (`theme.clean_hex`), а
+  `Settings.palette` накладывает их на разрешённую палитру через
+  `theme.apply_syntax_overrides` — `system`-тема берёт override той палитры,
+  которую выбрал рабочий стол; хром (страница, полосы, цвета вывода) не трогается.
+  Проверки: `test_settings.py` — `test_syntax_overrides_round_trip_and_reach_the_palette`
+  (круговорот, чистка мусора, override доходит до палитры и не двигает хром),
+  `test_settingsdialog.py` — `test_a_colour_can_be_changed_and_applied` (клик по
+  свотчу, «Применить» пишет, «Вернуть встроенные» стирает).  Полные
+  `test_settings.py`/`test_settingsdialog.py` зелёные (52 ключа — 38 в диалоге,
+  14 машинных), палитровые тесты окна зелёные.
+
+* GUI round, part 56: **упрощённая палитра стала умолчанием**.  Пользователь
+  подобрал в «Настройки → Подсветка» свой набор (меньше разных цветов, русский
+  и английский — одинаково) и попросил зашить его в поставку.
+  В `theme.py` обновлены обе палитры: `query_comment` = цвету комментария,
+  `quoted_atom` = цвету строки, `keyword` = цвету `query`/`expression`,
+  `atom_latin == atom_cyrillic` (фиолетовый `#4f1473` / `#d47bdc`),
+  `variable_latin == variable_cyrillic` (красный `#b62222` / `#ff7878`),
+  `mixed` — ярко-красный флаг `#e30004` в обеих темах; уточнены `string`,
+  `punctuation`.  `mixed` выведен из WCAG-проверки в `readable_pairs` — это
+  сигнал, а не текст.  Проверки: `test_appearance.py` (контраст), `test_highlighter.py`
+  (комментарий про алфавиты обновлён), `test_settings.py`, `test_settingsdialog.py`,
+  `test_window.py` — зелёные.
+
 
 
 

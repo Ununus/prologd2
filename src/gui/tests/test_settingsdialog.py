@@ -80,6 +80,33 @@ def test_the_syntax_page_lists_every_colour_in_both_themes(directory: pathlib.Pa
     print(f"ok: {len(rows)} syntax roles, light and dark hex for each")
 
 
+def test_a_colour_can_be_changed_and_applied(directory: pathlib.Path) -> None:
+    """«Подсветка»: clicking a swatch and applying writes the override (task_50)."""
+    from prologd_gui import theme
+
+    dialog = dialog_for(directory, "edit.ini")
+    dialog.show_section("Подсветка")
+    button = dialog._syntax_light_buttons["comment"]
+    assert button.color() == theme.LIGHT_SYNTAX.comment
+
+    # The swatch asks through the replaceable chooser — a modal QColorDialog
+    # would hang the headless run — and the answer is what gets painted.
+    dialog._ask_color = lambda start: "#00ff00"
+    button.click()
+    assert button.color() == "#00ff00"
+
+    # Not stored until «Применить», and the store is what the window re-reads.
+    assert dialog._settings.syntax_overrides("light") == {}
+    dialog.button("apply").click()
+    assert dialog._settings.syntax_overrides("light") == {"comment": "#00ff00"}
+
+    # «Вернуть встроенные цвета» clears it back on screen and in the file.
+    dialog.restore_syntax_colors()
+    assert dialog._settings.syntax_overrides("light") == {}
+    assert button.color() == theme.LIGHT_SYNTAX.comment
+    print("ok: a syntax colour is edited through the swatch, applied, and can be reverted")
+
+
 def test_the_widgets_show_the_stored_values(directory: pathlib.Path) -> None:
     settings = Settings(directory / "show.ini")
     settings.font_size = 17.0
@@ -341,6 +368,7 @@ def main(argv: list[str]) -> int:
         directory = pathlib.Path(name)
         test_a_page_per_section_and_a_widget_per_row(directory)
         test_the_syntax_page_lists_every_colour_in_both_themes(directory)
+        test_a_colour_can_be_changed_and_applied(directory)
         test_the_widgets_show_the_stored_values(directory)
         test_apply_writes_and_cancel_does_not(directory)
         test_reset_puts_the_defaults_in_the_widgets_and_needs_applying(directory)

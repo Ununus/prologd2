@@ -78,7 +78,8 @@ class Coloured:
 def test_colours_by_kind() -> None:
     coloured = Coloured("член(X) :- member(X), НАЙТИВСЕ(Y, цель(Y), L), ПС. % привет")
 
-    # Names: the colour tells the two alphabets apart, atoms and variables apart.
+    # Names: atoms and variables have a colour each, shared by both alphabets —
+    # the Russian and English spellings look alike since task_50's colour round.
     assert coloured.colour("член") == THEME.atom_cyrillic
     assert coloured.colour("member") == THEME.atom_latin
     assert coloured.colour("цель") == THEME.atom_cyrillic
@@ -90,7 +91,7 @@ def test_colours_by_kind() -> None:
     assert coloured.colour("ПС") == THEME.keyword
     assert coloured.colour("% привет") == THEME.comment
     assert coloured.colour(":-") == THEME.punctuation
-    print("ok: every kind gets its colour, and names follow their alphabet")
+    print("ok: every kind gets its colour, and names are told from variables")
 
 
 def test_colours_on_a_query_line() -> None:

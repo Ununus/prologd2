@@ -34,6 +34,7 @@ from PySide6.QtCore import Qt, QUrl, Signal
 from PySide6.QtGui import QColor, QDesktopServices
 from PySide6.QtWidgets import (
     QCheckBox,
+    QColorDialog,
     QComboBox,
     QDialog,
     QDoubleSpinBox,
@@ -72,6 +73,39 @@ SYNTAX_PAGE = "Подсветка"
 def _text_for(color: str) -> str:
     """Black or white, whichever reads on the swatch of `color` (task_50)."""
     return "#1a1a1a" if theme_module.relative_luminance(color) > 0.3 else "#ffffff"
+
+
+class ColorButton(QPushButton):
+    """One syntax colour as a swatch: its hex is the text, its fill the colour.
+
+    Clicking asks for a new colour through `ask` — a replaceable method on the
+    dialog, because a modal `QColorDialog` hangs a headless test instead of
+    failing it.  The text flips black or white by the colour's brightness, so the
+    hex stays readable whatever is chosen (task_50).
+    """
+
+    def __init__(self, hex_value: str, ask, parent: QWidget | None = None) -> None:
+        super().__init__(hex_value, parent)
+        self._ask = ask
+        self.set_color(hex_value)
+        self.clicked.connect(self._choose)
+
+    def color(self) -> str:
+        """The hex the button shows, lower-cased."""
+        return self._hex
+
+    def set_color(self, hex_value: str) -> None:
+        """Repaints the swatch and its text to `hex_value`."""
+        self._hex = str(hex_value).strip().lower()
+        self.setText(self._hex)
+        self.setStyleSheet(
+            f"QPushButton {{ background: {self._hex}; color: {_text_for(self._hex)}; }}"
+        )
+
+    def _choose(self) -> None:
+        chosen = self._ask(self._hex)
+        if chosen:
+            self.set_color(chosen)
 
 
 class PathListEditor(QWidget):
@@ -350,17 +384,18 @@ class SettingsDialog(QDialog):
     def _build_syntax_page(self) -> None:
         """The «Подсветка» page (task_50): every highlighted role, both themes.
 
-        Read-only on purpose: the colours belong to the two shipped palettes, and
-        the way to change the whole set is «Вид → Оформление».  The page is a
-        table of `что подсвечено · светлая · тёмная`, each hex painted in its own
-        colour, so the two columns read as the two themes at a glance.
+        Each hex is a swatch button — clicking it asks for a new colour — so the
+        table *is* the editor: `что подсвечено · светлая · тёмная`, each colour
+        painted in its own cell, black or white text by brightness.  «Вернуть
+        встроенные цвета» drops every override at once, like the insert page's
+        own revert.
         """
         page = QWidget(self)
         layout = QVBoxLayout(page)
         note = QLabel(
-            "Одна и та же роль в двух темах, рядом.  Эти цвета принадлежат теме "
-            "и по отдельности не меняются — выбрать тему можно в «Вид → "
-            "Оформление»."
+            "Одна и та же роль в двух темах.  Нажмите на цвет, чтобы изменить его "
+            "для этой темы; выбранный hex хранится в файле настроек и применяется "
+            "сразу.  «Вид → Оформление» по-прежнему выбирает тему целиком."
         )
         note.setWordWrap(True)
         layout.addWidget(note)
@@ -376,25 +411,93 @@ class SettingsDialog(QDialog):
         table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
-        self._syntax_rows: list[tuple[str, str, str]] = []
-        for row, (label, light, dark) in enumerate(theme_module.syntax_rows()):
-            self._syntax_rows.append((label, light, dark))
+        self._syntax_fields: list[str] = []
+        self._syntax_light_buttons: dict[str, ColorButton] = {}
+        self._syntax_dark_buttons: dict[str, ColorButton] = {}
+        for row, field in enumerate(theme_module.Theme.__dataclass_fields__):
+            self._syntax_fields.append(field)
             table.insertRow(row)
-            table.setItem(row, 0, QTableWidgetItem(label))
-            for column, hex_value in ((1, light), (2, dark)):
-                item = QTableWidgetItem(hex_value)
-                item.setBackground(QColor(hex_value))
-                item.setForeground(QColor(_text_for(hex_value)))
-                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                table.setItem(row, column, item)
+            table.setItem(row, 0, QTableWidgetItem(theme_module.SYNTAX_LABELS[field]))
+            # A lambda, not the bound method: the chooser is replaceable on the
+            # dialog (`_ask_color`), and a bound method captured here would keep
+            # pointing at the real `QColorDialog` — which is modal, and a modal
+            # box in a headless run hangs the test instead of failing it.
+            table.setCellWidget(
+                row,
+                1,
+                ColorButton(getattr(theme_module.LIGHT_SYNTAX, field), lambda start: self._ask_color(start), self),
+            )
+            table.setCellWidget(
+                row,
+                2,
+                ColorButton(getattr(theme_module.DARK_SYNTAX, field), lambda start: self._ask_color(start), self),
+            )
+            self._syntax_light_buttons[field] = table.cellWidget(row, 1)
+            self._syntax_dark_buttons[field] = table.cellWidget(row, 2)
 
         layout.addWidget(table, 1)
+        revert = QPushButton("Вернуть встроенные цвета", page)
+        revert.clicked.connect(self.restore_syntax_colors)
+        layout.addWidget(revert)
         self._sections[SYNTAX_PAGE] = self._pages.addWidget(page)
         self._nav.addItem(SYNTAX_PAGE)
 
     def syntax_rows(self) -> list[tuple[str, str, str]]:
-        """The «Подсветка» page as `(what, light hex, dark hex)` rows (task_50)."""
-        return list(self._syntax_rows)
+        """The «Подсветка» page as `(what, light hex, dark hex)` rows (task_50).
+
+        Read from the *buttons*, so it reports what is on screen — the built-in
+        colours while nothing was changed, the overrides after an edit.
+        """
+        return [
+            (
+                theme_module.SYNTAX_LABELS[field],
+                self._syntax_light_buttons[field].color(),
+                self._syntax_dark_buttons[field].color(),
+            )
+            for field in self._syntax_fields
+        ]
+
+    def _fill_syntax(self) -> None:
+        """Puts the stored colours into the buttons (the constructor and reload)."""
+        light = self._settings.syntax_overrides(theme_module.LIGHT.name)
+        dark = self._settings.syntax_overrides(theme_module.DARK.name)
+        for field in self._syntax_fields:
+            self._syntax_light_buttons[field].set_color(
+                light.get(field, getattr(theme_module.LIGHT_SYNTAX, field))
+            )
+            self._syntax_dark_buttons[field].set_color(
+                dark.get(field, getattr(theme_module.DARK_SYNTAX, field))
+            )
+
+    def _syntax_changes(self) -> tuple[dict[str, str], dict[str, str]]:
+        """The fields whose button colour differs from the shipped palette.
+
+        Sparse on purpose: only what the user actually changed is stored, so the
+        file stays readable and a palette that was never touched keeps following
+        the built-in colours of a future build.
+        """
+        light: dict[str, str] = {}
+        dark: dict[str, str] = {}
+        for field in self._syntax_fields:
+            if self._syntax_light_buttons[field].color() != getattr(theme_module.LIGHT_SYNTAX, field):
+                light[field] = self._syntax_light_buttons[field].color()
+            if self._syntax_dark_buttons[field].color() != getattr(theme_module.DARK_SYNTAX, field):
+                dark[field] = self._syntax_dark_buttons[field].color()
+        return light, dark
+
+    def restore_syntax_colors(self) -> None:
+        """Drops every syntax override and puts the built-in colours back."""
+        self._settings.set_syntax_overrides(theme_module.LIGHT.name, {})
+        self._settings.set_syntax_overrides(theme_module.DARK.name, {})
+        self._fill_syntax()
+        self._applied = True
+        self._message("цвета подсветки возвращены к встроенным")
+        self.changesApplied.emit()
+
+    def _ask_color(self, start: str) -> str | None:
+        """The colour the user chose, or `None`; replaceable for the headless test."""
+        color = QColorDialog.getColor(QColor(start), self, "Цвет подсветки")
+        return color.name() if color.isValid() else None
 
     def _build_inserts_page(self) -> None:
         """The «Вставки» page: what `Ctrl`+key does, and where the table lives.
@@ -516,6 +619,7 @@ class SettingsDialog(QDialog):
         for setting in settings_module.SETTINGS:
             self._set_widget(setting, self._settings.value_of(setting))
         self._fill_inserts()
+        self._fill_syntax()
 
     def _fill_inserts(self) -> None:
         table = shortcuts.Shortcuts.from_json(self._settings.shortcuts_table)
@@ -577,6 +681,15 @@ class SettingsDialog(QDialog):
             if _same(value, self._settings.value_of(setting)):
                 continue
             self._settings.set_value(setting, value)
+            changed += 1
+        # The syntax colours (task_50): written only when the swatches differ
+        # from what the store already holds, like every other row.
+        light, dark = self._syntax_changes()
+        if light != self._settings.syntax_overrides(theme_module.LIGHT.name):
+            self._settings.set_syntax_overrides(theme_module.LIGHT.name, light)
+            changed += 1
+        if dark != self._settings.syntax_overrides(theme_module.DARK.name):
+            self._settings.set_syntax_overrides(theme_module.DARK.name, dark)
             changed += 1
         if self._staged:
             self._settings.write_keys(self._staged)

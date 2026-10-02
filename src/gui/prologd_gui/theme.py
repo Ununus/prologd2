@@ -10,7 +10,7 @@ returns, so a test can compare a palette entry with what the document holds.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, replace
 
 from . import tokens
 
@@ -22,29 +22,31 @@ _BOLD_KINDS = frozenset({tokens.KEYWORD})
 class Theme:
     """The colours of the editor.
 
-    Names get their colour from the **alphabet** as well as the kind, which is
-    the point the user asked for: `член` and `member` are otherwise easy to
-    confuse while scanning a program, and a built-in is Russian far more often
-    than not.
+    One colour per role.  The Russian and English spellings of a name share one
+    colour by default (task_50's colour round): the two alphabets used to be
+    told apart, and a reader who wants that back can set the two fields apart
+    again in «Настройки → Подсветка» — the fields stay, they are just equal out
+    of the box.
     """
 
     comment: str = "#0d6a0d"
     # A question parked in a comment (`%   ?ВЕРСИЯ.`): a question to the reader,
-    # and the margin will run it — orange, so it does not read as prose.
-    query_comment: str = "#b45309"
-    string: str = "#a31515"
-    quoted_atom: str = "#b03060"
-    keyword: str = "#00008b"  # reserved names: built-ins, `mod`/`div`, `ИМПОРТ`
+    # and the margin will run it — the same green as a comment, so it reads as
+    # part of the prose until the marker is asked for (task_50's colour round).
+    query_comment: str = "#0d6a0d"
+    string: str = "#986801"
+    quoted_atom: str = "#986801"  # the same brown as a string: one "quoted" colour
+    keyword: str = "#0a22d6"  # reserved names: built-ins, `mod`/`div`, `ИМПОРТ`
     integer: str = "#505000"
     float: str = "#505000"
-    punctuation: str = "#555555"
+    punctuation: str = "#3f3f3f"
     query: str = "#0a22d6"
     expression: str = "#0a22d6"
-    atom_latin: str = "#800000"
-    atom_cyrillic: str = "#6a1b9a"
-    variable_latin: str = "#00695c"
-    variable_cyrillic: str = "#ad1457"
-    mixed: str = "#4a148c"  # an identifier that mixes the two alphabets
+    atom_latin: str = "#4f1473"
+    atom_cyrillic: str = "#4f1473"  # the same violet as the Latin atom (task_50)
+    variable_latin: str = "#b62222"
+    variable_cyrillic: str = "#b62222"  # the same red as the Latin variable (task_50)
+    mixed: str = "#e30004"  # a name that mixes the two alphabets: a bright red flag
 
     def color_for(self, kind: str, alphabet: str = "") -> str:
         """The colour of a token; an empty string means "leave it alone"."""
@@ -100,25 +102,26 @@ class Theme:
 #: caller that has no palette — gets exactly what it had before.
 LIGHT_SYNTAX = Theme()
 
-#: The dark syntax palette (task_29).  Same kinds, same alphabet split, chosen
-#: against `#1e1e1e`; every field clears WCAG AA on that page, the tightest being
-#: `mixed` at 5.07.
+#: The dark syntax palette (task_29).  Same roles, same alphabet merge, chosen
+#: against `#1e1e1e`.  Every field but `mixed` clears WCAG AA on that page — the
+#: mixed-alphabet flag is bright red on purpose, a signal rather than body text
+#: (task_50's colour round).
 DARK_SYNTAX = Theme(
     comment="#6a9955",
-    query_comment="#e8a33d",
+    query_comment="#6a9955",
     string="#ce9178",
-    quoted_atom="#e882b0",
-    keyword="#569cd6",
+    quoted_atom="#ce9178",
+    keyword="#4fc1ff",
     integer="#b5cea8",
     float="#b5cea8",
-    punctuation="#9d9d9d",
+    punctuation="#a6a6a6",
     query="#4fc1ff",
     expression="#4fc1ff",
-    atom_latin="#d2a679",
-    atom_cyrillic="#c586c0",
-    variable_latin="#4ec9b0",
-    variable_cyrillic="#f071a8",
-    mixed="#d16d9e",
+    atom_latin="#d47bdc",
+    atom_cyrillic="#d47bdc",
+    variable_latin="#ff7878",
+    variable_cyrillic="#ff7878",
+    mixed="#e30004",
 )
 
 #: What each syntax colour is, in the words of the settings dialog (task_50).
@@ -160,6 +163,44 @@ def syntax_rows() -> list[tuple[str, str, str]]:
         )
         for field in fields(Theme)
     ]
+
+
+def clean_hex(value: str) -> str | None:
+    """A `#rrggbb` colour, lower-cased — or `None` when `value` is not one.
+
+    What the settings file and the dialog hold is a hex string; the check is here,
+    Qt-free, so the store accepts only what the highlighter can paint.
+    """
+    text = str(value).strip().lower()
+    if len(text) != 7 or not text.startswith("#"):
+        return None
+    try:
+        int(text[1:], 16)
+    except ValueError:
+        return None
+    return text
+
+
+def apply_syntax_overrides(
+    palette: Palette, overrides: dict[str, str]
+) -> Palette:
+    """A palette whose syntax colours take the stored overrides (task_50).
+
+    Only known field names with valid hex values are taken — a hand-edited file
+    cannot paint an invalid colour — and the rest keep the palette's own colours.
+    The chrome (page, bands, output kinds) is untouched, because it is chosen as
+    a *set* against that page; the syntax colours are the part a reader fine-tunes.
+    Returns `palette` itself when there is nothing to apply.
+    """
+    known = {field.name for field in fields(Theme)}
+    chosen: dict[str, str] = {}
+    for name, value in overrides.items():
+        cleaned = clean_hex(value) if name in known else None
+        if cleaned is not None:
+            chosen[name] = cleaned
+    if not chosen:
+        return palette
+    return replace(palette, syntax=replace(palette.syntax, **chosen))
 
 
 @dataclass(frozen=True)
@@ -217,14 +258,16 @@ class Palette:
 
         `test_appearance.py` walks this against WCAG AA (4.5), for every palette —
         so a colour added to a palette is measured without the test being touched,
-        which is the only way a dark theme stays honest.  Two pairs are
-        deliberately *not* in it: the margin's inactive numbers and the
-        placeholder text are chrome, quiet on purpose (the margin is 3.03 in the
-        light theme), and forcing them to 4.5 would make the numbers shout as
-        loudly as the code.
+        which is the only way a dark theme stays honest.  A few pairs are
+        deliberately *not* in it: the margin's inactive numbers and the placeholder
+        text are chrome, quiet on purpose (the margin is 3.03 in the light theme),
+        and `mixed` is a bright-red *flag* for a name that mixes two alphabets —
+        a signal the reader must notice, not body text (task_50's colour round).
         """
         pairs = [("текст на странице", self.foreground, self.background)]
         for field in fields(self.syntax):
+            if field.name == "mixed":
+                continue
             pairs.append(
                 (f"подсветка: {field.name}", getattr(self.syntax, field.name), self.background)
             )

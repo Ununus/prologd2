@@ -340,6 +340,39 @@ def test_the_interpreter_and_process_directory_round_trip(directory: pathlib.Pat
     print("ok: the interpreter path and the process directory round-trip")
 
 
+def test_syntax_overrides_round_trip_and_reach_the_palette(directory: pathlib.Path) -> None:
+    """The changed syntax colours survive a new instance and paint the palette."""
+    from prologd_gui import theme
+
+    settings = Settings(directory / "syntax.ini")
+    assert settings.syntax_overrides("light") == {}
+    assert settings.syntax_overrides("dark") == {}
+
+    settings.set_syntax_overrides(
+        "light", {"comment": "#112233", "string": "NOT-HEX", "unknown": "#000000"}
+    )
+    settings.set_syntax_overrides("dark", {"keyword": "#ABCDEF"})
+
+    reopened = Settings(directory / "syntax.ini")
+    assert reopened.syntax_overrides("light") == {"comment": "#112233"}, (
+        reopened.syntax_overrides("light")
+    )
+    assert reopened.syntax_overrides("dark") == {"keyword": "#abcdef"}, (
+        reopened.syntax_overrides("dark")
+    )
+
+    # The palette layers the override over the shipped syntax, and nothing else.
+    settings.theme = "light"
+    palette = settings.palette
+    assert palette.syntax.comment == "#112233"
+    assert palette.syntax.string == theme.LIGHT_SYNTAX.string, "an untouched field moved"
+    assert palette.background == theme.LIGHT.background, "the chrome is not the syntax"
+
+    settings.theme = "dark"
+    assert settings.palette.syntax.keyword == "#abcdef"
+    print("ok: syntax overrides round-trip, are cleaned, and reach the palette")
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory(prefix="prologd_gui_settings_") as name:
         directory = pathlib.Path(name)
@@ -350,6 +383,7 @@ def main() -> int:
         test_unknown_keys_survive(directory)
         test_the_new_keys_have_the_documented_defaults(directory)
         test_the_interpreter_and_process_directory_round_trip(directory)
+        test_syntax_overrides_round_trip_and_reach_the_palette(directory)
         test_every_row_round_trips_and_resets(directory)
         test_set_value_clamps_and_survives_junk(directory)
         test_reset_touches_only_described_settings(directory)
