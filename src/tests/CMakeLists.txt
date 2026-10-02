@@ -82,8 +82,8 @@ if(TARGET prologd)
     PASS_REGULAR_EXPRESSION "Искался в:")
 
   # `--list-keywords` is a query: it prints `name/arity` lines and exits without
-  # loading anything.  The Catch2 test covers the content; these two cover the
-  # CLI shape — `/3` for a predicate, `/+` for the variadic ВЫВОД.
+  # loading anything.  The Catch2 test covers the content; these cover the CLI
+  # shape — `/3` for a predicate, `/+` for a variadic name (ВЫВОД, ПЕРВОЕ).
   add_test(NAME cli_list_keywords COMMAND prologd --list-keywords)
   set_tests_properties(cli_list_keywords PROPERTIES
     PASS_REGULAR_EXPRESSION "НАЙТИВСЕ/3")
@@ -91,6 +91,10 @@ if(TARGET prologd)
   add_test(NAME cli_list_keywords_variadic COMMAND prologd --list-keywords)
   set_tests_properties(cli_list_keywords_variadic PROPERTIES
     PASS_REGULAR_EXPRESSION "ВЫВОД/\\+")
+
+  add_test(NAME cli_list_keywords_variadic_first COMMAND prologd --list-keywords)
+  set_tests_properties(cli_list_keywords_variadic_first PROPERTIES
+    PASS_REGULAR_EXPRESSION "ПЕРВОЕ/\\+")
 
   # task_30: `--format` is checked by the bytes it writes — the formatted file
   # must still print what the original printed, and formatting it again must not

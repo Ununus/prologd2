@@ -1,7 +1,9 @@
 # task_51 — `ПЕРВОЕ` принимает любое число целей (variadic from arity 1)
 
-**Status:** not started — the plan is written down (2026-10-02); the user chose
-«с одной» (one goal at least, any number after)
+**Status:** done (2026-10-02).  Done as planned, with one correction found by a
+probe: a one-goal `ПЕРВОЕ(Ц)` is *not* `ВЫП(Ц)` — it commits to the first solution
+(`?НАЙТИВСЕ(X, ПЕРВОЕ(p(X)), L).` → `L=[1]`, while `ВЫП(p(X))` gives `L=[1,2]`),
+so the manual says «одна цель — фиксируется на первом решении».
 **Depends on:** task_44 (the name `ПЕРВОЕ`), task_39 (the alias table), task_43
 (`ВЫП/+` in the keyword table), task_37 (`doc/builtins.json`)
 **Milestone:** post-M10
@@ -64,49 +66,51 @@ The reason this is small is the same reason it was small for `ВЫВОД`: `ПЕ
 *dispatch-table builtin*, looked up by name and arity, unlike `ВЫП`, which the
 solver answers because it constructs a new goal term.
 
-## Deliverables
+## What was done
 
-- [ ] `builtins.cpp`: `builtinOr` loops over `args`
+- [x] `builtins.cpp`: `builtinFirst` (renamed from `builtinOr` — that was the last
+      place the retired `ИЛИ`/`or` survived) loops over `args`
       (`for (const Term& goal : args) { if (engine.callOnce(goal)) return
       BuiltinResult::Continue; } return BuiltinResult::Fail;`).
-- [ ] `builtins.cpp`: `isVariadicBuiltin(name)` becomes one small table — variadic
+- [x] `builtins.cpp`: `isVariadicBuiltin(name)` is now the table
+      `kVariadicNames` — variadic
       name → function — `ВЫВОД`/`write` → `builtinWrite`, `ПЕРВОЕ`/`first` →
-      `builtinOr`, read by `findBuiltin`, `builtinArities` and `builtinNames` (the
-      last one stops carrying two names in its own body).  Delete the row
-      `add("ПЕРВОЕ", 2, builtinOr)`.
-- [ ] Comments that enumerate the variadic names: `builtinTable`'s neighbours,
-      `BuiltinArities` in `engine.hpp` («`ВЫВОД` accepts any positive arity»),
-      `hasArity` in `checks.cpp` («`ВЫВОД/+` and `ВЫП/+`» → add `ПЕРВОЕ/+`).
-- [ ] Optional, but it finishes task_44: rename `builtinOr` → `builtinFirst` —
-      `builtinOr` is the last place the retired `ИЛИ`/`or` survives.
-- [ ] `doc/builtins.json`, the `ПЕРВОЕ` record: `"arities": []`, `"variadic": true`,
-      and a summary/variants with the general form (`ПЕРВОЕ(Цель1, …, Цельn) —
-      первая успешная цель, её альтернативы отсечены`).
-- [ ] `doc/help.typ` §4.6: the signature `ПЕРВОЕ(Цель1, …, Цельn)` and one sentence
-      that any number of goals is allowed (one at least); §4.5's «это `ПЕРВОЕ/2`» →
-      «это `ПЕРВОЕ`».
-- [ ] `doc/technical.typ` (`ПЕРВОЕ(Ц1, Ц2)`), `doc/prologd-diff.typ` (§18 and the
-      table row around line 230), `ai/porting_notes.md` (the `ИЛИ` → `ПЕРВОЕ` row),
-      `src/gui/README.md` (the sentence that `ВЫВОД` is *the* variadic name).
-- [ ] The retired-name advice (`checks.cpp`: «`ИЛИ` переименовано: теперь это
-      `ПЕРВОЕ(Ц1, Ц2)`», and the `or` spelling beside it): decide whether it keeps
-      the two-argument shape (the common one) or becomes `ПЕРВОЕ(Ц1, Ц2, …)`.
-      `test_diagnostics.cpp` pins that text, so the two move together.
-- [ ] Tests:
-      * `test_builtins_control.cpp` — the pinned case «`ПЕРВОЕ` не имеет арности 3
-        (есть 2)» **must change** (arity 3 is legal now); add the new cases: three
-        and more goals, commitment to the first successful one, `ПЕРВОЕ(Ц)` as
-        «once», and `?ПЕРВОЕ.` still being a load error.
-      * `test_keywords.cpp` — `first->arities == {2}` becomes `variadic` with an
-        empty arity list (the `ВЫВОД` case is the model).
-      * `test_aliases.cpp` — the `ВЫВОД`-only skip becomes
-        `builtinArities(name).variadic`, and `first` joins the
-        variadic-under-both-names case.
-      * optionally, a `ПЕРВОЕ/+` expectation in the CLI keyword test
-        (`src/tests/CMakeLists.txt`, next to `ВЫВОД/+`).
-      * `src/gui/tests/test_reference.py` (json ↔ `--list-keywords` ↔ the manual),
-        `test_completion.py` and `test_keywords.py` — run them once the flag starts
-        coming out for `ПЕРВОЕ`.
+      `builtinFirst`, read by `findBuiltin`, `builtinArities` and `builtinNames` (the
+      last one no longer carries two names in its own body).  The row
+      `add("ПЕРВОЕ", 2, builtinOr)` is gone.
+- [x] Comments that enumerate the variadic names: `kVariadicNames` itself,
+      `kEnglishNames`, `BuiltinArities` in `engine.hpp`, `builtinNames`'s comment,
+      `hasArity` in `checks.cpp` (`ВЫВОД/+`, `ПЕРВОЕ/+`, `ВЫП/+`).
+- [x] `doc/builtins.json`, the `ПЕРВОЕ` record: `"arities": []`, `"variadic": true`,
+      and the general form among the variants.
+- [x] `doc/help.typ` §4.6: the signature is `ПЕРВОЕ(Цель, ...)` (the shape
+      `ВЫП(Цель, ...)` and `ВЫВОД(Аргумент, ...)` use) with the number of goals and
+      the example; §4.5's «это `ПЕРВОЕ/2`» became «это `ПЕРВОЕ`».
+- [x] `doc/technical.typ`, `doc/prologd-diff.typ` (its «`ПЕРВОЕ` вместо `ИЛИ`»
+      section and the table row), `ai/porting_notes.md` (the `ИЛИ` → `ПЕРВОЕ` row),
+      `src/gui/README.md` (the sentence about the variadic names).
+- [x] `examples/lessons/lesson_04.pld`: the section that teaches `ПЕРВОЕ` says
+      `ПЕРВОЕ(Цель, ...)` and shows a three-goal query
+      (`?ПЕРВОЕ(БОЛЬШЕ(1, 2), цена(Т, 500), цена(Т, 40)).` → `Т=сыр`), pinned by
+      the `%!` line that `test_lessons.cpp` checks.
+- [x] The retired-name advice keeps the two-argument shape: an old call can only be
+      `ИЛИ/2`, so the message mirrors it one to one and mentions the disjunction.
+      `test_diagnostics.cpp` pins that text and needed no change.
+- [x] Tests:
+      * `test_builtins_control.cpp` — the pinned «`ПЕРВОЕ` не имеет арности 3» case
+        changed (arity 3 is legal now and answers `НЕТ`, `?ПЕРВОЕ.` is the arity-0
+        load error), and the new case «the choice form takes any number of goals»
+        pins the variadic form, the commitment and the non-predicate argument.
+      * `test_keywords.cpp` — `first->arities == {2}` became `variadic` with an
+        empty arity list, in both the arity test and the retired-name test.
+      * `test_aliases.cpp` — the `ВЫВОД`-only skip became
+        `builtinArities(name).variadic`, and the case is now «the variadic
+        built-ins are variadic under both spellings» over `ВЫВОД` and `ПЕРВОЕ`.
+      * `src/tests/CMakeLists.txt` — the CLI test
+        `cli_list_keywords_variadic_first` expects `ПЕРВОЕ/\+`.
+      * `src/gui/tests/test_reference.py`, `test_completion.py`,
+        `test_keywords.py`, `test_queries.py`, `test_tokens.py`,
+        `test_queryline.py` — all green with the flag coming out for `ПЕРВОЕ`.
 
 ## What must not change
 
@@ -118,32 +122,44 @@ solver answers because it constructs a new goal term.
 - `ВЫП`/`call` stay outside the table (`kEngineCallables`), so nothing about
   `call/N` is touched by this task.
 
-## Verification
+## Verification (done)
 
-1. `cmake --build build/windows-msvc --config Release` and
-   `ctest --test-dir build/windows-msvc -C Release`.
-2. `prologd --list-keywords` → `ПЕРВОЕ/+` and `first/+`, and no `ПЕРВОЕ/2`.
+1. Build: exit 0, no compiler errors or warnings.  `ctest --test-dir
+   build/windows-msvc -C Release`: **278/278** (276 before: +1 Catch2 case, +1 CLI
+   test).
+2. `prologd --list-keywords` → `ПЕРВОЕ/+`, `first/+`, `ВЫВОД/+`, `write/+`,
+   `ВЫП/+`, `call/+`; no `ПЕРВОЕ/2`.
 3. By hand, with `build\windows-msvc\src\cli\Release\prologd.exe`:
    * `?ПЕРВОЕ(ЛОЖЬ, ЛОЖЬ, РАВНО(X, 1), РАВНО(X, 2)).` → `X=1`;
    * `?ПЕРВОЕ(ЛОЖЬ, РАВНО(Y, 2)).` → `Y=2` (unchanged);
-   * `п(1). п(2). ?ПЕРВОЕ(п(X), ЛОЖЬ).` → `X=1` (commitment, unchanged);
-   * `?ПЕРВОЕ(ЛОЖЬ).` → `НЕТ`; `?ПЕРВОЕ.` → a load error naming the arity.
-4. GUI suites (`PYTHONUTF8=1`, `QT_QPA_PLATFORM=offscreen`): `test_reference.py`,
-   `test_completion.py`, `test_keywords.py`, `test_window.py`, `test_queries.py`.
-5. `cmake --build build/windows-msvc --config Release --target docs` (the five
-   PDFs, `help.typ` §4.6 among them).
+   * `п(1). п(2). ?ПЕРВОЕ(п(Z), ЛОЖЬ).` → `Z=1` (commitment, unchanged);
+   * `?first(ЛОЖЬ, ЛОЖЬ, РАВНО(W, 1)).` → `W=1` (the English spelling);
+   * `?ПЕРВОЕ(ЛОЖЬ).` → `НЕТ`; `?ПЕРВОЕ(ЛОЖЬ, ЛОЖЬ, ЛОЖЬ).` → `НЕТ`;
+   * `?ПЕРВОЕ.` → `1:2: error: ПЕРВОЕ не имеет арности 0`, exit 2;
+   * `?НАЙТИВСЕ(X, ПЕРВОЕ(p(X)), L).` → `L=[1]`, while `ВЫП(p(X))` → `L=[1,2]`.
+4. GUI suites (`PYTHONUTF8=1`, `QT_QPA_PLATFORM=offscreen`): `test_reference.py`
+   (the JSON ↔ `--list-keywords` ↔ the manual), `test_completion.py`,
+   `test_keywords.py` (108 reserved names), `test_queries.py`, `test_tokens.py`,
+   `test_queryline.py` — all green.
+5. `typst compile` of `help.typ` (32 pages), `prologd-diff.typ` (22 pages) and
+   `technical.typ` — exit 0; §4.6 of the manual and the «`ПЕРВОЕ` вместо `ИЛИ`»
+   section of the diff document were read on the rendered pages.
 
 ## Notes
 
-- `ПЕРВОЕ(Ц)` is deliberately allowed: it is `ВЫП(Ц)` without the extra-argument
+* A one-goal `ПЕРВОЕ(Ц)` is «the first solution of `Ц`», which is a *committed*
+  once: `?НАЙТИВСЕ(X, ПЕРВОЕ(p(X)), L).` answers `L=[1]` where `ВЫП(p(X))` answers
+  `L=[1,2]`.  The reading «i.e. `ВЫП(Ц)`» in the plan above was wrong; the manual
+  (`help.typ` §4.6) says «фиксируется на первом решении», and the probe is
+  recorded here.
+* The retired-name advice keeps the two-argument shape
+  (««ИЛИ» переименовано: теперь это «ПЕРВОЕ(Ц1, Ц2)»…»): an old call can only be
+  `ИЛИ/2`, so the message mirrors it one to one, and the variadic freedom belongs
+  in the manual, not in a message about a rename.  `test_diagnostics.cpp` pins
+  that text and did not have to change.
+* `ПЕРВОЕ(Ц)` is deliberately allowed: it is «once» without the extra-argument
   machinery.  Forbidding it would need a second notion of «variadic» — a minimum
   arity — through `BuiltinArities`, `KeywordInfo`, `hasArity`, `--list-keywords`
   and the completion skeleton, and would make one flag mean two things.  If the
   one-goal form ever looks like a mistake, the cheap fix is to reject arity 1 in
   `checks.cpp` alone; that is not proposed now.
-- The retired-name advice and this change meet in one place (see the deliverables):
-  the message names the *signature* of the replacement, so a variadic `ПЕРВОЕ`
-  may want `ПЕРВОЕ(Ц1, Ц2, …)` there.
-- `ПЕРВОЕ` in the manual is §4.6; the appendix table (§17) is built from
-  `doc/builtins.json` and carries the pair `ПЕРВОЕ`/`first` without arities, so it
-  needs no edit beyond the record itself.

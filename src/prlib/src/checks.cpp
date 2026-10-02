@@ -32,8 +32,8 @@ void addArity(NameInfo& info, std::size_t arity) {
 
 bool hasArity(const NameInfo& info, std::size_t arity) {
   if (info.variadic) {
-    // `ВЫВОД/+` and `ВЫП/+` take at least one argument: `ВЫВОД.` and `ВЫП.` are
-    // errors, not a silent failure.
+    // `ВЫВОД/+`, `ПЕРВОЕ/+` and `ВЫП/+` take at least one argument: `ВЫВОД.`,
+    // `ПЕРВОЕ.` and `ВЫП.` are errors, not a silent failure.
     return arity >= 1;
   }
   return std::find(info.arities.begin(), info.arities.end(), arity) != info.arities.end();

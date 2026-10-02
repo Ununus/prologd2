@@ -1016,9 +1016,10 @@ failure (for example an interrupted query).
   `input` with nothing waiting is.
 * `ready` carries `keywords`: every reserved name the lexer knows, with its kind
   (`predicate`, `operator`, `directive`) and its arities — `[]` for operators,
-  directives and the variadic `ВЫВОД`, which is marked with `"variadic":true`.
+  directives and the variadic `ВЫВОД` and `ПЕРВОЕ`, which are marked with
+  `"variadic":true`.
   The same table is printed by `prologd --list-keywords`, one `name/arity` per
-  line (`ВЫВОД/+` for the variadic one), so a front-end never keeps its own copy
+  line (`ВЫВОД/+` for the variadic ones), so a front-end never keeps its own copy
   of the built-in list — and one that needs the names *before* a session is up
   (completion at startup) can have them from that listing alone:
   `Keywords.from_list_lines` parses it.  Highlighting, completion and the

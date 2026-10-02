@@ -121,7 +121,7 @@ where its files go).
 | task_48_interface_cleanup | done | the round of small things the user asked for: five pictures left the tree (`help-about` — the same drawing as `prologd2`, the two `search-find-selected-*`, `view-toolbar`, `view-line-numbers`), `assets.MISSING` is down to four names, «Сохранить все» left the toolbar, the two «Найти выделенное» commands left «Поиск» with their icons; `Esc` now closes the graphics window → the find bar → the reference dock → the cheat sheet (one handler on the window, by *propagation*, so the completion popup and the find bar's field keep answering for themselves), and the graphics window opens itself on the **first primitive of a run** — once per run, so a window closed during an animation stays closed (task_45's window plus `_graphics_shown`) |
 | task_49_gui_defects | done | five defects found by using the window, all fixed.  `Шаг → Стоп → Запуск` no longer answers «нет шага, который ждёт ответа» (the paused flag is cleared by the events that conclude a run — including the *error* a «Стоп» turns into while a step waits); an untouched unnamed tab comes back clean (the session record carries the unsaved flag; JSON, because a fourth tab-separated field cannot be told apart from text with a tab in it); the format `Запустить с трассировкой` no longer takes the window (the output is handed over once per turn of the event loop, and the pane trims its history in bulks — 200 000 lines: 21.9 s → 3.0 s, a 16 000-line trace: 2.2 s → 0.6 s); the main window remembers its size and place (`view/window_geometry`), which the graphics window had done since task_45; and the **output arrives as it is written** — `IoContext::setOutputLineSink` fires at a line end and the session emits one `output` event per line, so a lesson's countdown counts 3, 2, 1 instead of arriving as one block when the program is over |
 | task_50_panel_tabs | done | the output panel is one `QTabWidget`: **Проблемы** (errors and warnings), **Вывод** (program output, the `>` echo, the trace), **Система** (the window's notes) and **Ввод** (the prepared answers with the per-request console under them).  Each title carries its count (`Вывод:5`, `Проблемы:0` …), «Проблемы» is painted by state (ordinary with none, orange warnings-only, red with an error), a run brings up «Вывод» and a diagnostic «Проблемы»; the panel defaults to the **bottom**; «Поле очереди ввода» is gone (the queue is a tab now); a full load writes `--- база знаний загружена (N мс) ---` into «Система», measured by the window's clock from «Запустить» to `loaded` |
-| task_51_variadic_first | not started | `ПЕРВОЕ` принимает любое число целей (`ПЕРВОЕ/+`), как `ВЫВОД`: тело — цикл по `callOnce`, вместо зашитого `isVariadicBuiltin` — таблица вариадических имён (оба написания), запись в `doc/builtins.json` и §4.6 руководства.  Выбрано «с одной» (2026-10-02); план — `ai/task_51_variadic_first.md` |
+| task_51_variadic_first | done | `ПЕРВОЕ` берёт любое число целей, начиная с одной: `builtinFirst` — цикл по `args` с `callOnce`, а вариадические имена собраны в одну таблицу `kVariadicNames` (`ВЫВОД`/`write`, `ПЕРВОЕ`/`first`), из которой читают `findBuiltin`, `builtinArities` и `builtinNames`; строки `add("ПЕРВОЕ", 2, …)` больше нет, `isVariadicBuiltin` (два сравнения имён) тоже.  Разбора, движка, лексера и `checks.cpp` не касается: `variadic` уже значит «от арности 1».  Одноаргументное `ПЕРВОЕ(Ц)` — это фиксация на первом решении, **не** `ВЫП(Ц)` (`?НАЙТИВСЕ(X, ПЕРВОЕ(p(X)), L).` → `L=[1]`, у `ВЫП(p(X))` — `L=[1,2]`); арность 0 — ошибка загрузки («ПЕРВОЕ не имеет арности 0»).  Проверки: новый случай Catch2 на вариадику (+1 CLI-тест `--list-keywords` → `ПЕРВОЕ/+`), ctest 278/278; `--list-keywords` печатает `ПЕРВОЕ/+` и `first/+` и больше не печатает `ПЕРВОЕ/2`; `doc/builtins.json` (`arities: []`, `variadic`), `help.typ` §4.5/§4.6, `technical.typ`, `prologd-diff.typ` (§«ПЕРВОЕ» и строка таблицы), `ai/porting_notes.md`, `gui/README.md` |
 | task_52_infix_operators | not started | `X = Y`, `X < Y`, `X > Y`, `X >= Y`, `X =< Y` — сахар над `РАВНО`/`МЕНЬШЕ`/`БОЛЬШЕ` (не новые имена), один слой в парсере с таблицей операторов, `xfx` (цепочка — ошибка разбора), подсказки для ISO-операторов, которых в диалекте нет, и клавиша вставки `= ` в GUI.  `=:=` не вводим (2026-10-02): `#…#` уже вычисляет, и это сказано в §4.7; план — `ai/task_52_infix_operators.md` |
 | task_53_writeln | not started | `ВЫВОДПС(Аргумент, ...)` / `writeln` — `ВЫВОД` с переводом строки: тело — `builtinWrite` плюс `newline()`, имя — строка в таблице вариадических имён из `task_51` (тот поэтому идёт первым), плюс `kEnglishNames`, `kReservedBuiltins` в лексере и запись в `doc/builtins.json`; в руководстве новая §6.2 со сдвигом номеров.  План — `ai/task_53_writeln.md` |
 | task_54_input_stream | not started | Ответ оболочки — кусок входного потока: интерпретатор сам режет его на строки, как файл, поэтому `ВВОДСТР`/`ВВОДСИМВ`/`ВВКОД` в окне ведут себя как с файлом, а многострочная консоль остаётся и значит «несколько строк ввода»; плюс BOM в начале потока или куска — не данные (как у исходников).  Заодно правится устаревший абзац про ввод в `doc/gui.typ` (окно до task_50).  Объединение `ВВОДСИМВ`/`ВВОДСТР` в `ВВОД` — отложено.  План — `ai/task_54_input_stream.md` |
@@ -130,8 +130,8 @@ where its files go).
 
 ## Test suite
 
-276 tests, about five seconds: 262 Catch2 cases plus 14 command-line and
-integration tests (seven option tests, two `--list-keywords` tests, the
+278 tests, about five seconds: 263 Catch2 cases plus 15 command-line and
+integration tests (seven option tests, three `--list-keywords` tests, the
 import-search report, the JSON protocol session, the formatter round-trip and the
 engine-limit and diagnostics cases). Groups:
 BigInt, lexer, keywords, parser, unification, engine, every built-in group,
@@ -1856,6 +1856,31 @@ Added on 2026-10-02 while implementing task_31:
   (двойные звёздочки в Typst ничего не выделяют, только предупреждение) стало
   `*сохранена*`.  Документ пересобран: 22 страницы, заголовки 1–19 без цифр в
   исходнике.
+
+* Interpreter round, part 61: **`ПЕРВОЕ` берёт любое число целей** (task_51,
+  2026-10-02).  Ответ на вопрос пользователя «сейчас `ПЕРВОЕ` у нас с двумя
+  аргументами, сложно ли заменить на любое количество, как у `ВЫВОД`?», решённый
+  в пользу «от арности 1»: в целом тракте (диспетчер, таблица ключевых слов,
+  проверка вызовов, `--list-keywords`, событие протокола, автодополнение)
+  `variadic` уже значит «хотя бы один аргумент», поэтому нигде не появилось
+  второго поля.  `builtinOr` стал `builtinFirst` и обходит `args` через
+  `callOnce` — первая цель, у которой есть решение, фиксируется; зашитый
+  `isVariadicBuiltin` (два сравнения имён) стал таблицей `kVariadicNames`
+  (`ВЫВОД`/`write`, `ПЕРВОЕ`/`first`), из которой читают `findBuiltin`,
+  `builtinArities` и `builtinNames`, а строка `add("ПЕРВОЕ", 2, …)` и `add`
+  больше на два имени не опираются.  Двухаргументные вызовы отвечают как
+  раньше, `;` по-прежнему дизъюнкция, а разбор, движок, лексер и `checks.cpp` не
+  тронуты.  Проверкой нашлась одна неточность в самой формулировке задачи:
+  одноаргументное `ПЕРВОЕ(Ц)` — это *фиксация* на первом решении, а не `ВЫП(Ц)`
+  (`?НАЙТИВСЕ(X, ПЕРВОЕ(p(X)), L).` → `L=[1]`, у `ВЫП(p(X))` — `L=[1,2]`), и в
+  руководстве §4.6 теперь так и написано.  Арность 0 — ошибка загрузки
+  («ПЕРВОЕ не имеет арности 0», код 2).  Руководство §4.5/§4.6,
+  `technical.typ`, §«`ПЕРВОЕ` вместо `ИЛИ`» и строка таблицы в
+  `prologd-diff.typ`, `doc/builtins.json` (`arities: []`, `variadic`),
+  `ai/porting_notes.md`, `gui/README.md`.  Проверки: 278/278 ctest (новый случай
+  Catch2 на вариадику и CLI-тест `ПЕРВОЕ/+`), шесть GUI-наборов
+  (`test_reference`, `test_completion`, `test_keywords`, `test_queries`,
+  `test_tokens`, `test_queryline`) зелёные, три документа собираются Typst.
 
 
 

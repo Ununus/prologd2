@@ -101,6 +101,17 @@ TEST_CASE("keyword arities come from the dispatch table") {
   REQUIRE(output->variadic);
   REQUIRE(output->arities.empty());
 
+  // `ПЕРВОЕ` joined it in task_51: any number of goals from one.
+  const prologd::KeywordInfo* first = findKeyword(keywords, "ПЕРВОЕ");
+  REQUIRE(first != nullptr);
+  REQUIRE(first->kind == prologd::KeywordKind::Predicate);
+  REQUIRE(first->variadic);
+  REQUIRE(first->arities.empty());
+  const prologd::KeywordInfo* firstEnglish = findKeyword(keywords, "first");
+  REQUIRE(firstEnglish != nullptr);
+  REQUIRE(firstEnglish->variadic);
+  REQUIRE(firstEnglish->arities.empty());
+
   // A latin name that is both a type word and a unary predicate.  The dialect
   // has two such checks: `integer` is the strict type test (a whole-valued real
   // is not an integer), `is_whole` asks whether a value *can* be taken as one.
@@ -134,7 +145,8 @@ TEST_CASE("a retired name is not offered, its replacement is") {
   const prologd::KeywordInfo* first = findKeyword(keywords, "ПЕРВОЕ");
   REQUIRE(first != nullptr);
   REQUIRE(first->kind == prologd::KeywordKind::Predicate);
-  REQUIRE(first->arities == std::vector<std::size_t>{2});
+  REQUIRE(first->variadic);  // any number of goals from one (task_51)
+  REQUIRE(first->arities.empty());
 
   // The spellings the language has retired stay reserved for the lexer (so an
   // old call gets a message instead of becoming a variable), but the keyword

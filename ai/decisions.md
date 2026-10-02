@@ -145,7 +145,8 @@ a disjunction at all.  This ADR first decided to keep the old behaviour.
 
 **Decision.** `;` between goals *is* the backtrackable disjunction (`,` binds
 tighter), the sentence terminator is `.` alone, and the committed «take the
-first» form is the built-in `ПЕРВОЕ/2` (renamed from `ИЛИ/2`).  A `;` written
+first» form is the built-in `ПЕРВОЕ/2` (renamed from `ИЛИ/2`; variadic from one
+goal since task_51).  A `;` written
 where a sentence used to end is an error that says what changed.
 
 **Consequences.** Standard-Prolog programs read naturally; a ported program that

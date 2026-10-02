@@ -145,11 +145,16 @@ BuiltinResult builtinNot(Engine& engine, std::span<const Term> args) {
   return engine.hasSolution(args[0]) ? BuiltinResult::Fail : BuiltinResult::Continue;
 }
 
-BuiltinResult builtinOr(Engine& engine, std::span<const Term> args) {
-  // `ПЕРВОЕ` (renamed from "ИЛИ", task_44) commits to the first solution of its
-  // first goal; the full disjunction is `A ; B` (task_41).
-  if (engine.callOnce(args[0]) || engine.callOnce(args[1])) {
-    return BuiltinResult::Continue;
+BuiltinResult builtinFirst(Engine& engine, std::span<const Term> args) {
+  // `ПЕРВОЕ` (renamed from "ИЛИ", task_44) commits to the first solution of the
+  // first goal that has one; the full disjunction is `A ; B` (task_41).  Any
+  // positive arity, like `ВЫВОД` (task_51): one goal is «the first solution of
+  // this goal» — committed, so unlike `ВЫП(Ц)` it does not backtrack into the
+  // rest of that goal's solutions.
+  for (const Term& goal : args) {
+    if (engine.callOnce(goal)) {
+      return BuiltinResult::Continue;
+    }
   }
   return BuiltinResult::Fail;
 }
@@ -257,7 +262,9 @@ using BuiltinTable = std::unordered_map<BuiltinKey, BuiltinFn, BuiltinKeyHash>;
 /// Names that are not listed are already English (`abs`, `sqrt`, `sin`, `cos`,
 /// `tan`, `exp`, `mod`, `div`) or are answered outside the dispatch table
 /// (`ВЫП`/`call`, handled by the solver; `ИМПОРТ`/`import`, handled by the
-/// parser) — see `keywords.cpp` and `parser.cpp`.
+/// parser) — see `keywords.cpp` and `parser.cpp`.  `ПЕРВОЕ`/`first` and
+/// `ВЫВОД`/`write` are here for their English spelling, but they are registered
+/// by `kVariadicNames`, not by `add`.
 constexpr std::pair<std::string_view, std::string_view> kEnglishNames[] = {
     {"ЛОЖЬ", "fail"},         {"ТРАССА", "trace"},
     {"НЕТ_ТРАССЫ", "no_trace"}, {"ТИХО", "quiet"},
@@ -296,10 +303,31 @@ std::string_view englishName(std::string_view name) {
   return {};
 }
 
-/// `ВЫВОД` accepts any positive arity and has no table entry to enumerate; its
-/// English spelling is `write`.
-bool isVariadicBuiltin(std::string_view name) {
-  return name == "ВЫВОД" || name == "write";
+/// The variadic names: every positive arity is legal, so they have no table
+/// entry to enumerate — `findBuiltin` looks here first.
+///
+/// `ВЫВОД`/`write` prints every argument (task_11); `ПЕРВОЕ`/`first` tries every
+/// argument as a goal and commits to the first one that succeeds (task_51).
+/// Both spellings of a name are listed: `add` registers the English spelling
+/// with the table, and these names never reach it.
+struct VariadicName {
+  std::string_view name;
+  BuiltinFn function;
+};
+
+constexpr VariadicName kVariadicNames[] = {
+    {"ВЫВОД", builtinWrite}, {"write", builtinWrite},
+    {"ПЕРВОЕ", builtinFirst}, {"first", builtinFirst},
+};
+
+/// The function behind a variadic name, `nullptr` when the name is not variadic.
+BuiltinFn variadicBuiltin(std::string_view name) {
+  for (const VariadicName& entry : kVariadicNames) {
+    if (entry.name == name) {
+      return entry.function;
+    }
+  }
+  return nullptr;
 }
 
 const BuiltinTable& builtinTable() {
@@ -326,7 +354,6 @@ const BuiltinTable& builtinTable() {
     add("ТИХО", 0, builtinQuiet);
     add("ВЕРСИЯ", 0, builtinVersion);
     add("НЕ", 1, builtinNot);
-    add("ПЕРВОЕ", 2, builtinOr);
     add("РАВНО", 2, builtinEqual);
     add("ПС", 0, builtinNewline);
     add("ЖДИ", 1, builtinWait);
@@ -407,9 +434,9 @@ const BuiltinTable& builtinTable() {
 }  // namespace
 
 BuiltinFn findBuiltin(std::string_view name, std::size_t arity) {
-  // `ВЫВОД` accepts any positive arity.
-  if (isVariadicBuiltin(name) && arity >= 1) {
-    return builtinWrite;
+  // The variadic names accept any positive arity (`ВЫВОД`, `ПЕРВОЕ`).
+  if (BuiltinFn variadic = variadicBuiltin(name); variadic != nullptr && arity >= 1) {
+    return variadic;
   }
   const auto& table = builtinTable();
   const auto it = table.find(BuiltinKey{name, arity});
@@ -422,9 +449,9 @@ BuiltinFn findBuiltin(std::string_view name, std::size_t arity) {
 std::span<const BuiltinAlias> builtinAliases() { return kEnglishNames; }
 
 BuiltinArities builtinArities(std::string_view name) {
-  // `ВЫВОД` has no table entry to enumerate: `findBuiltin` accepts any positive
-  // arity for it.
-  if (isVariadicBuiltin(name)) {
+  // A variadic name has no table entry to enumerate: `findBuiltin` accepts any
+  // positive arity for it.
+  if (variadicBuiltin(name) != nullptr) {
     return BuiltinArities{{}, true};
   }
   BuiltinArities result;
@@ -439,12 +466,13 @@ BuiltinArities builtinArities(std::string_view name) {
 
 std::vector<std::string> builtinNames() {
   std::vector<std::string> result;
-  result.reserve(builtinTable().size() + 2);
+  result.reserve(builtinTable().size() + std::size(kVariadicNames));
   for (const auto& entry : builtinTable()) {
     result.emplace_back(entry.first.name);
   }
-  result.emplace_back("ВЫВОД");  // variadic, the one name without a table entry
-  result.emplace_back("write");   // and its English spelling
+  for (const VariadicName& entry : kVariadicNames) {
+    result.emplace_back(entry.name);  // variadic: the names without a table entry
+  }
   std::sort(result.begin(), result.end());
   result.erase(std::unique(result.begin(), result.end()), result.end());
   return result;

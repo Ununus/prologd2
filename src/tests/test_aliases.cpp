@@ -39,7 +39,7 @@ TEST_CASE("every alias is wired to the function its Russian name reaches") {
   for (const prologd::BuiltinAlias& alias : prologd::builtinAliases()) {
     const std::string russian(alias.first);
     const std::string english(alias.second);
-    if (alias.first == "ВЫВОД") {
+    if (prologd::builtinArities(russian).variadic) {
       continue;  // variadic, no arities to enumerate; covered below
     }
     for (const std::size_t arity : prologd::builtinArities(russian).arities) {
@@ -50,13 +50,20 @@ TEST_CASE("every alias is wired to the function its Russian name reaches") {
   }
 }
 
-TEST_CASE("the output built-in is variadic under both names") {
-  for (const std::size_t arity : {std::size_t{1}, std::size_t{3}, std::size_t{9}}) {
-    INFO("arity: " << arity);
-    REQUIRE(prologd::findBuiltin("write", arity) == prologd::findBuiltin("ВЫВОД", arity));
+TEST_CASE("the variadic built-ins are variadic under both spellings") {
+  for (const std::string_view russian : {"ВЫВОД", "ПЕРВОЕ"}) {
+    const std::string_view english = englishOf(russian);
+    REQUIRE_FALSE(english.empty());
+    for (const std::size_t arity : {std::size_t{1}, std::size_t{3}, std::size_t{9}}) {
+      INFO("name: " << russian << " arity: " << arity);
+      REQUIRE(prologd::findBuiltin(english, arity) == prologd::findBuiltin(russian, arity));
+      REQUIRE(prologd::findBuiltin(russian, arity) != nullptr);
+    }
+    REQUIRE(prologd::builtinArities(russian).variadic);
+    REQUIRE(prologd::builtinArities(english).variadic);
+    REQUIRE(prologd::builtinArities(russian).arities.empty());
+    REQUIRE(prologd::findBuiltin(russian, 0) == nullptr);
   }
-  REQUIRE(prologd::builtinArities("write").variadic);
-  REQUIRE(prologd::builtinArities("ВЫВОД").variadic);
 }
 
 TEST_CASE("every Russian built-in has an English spelling") {

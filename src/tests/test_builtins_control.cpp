@@ -91,9 +91,38 @@ TEST_CASE("the choice form commits to the first solution of its first goal") {
   REQUIRE(generator.output == "X=1\n");
 }
 
+TEST_CASE("the choice form takes any number of goals") {
+  // task_51: `ПЕРВОЕ` is variadic like `ВЫВОД` — goals are tried in order, and
+  // the first one that succeeds is committed to.  One goal is `ВЫП(Ц)`.
+  const auto skipping = runProgram(
+      "?ПЕРВОЕ(ЛОЖЬ, ЛОЖЬ, РАВНО(X, 1), РАВНО(X, 2)).\n"
+      "?ПЕРВОЕ(ЛОЖЬ, ЛОЖЬ, ЛОЖЬ).\n"
+      "?ПЕРВОЕ(РАВНО(A, 1)).\n");
+  REQUIRE(skipping.loaded);
+  REQUIRE_FALSE(skipping.runtimeError);
+  REQUIRE(skipping.output == "X=1\nНЕТ\nA=1\n");
+
+  // Commitment is still to the first goal that succeeds: the goals after it are
+  // not reached, so the alternatives of a generator are dropped.
+  const auto committed = runProgram("п(1).\nп(2).\n?ПЕРВОЕ(ЛОЖЬ, п(X), ЛОЖЬ).\n");
+  REQUIRE(committed.loaded);
+  REQUIRE(committed.output == "X=1\n");
+
+  // The first goal that succeeds wins even when a later one would succeed too.
+  const auto earlier = runProgram("?ПЕРВОЕ(РАВНО(X, 9), РАВНО(X, 1)).\n");
+  REQUIRE(earlier.loaded);
+  REQUIRE(earlier.output == "X=9\n");
+
+  // A goal that is not a predicate is still an error, wherever it stands.
+  const auto bad = runProgram("?ПЕРВОЕ(ЛОЖЬ, 5, РАВНО(X, 1)).\n");
+  REQUIRE(bad.loaded);
+  REQUIRE(bad.runtimeError);
+  REQUIRE(bad.error.find("Цель должна быть предикатом") != std::string::npos);
+}
+
 TEST_CASE("a disjunction tries both branches and yields all their solutions") {
-  // `;` is the backtrackable disjunction (task_41), unlike `ПЕРВОЕ/2`, which
-  // commits to the first solution of its first goal.
+  // `;` is the backtrackable disjunction (task_41), unlike `ПЕРВОЕ`, which
+  // commits to the first solution of the first goal that succeeds.
   const auto result = runProgram(
       "a(1).\n"
       "a(2).\n"
@@ -151,7 +180,7 @@ TEST_CASE("the comma binds tighter than the disjunction") {
 TEST_CASE("a cut inside a branch is local to that branch") {
   // The branch runs in a frame of its own whose cut barrier sits above the
   // alternative, so `!` prunes what the branch created and leaves the other one
-  // alone — the ISO rule, and the reason `ПЕРВОЕ/2` is kept for the committed
+  // alone — the ISO rule, and the reason `ПЕРВОЕ` is kept for the committed
   // form.
   const auto after = runProgram("?РАВНО(X, 1), ! ; РАВНО(X, 2).\n");
   REQUIRE(after.loaded);
@@ -175,9 +204,16 @@ TEST_CASE("the choice form answers a goal that is not a predicate with an error"
   REQUIRE_FALSE(atom.runtimeError);
   REQUIRE(atom.output == "ДА\n");
 
-  const auto arity = runProgram("?ПЕРВОЕ(ЛОЖЬ, ЛОЖЬ, ЛОЖЬ).\n");
-  REQUIRE_FALSE(arity.loaded);
-  REQUIRE(arity.error.find("ПЕРВОЕ не имеет арности 3 (есть 2)") != std::string::npos);
+  // Any positive arity is legal now (task_51): three goals answer like two.
+  const auto three = runProgram("?ПЕРВОЕ(ЛОЖЬ, ЛОЖЬ, ЛОЖЬ).\n");
+  REQUIRE(three.loaded);
+  REQUIRE_FALSE(three.runtimeError);
+  REQUIRE(three.output == "НЕТ\n");
+
+  // Arity 0 is not: a variadic name still wants one goal at least.
+  const auto none = runProgram("?ПЕРВОЕ.\n");
+  REQUIRE_FALSE(none.loaded);
+  REQUIRE(none.error.find("ПЕРВОЕ не имеет арности 0") != std::string::npos);
 }
 
 TEST_CASE("quiet silences the query it appears in") {
