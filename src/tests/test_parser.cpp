@@ -127,6 +127,51 @@ TEST_CASE("a cut cannot be written inside a meta-call's argument") {
   (void)program;
 }
 
+TEST_CASE("`\\+` is ISO's spelling of the same negation") {
+  // `\+ Ц` is the goal `НЕ(Ц)` (task_55).  It is a prefix at the term level, so
+  // `,` and `;` bind looser — `\+ A, B` is `(\+ A), B` — and the brackets of
+  // `\+ (A, B)` are the same brackets `НЕ((A, B))` needs.
+  {
+    DiagnosticSink sink;
+    const auto program = parse("p :- \\+ q.\n", sink);
+    REQUIRE_FALSE(sink.hasErrors());
+    REQUIRE(goalText(program.clauses[0].body[0]) == "НЕ(q)");
+  }
+  {
+    DiagnosticSink sink;
+    const auto program = parse("p :- \\+ q, r.\n", sink);
+    REQUIRE_FALSE(sink.hasErrors());
+    REQUIRE(program.clauses[0].body.size() == 2);
+    REQUIRE(goalText(program.clauses[0].body[0]) == "НЕ(q)");
+    REQUIRE(goalText(program.clauses[0].body[1]) == "r");
+  }
+  {
+    DiagnosticSink sink;
+    const auto program = parse("p :- \\+ (q, r).\n", sink);
+    REQUIRE_FALSE(sink.hasErrors());
+    REQUIRE(goalText(program.clauses[0].body[0]) == "НЕ(,(q,r))");
+  }
+  {
+    DiagnosticSink sink;
+    const auto program = parse("p :- \\+ \\+ q.\n", sink);
+    REQUIRE_FALSE(sink.hasErrors());
+    REQUIRE(goalText(program.clauses[0].body[0]) == "НЕ(НЕ(q))");
+  }
+}
+
+TEST_CASE("an ISO infix `is` says what to write instead") {
+  // `X is 2+3` is how a reader of ISO Prolog evaluates an expression, and the
+  // dialect has no `is`: the message names `#…#` and the goal that takes it
+  // (task_55).  Without it the only reading given is «Цель не может быть
+  // переменной», which says nothing about the mistake.
+  DiagnosticSink sink;
+  const auto program = parse("?X is 2+3.\n", sink);
+  REQUIRE(sink.hasErrors());
+  REQUIRE(sink.diagnostics().front().message ==
+          "«is» — не оператор: выражение помечают «#…#», например «РАВНО(X, #2+3#)»");
+  (void)program;
+}
+
 TEST_CASE("a `;` where the dialect used to accept one is an error") {
   SECTION("as a sentence terminator") {
     DiagnosticSink sink;

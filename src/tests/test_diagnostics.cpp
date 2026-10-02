@@ -153,6 +153,22 @@ TEST_CASE("an undefined predicate is a warning with a suggestion") {
   REQUIRE(warning.message == "не найдено: члеен/2; возможно, член/2");
 }
 
+TEST_CASE("an ISO `is` is told what the dialect writes instead") {
+  // `is/2` is not a predicate of the dialect (task_55), so the call stays an
+  // ordinary unknown name — a program may define its own `is/2` — but the
+  // warning names the spelling that does the same thing, because a reader of
+  // ISO Prolog reaches for `is` first.
+  const std::vector<PrologError> diagnostics = diagnosticsOf("?is(X, #2+3#).\n");
+  REQUIRE(diagnostics.size() == 1);
+  const PrologError& warning = diagnostics.front();
+  REQUIRE(warning.code == ErrorCode::UnknownPredicate);
+  REQUIRE(warning.severity == Severity::Warning);
+  REQUIRE(warning.location.line == 1);
+  REQUIRE(warning.location.column == 2);
+  REQUIRE(warning.message ==
+          "не найдено: is/2; «is» — не предикат: в Пролог-Д это «РАВНО(X, #2+3#)»");
+}
+
 TEST_CASE("the retired findall spelling suggests the current one") {
   // The name with ё left the language (task_44): it is one letter away from
   // `НАЙТИВСЕ`, so the ordinary unknown-name path already says exactly what to

@@ -172,6 +172,29 @@ const char* retiredNameMessage(std::string_view name, std::size_t arity) {
   return nullptr;
 }
 
+/// Spellings borrowed from other Prologs that mean something the dialect writes
+/// differently (task_55).  A call to one stays an ordinary unknown predicate —
+/// the name is not reserved, so a program may still define its own `is/2` — but
+/// the warning names the Пролог-Д spelling of the same thing.
+struct ForeignSpelling {
+  std::string_view name;
+  std::size_t arity;
+  const char* hint;
+};
+
+constexpr ForeignSpelling kForeignSpellings[] = {
+    {"is", 2, "«is» — не предикат: в Пролог-Д это «РАВНО(X, #2+3#)»"},
+};
+
+const char* foreignSpellingHint(std::string_view name, std::size_t arity) {
+  for (const ForeignSpelling& foreign : kForeignSpellings) {
+    if (foreign.name == name && foreign.arity == arity) {
+      return foreign.hint;
+    }
+  }
+  return nullptr;
+}
+
 /// Visit every goal written in the unit as `(name, arity, location)`.
 ///
 /// The meta-predicates whose arguments are *goals* are opened up, so
@@ -330,6 +353,10 @@ void checkCallSites(const ParsedProgram& program, const Database& database,
       if (!suggestion.empty()) {
         message += "; возможно, ";
         message += suggestion;
+      }
+      if (const char* hint = foreignSpellingHint(name, arity); hint != nullptr) {
+        message += "; ";
+        message += hint;
       }
       warning.message = std::move(message);
       report(warning);

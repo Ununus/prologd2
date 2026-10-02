@@ -25,6 +25,19 @@ TEST_CASE("negation undoes the bindings of the goal it checks") {
   REQUIRE(result.output == "ДА\nНЕТ\nНЕТ\nX=_1\nДА\nA=_1\nB=2\n");
 }
 
+TEST_CASE("`\\+` is the ISO spelling of the same negation") {
+  const auto result = runProgram(
+      "?\\+ ЛОЖЬ.\n"
+      "?\\+ РАВНО(1, 2).\n"
+      "?\\+ РАВНО(1, 1).\n"
+      "?\\+ \\+ ЛОЖЬ.\n"                        // double negation is negation
+      "?\\+ (ЛОЖЬ ; ЛОЖЬ).\n"
+      "?\\+ (ЛОЖЬ ; РАВНО(A, 1)), ПЕР(A).\n"    // the whole disjunction is negated
+      "?\\+ (ЛОЖЬ, РАВНО(B, 1)), ПЕР(B).\n");   // the binding of B is gone
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "ДА\nДА\nНЕТ\nНЕТ\nДА\nНЕТ\nB=_1\n");
+}
+
 TEST_CASE("negation keeps what a goal did to the database") {
   // Bindings are undone, side effects are not: the database is not backtrackable
   // in PrologD, so the clause asserted inside `НЕ` survives the negation.

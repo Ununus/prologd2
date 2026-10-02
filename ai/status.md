@@ -13,7 +13,7 @@ where its files go).
   started (protocol + skeleton).
 * Build: the `windows-msvc` preset (Visual Studio 18 2026, MSVC 19.51) build is
   green locally; the Linux presets, including `-Werror`, build cleanly.
-* Tests: 268/268 pass in about five seconds: 254 Catch2 cases plus 14 command-line
+* Tests: 274/274 pass in about five seconds: 260 Catch2 cases plus 14 command-line
   and integration tests (seven option tests, two `--list-keywords` tests, the
   import-search report, the JSON protocol session, the engine-limit cases, the
   diagnostics cases and the formatter round-trip).
@@ -121,10 +121,15 @@ where its files go).
 | task_48_interface_cleanup | done | the round of small things the user asked for: five pictures left the tree (`help-about` — the same drawing as `prologd2`, the two `search-find-selected-*`, `view-toolbar`, `view-line-numbers`), `assets.MISSING` is down to four names, «Сохранить все» left the toolbar, the two «Найти выделенное» commands left «Поиск» with their icons; `Esc` now closes the graphics window → the find bar → the reference dock → the cheat sheet (one handler on the window, by *propagation*, so the completion popup and the find bar's field keep answering for themselves), and the graphics window opens itself on the **first primitive of a run** — once per run, so a window closed during an animation stays closed (task_45's window plus `_graphics_shown`) |
 | task_49_gui_defects | done | five defects found by using the window, all fixed.  `Шаг → Стоп → Запуск` no longer answers «нет шага, который ждёт ответа» (the paused flag is cleared by the events that conclude a run — including the *error* a «Стоп» turns into while a step waits); an untouched unnamed tab comes back clean (the session record carries the unsaved flag; JSON, because a fourth tab-separated field cannot be told apart from text with a tab in it); the format `Запустить с трассировкой` no longer takes the window (the output is handed over once per turn of the event loop, and the pane trims its history in bulks — 200 000 lines: 21.9 s → 3.0 s, a 16 000-line trace: 2.2 s → 0.6 s); the main window remembers its size and place (`view/window_geometry`), which the graphics window had done since task_45; and the **output arrives as it is written** — `IoContext::setOutputLineSink` fires at a line end and the session emits one `output` event per line, so a lesson's countdown counts 3, 2, 1 instead of arriving as one block when the program is over |
 | task_50_panel_tabs | done | the output panel is one `QTabWidget`: **Проблемы** (errors and warnings), **Вывод** (program output, the `>` echo, the trace), **Система** (the window's notes) and **Ввод** (the prepared answers with the per-request console under them).  Each title carries its count (`Вывод:5`, `Проблемы:0` …), «Проблемы» is painted by state (ordinary with none, orange warnings-only, red with an error), a run brings up «Вывод» and a diagnostic «Проблемы»; the panel defaults to the **bottom**; «Поле очереди ввода» is gone (the queue is a tab now); a full load writes `--- база знаний загружена (N мс) ---` into «Система», measured by the window's clock from «Запустить» to `loaded` |
+| task_51_variadic_first | not started | `ПЕРВОЕ` принимает любое число целей (`ПЕРВОЕ/+`), как `ВЫВОД`: тело — цикл по `callOnce`, вместо зашитого `isVariadicBuiltin` — таблица вариадических имён (оба написания), запись в `doc/builtins.json` и §4.6 руководства.  Выбрано «с одной» (2026-10-02); план — `ai/task_51_variadic_first.md` |
+| task_52_infix_operators | not started | `X = Y`, `X < Y`, `X > Y`, `X >= Y`, `X =< Y` — сахар над `РАВНО`/`МЕНЬШЕ`/`БОЛЬШЕ` (не новые имена), один слой в парсере с таблицей операторов, `xfx` (цепочка — ошибка разбора), подсказки для ISO-операторов, которых в диалекте нет, и клавиша вставки `= ` в GUI.  `=:=` не вводим (2026-10-02): `#…#` уже вычисляет, и это сказано в §4.7; план — `ai/task_52_infix_operators.md` |
+| task_53_writeln | not started | `ВЫВОДПС(Аргумент, ...)` / `writeln` — `ВЫВОД` с переводом строки: тело — `builtinWrite` плюс `newline()`, имя — строка в таблице вариадических имён из `task_51` (тот поэтому идёт первым), плюс `kEnglishNames`, `kReservedBuiltins` в лексере и запись в `doc/builtins.json`; в руководстве новая §6.2 со сдвигом номеров.  План — `ai/task_53_writeln.md` |
+| task_54_input_stream | not started | Ответ оболочки — кусок входного потока: интерпретатор сам режет его на строки, как файл, поэтому `ВВОДСТР`/`ВВОДСИМВ`/`ВВКОД` в окне ведут себя как с файлом, а многострочная консоль остаётся и значит «несколько строк ввода»; плюс BOM в начале потока или куска — не данные (как у исходников).  Заодно правится устаревший абзац про ввод в `doc/gui.typ` (окно до task_50).  Объединение `ВВОДСИМВ`/`ВВОДСТР` в `ВВОД` — отложено.  План — `ai/task_54_input_stream.md` |
+| task_55_iso_negation_and_is_hint | done | `\+` — вторая запись `НЕ/1`, а не новое имя: один токен в лексере (`TokenKind::NotGoal`), префикс уровня терма в `parseTerm`, поэтому он работает в теле, в запросе, в директиве и в аргументах `ВЫП`/`НАЙТИВСЕ`, а приоритет — ISO (`\+ A, B` — это `(\+ A), B`, `\+ (A, B)` — отрицание всей конъюнкции, `\+ \+ Ц` — двойное отрицание); `НЕ` остаётся основным именем, в таблицу операторов task_52 `\+` не входит (он префиксный).  `is` **не добавлен**: `#…#` уже помечает и вычисляет выражение, поэтому вместо оператора — две подсказки, называющие замену (`kForeignSpellings` в `checks.cpp` для вызова `is/2`; `kInfixIsHint` в `parser.cpp` для `X is 2+3`).  Руководство: §3.3, §4.4, строки «Арифметика»/«Отрицание» сравнительной таблицы, приложение; `prologd-diff.typ` §19/§20 и две строки в §14 |
 
 ## Test suite
 
-268 tests, about five seconds: 254 Catch2 cases plus 14 command-line and
+274 tests, about five seconds: 260 Catch2 cases plus 14 command-line and
 integration tests (seven option tests, two `--list-keywords` tests, the
 import-search report, the JSON protocol session, the formatter round-trip and the
 engine-limit and diagnostics cases). Groups:
@@ -197,6 +202,19 @@ plain scripts.
    текущей» in one click); the text-mode `--timeout-ms` was **dropped by decision**
    (a clock in the solver's hot path is a cost the front-end deadline avoids, and
    a console run has the shell's own timeout).
+   Written down on 2026-10-02 and not started: `task_51_variadic_first.md` —
+   `ПЕРВОЕ` принимает любое число целей (`ПЕРВОЕ/+`), как `ВЫВОД`; выбран вариант
+   «с одной» (одна цель как минимум), потому что `variadic` во всей цепочке уже
+   значит именно это.  Рядом лёг `task_52_infix_operators.md` — короткие формы
+   `=`, `<`, `>`, `>=`, `=<` сахаром над `РАВНО`/`МЕНЬШЕ`/`БОЛЬШЕ`, `xfx`
+   (цепочка — ошибка разбора) и клавиша вставки `= `; про `=:=` решено, что
+   `#…#` его уже заменяет — это объясняется в §4.7, а сам он попадает в
+   подсказки.  Третьим лёг `task_53_writeln.md` — `ВЫВОДПС`/`writeln`, вывод с
+   переводом строки; он опирается на таблицу вариадических имён из `task_51`,
+   поэтому тот идёт первым.  Четвёртым лёг `task_54_input_stream.md` — ответ
+   оболочки как кусок входного потока (окно и файл наконец подчиняются одному
+   правилу) и BOM в начале потока как метка, а не данные; объединение
+   `ВВОДСИМВ`/`ВВОДСТР` в `ВВОД` отложено — причины записаны в файле задачи.
 
 ## Open questions for the user
 
@@ -1757,6 +1775,35 @@ Added on 2026-10-02 while implementing task_31:
   ~192 px.  Проверки: новая `test_window.py::test_the_console_stays_one_field_high`
   (политика `Fixed` и высота ≈ sizeHint после показа окна), `test_output.py` и
   полный `test_window.py` зелёные.
+
+* Interpreter round, part 60: **`\+` и подсказка вместо `is/2`** (task_55,
+  2026-10-02).  Ответ на вопрос пользователя «осталось 2 существенных пункта,
+  где Пролог-Д расходится с другими: `is` и `\+ Ц`»: `\+` добавлен, `is` — нет.
+  `\+` — один токен (`TokenKind::NotGoal`: `peek(1) == '+'` в лексере, одинокий
+  `\` остаётся «недопустимым символом») и префикс уровня терма в `parseTerm`,
+  разворачивается в `НЕ/1`; приоритет ISO: `\+ A, B` — это `(\+ A), B`,
+  `\+ (A, B)` — отрицание конъюнкции, `\+ \+ Ц` — двойное отрицание;
+  `НАЙТИВСЕ(1, \+ РАВНО(1, 2), L)` отвечает `L=[1]`, а `\+ (ЛОЖЬ, РАВНО(B, 1)),
+  ПЕР(B)` — `B=_1` (связывание внутри отрицания отменяется).  Семантики,
+  диспетчера, `--list-keywords` и `doc/builtins.json` изменение не касается: это
+  запись, и проверка вызовов видит тот же `НЕ/1` (`walkGoal` его и так
+  раскрывает).  Формат читает `\+` как один токен и в строке не рвёт; в GUI
+  (`tokens.py`) он тоже один знак препинания, как `:-`.
+  Вместо `is` — подсказки: `?is(X, #2+3#).` получает предупреждение «не найдено:
+  is/2; «is» — не предикат: в Пролог-Д это «РАВНО(X, #2+3#)»» (имя при этом не
+  зарезервировано — своё `is/2` программа определить может), а `?X is 2+3.` —
+  ошибку разбора ««is» — не оператор: выражение помечают «#…#», например
+  «РАВНО(X, #2+3#)»»: без неё читатель ISO слышал только «Цель не может быть
+  переменной».  Настоящий оператор не добавлен сознательно: `#…#` — признак
+  выражения (вычисляется везде, где нужно число, а унификация обратима:
+  `РАВНО(5, #2+3#)` — ДА), и `is` ввёл бы вторую арифметику — голые `2+3` в
+  целях, — которую пришлось бы дать и сравнениям (`X < 2+1`, `=:=`), а от них уже
+  решено отказаться (task_52).  Проверки: 274/274 ctest — шесть новых случаев
+  Catch2 (лексер, парсер с сообщением про `is`, `\+` как `НЕ` в control-тестах,
+  формат) плюс тест текста предупреждения `is/2`; GUI `test_tokens.py` (новая
+  пара `\+`) и `test_reference.py` зелёные.  Руководство: §3.3 (про `is`), §4.4
+  и приложение, обе строки сравнительной таблицы; `prologd-diff.typ` — §19, §20 и
+  две строки в §14.
 
 
 

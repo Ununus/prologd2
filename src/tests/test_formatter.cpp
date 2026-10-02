@@ -161,6 +161,18 @@ TEST_CASE("a directive keeps its space and a query stays glued") {
           "%? НЕ(ЛОЖЬ).\n");
 }
 
+TEST_CASE("`\\+` stays one operator in every shape") {
+  // The lexer reads `\+` whole (task_55), so the formatter must not treat the
+  // backslash as a goal of its own and must not break between the operator and
+  // the goal it negates — in any mode.
+  const std::string source = "цель(Х) :- \\+ часть(Х), ещё(Х).\n";
+  for (const FormatOptions& options : {FormatOptions{}, hard(), hard(20)}) {
+    const FormatResult result = format(source, options);
+    REQUIRE(result.ok());
+    REQUIRE(result.text.find("\\+ часть(Х)") != std::string::npos);
+  }
+}
+
 TEST_CASE("a query and a directive keep their one line") {
   // A query is a question and a directive is an instruction: neither has a head
   // or a body to lay out, and the window's margin marker reads a *line*

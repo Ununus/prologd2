@@ -27,6 +27,7 @@ enum class TokenKind : std::uint8_t {
   ColonDash,
   Arrow,
   Bang,
+  NotGoal,  ///< `\+`, ISO's spelling of `НЕ` (task_55)
   Hash,
   Plus,
   Minus,

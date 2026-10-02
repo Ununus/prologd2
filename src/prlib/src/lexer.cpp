@@ -352,6 +352,25 @@ std::vector<Token> Lexer::tokenizeImpl(DiagnosticSink* sink) {
           tokens.push_back(makeToken(TokenKind::Unknown, "<", start));
         }
         break;
+      case '\\':
+        // `\+` is the ISO spelling of `НЕ` (task_55): one token, not two, so
+        // the parser sees a prefix operator and the formatter keeps it whole.
+        if (peek(1) == '+') {
+          advanceByte(2);
+          tokens.push_back(makeToken(TokenKind::NotGoal, "\\+", start));
+        } else {
+          advanceByte(1);
+          if (sink != nullptr) {
+            PrologError error;
+            error.code = ErrorCode::InvalidCharacter;
+            error.message = std::string(errorCodeText(error.code));
+            error.location = start;
+            error.isParseError = true;
+            sink->report(std::move(error));
+          }
+          tokens.push_back(makeToken(TokenKind::Unknown, "\\", start));
+        }
+        break;
       case '"':
         tokens.push_back(lexString(sink));
         break;

@@ -155,6 +155,9 @@ def test_reserved_names_variables_and_atoms() -> None:
         (PUNCTUATION, ")"),
         (PUNCTUATION, "."),
     ]
+    # `\+` is one token, like `:-`: the interpreter's lexer has a kind of its
+    # own for it (task_55), and the highlighter must not see a stray backslash.
+    assert kinds("\\+ p") == [(PUNCTUATION, "\\+"), (ATOM, "p")]
     # Without a table (an interpreter older than protocol 2) nothing is reserved,
     # so a built-in name is just a variable — the documented fallback.
     assert kinds("НАЙТИВСЕ", None) == [(VARIABLE, "НАЙТИВСЕ")]

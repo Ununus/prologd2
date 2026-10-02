@@ -56,6 +56,26 @@ TEST_CASE("lexer distinguishes atoms, variables and reserved names") {
   REQUIRE(tokens[6].text == "quoted atom");
 }
 
+TEST_CASE("`\\+` is one token, and a lone backslash is an error") {
+  {
+    DiagnosticSink sink;
+    const auto tokens = lex("?\\+ foo.", sink);
+    REQUIRE_FALSE(sink.hasErrors());
+    REQUIRE(tokens[1].kind == TokenKind::NotGoal);
+    REQUIRE(tokens[1].text == "\\+");
+    REQUIRE(tokens[2].kind == TokenKind::Identifier);
+  }
+  {
+    // A backslash that starts nothing (task_55): still the character the
+    // language does not know, so the diagnostic and the recoverable token stay.
+    DiagnosticSink sink;
+    const auto tokens = lex("\\", sink);
+    REQUIRE(sink.hasErrors());
+    REQUIRE(tokens[0].kind == TokenKind::Unknown);
+    REQUIRE(tokens[0].text == "\\");
+  }
+}
+
 TEST_CASE("a retired spelling is still a predicate name, not a variable") {
   // `НАЙТИВСЁ` (with ё) and `ИЛИ` left the language (task_44); the lexer keeps
   // them reserved so a call reaches the checks and gets a message instead of

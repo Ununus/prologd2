@@ -35,6 +35,13 @@ Term commaGoal(std::vector<Term>& goals) {
 /// sentence terminator (task_41) — the message says what changed.
 constexpr const char* kRetiredTerminator =
     "«;» — дизъюнкция; предложение не заканчивается точкой";
+
+/// The wording of an ISO `is` written as an infix operator (`X is 2+3`).  The
+/// dialect has no `is`: `#…#` marks an expression, and `РАВНО` evaluates it
+/// (task_55).  Without this the reader is told only «Цель не может быть
+/// переменной».
+constexpr const char* kInfixIsHint =
+    "«is» — не оператор: выражение помечают «#…#», например «РАВНО(X, #2+3#)»";
 }  // namespace
 
 Parser::Parser(std::vector<Token> tokens, VarAllocator allocator, DiagnosticSink* sink)
@@ -197,6 +204,12 @@ VarId Parser::variableFor(std::string_view name, bool anonymous,
 Term Parser::parseTerm() {
   if (check(TokenKind::Hash)) {
     return parseArithmetic();
+  }
+  if (match(TokenKind::NotGoal)) {
+    // ISO's `\+ Ц` — the same goal as `НЕ(Ц)` (task_55).  A prefix at the term
+    // level: `,` and `;` still bind looser, so `\+ A, B` is `(\+ A), B`, and
+    // `\+ (A, B)` needs the brackets it needs in ISO as well.
+    return makeCompound("НЕ", {parseTerm()});
   }
   return parsePrimary();
 }
@@ -469,7 +482,9 @@ Term Parser::parseGoal() {
     return goal;
   }
   if (goal.kind == TermKind::Var) {
-    if (goal.text.empty() || goal.text == "_") {
+    if (check(TokenKind::Identifier) && peek().text == "is") {
+      report(ErrorCode::InvalidSentence, previous().location, kInfixIsHint);
+    } else if (goal.text.empty() || goal.text == "_") {
       report(ErrorCode::MisplacedUnderscore, previous().location);
     } else {
       report(ErrorCode::InvalidSentence, previous().location,
