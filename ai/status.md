@@ -133,6 +133,7 @@ entries of the session log below and in `ai/task_*.md`.
 | task_58_gui_editor_menu_about | done | five requests: the icons, `Shift+Del`, the occurrences of the selection made visible, the loading line after a marker click, and the two question switches in «Выполнение» |
 | task_59_gui_answer_table | done | the answer table for a *single* goal (variant C), off by default; the rule lives in `answers.py`, Qt-free |
 | task_60_gui_ask_after_load | done | a question is asked only after `loaded` (`_pending_query`), and a load that fails drops it with one line in «Системе» |
+| task_61_portable_windows_build | planned | one folder for a clean Windows machine — the interpreter, the window frozen by PyInstaller (`--onedir`), five PDFs and `examples` — and the window's three source-tree paths moved onto it (`ai/task_61_portable_windows_build.md`) |
 
 ## Test suite
 
@@ -172,7 +173,8 @@ settings (`test_documents.py`, `test_settings.py`, `test_settingsdialog.py`,
    measured about 0.5 µs per failed head attempt).
 5. Optional and deliberately out of scope of task_54: `ВВОД(Пер, Терминатор)` instead of
    `ВВОДСИМВ` plus `ВВОДСТР`.
-6. Open on the board: `task_46`'s named profiles, and nothing else — the two «недочёта»
+6. Open on the board: `task_61` (the portable Windows build, written down on 2026-10-03)
+   and `task_46`'s named profiles, and nothing else — the two «недочёта»
    (task_47, task_48), the defects found by using the window (task_49), the four tasks of
    2026-10-02 (task_51 -- task_54) and the row of window requests (task_58 -- task_60) are
    all done.  The settings file is `%LOCALAPPDATA%\PrologD\gui\gui.ini` (or `--settings
@@ -2205,6 +2207,21 @@ Added on 2026-10-03 while planning task_59:
   программах; 22 набора `src/gui/tests/test_*.py` и `protocol_smoke.py`, которые
   надо запускать `.venv\Scripts\python.exe` (системный `python` без PySide6 роняет
   семь из них на `No module named 'PySide6'`); `docs` (пять документов, `typst=0`).
+
+* Planning round, part 71: **task_61 — переносная сборка для Windows** (2026-10-03).
+  Просьба пользователя: одна папка для чистой машины — окно, интерпретатор,
+  документы, примеры; и вопрос, каким инструментом.  Задача написана
+  (`ai/task_61_portable_windows_build.md`, M17, строка в `plan.md` §5 и на доске),
+  факты проверены на этой машине: `prologd.exe` — 944 КиБ и импортирует
+  `VCRUNTIME140.dll`/`MSVCP140.dll` (UCRT входит в Windows 10+, а эти две DLL — нет),
+  UTF-8 манифест вшит в образ (`/MANIFESTINPUT:src/utf8.manifest`), путь дерева
+  сборки в exe не попал; в окне три пути считаются от дерева исходников
+  (`default_executable`, `assets.DEFAULT_DIRECTORY`, `_open_document`); PyInstaller
+  6.22.3 поддерживает Python 3.14 и PySide6, но ни он, ни Nuitka, ни cx_Freeze не
+  установлены.  Решения пользователя: PyInstaller `--onedir`; DLL Visual C++ кладём
+  рядом; `_old` не кладём, `.typ` кладём; `gui.ini` в переносной сборке рядом с exe
+  (в других — AppData, как сейчас); `examples/lib` прописать сразу; папка
+  `prologd-2.0.0-win64` и zip.  Инсталлятор — следующая задача.
 
 
 

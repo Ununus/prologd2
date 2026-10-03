@@ -138,6 +138,7 @@ Removed from PrologD:
 | M14 | Engine limits, diagnostics and the standard surface | 38–44 |
 | M15 | The graphics window | 45 |
 | M16 | Interpreter options, profiles and limits | 46 |
+| M17 | A portable Windows build: interpreter, window, docs and examples in one folder | 61 |
 
 ## 6. Risks and mitigations
 

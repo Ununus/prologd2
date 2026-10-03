@@ -1157,7 +1157,12 @@ One piece of work is planned in a task file of its own (`ai/task_*.md`):
   `Шаг → Стоп → Запуск` answering «нет шага, который ждёт ответа», a second
   unnamed tab coming back modified after a restore, «Запустить с трассировкой»
   freezing the window on a deep recursion — and the live output they ask for, so a
-  countdown prints as it counts instead of when the program ends.
+  countdown prints as it counts instead of when the program ends.  All of them are
+  fixed (2026-10-03); the round entries in `ai/status.md` say how.
+* **Portable Windows build** — `ai/task_61_portable_windows_build.md`: one folder
+  for a machine without Python or Qt — the interpreter, this window frozen by
+  PyInstaller, the five PDFs and `examples`.  The window's three paths that are
+  derived from the source tree have to move onto the package first.
 
 The graphics window left this list in task_45: the engine keeps the pixels, the
 session draws them and sends every primitive, and `graphicswindow.py` shows the
