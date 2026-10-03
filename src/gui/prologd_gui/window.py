@@ -212,6 +212,13 @@ class MainWindow(QMainWindow):
         #: may end in the middle of a line, so splitting belongs to `answers.parse`
         #: and not here — the list holds what the interpreter sent, verbatim.
         self._answer_text: list[str] | None = None
+        #: A question that is waiting for its load to answer (task_60): a margin
+        #: marker and a goal typed into an empty window both send the program first
+        #: and the question only once the load has succeeded.  Asking earlier meant
+        #: answering against an empty knowledge base — «НЕТ» and a «не найдено»
+        #: warning for a predicate that never loaded — and reporting one broken line
+        #: twice, as the buffer's and as the query's.
+        self._pending_query: str | None = None
         #: The picture of the graphics predicates (task_45).  The interpreter
         #: keeps its own pixels, so this canvas mirrors the screen: it is created
         #: the first time the graphics window is opened, and what happened before
@@ -1471,6 +1478,9 @@ class MainWindow(QMainWindow):
         self._results_in_load = 0
         self._failed_in_load = False
         self._awaiting_query = False
+        # A question from an older click is about a program that this run replaces
+        # (task_60).  Both paths that ask after a load set it *after* this call.
+        self._pending_query = None
         # At once, not when `ready` arrives: the user pressed the button, and it
         # must not be pressable again while the interpreter is coming up.
         self._sync_run_actions()
@@ -1750,6 +1760,17 @@ class MainWindow(QMainWindow):
         if not self._session.is_running():
             if not self._start_session():
                 return
+        if not self._loaded:
+            # There is no program to ask: load what the editor holds, quietly, and
+            # ask when the load has answered (task_60).  With a base loaded this
+            # line asks *that* base and never reloads — one program, one load, and
+            # a goal typed after an edit belongs to the run that is in the window.
+            if not self.run_program(questions=False):
+                return
+            self._ask_after_load(text)
+            self._sync_run_actions()
+            self._update_details()
+            return
         self._busy = True
         self._arm_answer_table()
         self._session.run_query(text)
@@ -1767,6 +1788,10 @@ class MainWindow(QMainWindow):
         A click during a run stops that run first.  The margin marker is the way
         out of a runaway query as much as it is a way to ask one, and after the
         stop the clicked question is the one that answers (task_36).
+
+        The question itself goes out when the load has answered (`_ask_after_load`):
+        a file that does not parse has no base to ask, and asking anyway answered
+        «НЕТ» and repeated the file's own parse error as the query's (task_60).
         """
         if not statement:
             return
@@ -1781,11 +1806,44 @@ class MainWindow(QMainWindow):
         self._query_line.setText(statement)
         if not self.run_program(questions=False):
             return
+        self._ask_after_load(statement)
+
+    def _ask_after_load(self, statement: str) -> None:
+        """Keeps a question until the program it was sent with has loaded (task_60).
+
+        `_on_loaded` is the only place that knows the text parsed, and it is where
+        the question goes out from.  Asking at once, as the window used to, meant a
+        file that does not parse answered a question against an empty knowledge base
+        («НЕТ», plus «не найдено: факт/1») and reported its broken line twice: once
+        as the buffer's, once as the query's.
+        """
+        self._pending_query = statement
+        # The run is over when this question answers, not when the load does: the
+        # `loaded` event of the quiet load is the moment the question goes out, and
+        # from there the answer is what `_awaiting_query` waits for.
+        self._awaiting_query = True
+
+    def _send_pending_query(self) -> None:
+        """Sends the question that was waiting for its program."""
+        statement, self._pending_query = self._pending_query, None
+        if statement is None:
+            return
         self._arm_answer_table()
         self._session.run_query(statement)
-        # The run is over when this question answers, not when the load does:
-        # the `loaded` event of the quiet load is ignored while this is set.
-        self._awaiting_query = True
+
+    def _drop_pending_query(self, note: str = "") -> None:
+        """Forgets a question whose program never loaded, saying so if asked.
+
+        The file's own diagnostic is already in «Проблемах», with its line marked,
+        so silence would leave the click looking broken and a second question to the
+        interpreter would look like an answer.  One line in «Системе» is the middle
+        ground (task_60).
+        """
+        if self._pending_query is None:
+            return
+        self._pending_query = None
+        if note:
+            self._append_note(note)
 
     # -- files -------------------------------------------------------------
     def new_buffer(self, name: str | None = None) -> Buffer:
@@ -2075,8 +2133,10 @@ class MainWindow(QMainWindow):
         self._stopping = True
         self._busy = False
         self._loaded = False
-        # A stopped query answers nothing, so nothing is left to tabulate.
+        # A stopped query answers nothing, so nothing is left to tabulate — and a
+        # question still waiting for its load will never get one (task_60).
         self._answer_text = None
+        self._drop_pending_query()
         self._session.stop()
         self._input_console.idle()
         self._step_pane.idle()
@@ -2093,8 +2153,13 @@ class MainWindow(QMainWindow):
         self._stop_grace.stop()
         self._stopping = False
         self._busy = False
-        # The interrupted query answers nothing: there is no table to build.
+        # The interrupted query answers nothing: there is no table to build, and a
+        # question that was still waiting for its load has no load coming.  The
+        # waiting flag goes too — it was set for the query that just ended, and a
+        # later `loaded` would read it as «a question of mine is still to come».
         self._answer_text = None
+        self._drop_pending_query()
+        self._awaiting_query = False
         self._input_console.idle()
         self._step_pane.idle()
         self._step_stack.clear()
@@ -3285,6 +3350,9 @@ class MainWindow(QMainWindow):
                 self._append_note(
                     f"--- база знаний загружена ({self._run_clock.elapsed()} мс) ---\n"
                 )
+                # The program parsed, so the question that was waiting for it can
+                # be asked now (task_60).
+                self._send_pending_query()
             return
         self._busy = False
         if not self._failed_in_load:
@@ -3349,8 +3417,10 @@ class MainWindow(QMainWindow):
         self._busy = False
         self._failed_in_load = True
         self._awaiting_query = False
-        # The query ended in an error, not in an answer: nothing to tabulate.
+        # The query ended in an error, not in an answer: nothing to tabulate, and a
+        # question that was waiting for this program is not asked at all (task_60).
         self._answer_text = None
+        self._drop_pending_query("--- вопрос не выполнен: база знаний не загрузилась ---\n")
         self._step_pane.idle()
         self._step_stack.clear()
         self._show_panel_tab(panels.TAB_PROBLEMS)
@@ -3520,8 +3590,10 @@ class MainWindow(QMainWindow):
         # answer it: the buffer keeps its text and the state is dropped.
         self._format_pending = None
         # The same goes for a query that was in flight: nothing more is coming,
-        # so a half-collected answer must not be picked up by the next run.
+        # so a half-collected answer must not be picked up by the next run — nor a
+        # question still waiting for a program that will never load (task_60).
         self._answer_text = None
+        self._drop_pending_query()
         # A process *we* killed has no meaningful code: Windows reports the
         # termination status as a number nobody can read (62097), so the message
         # stays «остановлено» and the status bar keeps the last real code.

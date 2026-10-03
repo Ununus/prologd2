@@ -230,6 +230,19 @@ question in a fresh interpreter: the marker is the way out of a runaway query as
 much as a way to ask one.  The click leaves the caret, the selection and the
 document untouched — a run is not an edit.
 
+The question is sent **after** the load has answered, not with it (task_60).  The
+load parses the whole file — `questions:false` only stops the program's own
+`?`-statements from *running*, not from being read — so a broken line is reported
+by the load, under the file's name.  Asking at once parsed the same line a second
+time as `<query>` (two diagnostics for one reason) and, worse, answered against an
+**empty** base, because a file that does not parse adds nothing: the answer was
+«НЕТ» plus «не найдено: факт/1», blaming the query for the file's error.  Now
+the statement waits in `_pending_query` and goes out from `_on_loaded`; a load
+that fails drops it with one line in «Система» (`--- вопрос не выполнен: база
+знаний не загрузилась ---`), while the file's own error stays in «Проблемах» with
+its line marked.  A question that came from a *comment* is not covered by the
+file's parse at all, so a bad one still reports itself once, as `<query>`.
+
 ## The built-in reference
 
 The window answers «what does `КОПИЯ` do?» where the question is asked.  The data
@@ -637,7 +650,13 @@ has not finished on its own within `STOP_GRACE_MS` (500 ms) — so an interrupte
 leaves the interpreter idle *with* its base, and the next press unloads it.  A
 window the user has only opened starts **no**
 interpreter: the session comes up with the first run or with a goal typed into the
-query line, which is also what makes «Остановить» dead until then.  Opening the
+query line, which is also what makes «Остановить» dead until then.  A goal typed
+into the query line asks the **loaded** base and never reloads it — one program,
+one load (task_60) — except when there is no base at all: with the interpreter up
+and nothing loaded (just started, or unloaded by a stop), the window quietly loads
+what the editor holds and asks the goal afterwards, the way a margin marker does.
+Without that, a goal typed before the first `F5` was answered against an empty
+interpreter: «НЕТ» and «не найдено: факт/1».  Opening the
 window *does* start the executable once, briefly, for `--list-keywords`: the
 reserved names are needed by completion and colouring before anything runs, and
 waiting for the first `ready` is why autocompletion used to work only after the

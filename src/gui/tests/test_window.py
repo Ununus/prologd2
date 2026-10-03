@@ -1646,6 +1646,139 @@ def test_copy_over_the_table_takes_the_cells(executable: str) -> None:
     print("ok: Ctrl+C over the table copies the selected cells, tab-separated")
 
 
+# -- asking a question: when the window sends it (task_60) ------------------
+def test_a_clicked_question_is_asked_once_the_load_has_answered(executable: str) -> None:
+    """The question goes out when the program has loaded, not together with it.
+
+    `0 < 5 < 4` does not parse — chains are refused — and the line sits in the
+    *file*, so the load reports it under the file's own name.  Asking at once, as
+    the window used to, parsed the same line a second time as `<query>`: two
+    diagnostics for one reason, and neither of them wrong.  Now the question waits
+    for `loaded`, and a load that fails never gets asked (task_60).
+    """
+    window = empty_window(executable)
+    try:
+        window.editor().setPlainText("?0 < 5 < 4.\n")
+        window.editor().queryRequested.emit("?0 < 5 < 4.")
+        wait_for_the_run(window)
+
+        problems = window.problems_text()
+        assert problems.count("*** parse:") == 1, ascii(problems)
+        assert "Без имени:1:8" in problems, ascii(problems)
+        assert "«<» — не цепочка" in problems, ascii(problems)
+        assert "<query>" not in problems, "the same line was parsed a second time"
+        assert window.editor().error_line() == 1, "the file's own line is not marked"
+        assert "вопрос не выполнен" in window.system_text(), ascii(window.system_text())
+        assert "НЕТ" not in window.output_text(), ascii(window.output_text())
+    finally:
+        discard_changes(window)
+    print("ok: a clicked question waits for the load, so one bad line is reported once")
+
+
+def test_a_question_is_not_asked_when_the_file_does_not_parse(executable: str) -> None:
+    """A good question in a file with a syntax error is not asked at all.
+
+    The loader parses the whole text before it adds anything, so a file that does
+    not parse leaves an *empty* knowledge base — and the question was answered
+    against it: «НЕТ», plus «не найдено: факт/1», which blamed the query for the
+    file's error (task_60).
+    """
+    window = empty_window(executable)
+    try:
+        window.editor().setPlainText("сломано(1.\nфакт(1).\n% ?факт(1).\n")
+        window.editor().queryRequested.emit("?факт(1).")
+        wait_for_the_run(window)
+
+        assert "непарные скобки" in window.problems_text(), ascii(window.problems_text())
+        assert "не найдено" not in window.problems_text(), ascii(window.problems_text())
+        assert "НЕТ" not in window.output_text(), ascii(window.output_text())
+        assert "вопрос не выполнен" in window.system_text(), ascii(window.system_text())
+        assert window.editor().error_line() == 1, "the file's line is not marked"
+    finally:
+        discard_changes(window)
+    print("ok: a question in a file that does not parse is dropped, and said so")
+
+
+def test_a_parked_question_still_reports_its_own_parse_error(executable: str) -> None:
+    """A question from a comment is not part of the text the parser saw.
+
+    `% ?0 < 5 < 4.` is prose to the file's parser, so a clean load says nothing
+    about it; the clicked statement is parsed on its own and reports itself once,
+    as `<query>` — the two names exist so a front-end can tell «the error is in the
+    file» from «the error is in the line I sent» (task_36).
+    """
+    window = empty_window(executable)
+    try:
+        window.editor().setPlainText("факт(1).\n% ?0 < 5 < 4.\n")
+        window.editor().queryRequested.emit("?0 < 5 < 4.")
+        wait_for_the_run(window)
+
+        problems = window.problems_text()
+        assert problems.count("*** parse:") == 1, ascii(problems)
+        assert "<query>:1:8" in problems, ascii(problems)
+        assert "Без имени" not in problems, "the clean file was blamed"
+        assert window.output_text() == "", ascii(window.output_text())
+    finally:
+        discard_changes(window)
+    print("ok: a parked question is parsed on its own, once, and named after the query")
+
+
+def test_the_goal_line_loads_when_there_is_no_base(executable: str) -> None:
+    """With nothing loaded, the goal line runs the program first (task_60).
+
+    The program in the editor had never been run, so there was no base to ask: the
+    answer used to be «НЕТ» and «не найдено: факт/1» — a fact about an empty
+    interpreter rather than about the program.  Now the text is loaded quietly and
+    the goal is asked afterwards, exactly as a click on a margin marker does.
+    """
+    window = empty_window(executable)
+    try:
+        window.editor().setPlainText("факт(1).\n")
+        window._query_line.setText("?факт(1).")
+        window._run_query()
+        wait_for_the_run(window)
+
+        assert "ДА" in window.output_text(), ascii(window.output_text())
+        assert "не найдено" not in window.problems_text(), ascii(window.problems_text())
+        assert "--- база знаний загружена (" in window.system_text(), (
+            ascii(window.system_text())
+        )
+    finally:
+        discard_changes(window)
+    print("ok: the goal line runs the program when there is nothing to ask")
+
+
+def test_the_goal_line_does_not_reload_a_loaded_base(executable: str) -> None:
+    """A goal asks the program that is *loaded*, not the text in the editor.
+
+    One base, one load (the user's decision): reloading on every goal would be work
+    for nothing, and the goal line is not a run.  So an edit changes nothing until
+    the next `F5`, and the «загрузка базы знаний» line in «Системе» stays single.
+    """
+    window = empty_window(executable)
+    try:
+        window.editor().setPlainText("факт(1).\n")
+        window.run_program()
+        wait_for_the_run(window)
+        window.editor().setPlainText("факт(2).\n")
+
+        window._query_line.setText("?факт(1).")
+        window._run_query()
+        wait_for_the_run(window)
+        assert "ДА" in window.output_text(), ascii(window.output_text())
+
+        window._query_line.setText("?факт(2).")
+        window._run_query()
+        wait_for_the_run(window)
+        assert "НЕТ" in printed_lines(window), ascii(window.output_text())
+        assert window.system_text().count("--- загрузка базы знаний ---") == 1, (
+            ascii(window.system_text())
+        )
+    finally:
+        discard_changes(window)
+    print("ok: the goal line asks the loaded base and never reloads it")
+
+
 def test_the_toolbar_reuses_the_actions(executable: str) -> None:
     from prologd_gui import actions
 
@@ -3649,6 +3782,11 @@ def main(argv: list[str]) -> int:
         test_the_window_remembers_its_size_and_place(executable)
         test_the_output_arrives_while_the_program_runs(executable)
         test_a_marker_answers_one_question_alone(executable)
+        test_a_clicked_question_is_asked_once_the_load_has_answered(executable)
+        test_a_question_is_not_asked_when_the_file_does_not_parse(executable)
+        test_a_parked_question_still_reports_its_own_parse_error(executable)
+        test_the_goal_line_loads_when_there_is_no_base(executable)
+        test_the_goal_line_does_not_reload_a_loaded_base(executable)
         test_a_question_parked_in_a_comment_runs_from_the_margin(executable)
         test_a_marker_while_a_step_is_paused_starts_a_fresh_quiet_run(executable)
         test_a_failed_query_marks_no_line_and_moves_no_caret(executable)
