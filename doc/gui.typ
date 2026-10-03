@@ -1,5 +1,5 @@
-// Оформление листингов — общее для всех документов (см. doc/style.typ).
-#import "style.typ": apply
+// Оформление листингов и эмблемы — общее для всех документов (см. doc/style.typ).
+#import "style.typ": apply, logos
 #show: apply
 
 #set document(title: "Пролог-Д 2.0: графический интерфейс", author: "Проект PrologD")
@@ -11,6 +11,9 @@
 #set text(lang: "ru", size: 11pt)
 #set par(justify: true)
 #show heading.where(level: 1): it => pagebreak(weak: true) + it
+
+// Эмблемы проекта и вуза — рядом, в левом верхнем углу первой страницы.
+#logos()
 
 #v(6cm)
 

@@ -300,6 +300,11 @@ try {
     }
     Copy-Item 'doc\style.typ' $docTarget -Force
     Copy-Item 'doc\builtins.json' $docTarget -Force
+    # The two logos the documents put on their first page: without them the shipped
+    # `.typ` sources cannot be compiled from the package.
+    foreach ($image in 'prologd2.png', 'csu.png') {
+        Copy-Item (Join-Path 'doc' $image) $docTarget -Force
+    }
 
     Copy-Item 'tools\portable-readme.txt' (Join-Path $package $memoName) -Force
 
@@ -326,6 +331,7 @@ try {
                        'msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll',
                        '_internal\base_library.zip',
                        'doc\help.pdf', 'doc\builtins.json',
+                       'doc\prologd2.png', 'doc\csu.png',
                        'examples\lib\library.pld', 'examples\lessons\lesson_01.pld',
                        $memoName) {
         if (-not (Test-Path (Join-Path $package $needed))) { Fail "the package is missing $needed" }
