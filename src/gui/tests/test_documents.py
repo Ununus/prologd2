@@ -71,6 +71,32 @@ def test_a_byte_order_mark_is_dropped(directory: pathlib.Path) -> None:
     print("ok: a byte-order mark is dropped on read and never written")
 
 
+def test_a_line_separator_becomes_a_plain_newline(directory: pathlib.Path) -> None:
+    """`U+2028`/`U+2029` are folded on read (`tokens.LINE_SEPARATORS`, 2026-10-03).
+
+    The editor draws `U+2028` as a new line while `blockCount()` does not count it,
+    so the line numbers and the question markers of the margin stand on the wrong
+    lines; `prologd` rejects the character instead of breaking the line.  A file that
+    carries one is therefore read as if it had a plain newline — and written back
+    with one, in the shape the editor showed.
+    """
+    path = directory / "разделитель.pld"
+    path.write_bytes("?факт(1).\u2028?факт(2).\u2029".encode("utf-8"))
+    text, used = documents.read_text(path)
+    assert text == "?факт(1).\n?факт(2).\n", ascii(text)
+    assert used == "utf-8"
+
+    # The fold happens before the line ending is judged: a `U+2028` on the first
+    # line of a CRLF file may not hide that the file is CRLF.
+    path.write_bytes("?факт(1).\r\n\u2028?факт(2).\r\n".encode("utf-8"))
+    document = documents.Document.from_file(path)
+    assert document.eol == "\r\n"
+    assert document.text == "?факт(1).\n\n?факт(2).\n", ascii(document.text)
+    document.save()
+    assert path.read_bytes() == "?факт(1).\r\n\r\n?факт(2).\r\n".encode("utf-8")
+    print("ok: a line separator a file carries is folded into a newline")
+
+
 def test_text_that_is_not_utf8_is_reported_not_replaced(directory: pathlib.Path) -> None:
     path = directory / "old.pld"
     path.write_bytes("факт(1).\n".encode("cp1251"))
@@ -268,6 +294,7 @@ def main() -> int:
         test_line_endings_are_written_back()
         test_a_file_keeps_its_line_ending_and_its_encoding(directory)
         test_a_byte_order_mark_is_dropped(directory)
+        test_a_line_separator_becomes_a_plain_newline(directory)
         test_text_that_is_not_utf8_is_reported_not_replaced(directory)
         test_saving_without_a_name_is_refused()
         test_save_as_moves_the_buffer_to_the_new_file(directory)

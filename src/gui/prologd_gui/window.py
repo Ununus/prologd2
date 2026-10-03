@@ -3215,10 +3215,11 @@ class MainWindow(QMainWindow):
         working directory of the process, and it is passed exactly like
         `--include`: the engine tries the importing file's own folder first, so a
         local `lib/x.pld` still wins over a same-named file in a shared one
-        (task_46 folded the single «Рабочая папка» row into this list).  A package
-        adds its own `examples/lib` last, without writing anything anywhere — a
-        portable folder is copied from machine to machine and a remembered path
-        would go stale.
+        (task_46 folded the single «Рабочая папка» row into this list).  Only what
+        the user put in the list is passed — a package's own `examples/lib` is *not*
+        added (2026-10-03): lesson 11 asks the student to add that folder by hand, so
+        the row they see is the whole truth, and a folder copied to another machine
+        cannot leave a remembered path behind.
         """
         return paths.import_directories(
             [*self._command_line_includes, *self._settings.import_paths]

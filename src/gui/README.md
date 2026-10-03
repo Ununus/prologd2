@@ -38,10 +38,11 @@ started with.
 
 A **packaged** build (task_61) finds all of that beside itself — `prologd.exe` next
 to the window, the icons inside its folder, `doc/` and `examples/` next to the
-executable — and it adds its own `examples/lib` to the `ИМПОРТ` search list.  That
-directory goes **last**, behind whatever the user configured, and the path is not
-written anywhere: the folder is copied from machine to machine, and a path recorded
-on the first run would point at the old copy afterwards (`paths.import_directories`).
+executable — and the settings file as well (`gui.ini`, below).  It adds **nothing** to
+the `ИМПОРТ` search list: an earlier version put its own `examples/lib` there, and a
+lesson now asks the student to add that folder by hand instead (2026-10-03).  The
+list a run gets is exactly what the user configured (`paths.import_directories`),
+which is both transparent and immune to the folder being copied to another machine.
 
 Activating the environment is optional: calling `.venv\Scripts\python.exe`
 directly needs no `Set-ExecutionPolicy` and makes it obvious which interpreter is
@@ -72,8 +73,8 @@ a theme — the widgets dark and the light syntax colours on top of them.
 `%LOCALAPPDATA%\PrologD\gui\gui.ini`, holding the font family and size, line
 numbers, the indent character and width, completion and its threshold, and the
 theme.  A **packaged** build keeps that file beside its own executable instead
-(`gui.ini`), so the folder stays portable; the default and the first-run import row
-of `examples/lib` are decided by `prologd_gui.paths` (task_61).  A value that cannot be
+(`gui.ini`), so the folder stays portable — the place is decided by
+`prologd_gui.paths` (task_61).  A value that cannot be
 read falls back to the default instead of refusing to start, and keys this
 version does not know are left alone (task_29 adds the dialog).
 
@@ -110,7 +111,18 @@ version does not know are left alone (task_29 adds the dialog).
 | `Ctrl`+wheel, `Ctrl`+keypad `+`/`-`, `Ctrl+0` | font size (6…72 pt) and its reset |
 | `Ctrl+C` over the answer table | the selected cells, `Tab` between columns and a newline between rows |
 | `Tab` / `Shift+Tab` | indent / outdent the selected lines |
-| `Enter` | starts the new line at the indentation of the one above, one step deeper after `,`, `:-` or `<-` (with «Автоотступ» unticked, it starts at the margin) |
+| `Enter`, `Shift+Enter` | starts the new line at the indentation of the one above, one step deeper after `,`, `:-` or `<-` (with «Автоотступ» unticked, it starts at the margin) |
+
+`Shift+Enter` is the same plain newline as `Enter` — a report of 2026-10-03 showed why it
+cannot be Qt's own: Qt inserts a *line separator* (`U+2028`), which the widget draws as
+a new line while `blockCount()` does not count it, so the line numbers and the question
+markers of the margin stood on the wrong lines.  Measured against the editor and against
+`prologd` (`tokens.LINE_SEPARATORS`): `\n` is one line to both, `\v`/`\f` are spaces to
+the interpreter but not line breaks either, `U+2028` is a line the editor draws and does
+not count, `U+2029` is counted by the widget and *rejected* by the lexer.  Both are
+folded into `\n` wherever they could enter — `CodeEditor.keyPressEvent` never lets one
+through, `CodeEditor.insertFromMimeData` folds a paste, and `documents.read_text` folds a
+file (which is why a file that carried one is written back with a plain newline).
 
 A selected word is shown everywhere it occurs: `_refresh_extra_selections` paints the
 other occurrences with the palette's `occurrence` band, which is quiet on purpose —

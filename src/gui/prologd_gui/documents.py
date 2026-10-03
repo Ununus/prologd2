@@ -15,6 +15,8 @@ import pathlib
 from dataclasses import dataclass
 from typing import Iterable
 
+from . import tokens
+
 UNTITLED = "Без имени"
 
 EOL_LF = "\n"
@@ -65,7 +67,11 @@ def read_text(path: str | os.PathLike[str], encoding: str | None = None) -> tupl
 
     A byte-order mark is dropped, whatever the encoding: the lexer ignores one
     too, but keeping it would put an invisible character at the start of the
-    first line of the editor.
+    first line of the editor.  The Unicode line separators are folded for the same
+    reason (`tokens.plain_newlines`): a file that carries one is shown by the editor
+    as more lines than it counts, so the line numbers and the margin markers of the
+    questions would stand on the wrong lines — and the interpreter rejects the
+    character instead of treating it as a break.
     """
     data = pathlib.Path(path).read_bytes()
     used = encoding or DEFAULT_ENCODING
@@ -75,7 +81,7 @@ def read_text(path: str | os.PathLike[str], encoding: str | None = None) -> tupl
         raise DecodeFailure(str(path), used, error) from error
     if text.startswith("\ufeff"):
         text = text[1:]
-    return text, used
+    return tokens.plain_newlines(text), used
 
 
 def write_text(

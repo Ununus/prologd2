@@ -9,7 +9,16 @@ undo that takes two presses, an indent that eats a selection.
 
 from __future__ import annotations
 
-from PySide6.QtCore import QEvent, QPoint, QRect, QSize, QStringListModel, Qt, Signal
+from PySide6.QtCore import (
+    QEvent,
+    QMimeData,
+    QPoint,
+    QRect,
+    QSize,
+    QStringListModel,
+    Qt,
+    Signal,
+)
 from PySide6.QtGui import (
     QColor,
     QFont,
@@ -63,7 +72,9 @@ _MAX_FONT_SIZE = MAXIMUM_FONT_SIZE
 _CONTINUATION_ENDINGS = (",", ":-", "<-")
 
 #: Keys that take the highlighted completion.  With `Shift` they keep their own
-#: meaning: `Shift+Enter` is a newline and `Shift+Tab` an outdent.
+#: meaning: `Shift+Enter` is a newline — a real one since 2026-10-03, because Qt's
+#: own `Shift+Enter` is a line separator (`U+2028`) and the margin counts lines —
+#: and `Shift+Tab` an outdent.
 _COMPLETION_ACCEPT_KEYS = (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Tab)
 
 #: Keys that close the popup and still do their job in the editor — the caret
@@ -1066,13 +1077,22 @@ class CodeEditor(ZoomablePlainTextEdit):
                 elif key in _POPUP_CLOSE_KEYS:
                     self._hide_completion()
 
-        if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and modifiers == Qt.KeyboardModifier.NoModifier:
-            if not self.textCursor().hasSelection():
-                if self._auto_indent:
-                    self._insert_newline_with_indent()
-                else:
-                    self.insertPlainText("\n")
-                return
+        if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and not (
+            modifiers & (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.AltModifier)
+        ):
+            # One newline, whatever `Shift` says.  Left to Qt, `Shift+Enter` inserts a
+            # *line separator* (`U+2028`): the widget draws a new line without counting
+            # it, so the line numbers and the question markers of the margin stand on
+            # the wrong lines (`tokens.LINE_SEPARATORS`, the report of 2026-10-03).
+            # Nothing here is bound to `Ctrl`/`Alt` plus `Enter`, so those still reach
+            # Qt as they always did.
+            if self._auto_indent and not self.textCursor().hasSelection():
+                self._insert_newline_with_indent()
+            else:
+                # With a selection this replaces it, which is what `Enter` always did.
+                self.insertPlainText("\n")
+            event.accept()
+            return
         if key == Qt.Key.Key_Tab and modifiers == Qt.KeyboardModifier.NoModifier:
             if self.textCursor().hasSelection():
                 self.indent_selection()
@@ -1089,6 +1109,21 @@ class CodeEditor(ZoomablePlainTextEdit):
         # name, and only when the model has something to say.
         if self._completer is not None and event.text() and tokens.is_name_character(event.text()[-1]):
             self._maybe_complete()
+
+    def insertFromMimeData(self, source: QMimeData) -> None:  # noqa: N802 - Qt spelling
+        """A paste never brings a *line separator* into the document.
+
+        `Shift+Enter` is not the only door for `U+2028`/`U+2029`: text copied from a
+        browser or a PDF carries them, and they break the line count in exactly the
+        same way (`tokens.LINE_SEPARATORS`).  Text read from a file is folded in
+        `documents.read_text`, so all three doors now lead to one line break.
+        """
+        if source.hasText():
+            text = tokens.plain_newlines(source.text())
+            if text != source.text():
+                self.insertPlainText(text)
+                return
+        super().insertFromMimeData(source)
 
     def _insert_shortcut(self, event: QKeyEvent) -> bool:
         """`Ctrl`+physical key inserts punctuation (task_31), or nothing.

@@ -148,15 +148,15 @@ branch by branch — see `ai/task_34_builtin_branches.md`, which also lists what
 found.
 
 The front end has its own headless checks, run by hand (they need PySide6, so CI does not
-run them yet): 22 scripts in `src/gui/tests/` plus `protocol_smoke.py`.  They cover the
+run them yet): 23 scripts in `src/gui/tests/` plus `protocol_smoke.py`.  They cover the
 reserved names and the colouring rules (`test_keywords.py`, `test_tokens.py`,
 `test_highlighter.py`, `test_appearance.py`), the editor, its popup and its bars
-(`test_editor.py`, `test_completion.py`, `test_search.py`, `test_shortcuts.py`), files and
-settings (`test_documents.py`, `test_settings.py`, `test_settingsdialog.py`,
-`test_icons.py`), the interpreter on the wire (`test_session.py`,
-`test_formatter.py`), and the window itself (`test_window.py`, `test_queries.py`,
-`test_answers.py`, `test_output.py`, `test_stepping.py`, `test_graphics.py`,
-`test_reference.py`, `test_queryline.py`).
+(`test_editor.py`, `test_completion.py`, `test_search.py`, `test_shortcuts.py`), files,
+settings and the paths of a packaged build (`test_documents.py`, `test_settings.py`,
+`test_settingsdialog.py`, `test_icons.py`, `test_paths.py`), the interpreter on the wire
+(`test_session.py`, `test_formatter.py`), and the window itself (`test_window.py`,
+`test_queries.py`, `test_answers.py`, `test_output.py`, `test_stepping.py`,
+`test_graphics.py`, `test_reference.py`, `test_queryline.py`).
 
 ## Known gaps / next steps
 
@@ -2298,6 +2298,46 @@ Added on 2026-10-03 while planning task_59:
   и `Qt6Network` с TLS — около 27 МиБ из 110; `opengl32sw.dll` (19.7 МиБ) остаётся
   сознательно, это запасной программный OpenGL для машины без драйвера.  Вычет будет
   делаться вместе со скриптом §6 и проверяться `tools/check_dependencies.py`.
+
+* Portable round, part 76: **уроки пользователя, `$` как строки ввода, `Shift+Enter`
+  и отмена подстановки `examples/lib`** (2026-10-03).  Три запроса за раз: поправленные
+  уроки, «не подавать `examples/lib`» и «запретить `Shift+Enter` в редакторе».
+
+  *Уроки.*  `ctest` поймал в них две вещи.  В `lesson_01.pld` строка про
+  взаимозаменяемость строки и атома начиналась с `$` — а `$` в исходном файле это
+  **не комментарий**, а строка заранее подготовленных данных для ввода:
+  `ModuleLoader::extractInputLines` вырезает её из текста ещё до лексера, поэтому при
+  запуске она исчезает молча (`exit=0`, диагностики нет), а если бы урок что-нибудь
+  читал, эти слова ушли бы в программу как ответы.  Заметно стало только потому, что
+  `--format` (и `Ctrl+I` в окне) лексет текст целиком и такой файл не форматирует:
+  «недопустимый символ».  Заменено на `%`; заодно убраны хвостовые пробелы в
+  комментариях (`lesson_01` — 3 строки, `lesson_11` — 3), форматтер их подрезает, и
+  «программа уже в стандартном виде» падало.  Ещё две опечатки в `lesson_11` —
+  «Выполенение» и «ИМПОРАТ» — исправлены.  После правки `ctest` 307/307.
+
+  *`examples/lib`.*  Решение от 2026-10-03 (часть 74) отменено самим пользователем:
+  окно не подставляет в список поиска ИМПОРТ **ничего своего**.  Урок 11 теперь сам
+  говорит, что каталог библиотеки надо добавить руками («Правка → Настройки… →
+  Выполнение → Дополнительные каталоги ИМПОРТ»), и так **прозрачней для ученика** — он
+  видит строку, которую заполнил, и путь, который выбрал.  `paths.import_directories`
+  остался, но только для чистки: пустые строки и повторы.  Обновлены
+  `test_paths.py` (было «сборка ищет свой курс», стало «сборка ищет только то, что
+  добавил ученик, и ничего своего»), `src/gui/README.md`, `tools/portable-readme.txt`
+  (там теперь шаг «укажите `examples\lib`») и §4/§7.1/§8 задачи 61.
+
+  *`Shift+Enter`.*  Замерено, чем именно он ломает нумерацию: Qt вставляет им
+  **разделитель строк** `U+2028` — виджет рисует новую строку, а `blockCount()` её не
+  считает (`\n` — 2 блока, `\v`/`\f`/NEL/`U+2028` — 1, `U+2029` — 2), поэтому номера и
+  маркеры вопросов на полях уезжают.  Интерпретатор `U+2028`, `U+2029` и NEL вообще
+  отвергает («недопустимый символ»), а `\v`/`\f` считает пробелами.  Теперь `Enter` и
+  `Shift+Enter` — одна ветка в `CodeEditor.keyPressEvent` (обычный перевод строки с
+  автоотступом; `Ctrl`/`Alt`+`Enter` по-прежнему уходят в Qt), а «вставка» не приносит
+  разделитель: `CodeEditor.insertFromMimeData` и `documents.read_text` складывают
+  `U+2028`/`U+2029` в `\n` (`tokens.plain_newlines`, с записанным замером).  Случаи в
+  `test_editor.py` («`Shift+Enter` — строка, которую полянка считает», «вставка не
+  приносит разделитель») и в `test_documents.py` (в том числе порядок: складывание
+  раньше, чем определяется CRLF).  Заодно убран устаревший «(раздел 9.3)» из
+  `doc/gui.typ` §9.2 — раздела 9.3 больше нет.
 
 
 

@@ -109,22 +109,20 @@ def builtins() -> pathlib.Path:
 def import_directories(configured: Iterable[str]) -> list[str]:
     """The `ИМПОРТ` search directories of a run, in the order the engine tries them.
 
-    What the user configured comes first (the launcher's `--include`, then the row
-    of the settings dialog) and a **package** appends its own `examples/lib` last:
-    the portable folder carries the library its own lesson 11 imports, so a student
-    runs it without being told anything, while their own folder — the importing
-    file's is tried before any of these — still wins over a same-named file there.
+    Exactly what the user configured: the launcher's `--include` first, then the row
+    of the settings dialog (`window._import_directories` passes both).  The folder of
+    the importing file itself is tried before any of these, by the engine.
 
-    Nothing absolute is *written down* for it, and that is the point: this folder is
-    copied around (a flash drive, a second machine, back again) and a path recorded
-    on the first run would either point at the old copy or at a drive letter that
-    has changed.  The directory is derived from where the window is *now*.
+    A **package** used to append its own `examples/lib` here, so that lesson 11 ran
+    out of the box.  That was dropped on 2026-10-03 at the reader's request: the
+    lesson now tells the student to add the directory by hand, which is transparent —
+    they see the row they filled and the path they chose — and nothing is recorded
+    behind their back that could go stale when the folder moves to another machine.
+    The library still travels in the package (`example_library()`), it is simply not
+    searched until the student says so.
     """
     result: list[str] = []
-    wanted = list(configured)
-    if frozen():
-        wanted.append(str(example_library()))
-    for directory in wanted:
+    for directory in configured:
         text = str(directory).strip()
         if not text or text in result:
             continue

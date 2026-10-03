@@ -123,6 +123,22 @@ def alphabet_of(text: str) -> str:
     return ""
 
 
+#: The two Unicode separators Qt can put into a text, measured against the editor
+#: and against `prologd` on 2026-10-03: `U+2028` is drawn as a new line but *not*
+#: counted by `blockCount()`, so the line numbers and the question markers of the
+#: margin end up on the wrong lines (the report that started this), and `U+2029` is
+#: counted by the widget while the lexer rejects it outright.  A Prolog source has
+#: exactly one line break, and it is `\n`.
+LINE_SEPARATORS = ("\u2028", "\u2029")
+
+
+def plain_newlines(text: str) -> str:
+    """Folds the Unicode line separators back into a plain newline."""
+    for separator in LINE_SEPARATORS:
+        text = text.replace(separator, "\n")
+    return text
+
+
 def tokenize(line: str, keywords: Keywords | None = None) -> list[Token]:
     """Splits one line into highlightable tokens, in source order.
 

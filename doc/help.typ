@@ -12,7 +12,7 @@
 #set par(justify: true)
 #show heading.where(level: 1): it => pagebreak(weak: true) + it
 
-#v(6cm)
+#v(5cm)
 
 #align(center)[
   #text(size: 20pt, weight: "bold")[Пролог-Д 2.0]

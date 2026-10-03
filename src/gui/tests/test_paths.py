@@ -131,31 +131,32 @@ def test_the_reference_reads_the_same_document() -> None:
     print(f"ok: the built-in reference is `paths.builtins()` ({len(loaded)} records)")
 
 
-def test_a_package_searches_its_own_course() -> None:
-    """The package adds `examples/lib` last, so a user's own folder wins over it.
+def test_a_package_searches_only_what_the_student_added() -> None:
+    """No directory is added behind the reader's back (2026-10-03).
 
-    Nothing is written into the settings for it: a portable folder is copied from
-    machine to machine, and a path recorded on the first run would point at the old
-    copy (or at a drive letter that has changed) after the first move.
+    A package *carries* `examples/lib` — `test_a_package_finds_everything_beside_itself`
+    checks that — but the window does not search it.  Lesson 11 asks the student to add
+    the folder by hand, so the row of the settings dialog is the whole truth, and a
+    folder copied to another machine leaves no remembered path behind.
     """
     with tempfile.TemporaryDirectory(prefix="prologd_package_") as name:
         package = make_package(pathlib.Path(name))
         library = str(package / "examples" / "lib")
+        assert pathlib.Path(library).is_dir(), "the package does carry the library"
         with packaged(package):
             mine = str(package / "мои" / "модули")
-            assert paths.import_directories([mine]) == [mine, library]
-            # An empty row adds nothing, and a copy of a directory already in the
-            # list does not appear twice.
-            assert paths.import_directories(["", mine, library]) == [mine, library]
-            assert paths.import_directories([]) == [library]
-    print("ok: a package searches its own examples/lib, last and once")
+            assert paths.import_directories([mine]) == [mine]
+            assert paths.import_directories([]) == []
+    print("ok: a package searches what the student added, and nothing of its own")
 
 
-def test_a_checkout_is_not_given_that_directory() -> None:
-    """A checkout is a developer's tree: it says where to look (task_61 §4)."""
+def test_the_import_list_is_trimmed_and_deduplicated() -> None:
+    """Only what the user configured reaches `-I` (task_61 §4)."""
     assert paths.import_directories([]) == []
+    assert paths.import_directories(["", "   "]) == []
     assert paths.import_directories(["examples/lib", " examples/lib "]) == ["examples/lib"]
-    print("ok: a checkout searches only what it is told")
+    assert paths.import_directories(["a", "b", "a"]) == ["a", "b"]
+    print("ok: the import list is what it was told, trimmed and once each")
 
 
 def main(argv: list[str]) -> int:
@@ -164,8 +165,8 @@ def main(argv: list[str]) -> int:
     test_a_package_without_the_interpreter_names_the_expected_place()
     test_the_icons_come_from_the_same_answer()
     test_the_reference_reads_the_same_document()
-    test_a_package_searches_its_own_course()
-    test_a_checkout_is_not_given_that_directory()
+    test_a_package_searches_only_what_the_student_added()
+    test_the_import_list_is_trimmed_and_deduplicated()
     print("all path checks passed")
     return 0
 

@@ -17,7 +17,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-from PySide6.QtCore import QPoint, Qt  # noqa: E402
+from PySide6.QtCore import QMimeData, QPoint, Qt  # noqa: E402
 from PySide6.QtGui import QTextCursor  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
@@ -251,6 +251,39 @@ def test_auto_indent_can_be_switched_off() -> None:
     print("ok: auto-indent is a switch, and the indent unit is not")
 
 
+def test_shift_enter_is_one_plain_newline() -> None:
+    """A report of 2026-10-03: `Shift+Enter` moved the margin's markers.
+
+    Qt's own `Shift+Enter` inserts a *line separator* (`U+2028`): the widget draws a
+    new line and `blockCount()` does not count it, so every question marker below
+    the break stood one line above its question.  The editor now inserts the same
+    plain newline `Enter` does — indent and all.
+    """
+    editor = margin_editor("?факт(1).")
+    cursor = editor.textCursor()
+    cursor.movePosition(QTextCursor.MoveOperation.End)
+    editor.setTextCursor(cursor)
+    QTest.keyClick(editor, Qt.Key.Key_Return, Qt.KeyboardModifier.ShiftModifier)
+    editor.insertPlainText("?сумма(1, С).")
+
+    assert editor.toPlainText() == "?факт(1).\n?сумма(1, С).", ascii(editor.toPlainText())
+    assert editor.blockCount() == 2, "the break is not a line the editor counts"
+    assert editor.query_statements() == {1: "?факт(1).", 2: "?сумма(1, С)."}
+    print("ok: Shift+Enter is a newline, and the margin counts it")
+
+
+def test_a_paste_brings_no_line_separator() -> None:
+    """The other door to the same invisible character (`tokens.LINE_SEPARATORS`)."""
+    editor = make_editor()
+    source = QMimeData()
+    source.setText("?факт(1).\u2028?сумма(1, С).\u2029")
+    editor.insertFromMimeData(source)
+
+    assert editor.toPlainText() == "?факт(1).\n?сумма(1, С).\n", ascii(editor.toPlainText())
+    assert editor.blockCount() == 3
+    print("ok: a pasted line separator becomes a newline")
+
+
 def test_zoom_is_bounded_and_reported() -> None:
     editor = make_editor()
     sizes: list[float] = []
@@ -450,6 +483,8 @@ def main() -> int:
     test_shift_delete_on_the_last_line_leaves_an_empty_one()
     test_enter_continues_the_clause_with_an_indent()
     test_auto_indent_can_be_switched_off()
+    test_shift_enter_is_one_plain_newline()
+    test_a_paste_brings_no_line_separator()
     test_zoom_is_bounded_and_reported()
     test_line_number_width_grows_with_the_document()
     test_the_error_line_is_marked_and_cleared()
