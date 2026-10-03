@@ -92,7 +92,10 @@ other workload the difference is inside the run-to-run spread (recursion
 **Stage 2 — measured, deferred.**  See ADR-017: a full scan of 100 000 clauses
 costs ≈ 20 ms (≈ 0.1–0.3 µs per failed head attempt), lesson-scale predicates
 have a handful of clauses, and the queens workload is the shape an index cannot
-prune (heavy bodies behind shallow-matching heads).
+prune (heavy bodies behind shallow-matching heads).  *The scan figure is wrong
+and was corrected on 2026-10-03: both quoted runs scanned the whole list, so their
+difference was noise; isolated with a cut the scan costs ≈ 50 ms (≈ 0.5 µs per
+attempt).  See ADR-017.*
 
 **Stage 3 — not attempted, and the numbers say why.**  The whole per-goal lookup
 class was worth ≈ 4 % on the most favourable program in the suite; interning

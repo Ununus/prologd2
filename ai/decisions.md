@@ -452,10 +452,15 @@ first argument cannot match a goal that arrives with a bound first argument.
 task_42 measured what the absent index costs, with `tools/bench_engine.py` on the
 Release build (this machine, 2026-09-30):
 
-* 100 000 integer facts — query on the first clause 0.31 s, on the last 0.33 s: a
-  full scan of ~100 000 failed head attempts costs ≈ 20 ms (repeated runs put it
-  between 10 and 30 ms), i.e. ≈ 0.1–0.3 µs per attempt (each attempt creates an
-  environment and unifies the head);
+* 100 000 integer facts — query on the first clause 0.31 s, on the last 0.33 s.
+  *Corrected 2026-10-03:* those two runs both scan the whole list, so their
+  difference is not the scan — a ground query under `ТИХО` keeps asking for
+  solutions after its first one (`Engine::runQuery`: `quiet_` returns
+  `!has_variables`), and only a cut or a variable in the query stops it.  Isolated
+  with a cut right after the call (and re-measured on the same machine and preset):
+  loading the same 100 000 facts costs 0.25 s, and the scan costs ≈ 50 ms — 0.3 ms
+  for 1 000 clauses, 3.7 ms for 10 000, 54 ms for 100 000, i.e. ≈ 0.5 µs per failed
+  head attempt (each attempt creates an environment and unifies the head);
 * 50 000 facts with a compound head (`ф(к(N))`), where each failed attempt also
   compares a structure: first 0.25 s, last 0.25 s — the scan hides inside the
   spread;
