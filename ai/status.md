@@ -173,9 +173,11 @@ settings and the paths of a packaged build (`test_documents.py`, `test_settings.
    measured about 0.5 µs per failed head attempt).
 5. Optional and deliberately out of scope of task_54: `ВВОД(Пер, Терминатор)` instead of
    `ВВОДСИМВ` plus `ВВОДСТР`.
-6. Open on the board: `task_61` (the portable Windows build, written down on 2026-10-03)
-   and `task_46`'s named profiles, and nothing else — the two «недочёта»
-   (task_47, task_48), the defects found by using the window (task_49), the four tasks of
+6. Open on the board: `task_46`'s named profiles, and nothing else — task_61 (the
+   portable Windows build, written down on 2026-10-03) has its script, its package, its
+   zip and ADR-024 done; what it leaves to a person is a click-through of the frozen
+   window and a run on a machine without Visual Studio (§7.1, §7.5 of its task file).
+   The two «недочёта»   (task_47, task_48), the defects found by using the window (task_49), the four tasks of
    2026-10-02 (task_51 -- task_54) and the row of window requests (task_58 -- task_60) are
    all done.  The settings file is `%LOCALAPPDATA%\PrologD\gui\gui.ini` (or `--settings
    FILE`), the graphics window (task_45) is done, and task_29's own list is closed, RU/EN

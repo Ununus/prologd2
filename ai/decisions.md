@@ -696,3 +696,52 @@ separators itself — that is the only behaviour that was ever portable.
 
 **Status.** Accepted.
 
+## ADR-024: The shipped Windows build is a folder frozen by PyInstaller
+
+**Context.** The window is a PySide6 application and the interpreter is a C++
+executable; a teacher who wants to hand both to a student should not have to install
+Python, Qt or a runtime.  The alternatives were measured before choosing
+(`ai/task_61_portable_windows_build.md` §3): Nuitka compiles and starts faster but
+needs a compiler and a much longer build; cx_Freeze has fewer Qt hooks;
+`pyside6-deploy` is Nuitka underneath.  All four produce a folder, so the decision is
+reversible.
+
+**Decision.**
+
+* **PyInstaller, `--onedir`** — a folder, not `--onefile`: `--onefile` unpacks ~95 MiB
+  into `%TEMP%` on every start, `--onedir` starts directly and stays inspectable.
+  The freeze is `--windowed` (no console flash), with `prologd-gui.exe` named apart
+  from `prologd.exe`.
+* **One folder is the program.**  `prologd-gui.exe`, its `_internal`, `prologd.exe`,
+  the Visual C++ DLLs, `doc` (five PDFs, their `.typ`, `builtins.json`), `examples`
+  (lessons, tasks, `lib`) and a memo.  The window finds the interpreter *beside
+  itself*, keeps `gui.ini` there and opens the documents from its own `doc` — that is
+  `prologd_gui.paths`, and it is what makes copying the folder enough.
+* **The runtime rides along**: `vcruntime140.dll`, `vcruntime140_1.dll`, `msvcp140.dll`
+  in the root, taken from Visual Studio's redistributable folder, because the C++
+  executable looks next to itself and a machine without Visual Studio has no local
+  copy (the UCRT itself is part of Windows 10).
+* **Qt modules the window never loads are left out** — QML/Quick, `Qt6Pdf`,
+  `Qt6VirtualKeyboard`, `Qt6Network` and their plugins, 19.2 MiB of 116.3.  The cut is
+  checked by `tools/check_dependencies.py` (a still-needed file shows up as a SUSPECT)
+  and by starting the frozen window in the `offscreen` platform.
+* **Nothing is supplied behind the reader's back.**  An earlier decision to seed
+  `examples/lib` into the `ИМПОРТ` search list was reversed on 2026-10-03: lesson 11
+  asks the student to add the folder by hand, so the settings row is the whole truth
+  and no path recorded at first start can go stale when the folder moves.
+* **Windows 10 (1903) or newer, 64-bit** is the floor (ADR-013 for the UTF-8 manifest
+  element, Qt 6 and Python 3.14 for the rest); verified by the user on Windows 10 22H2
+  (19045.6456) and on a clean Windows 11 in Windows Sandbox (24H2 26100.9457).
+* **`tools/build_portable.ps1`** is the one way to build it: Release → `ctest` →
+  `docs` → freeze → lay out → checks → zip, with `-SkipTests`/`-SkipFreeze`/`-NoTrim`
+  for a shorter round.
+
+**Consequences.** A release is one folder (`dist\prologd-2.0.0-win64`, 280 files,
+95.4 MiB, zip 37.5 MiB) with no installer, which is what the lessons and the memo
+describe.  An installer, if it ever comes, is a *second* front end to the same folder
+and has to answer what it does with `gui.ini` beside the exe.  The cost of the choice
+is the size and a build that needs a Windows machine with the toolchain: no
+cross-compilation, and the zip is built by hand — by the script — not by CI.
+
+**Status.** Accepted.
+

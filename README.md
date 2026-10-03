@@ -53,6 +53,21 @@ ctest --preset windows-msvc
 
 The executable is `build\src\cli\Release\prologd.exe`.
 
+The portable package — interpreter, window, the five documents, the lessons and
+`examples\lib` — is built by one script:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\build_portable.ps1
+```
+
+It runs the Release build, `ctest`, the `docs` target and PyInstaller (`--onedir`,
+leaving out the Qt modules the window never loads), lays the folder out as
+`dist\prologd-<version>-win64` with the Visual C++ runtime beside the executables,
+checks it (`tools/check_dependencies.py`, plus the interpreter and the window itself)
+and writes the zip.  `-SkipTests`, `-SkipFreeze`, `-NoTrim` and `-NoZip` shorten a
+round; what a person still has to do is listed in
+`ai/task_61_portable_windows_build.md` section 7.
+
 ## Language at a glance
 
 ```prolog
