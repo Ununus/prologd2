@@ -1385,11 +1385,13 @@ def ask_from_the_margin(window, statement: str) -> None:
 
 
 def test_the_answer_table_switch_is_in_the_menu_and_in_the_settings(executable: str) -> None:
-    """task_59: «Формировать таблицу» is one switch in two places, off by default.
+    """task_59: «Формировать таблицу» is one switch in two places, on by default.
 
     Like the two switches of a run (task_58), the menu entry and the settings row
     read and write the same key (`execution/answer_table`), and the entry stands
-    above «Выполнять вопросы при запуске» — the order the user asked for.
+    above «Выполнять вопросы при запуске» — the order the user asked for.  On by
+    default since 2026-10-03: a single goal's answer is read as a table unless the
+    reader says otherwise (`ai/status.md`, part 73).
     """
     from prologd_gui import actions, settings as settings_module
 
@@ -1402,14 +1404,14 @@ def test_the_answer_table_switch_is_in_the_menu_and_in_the_settings(executable: 
 
         switch = window._actions["answer_table"]
         assert switch.isCheckable() is True
-        assert switch.isChecked() is False, "off by default: the text is the answer"
-        assert window._settings.answer_table is False
+        assert switch.isChecked() is True, "on by default: one goal is read as a table"
+        assert window._settings.answer_table is True
 
-        switch.setChecked(True)
-        assert window._settings.answer_table is True, "the menu did not write the setting"
-        window._settings.answer_table = False
+        switch.setChecked(False)
+        assert window._settings.answer_table is False, "the menu did not write the setting"
+        window._settings.answer_table = True
         window._sync_actions()
-        assert switch.isChecked() is False, "the setting did not reach the menu"
+        assert switch.isChecked() is True, "the setting did not reach the menu"
         print("ok: «Формировать таблицу» is one setting, in the menu and in the dialog")
     finally:
         discard_changes(window)
@@ -1516,10 +1518,18 @@ def test_the_goal_line_builds_the_table_too(executable: str) -> None:
     print("ok: a goal typed into the query line is tabulated the same way")
 
 
-def test_the_table_stays_off_until_it_is_asked_for(executable: str) -> None:
-    """With the switch off the answer stays text, and no tab moves."""
+def test_the_table_is_not_built_when_it_is_switched_off(executable: str) -> None:
+    """Switched off the answer stays text, and no tab moves (task_59, part 73).
+
+    This is the *only* case left in which the table is not built: since 2026-10-03
+    the switch starts **on**, so a reader who wants the plain text is the one who
+    turns it off — and then nothing is collected at all (`_arm_answer_table`), the
+    answer goes to «Вывод» as before, and the panel stays where it was.
+    """
     window = empty_window(executable)
     try:
+        window._actions["answer_table"].setChecked(False)
+        assert window._settings.answer_table is False
         window.editor().setPlainText(TWO_STUDENTS)
         ask_from_the_margin(window, "?студент(X, Y).")
         assert "X=вова" in window.output_text(), ascii(window.output_text())
@@ -3799,7 +3809,7 @@ def main(argv: list[str]) -> int:
         test_the_table_separates_two_solutions(executable)
         test_the_table_shows_a_word_for_a_ground_query(executable)
         test_the_goal_line_builds_the_table_too(executable)
-        test_the_table_stays_off_until_it_is_asked_for(executable)
+        test_the_table_is_not_built_when_it_is_switched_off(executable)
         test_a_diagnostic_keeps_the_panel_on_the_problems(executable)
         test_a_new_run_empties_the_table(executable)
         test_the_table_follows_the_output_font(executable)

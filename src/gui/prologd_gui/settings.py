@@ -328,8 +328,8 @@ SETTINGS: tuple[Setting, ...] = (
     # -- execution
     Setting(SAVE_BEFORE_RUN, "Сохранять перед запуском", "Выполнение", "bool", False,
             hint="Сохраняет текущий файл, если в нём есть несохранённые правки"),
-    Setting(ANSWER_TABLE, "Формировать таблицу", "Выполнение", "bool", False,
-            hint="Ответ отдельного запроса показывается ещё и таблицей: переменные — столбцы, решения — строки.  Текст в «Выводе» не меняется"),
+    Setting(ANSWER_TABLE, "Формировать таблицу", "Выполнение", "bool", True,
+            hint="Ответ отдельного запроса показывается ещё и таблицей: переменные — столбцы, решения — строки.  Текст в «Выводе» не меняется; выключено — таблица не строится вовсе"),
     Setting(RUN_QUESTIONS, "Выполнять вопросы при запуске", "Выполнение", "bool", True,
             hint="Строки «?цель.» программы выполняются сами; выключено — только правила"),
     Setting(PRINT_QUESTIONS, "Печатать вопросы при запуске", "Выполнение", "bool", False,
@@ -1071,12 +1071,13 @@ class Settings:
     def answer_table(self) -> bool:
         """Whether a single goal's answer is also shown as a table (task_59).
 
-        Off by default: the text of the answer is the main way it is read, and the
-        table moves the panel to its own tab — something to ask for, not to be
-        surprised by.  A single goal is the goal line or a margin marker; a whole
-        run is never tabulated.
+        On by default since 2026-10-03: the table is what makes the answer of one
+        goal readable at a glance, and the panel moves to its tab only when there
+        is an answer to show.  The text of the answer is written either way.  A
+        single goal is the goal line or a margin marker; a whole run is never
+        tabulated.
         """
-        return self._flag(ANSWER_TABLE, False)
+        return self._flag(ANSWER_TABLE, True)
 
     @answer_table.setter
     def answer_table(self, value: bool) -> None:

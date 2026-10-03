@@ -31,7 +31,6 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from prologd_gui import assets, paths  # noqa: E402
-from prologd_gui.settings import Settings  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 
@@ -132,35 +131,31 @@ def test_the_reference_reads_the_same_document() -> None:
     print(f"ok: the built-in reference is `paths.builtins()` ({len(loaded)} records)")
 
 
-def test_the_first_start_of_a_package_fills_the_import_row() -> None:
-    import main  # the entry point, for the one start-up policy it owns
+def test_a_package_searches_its_own_course() -> None:
+    """The package adds `examples/lib` last, so a user's own folder wins over it.
 
+    Nothing is written into the settings for it: a portable folder is copied from
+    machine to machine, and a path recorded on the first run would point at the old
+    copy (or at a drive letter that has changed) after the first move.
+    """
     with tempfile.TemporaryDirectory(prefix="prologd_package_") as name:
         package = make_package(pathlib.Path(name))
+        library = str(package / "examples" / "lib")
         with packaged(package):
-            preferences = Settings(package / "gui.ini")
-            assert main.seed_import_paths(preferences) is True
-            wanted = str(package / "examples" / "lib")
-            assert preferences.import_paths == [wanted], preferences.import_paths
-            # The file exists now: the row is the user's from here on, so even
-            # emptying it must not put the directory back.
-            assert main.seed_import_paths(preferences) is False
-            preferences.import_paths = []
-            assert main.seed_import_paths(preferences) is False
-            assert preferences.import_paths == []
-    print("ok: lesson 11's import row is filled on the first start and never again")
+            mine = str(package / "мои" / "модули")
+            assert paths.import_directories([mine]) == [mine, library]
+            # An empty row adds nothing, and a copy of a directory already in the
+            # list does not appear twice.
+            assert paths.import_directories(["", mine, library]) == [mine, library]
+            assert paths.import_directories([]) == [library]
+    print("ok: a package searches its own examples/lib, last and once")
 
 
-def test_a_checkout_never_gets_that_row() -> None:
-    import main
-
-    with tempfile.TemporaryDirectory(prefix="prologd_checkout_") as name:
-        file = pathlib.Path(name) / "gui.ini"
-        preferences = Settings(file)
-        assert main.seed_import_paths(preferences) is False
-        assert preferences.import_paths == [], preferences.import_paths
-        assert not file.exists(), "a checkout must not be written to"
-    print("ok: a checkout is left alone")
+def test_a_checkout_is_not_given_that_directory() -> None:
+    """A checkout is a developer's tree: it says where to look (task_61 §4)."""
+    assert paths.import_directories([]) == []
+    assert paths.import_directories(["examples/lib", " examples/lib "]) == ["examples/lib"]
+    print("ok: a checkout searches only what it is told")
 
 
 def main(argv: list[str]) -> int:
@@ -169,8 +164,8 @@ def main(argv: list[str]) -> int:
     test_a_package_without_the_interpreter_names_the_expected_place()
     test_the_icons_come_from_the_same_answer()
     test_the_reference_reads_the_same_document()
-    test_the_first_start_of_a_package_fills_the_import_row()
-    test_a_checkout_never_gets_that_row()
+    test_a_package_searches_its_own_course()
+    test_a_checkout_is_not_given_that_directory()
     print("all path checks passed")
     return 0
 

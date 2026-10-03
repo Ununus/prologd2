@@ -3209,25 +3209,20 @@ class MainWindow(QMainWindow):
         self._update_details()
 
     def _import_directories(self) -> list[str]:
-        """The `-I` directories of the next session: command line, then settings.
+        """The `-I` directories of the next session (task_61 put the rule in `paths`).
 
         «Дополнительные каталоги ИМПОРТ» is a *search* list for `ИМПОРТ`, not the
         working directory of the process, and it is passed exactly like
         `--include`: the engine tries the importing file's own folder first, so a
         local `lib/x.pld` still wins over a same-named file in a shared one
-        (task_46 folded the single «Рабочая папка» row into this list).
+        (task_46 folded the single «Рабочая папка» row into this list).  A package
+        adds its own `examples/lib` last, without writing anything anywhere — a
+        portable folder is copied from machine to machine and a remembered path
+        would go stale.
         """
-        directories = list(self._command_line_includes)
-        directories.extend(self._settings.import_paths)
-        seen: set[str] = set()
-        result: list[str] = []
-        for directory in directories:
-            text = str(directory).strip()
-            if not text or text in seen:
-                continue
-            seen.add(text)
-            result.append(text)
-        return result
+        return paths.import_directories(
+            [*self._command_line_includes, *self._settings.import_paths]
+        )
 
     def _trim_recent(self) -> None:
         """Applies a new «Помнить недавних файлов» to the list already stored."""

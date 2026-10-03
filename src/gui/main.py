@@ -21,22 +21,6 @@ from PySide6.QtCore import QCoreApplication  # noqa: E402
 from PySide6.QtWidgets import QApplication, QMessageBox  # noqa: E402
 
 
-def seed_import_paths(preferences: Settings) -> bool:
-    """Gives a package the import directory its own course needs (task_61).
-
-    A portable build carries `examples/`, and lesson 11 imports `lib/` from there,
-    so on the **first** start — while the settings file does not exist yet — the
-    row is filled in.  Afterwards it is an ordinary preference: whoever deletes it
-    keeps it deleted.  A checkout is not `frozen` and is never touched.
-    """
-    if not paths.frozen() or preferences.path.exists():
-        return False
-    library = paths.example_library()
-    if not library.is_dir():
-        return False
-    preferences.import_paths = [str(library)]
-    return True
-
 
 def report_missing_interpreter(executable: str) -> int:
     """Says why the window cannot start, in the way the build can be heard.
@@ -98,7 +82,6 @@ def main(argv: list[str] | None = None) -> int:
     # A package keeps its settings beside the window (task_61); in a checkout the
     # argument stays empty and Qt computes the usual AppData path.
     preferences = Settings(arguments.settings or paths.settings_path())
-    seed_import_paths(preferences)
 
     # Which interpreter will actually run: the `execution/interpreter` row when it
     # names one, else the `--exe` of this launch (task_46).  The check follows

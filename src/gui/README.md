@@ -30,10 +30,18 @@ python -m venv .venv
 `--exe` overrides the interpreter path (by default the newest build under
 `build/` is used), `--include` adds an `ИМПОРТ` search directory and may be
 repeated, and `--icons DIR` points the icon loader at another directory (the
-default is `src/gui/assets`).  The «Интерпретатор» row of the settings dialog
+default is `src/gui/assets` in a checkout, the copy inside its own folder in a
+package).  The «Интерпретатор» row of the settings dialog
 (`execution/interpreter`) beats `--exe`: when it is not empty, *it* is what a run
 starts, and the status bar names a build that is not the one the window was
 started with.
+
+A **packaged** build (task_61) finds all of that beside itself — `prologd.exe` next
+to the window, the icons inside its folder, `doc/` and `examples/` next to the
+executable — and it adds its own `examples/lib` to the `ИМПОРТ` search list.  That
+directory goes **last**, behind whatever the user configured, and the path is not
+written anywhere: the folder is copied from machine to machine, and a path recorded
+on the first run would point at the old copy afterwards (`paths.import_directories`).
 
 Activating the environment is optional: calling `.venv\Scripts\python.exe`
 directly needs no `Set-ExecutionPolicy` and makes it obvious which interpreter is
@@ -293,8 +301,9 @@ The menus are **Файл** (Новый, Открыть…, Последние, �
 «Сохранять перед запуском» is a settings row now, not a menu entry (task_58): it is
 decided once, while the switches about the program's own `?`-statements are flipped
 while working, so they are the ones that earn a place in «Выполнение».  «Формировать
-таблицу» (task_59) stands above them: it is turned on before asking a single goal,
-and it is the same setting in the dialog (`execution/answer_table`).  The
+tаблицу» (task_59) stands above them: it is on unless the reader turns it off (it
+became the default on 2026-10-03), and it is the same setting in the dialog
+(`execution/answer_table`).  The
 menu entry and the dialog write the same setting (`execution/run_questions`,
 `execution/print_questions`, `execution/answer_table`), and `_sync_actions` puts
 the setting back into the
@@ -560,8 +569,10 @@ shortcut and used to do exactly that).
 
 The fifth tab shows the answer of **one goal** as a grid: columns are the goal's
 variables, rows are the solutions, a cell is the value exactly as the interpreter
-printed it.  «Выполнение → Формировать таблицу» (`execution/answer_table`, off by
-default) turns it on for the goal line and for a margin marker.  A whole run is
+printed it.  «Выполнение → Формировать таблицу» (`execution/answer_table`, **on** by
+default since 2026-10-03) decides whether the goal line and a margin marker build
+it — the answer is written to «Вывод» either way, and the panel moves to the table's
+tab only when there is an answer to show.  A whole run is
 never tabulated, and that is a property of the answer rather than a shortage of
 effort: a program's own `?`-questions answer into one stream of text where nothing
 marks where one answer ends.  `X=вова`, `Y=корчагин`, `X=данил`, `Y=ахмеров` is

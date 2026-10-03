@@ -131,7 +131,7 @@ entries of the session log below and in `ai/task_*.md`.
 | task_56_missing_dot_between_statements | done | a missing dot is reported at the end of *its own* sentence whenever the next token can begin one |
 | task_57_tell_failed_redirect | done | a failed `ЗАПИСЬ_В` left the output on a closed stream; one line returns it to where it was |
 | task_58_gui_editor_menu_about | done | five requests: the icons, `Shift+Del`, the occurrences of the selection made visible, the loading line after a marker click, and the two question switches in «Выполнение» |
-| task_59_gui_answer_table | done | the answer table for a *single* goal (variant C), off by default; the rule lives in `answers.py`, Qt-free |
+| task_59_gui_answer_table | done | the answer table for a *single* goal (variant C), **on by default since 2026-10-03**; the rule lives in `answers.py`, Qt-free |
 | task_60_gui_ask_after_load | done | a question is asked only after `loaded` (`_pending_query`), and a load that fails drops it with one line in «Системе» |
 | task_61_portable_windows_build | in progress | §4 (the window's own paths, `prologd_gui/paths.py`) and §2–§3 (PyInstaller, the first frozen folder, `tools/check_dependencies.py`) are done and checked; left: `tools/build_portable.ps1`, the zip and the clean-machine run (`ai/task_61_portable_windows_build.md`) |
 
@@ -2250,6 +2250,37 @@ Added on 2026-10-03 while planning task_59:
   печатать, поэтому «нет prologd.exe рядом» теперь говорит окном, а не строкой в
   stderr; из дерева убран мусорный `doc/style.pdf` (остаток цели, которая когда-то
   собирала `style.typ` как документ) — он заехал в первую сборку.
+
+* Window round, part 73: **таблица ответа включена по умолчанию** (2026-10-03).  Просьба
+  пользователя: «Формировать таблицу» должна быть включена с самого начала, а не ждать,
+  пока её найдут в «Выполнении».  Изменено там, где умолчание записано: строка
+  `Setting(ANSWER_TABLE, …)` и свойство `answer_table` в `settings.py` (оба читали
+  `False`), документация (`src/gui/README.md` — и раздел «Таблица ответа», и абзац про
+  меню; `doc/gui.typ` §6.5 получил абзац про умолчание и про переход панели на
+  вкладку) и проверка `test_the_answer_table_switch_is_in_the_menu_and_in_the_settings`,
+  которая держала старое умолчание: теперь она начинается с включённого переключателя
+  и проверяет выключение.  Поведение таблицы не менялось: она строится только для
+  отдельного запроса (строка запроса или маркер), текст ответа так же идёт в «Вывод»,
+  диагностика оставляет панель на «Проблемах», а пустой ответ не переключает вкладку.
+
+  В тот же день пользователь проверил переносную сборку на **чистой Windows 11 в
+  Windows Sandbox, 24H2 26100.9457**: «запустилась и работает».  Это §7.5 задачи
+  task_61 — единственная проверка, которой не может быть на машине разработчика
+  (здесь DLL Visual C++ лежат в `System32`, поэтому забытую DLL тут не увидеть).
+
+* Portable round, part 74: **переносная сборка и перенос папки** (2026-10-03).  Вопрос
+  пользователя: `examples/lib` записывался в `execution/import_paths` на первом
+  запуске, а сборку будут копировать (флешка → компьютер → обратно), и абсолютный
+  путь от первого запуска станет чужим.  Решение: ничего не записывать.  Правило
+  переехало в `paths.import_directories(configured)` — замороженная сборка добавляет
+  свой `examples/lib` **при каждом запуске и последним**, каталоги пользователя идут
+  раньше и выигрывают при одинаковом имени файла; в дереве исходников поведение не
+  изменилось (там по-прежнему поиск только по тому, что задано).  `seed_import_paths`
+  удалён, `_import_directories` в окне теперь одна строка, проверки перенесены в
+  `test_paths.py` («находит ли сборка свой курс», «дерево ищет только то, что ему
+  сказали»).  Там же уточнилось, что `--icons` по умолчанию — это `src/gui/assets` в
+  дереве и своя копия внутри папки сборки — в `src/gui/README.md` и в памятке
+  `tools/portable-readme.txt` («папку можно переносить куда угодно»).
 
 
 
