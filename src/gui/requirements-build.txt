@@ -1,0 +1,12 @@
+# What only a *build* of the portable package needs (task_61 §3) - not what the
+# window needs to run, so this list stays out of `requirements.txt`: that one is
+# installed by anyone who runs the GUI from the sources.
+#
+#   .venv\Scripts\python -m pip install -r src/gui/requirements-build.txt
+#   cmake --build build/windows-msvc --config Release --target docs
+#   .venv\Scripts\pyinstaller --noconfirm --clean --onedir --windowed ^
+#       --name prologd-gui --icon src\gui\assets\prologd2.ico ^
+#       --add-data "src\gui\assets;assets" --paths src\gui src\gui\main.py
+#
+# `tools/build_portable.ps1` runs exactly this and lays the package out.
+pyinstaller>=6.22

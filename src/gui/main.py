@@ -18,7 +18,7 @@ from prologd_gui.settings import Settings  # noqa: E402
 from prologd_gui.window import MainWindow  # noqa: E402
 
 from PySide6.QtCore import QCoreApplication  # noqa: E402
-from PySide6.QtWidgets import QApplication  # noqa: E402
+from PySide6.QtWidgets import QApplication, QMessageBox  # noqa: E402
 
 
 def seed_import_paths(preferences: Settings) -> bool:
@@ -36,6 +36,35 @@ def seed_import_paths(preferences: Settings) -> bool:
         return False
     preferences.import_paths = [str(library)]
     return True
+
+
+def report_missing_interpreter(executable: str) -> int:
+    """Says why the window cannot start, in the way the build can be heard.
+
+    A checkout is started from a terminal, so printing is enough and the message
+    names the command that builds the interpreter.  A **frozen** build is started
+    by double-clicking an icon, with no console anywhere: printing there is
+    printing into nothing, so the one thing that is wrong with the package gets a
+    box instead.  The box is modal on purpose — it is the last thing the process
+    does (task_61 §7.1).
+    """
+    if not paths.frozen():
+        print(f"prologd not found: {executable}", file=sys.stderr)
+        print(
+            "build it first (cmake --preset windows-msvc && cmake --build build/windows-msvc --config Release)",
+            file=sys.stderr,
+        )
+        return 1
+    QApplication(sys.argv[:1])  # a box needs an application object first
+    QMessageBox.critical(
+        None,
+        "Пролог-Д 2.0",
+        "Рядом с окном нет интерпретатора prologd.exe.\n\n"
+        f"Искали здесь: {executable}\n"
+        f"Папка сборки: {paths.data_root()}\n\n"
+        "Сборка неполная: файл prologd.exe должен лежать рядом с prologd-gui.exe.",
+    )
+    return 1
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -77,15 +106,7 @@ def main(argv: list[str] | None = None) -> int:
     # is not refused because the default build path does not exist there.
     executable = preferences.interpreter.strip() or arguments.exe
     if not pathlib.Path(executable).is_file():
-        print(f"prologd not found: {executable}", file=sys.stderr)
-        if paths.frozen():
-            print(
-                "the package is incomplete: prologd.exe must sit beside prologd-gui.exe",
-                file=sys.stderr,
-            )
-        else:
-            print("build it first (cmake --preset windows-msvc && cmake --build build/windows-msvc --config Release)", file=sys.stderr)
-        return 1
+        return report_missing_interpreter(executable)
 
     # Qt must not see our own options: it parses the arguments it is given and
     # would complain about `--theme`.

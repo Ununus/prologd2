@@ -7,6 +7,11 @@ build/
 out/
 cmake-build-*/
 
+# Packaging (task_61): the frozen folder, the archive built from it, and the
+# `.spec` PyInstaller writes next to the command that ran it.
+dist/
+*.spec
+
 # Tooling artifacts
 compile_commands.json
 .cache/

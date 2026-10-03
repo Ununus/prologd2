@@ -133,7 +133,7 @@ entries of the session log below and in `ai/task_*.md`.
 | task_58_gui_editor_menu_about | done | five requests: the icons, `Shift+Del`, the occurrences of the selection made visible, the loading line after a marker click, and the two question switches in «Выполнение» |
 | task_59_gui_answer_table | done | the answer table for a *single* goal (variant C), off by default; the rule lives in `answers.py`, Qt-free |
 | task_60_gui_ask_after_load | done | a question is asked only after `loaded` (`_pending_query`), and a load that fails drops it with one line in «Системе» |
-| task_61_portable_windows_build | planned | one folder for a clean Windows machine — the interpreter, the window frozen by PyInstaller (`--onedir`), five PDFs and `examples` — and the window's three source-tree paths moved onto it (`ai/task_61_portable_windows_build.md`) |
+| task_61_portable_windows_build | in progress | §4 (the window's own paths, `prologd_gui/paths.py`) and §2–§3 (PyInstaller, the first frozen folder, `tools/check_dependencies.py`) are done and checked; left: `tools/build_portable.ps1`, the zip and the clean-machine run (`ai/task_61_portable_windows_build.md`) |
 
 ## Test suite
 
@@ -2222,6 +2222,34 @@ Added on 2026-10-03 while planning task_59:
   рядом; `_old` не кладём, `.typ` кладём; `gui.ini` в переносной сборке рядом с exe
   (в других — AppData, как сейчас); `examples/lib` прописать сразу; папка
   `prologd-2.0.0-win64` и zip.  Инсталлятор — следующая задача.
+
+* Packaging round, part 72: **task_61 — первая замороженная сборка** (2026-10-03).
+  §4 сделан: `prologd_gui/paths.py` отвечает на два вопроса (папка рядом с exe в
+  сборке, корень репозитория в исходниках; `sys._MEIPASS` для значков), на него
+  переведены интерпретатор, значки, документы, настройки, строка ИМПОРТ и — четвёртым,
+  чего в задаче не было, — `doc/builtins.json` для `F1`; проверки: `test_paths.py`
+  (семь случаев с подменёнными `sys.frozen`/`sys.executable`/`sys._MEIPASS`) и случай в
+  `test_window.py`; все 23 набора GUI зелёные, ctest 307/307.
+
+  §2–§3 сделаны на первом проходе: PyInstaller 6.22.3 поставлен в `.venv`
+  (`src/gui/requirements-build.txt` — отдельно от студенческого `requirements.txt`),
+  сборка `--onedir --windowed` занимает 27 с и даёт 112.9 МиБ в 252 файлах
+  (`prologd-gui.exe` 2.3 МиБ, в `_internal/assets` все 47 значков).  Папка
+  `dist/prologd-2.0.0-win64` — 297 файлов, 116.3 МиБ: окно, `prologd.exe` и три DLL
+  Visual C++ рядом, пять PDF с их `.typ` и `builtins.json`, `examples` без
+  `lessons/_old`, памятка `ЧИТАЙ_МЕНЯ.txt` (из `tools/portable-readme.txt`).
+
+  Проверено: `tools/check_dependencies.py` разбирает таблицу импорта каждого .exe и
+  .dll поставки и отвечает «every non-system import is a file of the package» (список
+  системных DLL пополнен тем, что нашлось на деле: `icuuc.dll` — ICU из Windows 10,
+  `d2d1`/`dwrite`/`d3d12`/`uiautomationcore` — бэкенды Qt); окно из этой папки
+  запускается, находит интерпретатор рядом и создаёт `gui.ini` рядом с собой,
+  прописывая в `execution/import_paths` свой `examples/lib`; `prologd.exe --version`
+  = `2.0.0`, `--list-keywords` = 122 строки (110 имён), вывод урока 1 совпадает со
+  строками `%!`.  При проверке нашлось и исправлено: в `--windowed` сборке некуда
+  печатать, поэтому «нет prologd.exe рядом» теперь говорит окном, а не строкой в
+  stderr; из дерева убран мусорный `doc/style.pdf` (остаток цели, которая когда-то
+  собирала `style.typ` как документ) — он заехал в первую сборку.
 
 
 
