@@ -52,12 +52,14 @@ The executable is `build\src\cli\Release\prologd.exe`.
 ## Language at a glance
 
 ```prolog
-% facts and rules
-студент(вова, корчагин).
-студент(данил, ахмеров).
+% facts
+студент('Вова', 'Корчагин').
+студент('Данил', 'Ахмеров').
 
 % a query (variables start with an upper-case letter)
-?НАЙТИВСЕ(И, студент(И, Ф), А).
+?НАЙТИВСЕ(Имя, студент(Имя, Фамилия), Список).
+% Список=[Вова,Данил]; the bindings the goal made are undone, so Имя and
+% Фамилия come back free and print as `_1`
 ```
 
 * Variables: `Name`, `_Name`; `_` is anonymous.
@@ -96,6 +98,14 @@ Usage: prologd [options] [files...]
 -e, --error FILE      write diagnostics to this file
 -q, --questions       echo queries before executing them
 -t, --trace           start with tracing enabled
+    --no-warnings     do not print warnings (they never change the exit code)
+    --max-depth N     recursion depth limit for one query (0 = unlimited)
+    --max-steps N     step limit for one query (0 = unlimited)
+    --max-findall N   solution limit for one НАЙТИВСЕ (0 = unlimited)
+    --format[=MODE]   print the source formatted and exit: soft, hard or line
+    --format-width N  soft mode: what has to fit on one line (default 80)
+    --format-indent N continuation indent in units (default 1)
+    --format-unit U   indent unit: tab (default) or spaces
     --protocol FORM   front-end protocol: text (default) or json
     --list-keywords   print the reserved names as name/arity and exit
 -h, --help            show help and exit
@@ -157,8 +167,8 @@ highlighting that tells Latin names from Cyrillic ones, completion built from
 the reserved names and the program's own, run/stop with a fresh interpreter per
 run, and the usual file handling (save prompts, line endings and encodings kept).
 Documentation is in `doc/` (`help.typ`, `gui.typ`, `technical.typ`,
-`prologd-diff.typ`); `cmake --build build --target docs` writes the PDFs into the
-same directory when Typst is installed.
+`prologd-diff.typ`, `lessons.typ`); `cmake --build build --target docs` writes the
+PDFs into the same directory when Typst is installed.
 
 CI builds and tests on Linux (GCC and Clang) and Windows (MSVC); see
 `.github/workflows/ci.yml` and `CMakePresets.json`. Current status and the task

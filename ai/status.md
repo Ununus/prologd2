@@ -1,72 +1,74 @@
 # Status tracker
 
-Last updated: after the graphics window of task_45 (protocol 10), the interface
-cleanups of task_48 (icons, the toolbar, the search menu), the formatter's round of
-task_47 (the lessons in one style, the head on its own line, the mode control back
-on the toolbar), task_49 (four window defects and the live output), and task_46's
-interpreter path and process directory (the two rows that pick the binary and
-where its files go).
+Last updated: after task_60 (a question is asked only when there is someone to ask — the
+margin marker waits for `loaded`) and the two documentation rounds that followed, parts
+69--70: the five Typst documents shortened and their title dropped towards the middle of
+the page, the window's first program rewritten, the lessons' variables named by role, and
+the window taught before the console in lessons 7, 10 and 11.
 
 ## Overall
 
-* Phase: feature-complete core, verified on Windows; the PySide6 front-end has
-  started (protocol + skeleton).
-* Build: the `windows-msvc` preset (Visual Studio 18 2026, MSVC 19.51) build is
-  green locally; the Linux presets, including `-Werror`, build cleanly.
-* Tests: 274/274 pass in about five seconds: 260 Catch2 cases plus 14 command-line
-  and integration tests (seven option tests, two `--list-keywords` tests, the
-  import-search report, the JSON protocol session, the engine-limit cases, the
-  diagnostics cases and the formatter round-trip).
-  or `--source`), stdin, the REPL and the `--protocol json` session for
-  front-ends.
-* GUI: `src/gui` (PySide6) drives the executable through the JSON protocol; the
-  window, the protocol and the stepping are covered by twenty-one offscreen scripts
-  (`src/gui/tests/`), which need no display.
-* Documentation: `doc/help.typ`, `doc/technical.typ`, `doc/prologd-diff.typ`
-  written (Russian); `cmake --build build --target docs` compiles them when
-  `typst` is installed.
+* Phase: the core is feature-complete and verified on Windows; the PySide6 window is a
+  full front end (task_21 -- task_60), not a skeleton: files and tabs, the code editor,
+  completion, the built-in reference, stepping and tracing, the graphics window, the
+  output panel with its answer table and the settings dialog are all in.  The only thing
+  left on the board is `task_46`'s named profiles.
+* Build: the `windows-msvc` preset (Visual Studio 18 2026, MSVC 19.51) is green locally,
+  tests included; the Linux presets, including `-Werror`, build cleanly.
+* Tests: 307/307 in about five seconds — 290 Catch2 cases plus 17 command-line and
+  integration tests.  The window has its own 22 offscreen scripts plus `protocol_smoke.py`;
+  they need PySide6, so CI runs the C++ suite only.
+* Interpreter surface: `-s/--source` (repeatable), positional files, stdin, `-i`/`-o`/`-e`,
+  `-q`, `-t`, `-I`, `--no-warnings`, `--max-depth`/`--max-steps`/`--max-findall`,
+  `--format[=soft|hard|line]` with `--format-width`/`--format-indent`/`--format-unit`,
+  `--list-keywords` and `--protocol json` (version 11).
+* Documentation: five Russian Typst documents — `help.typ` (the reference),
+  `technical.typ` (the design), `prologd-diff.typ` (what differs from the first
+  Пролог-Д), `gui.typ` (the window) and `lessons.typ` (the course) — plus
+  `doc/builtins.json`, whose records the manual's appendix table and the window's
+  reference are both built from.  `cmake --build build --target docs` compiles them when
+  `typst` is installed; the PDFs land next to the sources.
 
 ## What works now
 
-* UTF-8 lexer with Cyrillic support, reserved Russian built-in names and
-  trailing-dot floats (`1.`).
-* Recursive-descent parser with semantic error categories, `(A, B)`
-  conjunction and source-ordered statements.
+* UTF-8 lexer with Cyrillic support, 110 reserved Russian built-in names, each with an
+  English alias, and trailing-dot floats (`1.`).
+* Recursive-descent parser with semantic error categories, `(A, B)` conjunction, `;` as
+  the backtrackable disjunction, `\+` as the second spelling of `НЕ`, the short
+  comparison signs as sugar over `РАВНО`/`МЕНЬШЕ`/`БОЛЬШЕ`, and source-ordered
+  statements.
 * Value-based immutable terms with lists encoded as `./2` plus `[]`.
-* Unification with an undo trail; atoms and strings are interchangeable;
-  arithmetic expressions are evaluated eagerly on binding.
-* Resolution engine over a *persistent environment chain* (ADR-004): O(1) choice
-  points, standard cut, transparent `ВЫП/1`, `НЕ/1`, `ПЕРВОЕ/2`, `РАВНО/2`,
-  `ЛОЖЬ`, `ТРАССА`/`НЕТ_ТРАССЫ`, `ТИХО`, `ВЕРСИЯ`, `ПС`, `ЖДИ`.
+* Unification with an undo trail; atoms and strings are interchangeable; arithmetic
+  expressions are evaluated eagerly on binding.
+* Resolution engine over a *persistent environment chain* (ADR-004): O(1) choice points,
+  standard cut, transparent `ВЫП`, `НЕ`, `ПЕРВОЕ` (variadic), `РАВНО`, `ЛОЖЬ`,
+  `ТРАССА`/`НЕТ_ТРАССЫ`, `ТИХО`, `ВЕРСИЯ`, `ПС`, `ЖДИ`, with a recursion-depth and a
+  run-length limit that report instead of crashing.
 * Arithmetic: hand-written `BigInt`, `#expr#`, `БОЛЬШЕ`/`МЕНЬШЕ`, `СЛОЖЕНИЕ`,
-  `УМНОЖЕНИЕ/3,4`, `abs`, `sqrt`, `sin`, `cos`, `tan`, `exp`, `is_whole`,
-  `is_number`, `СЛУЧ`, `ЦЕЛВЕЩ`, `СТРЦЕЛ`, `СТРВЕЩ`, `СТРСПИС`.
-* Strings (code-point based): `БУКВА`, `ЦИФРА`, `СЦЕП`, `КОПИЯ`, `ДЛИНА` (each
-  with an English name too — appendix 17 of the manual).
-* I/O: `ВЫВОД`, `ВВКОД`, `ВВОДЦЕЛ`, `ВВОДВЕЩ`, `ВВОДСИМВ`, `ВВОДСТР`,
-  `ЧТЕНИЕ_ИЗ`, `ЗАПИСЬ_В`, preloaded `$...` input lines.
+  `УМНОЖЕНИЕ/3,4`, `abs`, `sqrt`, `sin`, `cos`, `tan`, `exp`, `is_whole`, `is_number`,
+  `СЛУЧ`, `ЦЕЛВЕЩ`, `СТРЦЕЛ`, `СТРВЕЩ`, `СТРСПИС`.
+* Strings (code-point based): `БУКВА`, `ЦИФРА`, `СЦЕП`, `КОПИЯ`, `ДЛИНА` and the rest.
+* I/O: `ВЫВОД`, `ВЫВОДПС`, `ВВКОД`, `ВВОДЦЕЛ`, `ВВОДВЕЩ`, `ВВОДСИМВ`, `ВВОДСТР`,
+  `ЧТЕНИЕ_ИЗ`, `ЗАПИСЬ_В`, preloaded `$...` input lines; the front-end's answer is a
+  piece of the input stream (ADR-023).
 * Program database: `СКОЛЬКО`, `ПРЕДЛ`, `ТЕРМ`, `ДОБ`, `УДАЛЕНИЕ`.
-* Graphics over `GraphicsBackend` (null and recording implementations).
+* Graphics over `GraphicsBackend` (a null one, a recording one, and the window's bitmap).
 * `НАЙТИВСЕ/3` reproduces the required examples.
-* `ИМПОРТ` loader: import-once, include paths, cycle detection, root containment.
-* CLI11 front-end with conventional options (positional files, `-s/--source`,
-  `-I/--include`, `-q`, `-t`, `--help`, `--version`); UTF-8 console setup on
-  Windows; diagnostics in the `file:line:column: error: message` form.
-* Examples ported to the new syntax (`examples/lessons/lesson_*.pld`,
-  `examples/*.pld`) with golden tests; `examples/import_demo.pld` demonstrates
-  `ИМПОРТ` and `-I`.
-* PySide6 front-end (`src/gui`): the `prologd` interpreter in its own process over
-  the line-delimited JSON protocol (version 2 carries the reserved names), a code
-  editor with highlighting, completion, line numbers, zoom and settings, tabs and
-  files with save prompts and encodings, an input field with a queue of prepared
-  answers, a split editor over one shared document set, and — with task_26 — one
-  action table feeding the menu bar, the toolbar and the context menu.
-* CMake presets and a GitHub Actions workflow (Linux GCC/Clang, Windows MSVC).
-* Windows verification: the library, CLI and test binary cross-compile to valid
-  PE32+ executables for `x86_64-windows-gnu` (Zig toolchain); the MSVC build and
-  runtime tests are delegated to CI.
+* `ИМПОРТ` loader: import-once, include paths, cycle detection, root containment, and a
+  failure that names the directories tried.
+* CLI11 front-end with UTF-8 console setup on Windows and diagnostics in the
+  `file:line:column: error: message` form, with severities.
+* Examples ported to the new syntax and covered by golden tests; the course in
+  `examples/lessons` is a program per lesson whose own `%!` lines are its expected output.
+* Windows verification: the library, CLI and test binary cross-compile to valid PE32+
+  executables for `x86_64-windows-gnu` (Zig toolchain); the MSVC build and the whole suite
+  run locally.
 
 ## Task board
+
+Tasks 00--20 are the core, 21--60 the window and the language surface around it.  A note
+says what the task *is* and which decision it left behind; the reasoning is in the round
+entries of the session log below and in `ai/task_*.md`.
 
 | Task | Status | Notes |
 |------|--------|-------|
@@ -86,180 +88,134 @@ where its files go).
 | task_13_findall | done | required examples pass |
 | task_14_modules_import | done | loader + tests (cycles, root, include path) |
 | task_15_graphics_stubs | done | |
-| task_16_cli | done | conventional CLI (ADR-012); Ctrl+C stop, exit codes and `--protocol json` added |
-| task_17_docs_typst | done | four Russian documents + `doc/README.md`; the PDFs are written into `doc/` (git-ignored) |
+| task_16_cli | done | conventional CLI (ADR-012); Ctrl+C stop, exit codes, `--protocol json` |
+| task_17_docs_typst | done | the Typst documents + `doc/README.md`; PDFs into `doc/` (git-ignored) |
 | task_18_examples_acceptance | done | lessons ported; golden tests |
-| task_19_windows_portability | done | verified locally on VS 2026: build + 108/108 tests (ADR-013); the CI image still has to be confirmed |
+| task_19_windows_portability | done | the VS 2026 build and the whole suite are green locally (ADR-013); the CI image still has to be confirmed |
 | task_20_gui_future | superseded | the Qt C++ plan became PySide6 over a JSON protocol (ADR-014) |
-| task_21_gui_pyside | in progress | protocol, `IoContext` input seam, `externalStop`, `src/gui` skeleton |
-| task_22_gui_editor | done | tokenizer, palette, highlighter, line numbers, Ctrl+K/U, zoom and the settings store are in and tested; find/replace and duplicate line come with the task_26 menus, saving a file with task_25 |
+| task_21_gui_pyside | done | protocol, `IoContext` input seam, `externalStop`, `src/gui` — the skeleton that tasks 22--60 grew into a full front end |
+| task_22_gui_editor | done | tokenizer, palette, highlighter, line numbers, Ctrl+K/U, zoom, the settings store |
 | task_23_gui_keyword_source | done | `--list-keywords` + `keywords` in `ready` (protocol 2); one source for the built-in list |
-| task_24_gui_completion | done | popup over the reserved names *and* the document's own names, with arities; no completion in a comment, string or `#…#`; `Ctrl+Space` |
-| task_25_gui_files_tabs | done | tabs, files, save prompts, encodings, input queue, drop anywhere and the split editor (two panes, one text per document) |
-| task_26_gui_toolbar | done | one action table (48 commands, 12 disabled with a reason) feeding the menu bar, the toolbar and the context menu; icon audit in `src/gui/README.md` (48 names referenced, 42 drawn, 6 left: the «Вид» switches — numbers as of task_26; task_47 and task_48 moved them) |
-| task_27_gui_panels | done | movable panel (`F4`, `Ctrl+F4`), output pane (colour by kind, visible half-lines, bounded history, auto-scroll, save to a file), input console with the queue switch, status-bar details and the two-state run/stop |
-| task_28_gui_run_step | done | `EngineOptions::stepHook` + `StepInfo`, protocol 3 (`step`/`trace` events, `step` request, positions on `error`), the step strip with the call stack, the trace line in the editor, `F10`/`Shift+F10`/`F5`, error and trace lines from structured positions |
-| task_29_gui_settings | done | `settings.SETTINGS` — one record per preference (key, label, section, kind, default, bounds, hint) that drives the dialog's row, validation, `«Сбросить»` and the map_positions-style test; `settingsdialog.SettingsDialog` with sections `Редактор/Вид/Формат/Выполнение/Файлы/Вставки`, «ОК»/«Применить»/«Отмена»/«Сбросить»/«Импорт…»/«Экспорт…»; the window applies everything without a restart (`apply_settings`); new keys: `output/font_size` (unset = follow the editor), `output/line_limit`, `editor/completion_match_case`, `editor/current_line`, `execution/working_directory`, `execution/import_paths`, `files/autosave_minutes`, `files/recent_limit`; unknown keys preserved through a foreign file; the dark theme and the system colours are done, session restore and the small switches are done, and **RU/EN was dropped** (ADR-021); profiles and limits are `task_46`, the graphics window `task_45` |
-| task_30_gui_formatter | done | `prlib/formatter.cpp` (whitespace-only, everything else copied byte for byte); three modes — **в одну строку**, **мягкое** (строки строятся заново: цели собираются до ширины) and **жёсткое** — chosen in «Правка → Формат» (the submenu moved back to the toolbar in task_47); `prologd --format[=soft|hard|line]` with `--format-width`, `--format-indent` and `--format-unit`; protocol **7**+**8** (`format` → `formatted`/`error`, answerable between queries; `loaded` when a run is over); the window's `Ctrl+I` with one undo step and the caret and selection mapped onto the new text; a source that does not parse is never rewritten |
-| task_31_gui_shortcuts | done | `shortcuts.py` — a Qt-free table of `Ctrl`+**physical key** insertions, matched on `nativeScanCode()`: `:-.`, `()`, `[]`, `#`, `?`, `РАВНО(,)`, `БОЛЬШЕ(,)`, `МЕНЬШЕ(,)`, `СЛОЖЕНИЕ(,,)`, `УМНОЖЕНИЕ(,,)` and the simple symbols `/ - _ ! '' ""`; `:` and `?` carry two chords each (Russian `Shift+6`/`Shift+7`), a selection is *wrapped* by the bracket-like rows, every insert is one undo step, only `Ctrl` (plus `Shift`) is accepted — `Alt` and `Ctrl+Alt` are left to the window; the table is data in the settings file (`shortcuts/table`, JSON, one entry per insert with a list of chords) and «Справка → Шпаргалка по вставкам» lists it from the same object; zoom stays on the keypad, `|` has no chord (merge keeps `Ctrl+Shift+\`) |
-| task_32_import_search_report | done | `ИМПОРТ` failure names the directories tried, with reasons |
-| task_33_gui_search_replace | done | `search.py` (plain-text, Qt-free) + the find bar: question from the selection or the word at the caret, `F3`/`Shift+F3` with the wrap reported, three switches, «Заменить всё» as one undo step, the matches lit in every view; `test_search.py` has 17 checks |
-| task_34_builtin_branches | done | every built-in branch-tested in Catch2 (186 cases); the sweep found and fixed five defects: two in the float built-ins (`nan` instead of a failure), the integer/real comparison, the cyclic term that ended the process, the ignored read prompt, the unchecked graphics arguments and the code points that were written as invalid UTF-8 |
-| task_35_lessons_rework | done | the course in `examples/lessons` is rewritten for the current dialect, one commit per lesson, from the plan in `ai/task_35_lessons_rework.md`; `test_lessons.cpp` runs every lesson (12 + the debug appendix) and compares its whole output with the `%!` lines the lesson itself carries, so a lesson cannot drift again; the old files are in `lessons/_old/`; the index is `examples/lessons/README.md` and the fifth Typst document `doc/lessons.typ` (the `docs` target builds it); writing the expectations found and fixed mistakes in the source material (a non-terminating `нод/3`, descending sorts, a hanging `?длина(Х, 2)`, a failed read that leaves the rest of its line) and taught the check two tricks: input files for lesson 7 and include paths for lesson 11 |
-| task_36_gui_query_markers | done | a blue triangle in the margin runs the question it stands at — `?Goal.` and `% ?Goal.` alike: the commented query of a lesson (its own lines still run whole), the `%?` line coloured as a question, and a `questions: false` load so the clicked query answers *alone*; the rule is not a parser and refuses a line it cannot read (commits e9c3beb/c38acc6/a99c906/cebd2c0); the first hands-on run added two fixes — a failed query marks no line of the program (`<query>`), and `Ctrl+C` copies from the focused pane |
-| task_37_gui_builtin_reference | done | `doc/builtins.json` — one record per predicate (name, English aliases, kind, arities, group, `help.typ` section, one-line summary, argument modes), 59 records over all 108 names; `help.typ` builds its appendix table from the file, `test_reference.py` keeps the file in step with the interpreter and the manual, `reference.py` loads it for the window (a missing file is an empty reference); the completion popup shows the summary of the highlighted row, `F1` opens a dock with the whole record — and `Up`/`Down` now really walk the popup list (they moved the caret, contradicting the README) |
-| task_38_engine_limits | done | recursion depth and long runs: the crash is gone (the chain and deep terms are released iteratively — the trigger was a *surviving* deep reference, a choice point whose base clause does not cut, or the solver's final environment), `maxDepth` turns runaway recursion into a diagnostic, the variable growth is documented instead of "fixed", and `tools/bench_engine.py` made the numbers reproducible |
-| task_39_english_aliases | done | every built-in has an English spelling in lower case (one `kEnglishNames` table in `builtins.cpp`, 47 pairs, is the only place a pair is written; `test_aliases.cpp` walks it and fails on a Russian name without a row); the manual gained appendix 17 with the whole table, `prologd-diff.typ` §15 and `conventions.md` the rule; doing it showed that `int`/`float` were *checks*, not conversions (`integer`/`float` are the ISO type tests, `is_whole`/`is_number` the old ones, and the planned `to_int`/`to_float` were dropped) and `ДЛИНА` became `strlen`; 108 reserved names, one list for CLI, protocol and GUI; renamed on review: `number` → `is_number`, `num_to_float` → `int_to_float` |
-| task_40_diagnostics | done | severity (an error stops a load or a query and keeps exit codes 2/3; a warning never changes either, and `--no-warnings` drops them) with `severity` on the wire (protocol 4) and amber warnings counted in the GUI; positions name what to fix (the opening bracket and its line, the end of a clause without its dot, the goal); a reserved name with an arity that exists nowhere is an error, an undefined predicate or a missing arity is a warning with a suggestion; singleton variables with separate advice for facts, rules and bodies |
-| task_41_semicolon_disjunction | done | `;` is the backtrackable disjunction of ISO, `,` binds tighter, and a branch runs in a frame whose cut barrier sits above the alternative (a cut in a branch is local to it; `ПЕРВОЕ/2` — then still named `ИЛИ/2`, renamed in task_44 — stays the committed form, and lesson 4 shows both side by side); the sentence terminator is the dot alone, and a `;` written as one is an error that says what changed; `examples/factorial.pld` was the only file to convert; parse shapes, solver semantics and diagnostics are all pinned |
-| task_42_engine_hot_path | done | the constant tax, measured: the two per-goal lookups stop building strings (`BuiltinKey` keyed by `string_view`; the database is a two-level `name -> (arity -> list)` map looked up with `std::less<>`, no `"name/arity"` key, `key_order_` gone) — interleaved six pairs on a dispatch-bound loop: median 1.45 s → 1.40 s, every pair faster, ≈ 4 %; clause indexing measured and deferred (ADR-017: a 100 000-clause scan costs ≈ 20 ms, lesson predicates have a handful of clauses, and the queens workload is a shape an index cannot prune); term interning bounded by that same ≈ 4 % and deferred; `tools/bench_engine.py` gained the `dispatch`, `structured` and `queens` workloads and `--only` |
-| task_43_language_surface | done | `ВЫП/2..N` (`call/N`): the extra arguments are appended to the goal (callee dereferenced first; the keyword table says `ВЫП/+`; the checker expands the same term; `!` inside the argument stays a parse error and the manual no longer promises it); the module-collision warning — one per predicate fed by two files with no import path between them, silent for the diamond and for extending an imported module (ADR-019); the dead library is gone (`?СКОЛЬКО(НЕ, А)` answers 0; ADR-018) |
-| task_44_names | done | the two names that promised something else: `ИЛИ/2` → `ПЕРВОЕ/2` (`or` → `first`) with the retired spelling removed from the language (a call is a load error naming the replacement), `НАЙТИВСЁ` → `НАЙТИВСЕ` (the spelling of the task and of the reference notes) with the retired spelling kept reserved, so its call is the ordinary suggestion «возможно, НАЙТИВСЕ/3»; the two `ИЛИ` library clauses removed so the old name cannot answer through the database; `doc/help.typ` §4.6, `prologd-diff.typ` §17/§18, lesson 4's section 5 |
-| task_45_gui_graphics_window | done | the graphics predicates are *visible*: `BitmapGraphicsBackend` inside the engine (a 1024×768 buffer that answers `getPixel` locally and performs `ЗАКРАСКА` itself, reporting every primitive), protocol **10** (`graphics` events and `{"cmd":"graphics","snapshot":true}` → `bitmap`), a Qt-free `graphics.Canvas` with the palette, and `graphicswindow.GraphicsWindow` — a window of its own with «Вписать в окно»/«1 : 1», «Очистить», «Сохранить как PNG…» and a cell readout; the last disabled menu entry is gone (ADR-022).  The by-hand look at `examples/drawing.pld` found two defects (the ellipse was read as a box; an untouched canvas was transparent) |
-| task_46_interpreter_options_and_limits | in progress | the limits are in: `Limits` + `applyTo` in the engine, `--max-findall`, protocol **9** (`limits` on `load`, a bad field is an `error` instead of a dead session), four dialog rows and a front-end deadline.  The core has **no limits of its own** (0 = «без предела», messages name a limit and its value only — ADR-020) and the window ships 0 / 1 000 000 / 1 000 000 / 0.  The **interpreter path** and the **process directory** are in too (2026-10-02): `execution/interpreter` (a `file` row; empty = «the one the window was started with», the row wins over `--exe`, the status bar names a non-default build) and `execution/process_directory` (`каталог файла` / `рабочая папка` / `свой каталог`; `ЗАПИСЬ_В`/`ЧТЕНИЕ_ИЗ` open relative to it) — every session start goes through one gate, «Применить» restarts a live session on either change and reports a missing path.  Still open: profiles, and `--timeout-ms` (a text-mode deadline would need a clock in the solver — **dropped by decision**).  The last item of task_29's settings list, split out on 2026-10-01 |
-| task_47_lessons_and_formatting | done | the corpus in one style and the formatter's round of fixes: 21 of the 25 shipped programs reformatted by `prologd --format` (soft, 80, one tab) with a new check that every shipped program *is* the standard shape, so the style cannot drift again; the hard mode puts the head of a clause on a line of its own (the first goal was the one glued to the head); the format mode returns to the toolbar right after «Форматировать» (icon `edit-format-set`) and leaves «Правка»; lesson 12's animation is a click away (`%?`) with a two-frame version runs in the check; and the reformat taught the formatter a rule — a **query and a directive are never broken**, because the margin marker that runs them is line-local (the pinned question counts caught it) |
-| task_48_interface_cleanup | done | the round of small things the user asked for: five pictures left the tree (`help-about` — the same drawing as `prologd2`, the two `search-find-selected-*`, `view-toolbar`, `view-line-numbers`), `assets.MISSING` is down to four names, «Сохранить все» left the toolbar, the two «Найти выделенное» commands left «Поиск» with their icons; `Esc` now closes the graphics window → the find bar → the reference dock → the cheat sheet (one handler on the window, by *propagation*, so the completion popup and the find bar's field keep answering for themselves), and the graphics window opens itself on the **first primitive of a run** — once per run, so a window closed during an animation stays closed (task_45's window plus `_graphics_shown`) |
-| task_49_gui_defects | done | five defects found by using the window, all fixed.  `Шаг → Стоп → Запуск` no longer answers «нет шага, который ждёт ответа» (the paused flag is cleared by the events that conclude a run — including the *error* a «Стоп» turns into while a step waits); an untouched unnamed tab comes back clean (the session record carries the unsaved flag; JSON, because a fourth tab-separated field cannot be told apart from text with a tab in it); the format `Запустить с трассировкой` no longer takes the window (the output is handed over once per turn of the event loop, and the pane trims its history in bulks — 200 000 lines: 21.9 s → 3.0 s, a 16 000-line trace: 2.2 s → 0.6 s); the main window remembers its size and place (`view/window_geometry`), which the graphics window had done since task_45; and the **output arrives as it is written** — `IoContext::setOutputLineSink` fires at a line end and the session emits one `output` event per line, so a lesson's countdown counts 3, 2, 1 instead of arriving as one block when the program is over |
-| task_50_panel_tabs | done | the output panel is one `QTabWidget`: **Проблемы** (errors and warnings), **Вывод** (program output, the `>` echo, the trace), **Система** (the window's notes) and **Ввод** (the prepared answers with the per-request console under them).  Each title carries its count (`Вывод:5`, `Проблемы:0` …), «Проблемы» is painted by state (ordinary with none, orange warnings-only, red with an error), a run brings up «Вывод» and a diagnostic «Проблемы»; the panel defaults to the **bottom**; «Поле очереди ввода» is gone (the queue is a tab now); a full load writes `--- база знаний загружена (N мс) ---` into «Система», measured by the window's clock from «Запустить» to `loaded` |
-| task_51_variadic_first | done | `ПЕРВОЕ` берёт любое число целей, начиная с одной: `builtinFirst` — цикл по `args` с `callOnce`, а вариадические имена собраны в одну таблицу `kVariadicNames` (`ВЫВОД`/`write`, `ПЕРВОЕ`/`first`), из которой читают `findBuiltin`, `builtinArities` и `builtinNames`; строки `add("ПЕРВОЕ", 2, …)` больше нет, `isVariadicBuiltin` (два сравнения имён) тоже.  Разбора, движка, лексера и `checks.cpp` не касается: `variadic` уже значит «от арности 1».  Одноаргументное `ПЕРВОЕ(Ц)` — это фиксация на первом решении, **не** `ВЫП(Ц)` (`?НАЙТИВСЕ(X, ПЕРВОЕ(p(X)), L).` → `L=[1]`, у `ВЫП(p(X))` — `L=[1,2]`); арность 0 — ошибка загрузки («ПЕРВОЕ не имеет арности 0»).  Проверки: новый случай Catch2 на вариадику (+1 CLI-тест `--list-keywords` → `ПЕРВОЕ/+`), ctest 278/278; `--list-keywords` печатает `ПЕРВОЕ/+` и `first/+` и больше не печатает `ПЕРВОЕ/2`; `doc/builtins.json` (`arities: []`, `variadic`), `help.typ` §4.5/§4.6, `technical.typ`, `prologd-diff.typ` (§«ПЕРВОЕ» и строка таблицы), `ai/porting_notes.md`, `gui/README.md` |
-| task_52_infix_operators | done | Знаки сравнения — сахар над `РАВНО`/`МЕНЬШЕ`/`БОЛЬШЕ`, а не новые имена: `InfixOperator`/`kInfixOperators` в `parser.cpp` (`=`→`РАВНО`, `<`→`МЕНЬШЕ`, `>`→`БОЛЬШЕ`, `=<`→`НЕ(БОЛЬШЕ)`, `>=`→`НЕ(МЕНЬШЕ)`), один слой в `parseTerm`/`parseComparison`, цепочка (`0 < X < 10`) — ошибка разбора одним сообщением (`skipToTerminator`), операнды через `parseOperand` — поэтому `#…#` тоже операнд (`r(#1 + 1# = 2)`).  Лексер: по одному виду на знак и таблица подсказок `kForeignOperators` (`=:=`, `=\=`, `\==`, `\=`, `==`, `@<`…, `->`, `<=`) — чужая запись объясняется в месте знака, а не сообщением про переменную-цель.  `=:=` не введён: `#…#` вычисляет, и вместо `1 + 1 =:= 2` пишут `#1 + 1# = 2`.  Вместе с этим принято правило ISO для числа: `1.` — целое `1` и точка, вещественное — `1.0` (перенесённая запись с точкой на конце съедала терминатор, и `?2 > 1.` не разбиралось).  GUI: знаки — вид `OPERATOR` (`tokens.py`, цвет уже был), `shortcuts.py` не тронут (решение пользователя: `Ctrl+=` остаётся за `РАВНО(`).  Документы: `help.typ` §3.2/§3.3/§4.7/§5.1 и строки таблицы, `prologd-diff.typ` §9 и три строки «Краткой таблицы», `technical.typ` (число и грамматика), варианты в `doc/builtins.json`.  Проверки: 285/285 ctest (семь новых случаев), 21 набор GUI (`test_*.py`) и `protocol_smoke.py`; уроки 3 и 4 получили пример с короткой записью, счётчики `test_queries.py` освежены (урок 4: 24 → 25 после task_51, плюс 03: 34 → 37 и 04: 25 → 27) |
-| task_53_writeln | done | `ВЫВОДПС(Аргумент, ...)` / `writeln` — `ВЫВОД` с переводом строки: тело `builtinWriteLine` рядом с `builtinWrite` (тот же цикл плюс один `newline()`), две строки в таблицах `builtins.cpp`, слово в `kReservedBuiltins` и запись в `doc/builtins.json`.  В руководстве новая §6.3 (место выбрал пользователь: сразу после `ПС`), и всё с 6.3 по 6.9 сдвинулось на один — номера поправлены и там, где они были процитированы: `prologd-diff.typ`, урок 7, план task_54.  `--list-keywords`: 108 → 110 имён; ctest 290/290 |
-| task_54_input_stream | done | Ответ оболочки — **кусок входного потока**: `pending_`/`pending_pos_` в `IoContext` и `fetchChunkLine` выдают по одной строке — до `\n` (с отбрасыванием `\r` перед ним), а без разделителя — весь остаток, потому что конец куска заканчивает его последнюю строку; новый кусок спрашивается только когда предыдущий исчерпан.  Отсюда: `a\n` — одна строка (без фантомной пустой), `""` — одна пустая, `ВВКОД` не читает код 10 между строками, «остаток строки» после `ВВОДСИМВ` работает в окне как в файле.  BOM отбрасывается в начале каждого потока (первая строка базового потока, каждого файла `ЧТЕНИЕ_ИЗ` и каждого куска), в другом месте — данные.  Оболочка свою очередь всё равно режет — но это бухгалтерия (`>` и «осталось строк»), а не чтение; консоль получила подсказку «Строки — Ctrl+Enter», `window.py` — док-комментарий, `protocol.cpp` — комментарий (поведение не изменилось).  Документы: ADR-023, `technical.typ` §10, `help.typ` §6.5/§6.8, `gui.typ` §6.1 (абзац переписан — он описывал окно до task_50), `gui/README.md`, подсказка настройки «Спрашивать ввод».  Проверки: 8 новых случаев `IoContext`, 7 через встроенные предикаты (включая файл с BOM), случай в `protocol_session.cmake` (две строки в одном ответе — один `input_request`) и GUI-проверка с диалогом-«предателем»; ctest 305/305 |
-| task_55_iso_negation_and_is_hint | done | `\+` — вторая запись `НЕ/1`, а не новое имя: один токен в лексере (`TokenKind::NotGoal`), префикс уровня терма в `parseTerm`, поэтому он работает в теле, в запросе, в директиве и в аргументах `ВЫП`/`НАЙТИВСЕ`, а приоритет — ISO (`\+ A, B` — это `(\+ A), B`, `\+ (A, B)` — отрицание всей конъюнкции, `\+ \+ Ц` — двойное отрицание); `НЕ` остаётся основным именем, в таблицу операторов task_52 `\+` не входит (он префиксный).  `is` **не добавлен**: `#…#` уже помечает и вычисляет выражение, поэтому вместо оператора — две подсказки, называющие замену (`kForeignSpellings` в `checks.cpp` для вызова `is/2`; `kInfixIsHint` в `parser.cpp` для `X is 2+3`).  Руководство: §3.3, §4.4, строки «Арифметика»/«Отрицание» сравнительной таблицы, приложение; `prologd-diff.typ` §19/§20 и две строки в §14 |
-| task_56_missing_dot_between_statements | done | пропущенную точку видно и тогда, когда причина не в конце файла: `beginsStatement(TokenKind)` в `parser.cpp` (Identifier, Variable, Integer, Float, String, QuotedAtom, Hash, Question, NotGoal, LParen, LBracket) — если после законченного предложения идёт такой токен, сообщение «предложение должно заканчиваться точкой» с позицией на *конце своего* предложения (`студент(вова, корчагин)` перед следующей строкой — `1:42` вместо `2:1: ошибка при разборе предложения`); общая формулировка осталась там, где новое предложение начаться не может (`a(1), b(2).`).  Проверки: два новых случая Catch2 — в парсере (четыре раздела: факт, правило, запрос, «точка везде») и через загрузчик; ctest 276/276 |
-| task_57_tell_failed_redirect | done | Неудачный `ЗАПИСЬ_В` оставлял `output_` на **закрытом** `file_output_`: `openOutput` закрывал текущий файл до попытки открыть новый, а `output_` присваивался только при успехе.  Запись в закрытый `std::ofstream` теряется молча, поэтому после такого вызова пропадало всё до следующего удачного `ЗАПИСЬ_В` — и вывод программы, и ответы самого интерпретатора (`ДА`/`НЕТ` печатаются тем же `IoContext`).  Правка — одна строка: `output_ = base_output_` сразу после закрытия, то есть неудачное переключение возвращает вывод туда, где он был бы и без него (симметрично `ЧТЕНИЕ_ИЗ`, который возвращает чтение к клавиатуре).  Вариант «не закрывать прежний файл, пока новый не откроется» отвергнут: он тихо игнорировал бы просьбу продолжить писать в прежний файл.  Проверки: случай через `ЗАПИСЬ_В`/`ВЫВОД` (вывод и ответы остаются на экране, имя текущего файла пусто) и случай на `IoContext` (`write` после неудачи идёт в базовый поток); `help.typ` §6.9 — фраза про то, куда возвращается вывод |
-
-| task_58_gui_editor_menu_about | done | Раунд из пяти просьб по окну.  **Значки (сделаны первыми — `test_icons.py` была красной):** `view-output-right` → `view-output`, `view-output-bottom` → `view-output-change-orient`, `view-split-editor` ушёл из `assets.MISSING` (нарисован), новые `view-unite-editor` (у `merge`) и `select-all` (у `select_all`) — до этого оба пункта были текстовыми; итог — 49 имён, 48 нарисовано, ждёт один `view-theme`.  **Клавиша:** `Shift+Del` — новое действие `delete_line` («Удалить строку» в «Правке», без значка), курсор встаёт в первый столбец съехавшей строки, выделение берёт все затронутые строки (кроме той, на начале которой остановилось), последняя строка файла пустеет, а не исчезает — всё одним шагом отмены.  **Подсветка:** вхождения выделенного слова стали видны — светлая `#e8ecf5` → `#cfe0f7`, тёмная `#2d3038` (15 единиц от страницы `#1e1e1e`, то есть невидимая, а именно её получает тёмный рабочий стол через «системное» оформление) → `#3a4a63`; разницу с фоном и с полосой текущей строки теперь измеряет `test_appearance.py`.  **Строка о загрузке:** клик по маркеру вопроса на полях пишет `--- база знаний загружена (N мс) ---` в «Систему», как `F5` (печатается по `loaded`, до раннего `return` в `_on_loaded`).  **Меню:** руководство переехало под «Справку по предикату»; в «Выполнении» `save_before_run` ушёл из меню (настройкой остался), вместо него два переключателя — `run_questions` и `print_questions`, те же настройки, что в диалоге (`_sync_actions` возвращает значение в галочку); с панели инструментов убрано руководство, размер шрифта встал после «Настройки…».  **«О программе»:** «Графическая оболочка Пролог-Д 2.0», пять имён АБВГД с выровненной пробелами колонкой `--`, без строк про панели и настройки.  **Доработка после первого взгляда:** `Shift+Del` в редакторе не работал (Qt отдаёт эту клавишу не нашему `QAction`, а `QTextControl` — на Windows `Shift+Del` это вторая запись «Вырезать»), поэтому команда вызывается из `keyPressEvent`, а тест теперь **нажимает клавишу**; размер шрифта убран с панели инструментов совсем (вместе с полем; масштаб — колесо с `Ctrl` и три команды, точное значение — строка настроек), «Очистить вывод» переехала в «Выполнение» над «Графическим окном», в «О программе» `--` заменено на `–`, а правило многоточия записано в докстроке `actions.py`.  Проверки: те же наборы, ctest 307/307 |
-| task_59_gui_answer_table | done | Таблица ответа для **отдельного** запроса (вариант C).  Переключатель «Выполнение → Формировать таблицу» над двумя переключателями вопросов (task_58) + строка `execution/answer_table` в диалоге, по умолчанию **выключено**: текстовая лента остаётся основным способом чтения ответа.  Вкладка «Таблица» — пятая, после «Ввода», заголовок считает решения (`Таблица:3`); панель берёт размер вывода, сигнал `zoomChanged` и колесо с `Ctrl`, потому что это не вид вывода (у таблицы нет `kind`, и в `KIND_TAB` ей нечего делать).  Qt-free модуль `answers.py` держит всё правило: строка `Имя=значение` — связка (имя — по правилам лексера: заглавная буква или `_`), повтор имени начинает новое решение, столбцы — в порядке ответа интерпретатора, всё остальное — `ignored`.  `ДА`/`НЕТ` (цель без переменных) занимает одну ячейку с заголовком «Ответ»: слово и связки внутри одного запроса не смешиваются никогда — это следует из `engine.cpp::runQuery`.  Таблица только у одиночного запроса (маркер на полях или строка запроса): у `F5` ответы всех вопросов лежат в тексте одной лентой без разделителей, и отделить их можно только правкой протокола (`bindings` в `result` — вариант B, оставлен в `doc/gui.typ` §10).  `Ctrl+C` над таблицей копирует выделенные ячейки (столбцы через табуляцию) — без этого команда «оттуда, куда смотрит пользователь» ушла бы в редактор.  Новый запуск и `Ctrl+L` таблицу очищают, диагностика оставляет панель на «Проблемах».  Записью: `ai/task_59_gui_answer_table.md` |
-| task_60_gui_ask_after_load | done | Вопрос задаётся только тогда, когда есть кого спрашивать.  **Маркер:** вопрос ждёт `loaded` (состояние `_pending_query`), а не уходит вместе с тихой загрузкой; ошибка загрузки выбрасывает его со строкой «`--- вопрос не выполнен: база знаний не загрузилась ---`» в «Системе».  Причина: `questions=false` только не *выполняет* собственные `?`-строки программы, а файл разбирается целиком — поэтому `?0 < 5 < 4.` в файле это ошибка загрузки (`Без имени:1:8`), а отправленный сразу запрос разбирал ту же строку второй раз (`<query>:1:8`); хуже того, файл, который не разобрался, не загружает базу вовсе (загрузчик разбирает текст целиком до того, как что-то добавить), поэтому вопрос отвечал «НЕТ» и «не найдено: факт/1» — как будто виноват запрос.  **Строка запроса:** не перечитывает программу (решение пользователя: база одна, цель спрашивает ту, что загрузил последний `F5` или маркер), но грузит текущий текст, если базы нет вовсе (`_loaded` false: интерпретатор только поднят или базу выгрузили «Остановить») — тогда вопрос уходит тем же отложенным путём.  Отложенный вопрос сбрасывается также в `_stop_now`, `_finish_polite_stop`, `_on_ended` и `run_program`; заодно `_finish_polite_stop` снимает `_awaiting_query`, который оставался выставленным после остановки запроса.  Проверки: пять случаев `test_window.py` (одна ошибка вместо двух; вопрос в сломанном файле не спрашивается; «припаркованный» вопрос по-прежнему сообщает о себе сам; строка запроса грузит без базы и не перезагружает с базой) |
+| task_24_gui_completion | done | the popup over the reserved names *and* the document's own, with arities; `Ctrl+Space` |
+| task_25_gui_files_tabs | done | tabs, files, save prompts, encodings, the input queue, the split editor |
+| task_26_gui_toolbar | done | one action table feeding the menu bar, the toolbar and the context menu; the icon audit |
+| task_27_gui_panels | done | the movable output panel, the input console, the status-bar details, the two-state run/stop |
+| task_28_gui_run_step | done | `stepHook`/`StepInfo`, protocol 3, the step strip, the trace line, `F10`/`Shift+F10`/`F5` |
+| task_29_gui_settings | done | `settings.SETTINGS` drives the dialog, its validation and «Сбросить»; the window applies everything without a restart; RU/EN dropped (ADR-021) |
+| task_30_gui_formatter | done | `prlib/formatter.cpp` (whitespace only), three modes, `--format*`, protocol 7/8, the window's `Ctrl+I`; a source that does not parse is never rewritten |
+| task_31_gui_shortcuts | done | `shortcuts.py` — a Qt-free table of `Ctrl`+physical key insertions, kept in the settings file and listed by «Справка → Шпаргалка по вставкам» |
+| task_32_import_search_report | done | an `ИМПОРТ` failure names the directories tried, with reasons |
+| task_33_gui_search_replace | done | `search.py` (Qt-free) + the find bar: `F3`/`Shift+F3` with the wrap reported, «Заменить всё» as one undo step |
+| task_34_builtin_branches | done | every built-in branch-tested (186 cases); the sweep found and fixed five defects |
+| task_35_lessons_rework | done | the course rewritten for the current dialect; `test_lessons.cpp` compares a lesson's whole output with its own `%!` lines |
+| task_36_gui_query_markers | done | a blue triangle in the margin runs the question it stands at, *alone* (a `questions:false` load); the rule is not a parser |
+| task_37_gui_builtin_reference | done | `doc/builtins.json` — one record per predicate, from which the manual's appendix table, `test_reference.py` and the window's `F1` dock are all built |
+| task_38_engine_limits | done | deep recursion no longer crashes (the release is iterative), `maxDepth` reports instead, `tools/bench_engine.py` makes the numbers reproducible |
+| task_39_english_aliases | done | one `kEnglishNames` table is the only place a pair is written; appendix 17 of the manual; 110 reserved names |
+| task_40_diagnostics | done | severities, `severity` on the wire (protocol 4), positions that name what to fix, advice for a singleton variable, `--no-warnings` |
+| task_41_semicolon_disjunction | done | `;` is the backtrackable disjunction of ISO, `,` binds tighter, a cut in a branch is local to it |
+| task_42_engine_hot_path | done | the constant tax measured and halved (about 4 %); clause indexing and term interning measured and deferred (ADR-017) |
+| task_43_language_surface | done | `ВЫП/2..N`; the module-collision warning (ADR-019); the dead library gone (ADR-018) |
+| task_44_names | done | `ИЛИ/2` → `ПЕРВОЕ/2` and `НАЙТИВСЁ` → `НАЙТИВСЕ`, each retired spelling explained where it is called |
+| task_45_gui_graphics_window | done | the graphics predicates are *visible*: a bitmap backend in the engine, protocol 10, a window with «Вписать в окно» and «Сохранить как PNG…» (ADR-022) |
+| task_46_interpreter_options_and_limits | in progress | limits in the engine and four dialog rows (ADR-020), protocol 9, plus the interpreter path and the process directory; still open: named profiles (`--timeout-ms` dropped by decision) |
+| task_47_lessons_and_formatting | done | the corpus in one style (21 of 25 shipped programs reformatted) with a check that every shipped program *is* the standard shape; a query and a directive are never broken |
+| task_48_interface_cleanup | done | five pictures left the tree, `Esc` closes the graphics window → the find bar → the reference → the cheat sheet, and the graphics window opens itself on the first primitive |
+| task_49_gui_defects | done | five defects found by using the window, all fixed: the paused flag, the clean unnamed tab, the trace that no longer takes the window, `view/window_geometry`, the output that arrives as it is written |
+| task_50_panel_tabs | done | the output panel is one `QTabWidget` (Проблемы/Вывод/Система/Ввод) with counts in the titles and `--- база знаний загружена (N мс) ---` in «Системе» |
+| task_51_variadic_first | done | `ПЕРВОЕ` takes any number of goals; one `kVariadicNames` table drives lookup, arities and names |
+| task_52_infix_operators | done | the comparison signs are sugar over `РАВНО`/`МЕНЬШЕ`/`БОЛЬШЕ`, a chain is a parse error, a foreign operator is explained where it stands |
+| task_53_writeln | done | `ВЫВОДПС`/`writeln` — `ВЫВОД` with a newline; manual §6.3, and 6.3--6.9 shifted by one everywhere they are quoted |
+| task_54_input_stream | done | the front-end's answer is a piece of the input stream; a BOM is a marker, not data (ADR-023) |
+| task_55_iso_negation_and_is_hint | done | `\+` is the second spelling of `НЕ/1`, with ISO precedence; `is/2` is not added — two hints name the replacement |
+| task_56_missing_dot_between_statements | done | a missing dot is reported at the end of *its own* sentence whenever the next token can begin one |
+| task_57_tell_failed_redirect | done | a failed `ЗАПИСЬ_В` left the output on a closed stream; one line returns it to where it was |
+| task_58_gui_editor_menu_about | done | five requests: the icons, `Shift+Del`, the occurrences of the selection made visible, the loading line after a marker click, and the two question switches in «Выполнение» |
+| task_59_gui_answer_table | done | the answer table for a *single* goal (variant C), off by default; the rule lives in `answers.py`, Qt-free |
+| task_60_gui_ask_after_load | done | a question is asked only after `loaded` (`_pending_query`), and a load that fails drops it with one line in «Системе» |
 
 ## Test suite
 
-307 tests, about five seconds: 290 Catch2 cases plus 17 command-line and
-integration tests (seven option tests, five `--list-keywords` tests, the
-import-search report, the JSON protocol session, the formatter round-trip and the
-engine-limit and diagnostics cases). Groups:
-BigInt, lexer, keywords, parser, unification, engine, every built-in group,
-`НАЙТИВСЕ`, module loader (including the import search report), the I/O seams,
-typical tasks (factorial, Fibonacci, GCD, insertion sort, 4-queens, knapsack),
-ported lesson/example programs (golden output) and the CLI (`-s`, `--source`,
-`--source=`, positional, `-I`, `--help`, `--version`, `--list-keywords`,
-`--protocol json`).  Every built-in is covered branch by branch — see
-`ai/task_34_builtin_branches.md`, which also lists what the sweep found.
+307 tests, about five seconds: 290 Catch2 cases plus 17 command-line and integration
+tests (seven option tests, five `--list-keywords` tests, the import-search report, the
+JSON protocol session, the formatter round-trip and the engine-limit and diagnostics
+cases).  Groups: BigInt, lexer, keywords, parser, unification, engine, every built-in
+group, `НАЙТИВСЕ`, the module loader (including the import search report), the I/O seams,
+the typical tasks (factorial, Fibonacci, GCD, insertion sort, 4-queens, knapsack), the
+ported lesson and example programs (golden output) and the CLI.  Every built-in is covered
+branch by branch — see `ai/task_34_builtin_branches.md`, which also lists what the sweep
+found.
 
-The front-end has its own headless checks, run by hand (they need PySide6 or a
-build, so CI does not run them yet): `src/gui/tests/protocol_smoke.py`,
-`test_keywords.py` (the keyword table from both sides), `test_tokens.py` (the
-highlighting rules, including a sweep over the example programs),
-`test_highlighter.py` (the palette reaching the document),
-`test_appearance.py` (forced light palette and contrast of every syntax colour),
-`test_editor.py` (comment/uncomment and indent as single undo steps, the Tab and
-Enter keys, zoom bounds, line-number width, the error marker),
-`test_completion.py` (what is offered and in which order, and the popup driven
-by real key events),
-`test_documents.py` (line endings, byte-order marks, cp1251 round trips, the
-untitled counter, the recent list),
-`test_settings.py` (defaults, persistence, clamping, keys a later version adds),
-`test_icons.py` (the icon audit: every referenced name has a file or is in the
-documented `MISSING` set, a missing name has no file, `--icons DIR` works),
-`test_session.py`
-(request queueing and the clean-slate restart) and `test_window.py` (opening a
-file does not run it; the documented keys are bound; zoom reaches the settings
-file; menus, toolbar and context menu come from the action table; the recent
-menu; the font-size control; save-before-run; the split panes), all invoked as
-plain scripts.
+The front end has its own headless checks, run by hand (they need PySide6, so CI does not
+run them yet): 22 scripts in `src/gui/tests/` plus `protocol_smoke.py`.  They cover the
+reserved names and the colouring rules (`test_keywords.py`, `test_tokens.py`,
+`test_highlighter.py`, `test_appearance.py`), the editor, its popup and its bars
+(`test_editor.py`, `test_completion.py`, `test_search.py`, `test_shortcuts.py`), files and
+settings (`test_documents.py`, `test_settings.py`, `test_settingsdialog.py`,
+`test_icons.py`), the interpreter on the wire (`test_session.py`,
+`test_formatter.py`), and the window itself (`test_window.py`, `test_queries.py`,
+`test_answers.py`, `test_output.py`, `test_stepping.py`, `test_graphics.py`,
+`test_reference.py`, `test_queryline.py`).
 
 ## Known gaps / next steps
 
-1. The GitHub Actions Windows job still has to run on an image that provides
-   VS 2026; locally the MSVC 2026 build and the whole suite are green.
+1. The GitHub Actions Windows job still has to run on an image that provides VS 2026;
+   locally the MSVC 2026 build and the whole suite are green.
 2. `--dump-ast` and `--dump-clauses` (task_16) are dropped: the parser produces a
    `ParsedProgram`, not a tree worth printing, and no workflow asked for them.
-3. Catch2 test discovery decodes the test executable's stdout with the console
-   code page, so a non-ASCII test *name* lands in `prlib_tests-*_tests.cmake`
-   mangled and ctest reports "No test cases matched" for it.  Test names are
-   ASCII for that reason (the *goals* are Russian as always), which is written
-   down next to `catch_discover_tests` in `src/tests/CMakeLists.txt`; the
-   underlying fix (a project-local discovery step writing `--list-tests
-   --reporter json` to a *file*, which `execute_process(... OUTPUT_FILE ...)`
-   leaves byte-exact) is still a possible improvement.
-4. Optional: first-argument clause indexing if a real program needs more speed.
-5. Optional: `is/2` and infix comparison operators next to `#expr#`.
-6. GUI: task_21 is the skeleton only (protocol, `src/gui` window with an editor,
-   a query line and an output pane); task_22 adds the code editor itself and
-   task_23 the keyword source.  The rest is task_24–task_31, see the board above.
-   The settings file is written to `%LOCALAPPDATA%\PrologD\gui\gui.ini`; the
-   dialog that edits it is task_29, and `--settings FILE` overrides the path.
-   Open for the next session, and no longer part of task_29: the **interpreter
-   options, profiles and limits** (`task_46_interpreter_options_and_limits.md`).
-   The graphics window (`task_45_gui_graphics_window.md`) is done, and task_29's
-   own list is closed: «использовать системные цвета» was done with the three
-   themes, and **RU/EN was dropped** on 2026-10-01 (ADR-021 — the window stays
-   Russian).  Two of the user's ten «недочётов» are written down and both are
-   done: `task_47_lessons_and_formatting.md` and `task_48_interface_cleanup.md`
-   (its last loose end — the by-hand look at the redrawn icons in the dark theme —
-   was confirmed by the user on 2026-10-02: «иконки в тёмной теме нормальные»).
-   The batch of defects found by
-   using the window (`task_49_gui_defects.md`) is closed as well: four fixes pinned
-   by reproductions and the live output — `IoContext::setOutputLineSink` plus one
-   `output` event per written line, so a countdown prints 3, 2, 1 while the program
-   is still running.  What is left on the board is `task_46`'s remainder:
-   **named profiles** (a table of sets — `-I`, limits, interpreter — with «Сделать
-   текущей» in one click); the text-mode `--timeout-ms` was **dropped by decision**
-   (a clock in the solver's hot path is a cost the front-end deadline avoids, and
-   a console run has the shell's own timeout).
-   The four tasks written down on 2026-10-02 are **all done** — `task_51`
-   (`ПЕРВОЕ` takes any number of goals), `task_52` (the short comparison signs,
-   sugar over `РАВНО`/`МЕНЬШЕ`/`БОЛЬШЕ`), `task_53` (`ВЫВОДПС`/`writeln`) and
-   `task_54` (the front-end's answer is a piece of the input stream, and a BOM is
-   a marker, not data).  The reasons are in the files themselves: `variadic` means
-   «one argument at least» throughout, so `ПЕРВОЕ/+`; `#…#` already computes, so
-   `=:=` is explained rather than added; `ВЫВОДПС` is two rows of data in the
-   variadic and alias tables; and the window now obeys the rule a file always
-   obeyed, while merging `ВВОДСИМВ`/`ВВОДСТР` into `ВВОД(Пер, Терминатор)` stays
-   deliberately out of scope.
+3. Catch2 test discovery decodes the test executable's stdout with the console code page,
+   so a non-ASCII test *name* lands in `prlib_tests-*_tests.cmake` mangled and ctest
+   reports "No test cases matched" for it.  Test names are ASCII for that reason (written
+   down next to `catch_discover_tests` in `src/tests/CMakeLists.txt`); the underlying fix
+   (a discovery step writing `--list-tests --reporter json` to a *file*) is still possible.
+4. Optional: first-argument clause indexing if a real program needs more speed (ADR-017
+   measured about 0.5 µs per failed head attempt).
+5. Optional and deliberately out of scope of task_54: `ВВОД(Пер, Терминатор)` instead of
+   `ВВОДСИМВ` plus `ВВОДСТР`.
+6. Open on the board: `task_46`'s named profiles, and nothing else — the two «недочёта»
+   (task_47, task_48), the defects found by using the window (task_49), the four tasks of
+   2026-10-02 (task_51 -- task_54) and the row of window requests (task_58 -- task_60) are
+   all done.  The settings file is `%LOCALAPPDATA%\PrologD\gui\gui.ini` (or `--settings
+   FILE`), the graphics window (task_45) is done, and task_29's own list is closed, RU/EN
+   included (ADR-021).
 
 ## Open questions for the user
 
-1. String positions are code-point based (not CP1251 bytes) --- confirmed as the
-   intended UTF-8 behaviour unless told otherwise.
+1. String positions are code-point based (not CP1251 bytes) — confirmed as the intended
+   UTF-8 behaviour unless told otherwise.
 
-Resolved on 2026-09-29 (GUI planning):
+Decided on 2026-09-29 while planning the GUI:
 
-* formatter (task_30): trailing whitespace is removed, the continuation indent
-  is one tab, the soft width is 80 columns;
-* shortcuts (task_31): the modifier is `Ctrl`, not `Alt` (which focuses the menu
-  bar), and `?`/`:` get both physical keys --- `Ctrl+/` + `Ctrl+7` and `Ctrl+;` +
-  `Ctrl+6`;
+* formatter (task_30): trailing whitespace removed, the continuation indent one tab, the
+  soft width 80 columns;
+* shortcuts (task_31): the modifier is `Ctrl`, not `Alt` (which focuses the menu bar), and
+  `?`/`:` get both physical keys — `Ctrl+/` + `Ctrl+7` and `Ctrl+;` + `Ctrl+6`;
+* split editor (task_25): two independent panes, each with its own tab bar;
+* running a buffer (task_28): a modified buffer is loaded as text whose `name` is the
+  file's path, so `ИМПОРТ` resolves exactly as it does for the saved file;
+* the working folder (task_29) is a search directory passed as `-I`, alongside the
+  importing file's own directory — before and after an untitled buffer is saved;
 
 Added on 2026-10-02 while implementing task_31:
 
-* `Ctrl+Shift+\` stays «Объединить редакторы», so `|` gets **no** chord at all
-  (the user's decision: the window command wins over the row);
-* the extra combinations are the simple symbols (`/`, `-`, `_`, `!`, `''`,
-  `""`) — no clause skeletons: `ФАКТ.`, `Правило(…) :- …` and the rest of the
-  proposed shapes were dropped as writing the program for the user;
-* the table is written into the settings file on the first run, which is what
-  makes it readable and remappable *there* rather than in the code.
-* split editor (task_25): two independent panes, each with its own tab bar;
-* running a buffer (task_28): a modified buffer is loaded as text whose `name`
-  is the file's path, so `ИМПОРТ` resolves exactly as it does for the saved
-  file;
-* the working folder (task_29) is a search directory passed as `-I`, so it is
-  searched alongside the importing file's own directory — before and after an
-  untitled buffer is saved (task_32 reports what was tried).
+* `Ctrl+Shift+\` stays «Объединить редакторы», so `|` gets **no** chord at all (the
+  window command wins over the row);
+* the extra combinations are the simple symbols (`/`, `-`, `_`, `!`, `''`, `""`) — no
+  clause skeletons: `ФАКТ.` and `Правило(…) :- …` were dropped as writing the program for
+  the user;
+* the table is written into the settings file on the first run, which is what makes it
+  readable and remappable *there* rather than in the code.
 
 Added on 2026-10-03 while planning task_59:
 
-* the answer table (task_59) is **variant C**: a table for a **single** goal only
-  (a margin marker or the goal line), text output unchanged.  Variant B — a
-  `bindings` field in the `result` event, the only way to tabulate a whole run —
-  is recorded in `doc/gui.typ` §10 rather than built now;
-* the user's report «есть проблема в запуске файлов, у которых много вопросов и
-  которые что-то выводят» is **not a defect**: it is exactly the reason the whole
-  run cannot be tabulated — the answers of several questions arrive as one stream
-  of text with no separator.  A single goal is tabulated exactly instead.
-
+* the answer table (task_59) is **variant C**: a table for a **single** goal only (a
+  margin marker or the goal line), text output unchanged.  Variant B — a `bindings` field
+  in the `result` event, the only way to tabulate a whole run — is recorded in
+  `doc/gui.typ` §10 rather than built now;
+* the user's report «есть проблема в запуске файлов, у которых много вопросов и которые
+  что-то выводят» is **not a defect**: it is exactly why the whole run cannot be
+  tabulated — the answers of several questions arrive as one stream of text with no
+  separator.  A single goal is tabulated exactly instead.
 ## Session log
 
 * Planning session: reference extraction, architecture, ADRs, task breakdown.
@@ -1929,7 +1885,7 @@ Added on 2026-10-03 while planning task_59:
   с короткой записью (решение пользователя: «и урок 3, и урок 4») — их `%!`
   строки сами себе золотой ответ, поэтому `test_lessons.cpp` не менялся.
   Проверки: 285/285 ctest (семь новых случаев), 21 набор GUI (`test_*.py`) и
-  `protocol_smoke.py`, шесть PDF;
+  `protocol_smoke.py`, пять PDF;
   счётчики `test_queries.py` пришлось освежить — правка урока 4 в task_51
   добавила вопрос (`24` → `25`), и набор был красным уже на HEAD, а примеры
   этого раунда сдвинули ещё два (`03`: `34` → `37`, `04`: `25` → `27`): наборы
@@ -1952,7 +1908,7 @@ Added on 2026-10-03 while planning task_59:
   `test_queries.py` — `19` → `20`; в приложении английских имён запись встала
   сама (`ВЫВОДПС — writeln`).  Проверки: 290/290 ctest (три новых случая Catch2
   и два CLI), `--list-keywords` — 110 имён, 21 набор GUI и `protocol_smoke.py`,
-  шесть PDF, страницы 16–18 и 33 просмотрены.
+  пять PDF, страницы 16–18 и 33 просмотрены.
 
 * Interpreter round, part 64: **ответ оболочки — кусок входного потока**
   (task_54, 2026-10-03).  Источников ввода четыре — файл (`-i`, `ЧТЕНИЕ_ИЗ`),
@@ -1981,7 +1937,7 @@ Added on 2026-10-03 while planning task_59:
   называла поле «под выводом».  Проверки: 305/305 ctest (8 случаев `IoContext`,
   7 через встроенные предикаты, один случай в `protocol_session.cmake` — две строки
   в одном ответе дают один `input_request`), GUI-проверка с диалогом-«предателем»
-  (вторая строка не должна дойти до окна), шесть PDF.
+  (вторая строка не должна дойти до окна), пять PDF.
 
 * I/O round, part 65: **неудачный `ЗАПИСЬ_В` оставлял вывод на закрытом потоке**
   (task_57, 2026-10-03).  Нашлось при работе над task_54, когда смотрели на
@@ -2036,7 +1992,7 @@ Added on 2026-10-03 while planning task_59:
   пробелами (решение пользователя — без rich text), и тест сверяет, что позиция `--`
   у всех пяти строк одна.  Проверки: три новых случая `test_editor.py`, измерение
   подложки в `test_appearance.py`, четыре новых требования в `test_window.py`; ctest
-  307/307, все 21 набор GUI и `protocol_smoke.py`, шесть PDF.
+  307/307, все 21 набор GUI и `protocol_smoke.py`, пять PDF.
 
   **Доработка после первого взгляда.**  Пользователь нашёл то, чего не нашла моя
   проверка: `Shift+Del` в редакторе не работал, а из пункта меню — работал.  Тесты
@@ -2177,10 +2133,10 @@ Added on 2026-10-03 while planning task_59:
   Проверки: все пять документов собираются (`typst=0`), первые страницы посмотрены.
 
 * Documentation round, part 70: **пример программы в окне и имена переменных в
-  уроках** (2026-10-03).  Две просьбы пользователя: поменять приветственную
-  программу на `% пример программы` с `студент('Вова', 'Корчагин')` и запросом
-  `?студент(Имя, Фамилия).`, и дать переменным уроков осмысленные имена там, где
-  это помогает читателю.
+  уроках** (2026-10-03).  Просьбы пользователя: поменять приветственную программу
+  на `% пример программы` с `студент('Вова', 'Корчагин')` и запросом
+  `?студент(Имя, Фамилия).`, дать переменным уроков осмысленные имена там, где это
+  помогает читателю, и закрыть шероховатости, найденные работой с окном.
 
   Приветственная программа: атомы в кавычках (заглавная буква без кавычек —
   переменная, урок 1), переменные — `Имя` и `Фамилия`.  Программа проверена
@@ -2193,14 +2149,11 @@ Added on 2026-10-03 while planning task_59:
   для отдельного запроса.
 
   Уроки: имена переменных заменены на слова там, где у переменной есть роль —
-  `дед(Дед, Внук)`, `сумма(Предел, Сумма)` и `Часть`, `фак(Число, Часть,
-  Факториал)`, `нод(Первое, Второе, Нод)`, `фиб(Число, Фибоначчи)`,
-  `член(Элемент, [...])`, `присоединить(..., Начало, Конец, Результат)`,
-  `сколько(Строка, Подстрока, Раз)`, `баланс(Строка, Позиция, Глубина)`,
-  `xor(Первое, Значение1, Второе, Значение2)`, `ход(с(ВПервом, ВоВтором), ...)`,
-  `не_бьёт(Строка, Столбец, ...)`, `НАЙТИВСЕ(Имя, студент(Имя, Фамилия), Список)`,
-  `рисовать_граф([ребро(Узел1, Узел2) | ...])`.  Прописные «Х», «У», «_» и
-  координаты `Х1`, `У1` оставлены там, где это и есть «любое значение»; буквы
+  `дед(Дед, Внук)`, `сумма(Предел, Сумма)`, `фак(Число, Часть, Факториал)`,
+  `нод(Первое, Второе, Нод)`, `фиб(Число, Фибоначчи)`, `член(Элемент, [...])`,
+  `НАЙТИВСЕ(Имя, студент(Имя, Фамилия), Список)` и так по всем урокам.  Прописные
+  «Х», «У», «_» и координаты `Х1`, `У1` оставлены там, где это и есть «любое
+  значение»; буквы
   Д, К, М, Н в задаче о бегунах — потому что проза называет их именами, а
   Cyrillic/Latin-пара `Х` и `X` в приложении — сам предмет пункта 2 раздела 4.
   Каждая правка тянула за собой `%!`-строки (в ответе печатается *имя*
@@ -2238,14 +2191,20 @@ Added on 2026-10-03 while planning task_59:
   командной строке.  Те же пояснения — в `examples/lessons/README.md` (разделы
   «Как читать урок» и «Вопросы на полях») и в `doc/lessons.typ` §1.
 
-  Проверки: уроки 7, 10 и 11 прогнаны и сверены с их `%!`, каждый файл равен
-  выводу `prologd --format`; счёт вопросов 278 в 33 программах; ctest 307/307;
-  `docs` (пять документов).
+  Разбор вопроса пользователя про директиву: у `:- ДОБ(...)` маркера нет вовсе
+  (правило принимает только `?`-строки), а щелчок по соседнему вопросу её не
+  выполняет — тихая загрузка идёт без query runner, то есть добавляет в базу
+  только предложения.  Проверено: `?дед(аня, Y).` по щелчку отвечает НЕТ и
+  «не найдено: дед/2», а по F5 — `Y=витя`.  В `help.typ` §11 про это не писали
+  (его пример верен для консоли и для F5); `:- ИМПОРТ` — исключение, его разбирает
+  сам загрузчик, поэтому маркеры урока 11 работают.
 
-  Проверки: все 13 уроков прогнаны и сверены с их `%!` (в приложении —
-  предупреждение «не найдено: любит/2», как и обещает его раздел 4); каждый файл
-  сверен с `prologd --format` (побайтно равен); ctest 307/307; 21 набор
-  `src/gui/tests/test_*.py` и `protocol_smoke.py`; `docs` (пять документов).
+  Проверки: ctest 307/307; все 13 уроков прогнаны и сверены с их `%!` (в
+  приложении — предупреждение «не найдено: любит/2», как и обещает его раздел 4),
+  каждый файл побайтно равен выводу `prologd --format`; счёт вопросов 278 в 33
+  программах; 22 набора `src/gui/tests/test_*.py` и `protocol_smoke.py`, которые
+  надо запускать `.venv\Scripts\python.exe` (системный `python` без PySide6 роняет
+  семь из них на `No module named 'PySide6'`); `docs` (пять документов, `typst=0`).
 
 
 
