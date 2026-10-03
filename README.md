@@ -56,9 +56,6 @@ The executable is `build\src\cli\Release\prologd.exe`.
 студент(вова, корчагин).
 студент(данил, ахмеров).
 
-член(X, [X|_]).
-член(X, [_|T]) :- член(X, T).
-
 % a query (variables start with an upper-case letter)
 ?НАЙТИВСЕ(И, студент(И, Ф), А).
 ```

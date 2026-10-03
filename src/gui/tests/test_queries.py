@@ -189,7 +189,7 @@ def test_the_acceptance_lesson_lines_carry_a_marker() -> None:
     root = pathlib.Path(__file__).resolve().parents[3] / "examples" / "lessons"
     keywords = interpreter_keywords()
     lesson = (root / "lesson_04.pld").read_text(encoding="utf-8")
-    assert "?сумма(5, С)." in [text for _line, text in find_statements(lesson, keywords)]
+    assert "?сумма(5, Сумма)." in [text for _line, text in find_statements(lesson, keywords)]
     appendix = (root / "appendix_debug.pld").read_text(encoding="utf-8")
     assert "?ВЕРСИЯ." in [text for _line, text in find_statements(appendix, keywords)]
     print("ok: lesson_04 and appendix_debug offer their questions to the margin")

@@ -848,7 +848,7 @@ class CodeEditor(ZoomablePlainTextEdit):
         self._keywords = keywords
         if self._completion is not None:
             self._completion.set_keywords(keywords)
-        # The same names decide what the margin accepts as a question: «?длина(Х, 2)
+        # The same names decide what the margin accepts as a question: «?длина(Список, 2)
         # не завершится.» is prose only because nothing knows the word `не`.
         self._refresh_statements()
 

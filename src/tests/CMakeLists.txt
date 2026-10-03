@@ -72,7 +72,7 @@ if(TARGET prologd)
     COMMAND prologd -I "${CMAKE_SOURCE_DIR}/examples/lib"
             -s "${CMAKE_SOURCE_DIR}/examples/import_demo.pld")
   set_tests_properties(cli_include PROPERTIES
-    PASS_REGULAR_EXPRESSION "Y=42")
+    PASS_REGULAR_EXPRESSION "Дважды=42")
 
   # task_32: an import that cannot be resolved must name the directories that
   # were searched, so a working-folder mistake is visible in the front-end.

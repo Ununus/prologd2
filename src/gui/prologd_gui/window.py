@@ -66,11 +66,11 @@ from .settings import OUTPUT_FONT_SIZE, Settings
 #: before the process is taken down (`stop_program`).
 STOP_GRACE_MS = 500
 
-WELCOME = """% PrologD — пример программы
-студент(вова, корчагин).
-студент(данил, ахмеров).
+WELCOME = """% пример программы
+студент('Вова', 'Корчагин').
+студент('Данил', 'Ахмеров').
 
-?студент(X, Y).
+?студент(Имя, Фамилия).
 """
 
 #: The three answers to "save before closing?".

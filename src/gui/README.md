@@ -216,7 +216,7 @@ Which lines are questions is decided by `queries.py` and checked without Qt in
 followed by blanks and `?`, the sentence ends at the first `.` outside `"..."`,
 `'...'`, `#...#` and every bracket, and each bare word inside must be a variable,
 a reserved name, or a name the document itself uses.  The last clause is what
-refuses prose like `% ?длина(Х, 2) не завершится.` — the rule is deliberately not
+refuses prose like `% ?длина(Список, 2) не завершится.` — the rule is deliberately not
 a parser, and a line it cannot read gets no marker: no marker is a small loss, a
 marker that runs the wrong text is a wrong program.  The sweep over `examples/`
 pins the number of statements per file, and that no live `?`-line anywhere is

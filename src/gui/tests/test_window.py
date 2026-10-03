@@ -34,8 +34,8 @@ except ImportError:  # pragma: no cover - main() reports it
 EXAMPLE = pathlib.Path(__file__).resolve().parents[3] / "examples" / "factorial.pld"
 ANSWER = "Ф=720\n"
 
-#: task_36's files: the lesson whose `?сумма(5, С).` must answer `С=15` alone,
-#: and the appendix whose questions only run if someone asks for one.
+#: task_36's files: the lesson whose `?сумма(5, Сумма).` must answer `Сумма=15`
+#: alone, and the appendix whose questions only run if someone asks for one.
 LESSON_04 = pathlib.Path(__file__).resolve().parents[3] / "examples" / "lessons" / "lesson_04.pld"
 APPENDIX_DEBUG = (
     pathlib.Path(__file__).resolve().parents[3] / "examples" / "lessons" / "appendix_debug.pld"
@@ -1415,7 +1415,7 @@ def test_the_answer_table_switch_is_in_the_menu_and_in_the_settings(executable: 
 
 
 def test_a_marker_builds_the_answer_table(executable: str) -> None:
-    """lesson_04's `?сумма(5, С).` answers `С=15`: one column, one row.
+    """lesson_04's `?сумма(5, Сумма).` answers `Сумма=15`: one column, one row.
 
     The text answer stays in «Выводе» — the table is an addition, not a
     replacement — and the panel moves to the «Таблица» tab, because a table is
@@ -1429,14 +1429,14 @@ def test_a_marker_builds_the_answer_table(executable: str) -> None:
         line = next(
             number
             for number, content in enumerate(view.toPlainText().splitlines(), 1)
-            if content.strip() == "?сумма(5, С)."
+            if content.strip() == "?сумма(5, Сумма)."
         )
         statement = view.query_statements().get(line)
-        assert statement == "?сумма(5, С).", (line, statement)
+        assert statement == "?сумма(5, Сумма).", (line, statement)
 
         ask_from_the_margin(window, statement)
-        assert printed_lines(window) == ["С=15"], ascii(window.output_text())
-        assert window._table.column_titles() == ["С"], window._table.column_titles()
+        assert printed_lines(window) == ["Сумма=15"], ascii(window.output_text())
+        assert window._table.column_titles() == ["Сумма"], window._table.column_titles()
         assert window._table.cells() == [["15"]], window._table.cells()
         bar = window.panel_tabs().tabBar()
         index = window.panel_tabs().indexOf(window._table)
@@ -2566,7 +2566,7 @@ def test_the_trace_is_coloured_apart_from_the_output(executable: str) -> None:
 
 
 def test_a_marker_answers_one_question_alone(executable: str) -> None:
-    """task_36: lesson_04's `?сумма(5, С).` answers `С=15` and nothing else.
+    """task_36: lesson_04's `?сумма(5, Сумма).` answers `Сумма=15` and nothing else.
 
     The file's other questions are loaded but *not* run (the load is quiet), so
     the pane holds the one answer that was asked for.  `Запустить` still runs
@@ -2579,18 +2579,18 @@ def test_a_marker_answers_one_question_alone(executable: str) -> None:
         line = next(
             number
             for number, content in enumerate(view.toPlainText().splitlines(), 1)
-            if content.strip() == "?сумма(5, С)."
+            if content.strip() == "?сумма(5, Сумма)."
         )
         statement = view.query_statements().get(line)
-        assert statement == "?сумма(5, С).", (line, statement)
+        assert statement == "?сумма(5, Сумма).", (line, statement)
 
         view.queryRequested.emit(statement)
         wait_for_result(window)
-        assert printed_lines(window) == ["С=15"], ascii(window.output_text())
-        assert window._query_line.text() == "?сумма(5, С).", "the question stays visible"
+        assert printed_lines(window) == ["Сумма=15"], ascii(window.output_text())
+        assert window._query_line.text() == "?сумма(5, Сумма).", "the question stays visible"
     finally:
         discard_changes(window)
-    print("ok: a marker answers one question alone (С=15 from lesson_04)")
+    print("ok: a marker answers one question alone (Сумма=15 from lesson_04)")
 
 
 def test_a_question_parked_in_a_comment_runs_from_the_margin(executable: str) -> None:
@@ -3267,12 +3267,12 @@ def test_an_untouched_unnamed_tab_comes_back_clean(executable: str) -> None:
     """
     from prologd_gui import documents
     from prologd_gui.settings import Settings
-    from prologd_gui.window import MainWindow
+    from prologd_gui.window import MainWindow, WELCOME
 
     window = make_window(executable)
     settings_path = window._settings.path
     try:
-        assert window.buffers()[0].text().startswith("% PrologD"), "the welcome tab"
+        assert window.buffers()[0].text() == WELCOME, "the welcome tab"
         assert window.buffers()[0].is_modified() is False
         window.new_buffer()
         assert window.tab_count() == 2, window.tab_count()
@@ -3284,13 +3284,13 @@ def test_an_untouched_unnamed_tab_comes_back_clean(executable: str) -> None:
     settings = Settings(settings_path)
     stored = documents.decode_tabs(settings.session_tabs)
     assert [record.name for record in stored] == ["Без имени"], stored
-    assert stored[0].text.startswith("% PrologD")
+    assert stored[0].text == WELCOME
     assert stored[0].modified is False, "nobody edited the welcome program"
 
     reopened = MainWindow(executable, [], settings)
     try:
         assert reopened.tab_count() == 1, [b.model.name for b in reopened.buffers()]
-        assert reopened.buffers()[0].text().startswith("% PrologD")
+        assert reopened.buffers()[0].text() == WELCOME
         assert reopened.buffers()[0].is_modified() is False, (
             "the restored tab carries a star it never earned"
         )

@@ -31,10 +31,10 @@ def check(text: str, expected: Answer, what: str) -> None:
 
 
 def test_one_solution_makes_one_row() -> None:
-    """lesson_04's `?сумма(5, С).` answers `С=15`: one column, one row."""
+    """lesson_04's `?сумма(5, Сумма).` answers `Сумма=15`: one column, one row."""
     check(
-        "С=15\n",
-        Answer(columns=("С",), rows=(("15",),)),
+        "Сумма=15\n",
+        Answer(columns=("Сумма",), rows=(("15",),)),
         "one binding",
     )
 
