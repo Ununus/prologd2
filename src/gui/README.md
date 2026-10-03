@@ -63,7 +63,9 @@ a theme — the widgets dark and the light syntax colours on top of them.
 `--settings FILE` chooses the settings file; by default it is
 `%LOCALAPPDATA%\PrologD\gui\gui.ini`, holding the font family and size, line
 numbers, the indent character and width, completion and its threshold, and the
-theme.  A value that cannot be
+theme.  A **packaged** build keeps that file beside its own executable instead
+(`gui.ini`), so the folder stays portable; the default and the first-run import row
+of `examples/lib` are decided by `prologd_gui.paths` (task_61).  A value that cannot be
 read falls back to the default instead of refusing to start, and keys this
 version does not know are left alone (task_29 adds the dialog).
 
@@ -876,7 +878,8 @@ keeps, not choices the user made in this dialog.
 a key this version does not know travels with the rest); **Экспорт…** applies
 first and writes the whole configuration, unknown keys included, so one ini file
 can be handed out to a class.
-* Values live in `%LOCALAPPDATA%\PrologD\gui\gui.ini` (or `--settings FILE`), and
+* Values live in `%LOCALAPPDATA%\PrologD\gui\gui.ini` (or `--settings FILE`; a
+packaged build reads `gui.ini` beside the window instead), and
 a value that cannot be read falls back to its default instead of taking the
 window down.
 

@@ -50,6 +50,7 @@ from . import (
     graphics,
     graphicswindow,
     panels,
+    paths,
     reference,
     search,
     settings,
@@ -1095,11 +1096,21 @@ class MainWindow(QMainWindow):
 
         The PDFs are written into `doc/` by the `docs` target and are not in
         version control, so a fresh checkout has none — the message names both the
-        file and the command that builds it.
+        file and the command that builds it.  In a package (task_61) `doc/` is a
+        folder beside the window, and that command is not something anyone there
+        could run.
         """
-        pdf = pathlib.Path(__file__).resolve().parents[3] / "doc" / f"{name}.pdf"
+        pdf = paths.document(name)
         if pdf.is_file():
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(pdf)))
+            return
+        if paths.frozen():
+            QMessageBox.information(
+                self,
+                "PrologD",
+                f"Файл {pdf} не найден.\n\n"
+                "Похоже, сборка неполная: папка doc должна лежать рядом с окном.",
+            )
             return
         QMessageBox.information(
             self,

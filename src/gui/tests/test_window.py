@@ -24,6 +24,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from test_session import find_executable, pump  # noqa: E402
+from test_paths import make_package, packaged  # noqa: E402
 
 try:
     from PySide6.QtGui import QTextCursor
@@ -3700,6 +3701,44 @@ def test_the_process_directory_is_where_files_go(
         discard_changes(window)
 
 
+def test_the_document_opens_from_the_package(executable: str) -> None:
+    """task_61: `Shift+F1` finds `doc/` beside the window, not inside the bundle.
+
+    The path used to be counted up from `__file__`, and in a frozen package that
+    is `_internal/prologd_gui/` - a folder whose neighbours are not the ones the
+    reader sees.  Asked here of the window itself, with a package that exists on
+    disk, and with the desktop service replaced by a list: opening a real PDF in
+    a browser during a test would be as bad as the missing-file box it avoids.
+    """
+    from prologd_gui import window as window_module
+
+    window = make_window(executable)
+    try:
+        with tempfile.TemporaryDirectory(prefix="prologd_package_") as name:
+            package = make_package(pathlib.Path(name))
+            manual = package / "doc" / "help.pdf"
+            opened: list[str] = []
+
+            class Opener:
+                @staticmethod
+                def openUrl(url) -> None:
+                    opened.append(url.toLocalFile())
+
+            real_service = window_module.QDesktopServices
+            window_module.QDesktopServices = Opener
+            try:
+                with packaged(package):
+                    window._open_document("help")
+            finally:
+                window_module.QDesktopServices = real_service
+            # `QUrl.toLocalFile` answers with forward slashes on Windows, so the
+            # two are compared as paths and not as text.
+            assert [pathlib.Path(one) for one in opened] == [manual], opened
+    finally:
+        discard_changes(window)
+    print("ok: the manual is opened from the package's own doc folder")
+
+
 def main(argv: list[str]) -> int:
     if QApplication is None:
         print("skipped: PySide6 is not installed")
@@ -3816,6 +3855,7 @@ def main(argv: list[str]) -> int:
         test_the_tabs_come_back_on_the_next_start(executable, files)
         test_an_unnamed_tab_left_unsaved_is_forgotten(executable, files)
         test_an_untouched_unnamed_tab_comes_back_clean(executable)
+        test_the_document_opens_from_the_package(executable)
     print("all window checks passed")
     del application
     return 0

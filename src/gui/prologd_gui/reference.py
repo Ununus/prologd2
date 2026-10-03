@@ -18,7 +18,8 @@ numbers of the manual.
 A missing or broken file must never break the window: `load` answers an *empty*
 reference then, the popup shows names and arities without descriptions, and the
 help command says there is no record.  The GUI has to work in a checkout where
-`doc/` was not copied.
+`doc/` was not copied — and, in a package (task_61), the file travels beside the
+window with the documents (`paths.builtins`).
 """
 
 from __future__ import annotations
@@ -27,8 +28,10 @@ import json
 import pathlib
 from collections.abc import Iterator
 
-#: Where the records live in a checkout: `src/gui/prologd_gui/` -> the root.
-DEFAULT_PATH = pathlib.Path(__file__).resolve().parents[3] / "doc" / "builtins.json"
+from . import paths
+
+#: Where the records live: `doc/builtins.json` of the checkout or of the package.
+DEFAULT_PATH = paths.builtins()
 
 
 def record_title(record: dict) -> str:

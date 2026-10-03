@@ -1,9 +1,9 @@
 """Icons: a plain directory of PNG files, loaded by name and cached.
 
 The reference front-end embedded them through `res.qrc` (`:/images/…`).  Python
-has no resource compiler, so the assets stay a directory next to the package and
-this module resolves them; a frozen build would look inside `sys._MEIPASS`, which
-is noted rather than implemented.
+has no resource compiler, so the assets stay a directory and `paths` resolves it:
+`src/gui/assets` in a checkout, `sys._MEIPASS/assets` in a frozen package (the
+portable build of task_61).
 
 A name with no file is not an error: the action is built without an icon (a
 text-only button) and the name is reported once.  `MISSING` lists the icons that
@@ -18,8 +18,11 @@ import sys
 
 from PySide6.QtGui import QIcon
 
-#: Where the icons live: beside the package, so a source checkout just works.
-DEFAULT_DIRECTORY = pathlib.Path(__file__).resolve().parent.parent / "assets"
+from . import paths
+
+#: Where the icons live: `src/gui/assets` in a checkout, the bundled copy in a
+#: package — `paths.resource` answers both (`--icons DIR` still overrides it).
+DEFAULT_DIRECTORY = paths.resource("assets")
 
 #: Referenced by the code, not drawn yet.  Task_26 lists the set and the sizes
 #: they should be drawn in; until then those actions show their title only (and a
