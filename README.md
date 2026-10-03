@@ -31,7 +31,11 @@ The console interpreter is `build/src/cli/prologd`.
 
 Prerequisites: Git, CMake 3.24 or newer, and Visual Studio 2026 with the
 "Desktop development with C++" workload. The first configure downloads Catch2
-and CLI11 through CMake FetchContent, so it needs network access.
+and CLI11 through CMake FetchContent, so it needs network access.  The build and
+the portable package (task_61) require Windows 10 (1903) or newer, 64-bit: the
+UTF-8 manifest element (`<activeCodePage>`) is understood from 1903, the window
+needs Windows 10 because of Qt 6 and Python 3.14, and Windows 7 is out of
+support since 2020 (ADR-013).
 
 ```powershell
 cmake -S . -B build -G "Visual Studio 18 2026" -A x64
