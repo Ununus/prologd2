@@ -1,81 +1,79 @@
-# task_44 — имена: `ПЕРВОЕ` вместо `ИЛИ`, `НАЙТИВСЕ` без ё
+# task_44 — names: `ПЕРВОЕ` instead of `ИЛИ`, `НАЙТИВСЕ` without the ё
 
-Статус: done.
+**Status:** done.
 
-## Зачем
+## Why
 
-1. **`ИЛИ/2` назывался не тем, чем является.**  Имя честное для исходного
-   диалекта: там дизъюнкции не было вовсе, и «или» было лучшим словом.  Почему
-   именно оно — видно из оригинала (`Ununus/prologd`, `src/prologd-help.html`,
-   проверено 2026-10-03):
+1. **`ИЛИ/2` was not named after what it is.**  The name was honest for the original
+   dialect: there was no disjunction in it at all, and "or" was the best word available.
+   Why exactly that word is visible in the original (`Ununus/prologd`,
+   `src/prologd-help.html`, checked 2026-10-03):
 
-   * **знак «или» был занят.**  Терминатор предложения в исходном языке — `;`
-     (`Факт ::= Предикат;`), поэтому сказать «одно из двух» внутри правила было
-     больше нечем: либо два предложения с одним заголовком, либо предикат
-     `ИЛИ/2`;
-   * **имя описывало условие, а не механизм.**  Руководство объясняет его с двух
-     сторон: «Предикат ИЛИ истинен тогда и только тогда, когда хотя бы один из
-     аргументов истинен» — это «или» как логическая связка, и тут же
-     процедурно: «попытаться выполнить цель1. Если цель1 выполнена успешно, то
-     предикат ИЛИ истинен, а цель2 не выполняется, в противном случае
-     происходит попытка выполнить цель2» — это «или» как `||` из обычных языков,
-     короткое замыкание.  Для школьной аудитории это и есть привычное «или»;
-   * **он был библиотечным.**  В руководстве есть раздел «Пример: реализация
-     предикатов НЕ, ИЛИ», и два предложения
-     `ИЛИ(цель1',_) <- ВЫП(цель1'),!;` / `ИЛИ(_,цель2') <- ВЫП(цель2');` — ровно
-     те, что перенос унаследовал в `engine.cpp` до этой задачи;
-   * **«или» было рабочим словом диалекта.**  Там же: `БОЛЬШЕ_ИЛИ_РАВНО(x,y) <-`
-     `НЕ(МЕНЬШЕ(x,y));`, а в уроке 1 отсечение объясняется как «исключающее
-     ИЛИ».
+   * **the "or" sign was taken.**  The statement terminator of the original language is
+     `;` (`Факт ::= Предикат;`), so there was nothing else to say "one of the two" with
+     inside a rule: either two clauses with one head, or the predicate `ИЛИ/2`;
+   * **the name described the condition, not the mechanism.**  The manual explains it from
+     both sides: "Предикат ИЛИ истинен тогда и только тогда, когда хотя бы один из
+     аргументов истинен" — "or" as a logical connective — and right after that
+     procedurally: "попытаться выполнить цель1. Если цель1 выполнена успешно, то
+     предикат ИЛИ истинен, а цель2 не выполняется, в противном случае происходит попытка
+     выполнить цель2" — "or" as `||` in ordinary languages, short-circuit.  For a school
+     audience that is the familiar "or";
+   * **it was a library predicate.**  The manual has a section "Пример: реализация
+     предикатов НЕ, ИЛИ" with the two clauses
+     `ИЛИ(цель1',_) <- ВЫП(цель1'),!;` / `ИЛИ(_,цель2') <- ВЫП(цель2');` — exactly the
+     ones the port inherited in `engine.cpp` until this task;
+   * **"or" was a working word of the dialect.**  Same place:
+     `БОЛЬШЕ_ИЛИ_РАВНО(x,y) <- НЕ(МЕНЬШЕ(x,y));`, and lesson 1 explains the cut as
+     "исключающее ИЛИ".
 
-   Имя описывало *намерение* («здесь или то, или это»), а не то, что предикат
-   делает, и было верным, пока «или» в языке значило только это.  Но после
-   task_41 дизъюнкция есть — это `;`.  `ИЛИ` же берёт **первое решение первой
-   успешной цели**: `?ИЛИ(РАВНО(X,1), РАВНО(X,2)).` отвечает `X=1` и никогда не
-   даёт `X=2`.  Имя обещает перебор двух ветвей и обещает неверно.
+   The name described an *intention* ("either this or that"), not what the predicate
+   does, and it was true while "or" meant only that in the language.  But after task_41
+   disjunction exists — it is `;`.  `ИЛИ` takes **the first solution of the first goal
+   that succeeds**: `?ИЛИ(РАВНО(X,1), РАВНО(X,2)).` answers `X=1` and never gives `X=2`.
+   The name promises enumeration over two branches, and promises it wrongly.
 
-2. **`НАЙТИВСЁ` разошлось с исходником.**  В задании (`task_13_findall.md`) и в
-   заметках по оригиналу (`reference_notes.md`) имя записано без ё:
-   `?НАЙТИВСЕ(И,студент(И,Ф),А).`  Перенос добавил ё сам собой.  Без ё и набирать
-   проще, и читается точнее: «найти все [решения]», а не «всё».
+2. **`НАЙТИВСЁ` had drifted from the original.**  In the task (`task_13_findall.md`) and in
+   the notes on the original (`reference_notes.md`) the name is written without the ё:
+   `?НАЙТИВСЕ(И,студент(И,Ф),А).`  The port added the ё by itself.  Without it the name is
+   both easier to type and more precise to read: "find all [solutions]", not "everything".
 
-## Решение (выбрано пользователем)
+## The decision (chosen by the user)
 
-* `ИЛИ` → `ПЕРВОЕ` (английское имя `or` → `first`).  Старое имя **удалено**:
-  вызов — ошибка загрузки с сообщением «`«ИЛИ» переименовано: теперь это
-  «ПЕРВОЕ(Ц1, Ц2)», а дизъюнкция — «A ; B»`».
-* `НАЙТИВСЁ` → `НАЙТИВСЕ`.  Старое написание остаётся зарезервированным (не
-  переменная!) и даёт обычное предупреждение с подсказкой: «не найдено:
-  НАЙТИВСЁ/3; возможно, НАЙТИВСЕ/3».  Отдельной таблицы для него не нужно —
-  расстояние редактирования до нового имени равно 1, и подсказка выходит сама.
+* `ИЛИ` → `ПЕРВОЕ` (the English name `or` → `first`).  The old name is **removed**: calling
+  it is a load error with the message "«ИЛИ» переименовано: теперь это «ПЕРВОЕ(Ц1, Ц2)», а
+  дизъюнкция — «A ; B»".
+* `НАЙТИВСЁ` → `НАЙТИВСЕ`.  The old spelling stays reserved (it is not a variable!) and
+  gives the ordinary warning with a hint: "не найдено: НАЙТИВСЁ/3; возможно, НАЙТИВСЕ/3".
+  No table of its own is needed — the edit distance to the new name is 1 and the hint comes
+  out by itself.
 
-## Что сделано
+## What was done
 
-* `lexer.cpp`: `ПЕРВОЕ`/`first` в основном наборе; новый набор
-  `kRetiredBuiltinNames` (`ИЛИ`, `НАЙТИВСЁ`) — лексер держит их именами
-  предикатов, но `reservedBuiltinNames()` их не отдаёт: таблица ключевых слов,
-  автодополнение GUI и `--list-keywords` не предлагают отставленные написания.
-* `checks.cpp`: таблица `kRetiredNames` и ошибка загрузки для вызова отставленного
-  имени (проверка идёт до поиска в `known`: отставленного имени там уже нет);
-  `ПЕРВОЕ/2` раскрывается как мета-вызов — оба его аргумента цели.
-* `engine.cpp`: два библиотечных предложения `ИЛИ(X,_) :- ВЫП(X), !.` /
-  `ИЛИ(_,X) :- ВЫП(X).` удалены — иначе `ИЛИ` продолжало бы работать через базу.
-  (Остальные затенённые библиотечные предложения снимает task_43.)
-* Тесты: `test_keywords.cpp` (отставленные имена не предлагаются, `ПЕРВОЕ/2`
-  предлагается), `test_lexer.cpp` (отставленное написание — всё ещё имя, не
-  переменная), `test_diagnostics.cpp` (сообщение об `ИЛИ` слово в слово;
-  подсказка для `НАЙТИВСЁ`), а в `test_builtins_control.cpp` случаи перестали
-  называть `ПЕРВОЕ` «дизъюнкцией».
-* Документы: `help.typ` §4.5/§4.6 и приложение 17; `prologd-diff.typ` §6
-  (устаревшая формулировка «поведение сохранено» приведена к task_41), §13, §14,
-  §16 и новые §17 (`НАЙТИВСЕ` без ё) и §18 (`ПЕРВОЕ` вместо `ИЛИ`);
-  `technical.typ` §6.4; `lessons.typ`; урок 4 и его раздел 5;
-  `ai/conventions.md`, `ai/status.md`, таблица task_39.
+* `lexer.cpp`: `ПЕРВОЕ`/`first` in the main set, plus a new set `kRetiredBuiltinNames`
+  (`ИЛИ`, `НАЙТИВСЁ`) — the lexer keeps those as predicate names, but
+  `reservedBuiltinNames()` does not report them: the keyword table, the GUI completion and
+  `--list-keywords` do not offer retired spellings.
+* `checks.cpp`: the table `kRetiredNames` and a load error for calling a retired name (the
+  check runs before the lookup in `known`, where the retired name no longer exists);
+  `ПЕРВОЕ/2` expands as a meta-call — both its arguments are goals.
+* `engine.cpp`: the two library clauses `ИЛИ(X,_) :- ВЫП(X), !.` / `ИЛИ(_,X) :- ВЫП(X).`
+  are removed — otherwise `ИЛИ` would keep working through the database.  (The remaining
+  shadowed library clauses are removed by task_43.)
+* Tests: `test_keywords.cpp` (retired names are not offered, `ПЕРВОЕ/2` is),
+  `test_lexer.cpp` (a retired spelling is still a name, not a variable),
+  `test_diagnostics.cpp` (the message about `ИЛИ` word for word; the hint for `НАЙТИВСЁ`),
+  and in `test_builtins_control.cpp` the cases stopped calling `ПЕРВОЕ` "disjunction".
+* Documents: `help.typ` §4.5/§4.6 and appendix 17; `prologd-diff.typ` §6 (the stale "the
+  behaviour is preserved" wording brought in line with task_41), §13, §14, §16 and new §17
+  (`НАЙТИВСЕ` without the ё) and §18 (`ПЕРВОЕ` instead of `ИЛИ`); `technical.typ` §6.4;
+  `lessons.typ`; lesson 4 and its section 5; `ai/conventions.md`, `ai/status.md`, the
+  table of task_39.
 
-## Проверка
+## Checks
 
-* ctest 221 → 223, Catch2 208 → 210 случаев; GUI-набор (venv) и пять документов
-  Typst собираются.
-* Руками: `?НАЙТИВСЁ(_, ЛОЖЬ, _).` →
-  `1:2: warning: не найдено: НАЙТИВСЁ/3; возможно, НАЙТИВСЕ/3` (выход 0);
-  `?ИЛИ(ЛОЖЬ, ЛОЖЬ).` → `1:2: error: «ИЛИ» переименовано: …` (выход 2).
+* ctest 221 → 223, Catch2 208 → 210 cases; the GUI suite (venv) and the five Typst
+  documents build.
+* By hand: `?НАЙТИВСЁ(_, ЛОЖЬ, _).` →
+  `1:2: warning: не найдено: НАЙТИВСЁ/3; возможно, НАЙТИВСЕ/3` (exit 0);
+  `?ИЛИ(ЛОЖЬ, ЛОЖЬ).` → `1:2: error: «ИЛИ» переименовано: …` (exit 2).

@@ -1,8 +1,8 @@
-# task_55 — `\+` как вторая запись `НЕ` и подсказки вместо `is/2`
+# task_55 — `\+` as a second spelling of `НЕ`, and hints instead of `is/2`
 
 **Status:** done (2026-10-02).  The user asked to settle the two items the
-comparison table still showed as divergences from ISO: «Осталось 2 существенных
-пункта, где Пролог-Д расходится с другими: `is` и `\+ Ц`.»  Decision the same
+comparison table still showed as divergences from ISO: "two significant points remain
+where Пролог-Д diverges from the others: `is` and `\+ Ц`."  Decision the same
 day: `\+` is added, `is` is **not** — and both spellings of `is` get a message
 that names the Пролог-Д way of writing the same thing.
 **Depends on:** task_41 (the `,`/`;` precedence), task_44 (the wording of the

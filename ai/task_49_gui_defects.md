@@ -98,8 +98,8 @@ is the terminal's business.
 
 ### 5. The main window forgets its size and place (found 2026-10-01)
 
-The user, in one sentence with «продолжим task_49»: «Графическое окно сохраняет
-свой размер и положение, а при этом главное окно не сохраняет».  The graphics
+The user, in one sentence with "let us continue task_49": "the graphics window keeps
+its size and position, while the main window does not".  The graphics
 window has kept a `saveGeometry()` blob since task_45 and the main window — the one
 the user moves first — kept nothing.  Both go through `prologd_gui.geometry` now,
 and the key is `view/window_geometry` (a machine key: a record, not a row in the

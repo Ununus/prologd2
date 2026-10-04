@@ -1,14 +1,14 @@
-# task_57 — неудачный `ЗАПИСЬ_В` оставлял вывод на закрытом потоке
+# task_57 — a failed `ЗАПИСЬ_В` left the output on a closed stream
 
-**Status:** done (2026-10-03) — дефект найден при работе над task_54, воспроизведён
-на собранном интерпретаторе, починен одной строкой и закреплён двумя проверками
-**Depends on:** task_11 (предикаты ввода-вывода), task_54 (круг правок вокруг
-ввода-вывода: там же смотрели на `IoContext`)
+**Status:** done (2026-10-03) — the defect was found while working on task_54,
+reproduced on the built interpreter, fixed with one line and pinned by two tests.
+**Depends on:** task_11 (the I/O predicates), task_54 (the round of I/O fixes — where
+`IoContext` was under the same microscope)
 **Milestone:** post-M10
 
-## Что было
+## What was wrong
 
-`IoContext::openOutput` закрывал текущий файл **до** попытки открыть новый:
+`IoContext::openOutput` closed the current file **before** trying to open the new one:
 
 ```cpp
 file_output_.close();
@@ -17,17 +17,17 @@ output_name_.clear();
 if (path.empty() || ...) { output_ = base_output_; return true; }
 file_output_.open(path);
 if (!file_output_.is_open()) {
-  return false;            // output_ всё ещё указывает на ЗАКРЫТЫЙ file_output_
+  return false;            // output_ still points at the CLOSED file_output_
 }
 ```
 
-`output_` присваивался только при успехе, поэтому после неудачного переключения он
-оставался на закрытом `file_output_`.  Запись в закрытый `std::ofstream` молча
-теряется (флаг `badbit`, никто его не смотрит), и пропадало всё до следующего
-удачного `ЗАПИСЬ_В`: и вывод программы, и **ответы самого интерпретатора** —
-`ДА`/`НЕТ`/связывания печатаются тем же `IoContext`.
+`output_` was assigned only on success, so after a failed redirect it kept pointing at
+the closed `file_output_`.  Writing to a closed `std::ofstream` is silently lost (the
+`badbit` flag, which nobody looks at), so everything vanished until the next successful
+`ЗАПИСЬ_В`: the program's output *and* the interpreter's own answers — `ДА`/`НЕТ` and
+bindings are printed through the same `IoContext`.
 
-Воспроизведено 2026-10-03 на `prologd.exe`:
+Reproduced on 2026-10-03 on `prologd.exe`:
 
 ```prolog
 ?ЗАПИСЬ_В("tmp_out.txt").
@@ -39,57 +39,59 @@ if (!file_output_.is_open()) {
 ?ПС.
 ```
 
-До правки на экране было `ДА`, `снова на экран`, `ДА`, пустая строка, `ДА`:
-`НЕТ` неудачного переключения и вся третья цель исчезли.  После правки на экране
-`НЕТ`, `после`, `ДА`, `ДА`, `снова на экран`, `ДА`, пустая строка, `ДА`.
+Before the fix the screen showed `ДА`, `снова на экран`, `ДА`, an empty line, `ДА`: the
+`НЕТ` of the failed redirect and the whole third goal were gone.  After the fix the
+screen shows `НЕТ`, `после`, `ДА`, `ДА`, `снова на экран`, `ДА`, an empty line, `ДА`.
 
-Заметить это было трудно именно потому, что **молча**: `ЗАПИСЬ_В` честно ложен,
-диагностики нет, а вывод просто перестаёт появляться.  Соседняя ветка — ввод —
-вела себя правильно: неудачный `ЧТЕНИЕ_ИЗ` возвращал чтение к клавиатуре, потому
-что `fetchLine` проверяет `input_from_file_`, а не указатель на поток.
+It was hard to notice precisely because it was **silent**: `ЗАПИСЬ_В` honestly fails, no
+diagnostic is printed, and the output simply stops appearing.  The neighbouring branch —
+input — behaved correctly: a failed `ЧТЕНИЕ_ИЗ` returned reading to the keyboard, because
+`fetchLine` checks `input_from_file_`, not a stream pointer.
 
-## Решение
+## The fix
 
-Одно правило для обоих потоков: **неудачное переключение возвращает поток туда,
-где он был бы и без него**.
+One rule for both streams: **a failed redirect returns the stream to where it would be
+without the attempt**.
 
 ```cpp
 file_output_.close();
 output_to_file_ = false;
 output_name_.clear();
-output_ = base_output_;      // ← единственная новая строка
+output_ = base_output_;      // <- the only new line
 ```
 
-Вариант «сначала попробовать открыть, а закрыть только при успехе» отвергнут: он
-оставлял бы программу писать в *прежний* файл после неудачного переключения, то
-есть тихо игнорировать просьбу.  Для ввода такого варианта никто и не
-предлагал — там чтение возвращается к клавиатуре, а не к прежнему файлу.
+The alternative — "open first, close only on success" — was rejected: it would leave the
+program writing into the *previous* file after a failed redirect, that is, silently
+ignoring the request.  Nobody proposed that for input either: there reading returns to
+the keyboard, not to the previous file.
 
-## Что не менялось
+## What did not change
 
-- Успешный `ЗАПИСЬ_В` и `ЗАПИСЬ_В("")` — как были; `outputName()` после неудачи
-  пуст и раньше (имя чистилось до попытки), это теперь закреплено проверкой.
-- `openInput` не трогали: он был прав.
-- Ни диспетчера, ни решателя: `builtinTell` просто читает `false` из `openOutput`.
+* A successful `ЗАПИСЬ_В` and `ЗАПИСЬ_В("")` as they were; `outputName()` after a failure
+  was empty before (the name was cleared before the attempt), and that is now pinned by a
+  test.
+* `openInput` was not touched: it was right.
+* Neither the dispatcher nor the solver: `builtinTell` just reads `false` from
+  `openOutput`.
 
-## Проверки
+## Checks
 
-- `src/tests/test_builtins_io.cpp`, случай «a failed redirect returns the output to
-  the screen»: успешное переключение в файл, неудачное (вывод и ответы остаются на
-  экране), `ЗАПИСЬ_В(Имя)` после неудачи даёт пустое имя, затем возврат в файл
-  пустой строкой.
-- `src/tests/test_io_context.cpp`, случай «a redirect that fails leaves the output
-  on the base stream»: то же на уровне `IoContext` — `write` после неудачи
-  попадает в базовый поток, `outputName()` пуст, удачное переключение после
-  неудачного работает.
-- `doc/help.typ` §6.9: одна фраза про то, куда возвращается вывод (симметрично
-  фразе про клавиатуру у `ЧТЕНИЕ_ИЗ`).
+* `src/tests/test_builtins_io.cpp`, the case "a failed redirect returns the output to the
+  screen": a successful redirect into a file, a failed one (output and answers stay on
+  the screen), `ЗАПИСЬ_В(Имя)` after the failure gives an empty name, then a return into
+  the file with an empty string.
+* `src/tests/test_io_context.cpp`, the case "a redirect that fails leaves the output on
+  the base stream": the same at the `IoContext` level — `write` after a failure lands in
+  the base stream, `outputName()` is empty, and a successful redirect after a failed one
+  works.
+* `doc/help.typ` §6.9: one sentence about where the output returns to (symmetric with the
+  sentence about the keyboard for `ЧТЕНИЕ_ИЗ`).
 
 ## Notes
 
-- Неудачный `ЗАПИСЬ_В` в *директиве* (`:- ЗАПИСЬ_В("...").`) тоже просто ложен:
-  загрузка продолжается, и вывод идёт на экран — это и есть поведение, которое
-  теперь описано в руководстве.
-- Дефект лежал в `fetchLine`-соседстве не случайно: обе правки (task_54 и эта) —
-  про то, что «текущий поток» обязан быть потоком, в который действительно можно
-  писать или из которого действительно можно читать.
+* A failed `ЗАПИСЬ_В` inside a *directive* (`:- ЗАПИСЬ_В("...").`) is simply false too:
+  loading continues and the output goes to the screen — which is what the manual now
+  describes.
+* The defect living next to `fetchLine` is no accident: both fixes (task_54 and this one)
+  are about one thing — "the current stream" must be a stream one can really write to or
+  read from.

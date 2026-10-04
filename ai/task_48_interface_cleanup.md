@@ -1,7 +1,7 @@
 # task_48 — Interface cleanups: icons, the toolbar, the search menu, Escape
 
 **Status:** done (2026-10-01; the by-hand look at the redrawn icons was confirmed by
-the user on 2026-10-02 — «иконки в тёмной теме нормальные»)
+the user on 2026-10-02 — "the icons in the dark theme look fine")
 **Depends on:** task_26 (the action table), task_29 (the settings dialog),
 task_33 (the find bar), task_37 (the reference dock), task_45 (the graphics window)
 **Milestone:** M17
@@ -105,8 +105,8 @@ the way, and a graphics window that opens itself when a program first draws.
   gone from the table the test walks) ✓ — the walk is now
   `("find", "find_next", "find_prev")`.
 - [x] By hand: the menu and the toolbar after the removals, and the redrawn
-  icons in the dark theme — the user's own look on 2026-10-02: «иконки в тёмной
-  теме нормальные», дорисовывать нечего.
+  icons in the dark theme — the user's own look on 2026-10-02: "the icons in the dark
+  theme look fine", nothing left to redraw.
 
 ## The second half (2026-10-01, the round after task_47)
 

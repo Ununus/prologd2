@@ -1,4 +1,4 @@
-# task_50 — панель вывода с вкладками: Проблемы, Вывод, Система, Ввод
+# task_50 — the output panel with tabs: Проблемы, Вывод, Система, Ввод
 
 **Status:** in progress
 **Depends on:** task_29 (settings dialog), task_46 (limits), task_49 (batched output)

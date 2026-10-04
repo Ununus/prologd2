@@ -1,126 +1,129 @@
-# task_61 — переносная сборка для Windows (portable)
+# task_61 — portable Windows build
 
-**Status:** in progress (2026-10-03) — §4 сделан (модуль путей, `test_paths.py` и
-случай в `test_window.py`), §2, §3 и §7.5 сделаны: PyInstaller 6.22.3 поставлен,
-замороженная сборка собрана, папка собрана и проверена (§7.1–§7.3, кроме кликов), а
-на чистой Windows 11 в Sandbox (24H2 26100.9457) она запустилась и работает — это
-проверил пользователь.  Впереди — §6 (`tools/build_portable.ps1`) и zip.
-**Depends on:** task_16 (`-s`, `-I`, `--version`, `--list-keywords`), task_17 и
-task_35 (цель `docs` — пять PDF), task_45 (окно графики), task_46
-(`execution/interpreter`, `execution/import_paths`), task_58–60 (текущее
-состояние окна), ADR-013 (MSVC 2026 — сборка, которую мы поставляем)
-**Milestone:** M17 (переносная сборка; строка добавлена в `plan.md` §5)
+**Status:** in progress (2026-10-04) — everything is built and checked except the
+manual GUI clicks (§7.1) and the clean machine, which the user confirmed on
+2026-10-03; the folder and the zip are made by `tools/build_portable.ps1` (§6).  The
+installer is the next task (§8.8).
+**Depends on:** task_16 (`-s`, `-I`, `--version`, `--list-keywords`), task_17 and
+task_35 (the `docs` target — five PDFs), task_45 (graphics window), task_46
+(`execution/interpreter`, `execution/import_paths`), task_58–60 (the window as it
+stands), ADR-013 (MSVC 2026 — the build we ship)
+**Milestone:** M17 (portable build; the line was added to `plan.md` §5)
 
 ## Goal
 
-Одна папка, которую копируют на чистую Windows-машину — **без Python, Qt, Visual
-Studio и без дерева исходников** — и она работает:
+One folder, copied to a clean Windows machine — **no Python, no Qt, no Visual
+Studio, no source tree** — and it works:
 
 ```
 prologd-2.0.0-win64\
-  prologd.exe          интерпретатор (консольный, UTF-8, --version → 2.0.0)
-  vcruntime140.dll     рантайм Visual C++ — три DLL рядом с exe (§2)
+  prologd.exe          interpreter (console, UTF-8, --version → 2.0.0)
+  vcruntime140.dll     the Visual C++ runtime — three DLLs beside the exe (§2)
   vcruntime140_1.dll
   msvcp140.dll
-  prologd-gui.exe      графическая оболочка
-  _internal\           то, что положит упаковщик (Python, Qt, плагины Qt)
-  gui.ini              настройки окна — рядом с exe, а не в AppData (§4)
-  doc\                 пять PDF (help, technical, prologd-diff, gui, lessons)
-                       и их исходники *.typ рядом (§5)
-  examples\            уроки, типовые задачи, lib (без lessons\_old)
-  ЧИТАЙ_МЕНЯ.txt       десяток строк: как запустить, где настройки, что требовать
+  prologd-gui.exe      the graphics window
+  _internal\           whatever the freezer puts there (Python, Qt, Qt plugins)
+  gui.ini              window settings — beside the exe, not in AppData (§4)
+  doc\                 five PDFs (help, technical, prologd-diff, gui, lessons)
+                       and their *.typ sources beside them (§5)
+  examples\            lessons, typical tasks, lib (no lessons\_old)
+  ЧИТАЙ_МЕНЯ.txt       a dozen lines: how to start, where the settings live,
+                       what to require
 ```
 
-Готовность — это §7 (проверка на машине без инструментов сборки), а не «собралось
-без ошибок».
+Done means §7 (a machine without build tools), not "it built without errors".
 
-## Решения пользователя (2026-10-03)
+## User decisions (2026-10-03)
 
-Коротко: `--onedir` упаковщиком PyInstaller, DLL Visual C++ рядом с exe, `_old` не
-кладём, `doc/*.typ` кладём, `gui.ini` в переносной сборке рядом с exe,
-`examples/lib` кладём в поставку, но **в список поиска ИМПОРТ не подставляем**
-(урок 11 просит добавить каталог вручную — решение отменено 2026-10-03, см. §4),
-папка `prologd-2.0.0-win64` и zip.  Перечень
-целиком — в §8, и он же разнесён по §2, §4, §5 и §6; открытым остаётся инсталлятор,
-и это следующая задача, а не эта.
+Short: PyInstaller with `--onedir`, the Visual C++ DLLs beside the exe, `_old` is not
+shipped, `doc/*.typ` **is** shipped, `gui.ini` sits beside the exe in the portable
+build, `examples/lib` is shipped but **is not added to the import search path**
+(lesson 11 asks the reader to add the directory by hand — the earlier decision was
+reverted on 2026-10-03, see §4), the folder is `prologd-2.0.0-win64`, plus a zip.
+The full list is §8 and is what §2, §4, §5 and §6 implement; the installer stays open
+and is the next task, not this one.
 
-## Факты, на которых это построено (проверено 2026-10-03 на этой машине)
+## Facts this rests on (checked 2026-10-03 on this machine)
 
-* `prologd.exe` — 944 КиБ, в таблице импорта `VCRUNTIME140.dll`, `MSVCP140.dll` и
-  `api-ms-win-crt-*`.  Две DLL Visual C++ кладём рядом (§2), а `api-ms-win-crt-*` —
-  это не файлы, а имена API set: их разрешает загрузчик Windows по схеме
-  (`apisetschema.dll`), и сама UCRT — часть системы с Windows 10 (проверено на этой
-  машине: файлов `api-ms-win-*.dll` в `System32` — 0, а `ucrtbase.dll` есть).  На
-  Windows 7 UCRT пришлось бы ставить отдельно — см. §9.
-* UTF-8 манифест **вшит** в exe (`src/utf8.manifest` отдан линкеру, в образе есть
-  строка `activeCodePage`) — отдельный `.manifest` в поставку не нужен.
-* Путь дерева сборки в образ exe не попал (проверено поиском строки).
-* Окно: Python 3.14.5, PySide6 6.11.2 — это `.venv` этой машины. **Ни PyInstaller,
-  ни Nuitka, ни cx_Freeze, ни `pyside6-deploy` не установлены** — упаковщик надо
-  добавить (в `.venv`, отдельным списком зависимостей, не в
-  `src/gui/requirements.txt` — тот список читают студенты).
-* PyInstaller 6.22.3 (PyPI): Python 3.8–3.15 (3.14 подходит), PySide6 собирается
-  «из коробки», DLL Visual C++ кладёт сам, **кросс-компиляции нет** — Windows-сборку
-  делает Windows (нам это подходит: сборка и так на Windows).
-* `src/gui/assets/prologd2.ico` уже в репозитории (16 958 байт) — иконка exe готова.
-* Три пути внутри окна считаются **от дерева исходников** и в замороженной сборке
-  не найдут ничего (это и есть основная правка §4):
-  * `main.py:default_executable()` — `build/windows-msvc/.../prologd.exe` от
+* `prologd.exe` is 944 KiB; its import table names `VCRUNTIME140.dll`, `MSVCP140.dll`
+  and `api-ms-win-crt-*`.  Two of those are files we ship (§2), while
+  `api-ms-win-crt-*` are API-set names, not files: Windows resolves them through
+  `apisetschema.dll`, and the UCRT itself is part of Windows 10 (checked here: zero
+  `api-ms-win-*.dll` files in `System32`, `ucrtbase.dll` present).  On Windows 7 the
+  UCRT would have to be installed separately — §9.
+* The UTF-8 manifest is **baked into** the exe (`src/utf8.manifest` is handed to the
+  linker; the image contains the string `activeCodePage`), so no separate `.manifest`
+  is shipped.
+* No path of the build tree leaked into the exe (checked by searching for the string).
+* The window is Python 3.14.5 + PySide6 6.11.2 — this machine's `.venv`.  **Neither
+  PyInstaller nor Nuitka, cx_Freeze or `pyside6-deploy` is installed**, so a freezer
+  has to be added (into `.venv`, through a separate requirements file — not
+  `src/gui/requirements.txt`, which students read).
+* PyInstaller 6.22.3 (PyPI): Python 3.8–3.15 (3.14 fits), PySide6 works out of the
+  box, it copies the Visual C++ DLLs itself, and there is **no cross-compilation** —
+  a Windows build is made on Windows (which suits us: the build is on Windows anyway).
+* `src/gui/assets/prologd2.ico` is already in the repository (16 958 bytes), so the
+  exe icon exists.
+* Three paths inside the window are computed **from the source tree** and would find
+  nothing in a frozen build (this is what §4 fixes):
+  * `main.py:default_executable()` — `build/windows-msvc/.../prologd.exe` from
     `Path(__file__).resolve().parents[2]`;
   * `assets.DEFAULT_DIRECTORY` = `Path(__file__).resolve().parent.parent / "assets"`
-    (в докстроке модуля уже написано: «a frozen build would look inside
-    `sys._MEIPASS`, which is noted rather than implemented»);
+    (the module docstring already noted that a frozen build would look inside
+    `sys._MEIPASS`);
   * `window._open_document` — `Path(__file__).resolve().parents[3] / "doc" / f"{name}.pdf"`
-    (это `Shift+F1`, руководство и остальные документы).
-* Настройки окна: `%LOCALAPPDATA%\PrologD\gui\gui.ini`, `--settings FILE`
-  переопределяет путь (`settings.py`, `main.py`).
-* `examples/lib` — каталог поиска для урока 11; в окне это строка
-  `execution/import_paths`.  В поставку он кладётся (урок его подключает), но в
-  список поиска окно его не добавляет (§4).
-* PDF-ы **не в git**: их делает цель `docs` (`typst`, здесь 0.15.1), поэтому в
-  поставку они должны попасть собранными, а не из репозитория.
-* Локально «чистую машину» изобразить нельзя: в `System32` этой машины
-  `vcruntime140.dll` и `msvcp140.dll` 14.51 есть (стоит Visual Studio), поэтому
-  забытая DLL здесь не проявится. Отсюда §7: статическая проверка импортов плюс
-  Windows Sandbox или виртуальная машина.
+    (that is `Shift+F1`, the manual and the other documents).
+* Window settings: `%LOCALAPPDATA%\PrologD\gui\gui.ini`, with `--settings FILE`
+  overriding the path (`settings.py`, `main.py`).
+* `examples/lib` is the search directory for lesson 11; in the window it is the
+  `execution/import_paths` field.  It is shipped (the lesson enables it), but the
+  window does not add it to the search list (§4).
+* The PDFs are **not in git**: the `docs` target makes them (`typst`, 0.15.1 here), so
+  they have to reach the package built, not from the repository.
+* A "clean machine" cannot be imitated locally: this machine's `System32` has
+  `vcruntime140.dll` and `msvcp140.dll` 14.51 (Visual Studio is installed), so a
+  forgotten DLL would not show up here.  Hence §7: a static import check plus Windows
+  Sandbox or a virtual machine.
 
 ---
 
-## §1. Раскладка поставки и что в неё входит
+## §1. The layout of the package and what goes into it
 
-**Входит** (§8): `prologd.exe` и три DLL Visual C++ рядом, окно со своим
-окружением, пять PDF **и их исходники `doc/*.typ`** (поставка объясняет себя),
-`examples/**` без `examples/lessons/_old/` (это материал порта, а не урок),
-`ЧИТАЙ_МЕНЯ.txt`, zip-архив папки `prologd-2.0.0-win64`.
+**In it** (§8): `prologd.exe` with the three Visual C++ DLLs beside it, the window
+with its own runtime, five PDFs **and their `doc/*.typ` sources** (the package
+explains itself), `examples/**` without `examples/lessons/_old/` (that is porting
+material, not a lesson), `ЧИТАЙ_МЕНЯ.txt`, and the zip of the
+`prologd-2.0.0-win64` folder.
 
-**Не входит** (сознательно): инсталлятор — следующая задача (§8), а также подпись
-кода, автообновление, Linux-сборка и статическая линковка Qt (она потянула бы
-лицензию LGPL/GPL — здесь Qt остаётся DLL рядом, как в любой PySide6-сборке).
+**Deliberately not in it** (§8): the installer (the next task), code signing,
+auto-update, a Linux build, and static Qt linking (which would drag in the LGPL/GPL
+question — Qt stays a DLL beside the exe, as in every PySide6 build).
 
-## §2. Интерпретатор: DLL Visual C++ рядом с exe
+## §2. The interpreter: the Visual C++ DLLs beside the exe
 
-**Решение пользователя: для начала кладём DLL рядом.** Сборка не меняется вовсе,
-три файла лежат в папке поставки: `vcruntime140.dll`, `vcruntime140_1.dll`,
-`msvcp140.dll` из `…\VC\Redist\MSVC\14.51.36231\x64\Microsoft.VC145.CRT\`.
-Копирование — шаг скрипта §6, а не ручная работа.
+**User decision: ship the DLLs beside the exe to start with.**  The build does not
+change at all; three files go into the package folder — `vcruntime140.dll`,
+`vcruntime140_1.dll`, `msvcp140.dll` from
+`…\VC\Redist\MSVC\14.51.36231\x64\Microsoft.VC145.CRT\`.  Copying them is a step of
+the §6 script, not manual work.
 
-**Альтернатива на потом** (не в этой задаче): статический CRT — одна строка в
+**Alternative for later** (not in this task): a static CRT — one line in
 `CMakeLists.txt`,
-`set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")`, и exe
-самодостаточен.  Если после первой поставки захочется убрать три файла, это
-отдельное измерение: собираются ли так же Catch2 и CLI11, остаётся ли `ctest`
-307/307 и как меняется размер exe.
+`set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")`, and the exe
+is self-contained.  If the three files are to go after the first package, that is a
+separate measurement: whether Catch2 and CLI11 still build, whether `ctest` stays
+307/307, and how the exe size changes.
 
-**Проверка (§7.3):** в таблице импорта `prologd.exe` каждое имя — либо системное
-(`api-ms-win-*`, `KERNEL32`, …), либо файл из папки поставки.
+**Check (§7.3):** every name in the import table of `prologd.exe` is either a system
+name (`api-ms-win-*`, `KERNEL32`, …) or a file of the package folder.
 
-## §3. Окно: PyInstaller (рекомендация) и альтернативы
+## §3. The window: PyInstaller (recommendation) and the alternatives
 
-**Рекомендация — PyInstaller, `--onedir` (папка, не `--onefile`).** Причины:
-официальные хуки для PySide6, Python 3.14 поддержан, сам кладёт DLL Visual C++,
-`--onedir` не распаковывается в `%TEMP%` при каждом запуске (быстрее стартует, и
-папка остаётся тем, чем её видит пользователь), антивирусы к `--onefile` придираются.
-Команда-заготовка:
+**The recommendation is PyInstaller with `--onedir` (a folder, not `--onefile`).**
+Reasons: official hooks for PySide6, Python 3.14 supported, it copies the Visual C++
+DLLs itself, `--onedir` does not unpack into `%TEMP%` on every start (it starts
+faster, and the folder stays what the user sees), and antivirus software objects to
+`--onefile`.  The starting command:
 
 ```
 .venv\Scripts\python -m pip install pyinstaller
@@ -130,275 +133,280 @@ prologd-2.0.0-win64\
     --paths src\gui  src\gui\main.py
 ```
 
-`--windowed` убирает консоль (иначе при запуске мигает чёрное окно), поэтому окно
-не должно зависеть от stdout — оно и не зависит (диагностика идёт на панели). Для
-отладки сборки держать рядом вариант `--console`.
+`--windowed` removes the console (otherwise a black window flashes on start), so the
+window must not depend on stdout — and it does not (diagnostics go to a panel).  Keep
+a `--console` variant beside it for debugging a build.
 
-**Альтернативы** (записать в ADR, почему не они): **Nuitka**
-(`--standalone --enable-plugin=pyside6`) — компилирует, старт быстрее, сборка
-заметно дольше и требует компилятора; **cx_Freeze** — проще, хуков для Qt меньше;
-**`pyside6-deploy`** — обёртка над Nuitka от Qt. Все три дают ту же папку, поэтому
-перейти на другую можно позже, не меняя §4.
+**Alternatives** (to be written into an ADR with the reason for rejecting them):
+**Nuitka** (`--standalone --enable-plugin=pyside6`) compiles, starts faster, but
+builds much longer and needs a compiler; **cx_Freeze** is simpler and has fewer Qt
+hooks; **`pyside6-deploy`** is Qt's wrapper around Nuitka.  All three produce the same
+folder, so switching later does not touch §4.
 
-**Отдельно:** имя `prologd-gui.exe` рядом с `prologd.exe` — так окно находит
-интерпретатор без настроек (§4), а пользователь видит две понятные программы.
+**Also:** the name `prologd-gui.exe` beside `prologd.exe` is how the window finds the
+interpreter without settings (§4), and the user sees two understandable programs.
 
-**Первый проход (2026-10-03).**  `pip install -r src/gui/requirements-build.txt`
-(сам список — новый файл, чтобы не путать его с `requirements.txt`, который читают
-студенты), затем команда выше: сборка **27 с**, `dist/prologd-gui` — **112.9 МиБ**,
-252 файла, `prologd-gui.exe` — 2.3 МиБ.  В `_internal/assets` легли все 47 значков и
-`prologd2.png`, то есть `paths.resource("assets")` в сборке работает.  Собранная
-папка вместе с `prologd.exe`, DLL, `doc`, `examples` и памяткой —
-`dist/prologd-2.0.0-win64`, **297 файлов, 116.3 МиБ**.
+**First run (2026-10-03).**  `pip install -r src/gui/requirements-build.txt` (a new
+file, so that it is not confused with `requirements.txt`, which students read), then
+the command above: a **27 s** build, `dist/prologd-gui` at **112.9 MiB**, 252 files,
+`prologd-gui.exe` 2.3 MiB.  All 47 icons and `prologd2.png` landed in
+`_internal/assets`, so `paths.resource("assets")` works in a frozen build.  Together
+with `prologd.exe`, the DLLs, `doc`, `examples` and the read-me the folder became
+`dist/prologd-2.0.0-win64`, **297 files, 116.3 MiB**.
 
-**Итог со скриптом (2026-10-03).**  Тот же пакет после вычета (§6) — **280 файлов,
-95.4 МиБ**, то есть на 20.9 МиБ меньше; zip — **37.5 МиБ**.  Большое осталось
-сознательно: `opengl32sw.dll` 19.7 МиБ (запасной программный OpenGL),
-`Qt6Core` 9.9 + `Qt6Gui` 9.1 + `Qt6Widgets` 6.2 и `python314.dll` 6.5.  `libcrypto-3.dll`
-(5.0) и `libssl-3.dll` тоже остались: их тянет не Qt, а `_ssl.pyd` самого Python, и
-выбрасывать половину пары «модуль + библиотека» ради шести мегабайт не стоило.
+**With the script (2026-10-03).**  The same package after the trim (§6) is **280 files,
+95.4 MiB** — 20.9 MiB lighter; the zip is **37.5 MiB**.  After the first-page logos
+went into the documents the package is **282 files, 95.5 MiB** and the zip **37.7 MiB**.
+The big remainder is deliberate: `opengl32sw.dll` 19.7 MiB (the software OpenGL
+fallback), `Qt6Core` 9.9 + `Qt6Gui` 9.1 + `Qt6Widgets` 6.2 and `python314.dll` 6.5.
+`libcrypto-3.dll` (5.0) and `libssl-3.dll` also stayed: Python's `_ssl.pyd` pulls them,
+not Qt, and dropping half a module/library pair for six megabytes was not worth it.
 
-## §4. Правки в коде: раскладка вместо дерева исходников
+## §4. Code changes: the layout instead of the source tree
 
-Один маленький модуль (например `src/gui/prologd_gui/paths.py`) с двумя функциями —
-`data_root()` (рядом с exe в замороженной сборке, корень репозитория в исходниках) и
-`resource(name)` (внутри `sys._MEIPASS` для данных, добавленных упаковщиком) — и на
-него переводятся три места из фактов:
+One small module (say `src/gui/prologd_gui/paths.py`) with two functions —
+`data_root()` (beside the exe in a frozen build, the repository root in the sources)
+and `resource(name)` (inside `sys._MEIPASS` for data the freezer added) — and the
+places from the facts move onto it:
 
-* `default_executable()`: **первый** кандидат — `prologd.exe` рядом с окном, дальше
-  прежние пути сборки (чтобы работа в исходниках не изменилась ни на шаг);
-* `assets.DEFAULT_DIRECTORY`: `sys._MEIPASS/assets`, если упаковщик её положил;
-* `_open_document`: `<data_root>/doc/<name>.pdf`; если файла нет, сообщение должно
-  называть *этот* путь, а не путь дерева сборки;
-* `reference.DEFAULT_PATH`: `doc/builtins.json` — его окно тоже **читает** (`F1` и
-  сводки в автодополнении), поэтому он ищется через `paths.builtins()` и едет в
-  поставке вместе с документами.  В §4 мест было три, а оказалось четыре —
-  `doc/builtins.json` нашёлся уже при выполнении;
-* **Настройки (решение пользователя):** в замороженной сборке `gui.ini` лежит рядом
-  с exe, в исходниках — как сейчас, в `%LOCALAPPDATA%\PrologD\gui\`; признак —
-  `getattr(sys, "frozen", False)`, отдельного ключа не заводим.  Будущий инсталлятор
-  вернёт себе AppData сам (или получит свой ключ), когда до него дойдёт;
-* **Каталог ИМПОРТ (решение пользователя, окончательное — 2026-10-03):** окно не
-  добавляет к списку поиска **ничего** — только то, что указал пользователь
-  (`--include` и строка «Дополнительные каталоги ИМПОРТ»), а каталог самого
-  импортирующего файла движок пробует раньше них.  `paths.import_directories`
-  остаётся единственным местом, где список чистится: пустые строки отбрасываются,
-  повторы склеиваются.
-  * История: сначала путь `examples/lib` писался в `gui.ini` при первом запуске —
-    оказалось плохо, потому что папку переносят (флешка → компьютер → обратно,
-    буква диска меняется) и записанный абсолютный путь указывает на старую копию.
-    Потом каталог `<data_root>/examples/lib` подставлялся при каждом запуске —
-    запоминания уже не было, но подстановка осталась незаметной для читателя.
-  * Отменено по просьбе пользователя: урок 11 теперь сам говорит, что каталог
-    библиотеки надо добавить руками («Правка → Настройки… → Выполнение →
-    Дополнительные каталоги ИМПОРТ»), и так **прозрачней для ученика** — он видит
-    строку, которую заполнил, и путь, который выбрал.  Побочная выгода та же, что и у
-    вывода пути из `data_root()`: в настройке не остаётся ничего абсолютного, что
-    устареет при переносе папки.  Плата: из коробки урок 11 не работает, пока этот
-    шаг не сделан (он описан в самом уроке, в `tools/portable-readme.txt` и в
-    `README.md` набора);
+* `default_executable()`: the **first** candidate is `prologd.exe` beside the window,
+  then the old build paths (so working in the sources does not change at all);
+* `assets.DEFAULT_DIRECTORY`: `sys._MEIPASS/assets` if the freezer put it there;
+* `_open_document`: `<data_root>/doc/<name>.pdf`; when the file is missing, the
+  message must name *this* path, not a path in the build tree;
+* `reference.DEFAULT_PATH`: `doc/builtins.json` — the window **reads** it too (`F1` and
+  the completion summaries), so it is looked up through `paths.builtins()` and travels
+  in the package with the documents.  §4 was about three places, but there were four:
+  `doc/builtins.json` turned up while doing the work;
+* **Settings (user decision):** in a frozen build `gui.ini` sits beside the exe; in the
+  sources it stays where it was, `%LOCALAPPDATA%\PrologD\gui\`.  The marker is
+  `getattr(sys, "frozen", False)`; no new key.  A future installer will take AppData
+  back for itself (or get a key of its own) when it arrives;
+* **The import directory (user decision, final on 2026-10-03):** the window adds
+  **nothing** to the search list — only what the user gave it (`--include` and the
+  "additional import directories" field), and the directory of the importing file is
+  tried by the engine before them.  `paths.import_directories` stays the single place
+  where the list is cleaned: empty lines are dropped, duplicates are merged.
+  * History: at first `examples/lib` was written into `gui.ini` on the first start —
+    that turned out to be bad, because the folder gets copied around (memory stick →
+    computer → back, the drive letter changes) and the recorded absolute path points
+    at the old copy.  Then `<data_root>/examples/lib` was substituted on every start —
+    nothing was remembered any more, but the substitution stayed invisible to the
+    reader.
+  * Reverted at the user's request: lesson 11 now says itself that the library
+    directory has to be added by hand ("Правка → Настройки… → Выполнение →
+    Дополнительные каталоги ИМПОРТ"), and that is **clearer for a student** — he sees
+    the line he filled in and the path he chose.  The side benefit is the same as with
+    deriving the path from `data_root()`: no absolute path is left in a setting to go
+    stale when the folder moves.  The price: out of the box lesson 11 does not work
+    until that step is done (it is described in the lesson, in
+    `tools/portable-readme.txt` and in the package's `README.md`);
 
-**Проверка (сделано):** `src/gui/tests/test_paths.py` — семь случаев с подменёнными
-`sys.frozen` / `sys.executable` / `sys._MEIPASS` (сборка и дерево исходников,
-отсутствующий интерпретатор, значки, встроенная справка, «в сборке не появляется
-ничего своего» в строке ИМПОРТ), плюс случай в `test_window.py`: окно открывает PDF
-из `doc/` поставки.
-Остальные наборы GUI остаются зелёными.
+**Check (done):** `src/gui/tests/test_paths.py` — seven cases with `sys.frozen` /
+`sys.executable` / `sys._MEIPASS` faked (a frozen build and the source tree, a missing
+interpreter, the icons, the built-in reference, "a frozen build adds nothing of its
+own" to the import line), plus a case in `test_window.py`: the window opens a PDF from
+the package's `doc/`.  The other GUI suites stay green.
 
-## §5. Документы и примеры
+## §5. Documents and examples
 
-* Пять PDF из цели `docs` — в `doc/` поставки (собрать до упаковки: без `typst`
-  поставка получится без документации, и это должно быть ошибкой сборки, а не
-  тихим пропуском).
-* `doc/*.typ` — рядом с PDF (решение пользователя): поставка объясняет себя, а
-  `typst` для чтения не нужен.  Вместе с ними едут два значка первой страницы
-  (`prologd2.png`, `csu.png`): без них поставленные исходники не собрать.
-* `doc/builtins.json` — обязательно: без него справка `F1` и сводки в
-  автодополнении работают, но молчат (окно терпит отсутствие файла сознательно).
-* `examples/` — уроки, типовые задачи, `lib/`; **`lessons/_old/` не кладём**
-  (решение пользователя: это материал порта, а не урок).
-* Памятка `ЧИТАЙ_МЕНЯ.txt`: как запустить окно и интерпретатор, где лежит `gui.ini`,
-  что окно само находит `prologd.exe` рядом, что уроки открываются из `examples`,
-  что требуется **Windows 10 (1903) или новее, 64 bit** и почему (§9).
+* The five PDFs from the `docs` target go into the package's `doc/` (built before
+  freezing: without `typst` the package would come out without documentation, and that
+  must be a build error, not a silent skip).
+* `doc/*.typ` goes beside the PDFs (user decision): the package explains itself, and
+  `typst` is not needed to read it.  The two first-page logos travel with them
+  (`prologd2.png`, `csu.png`) — without them the shipped sources do not compile.
+* `doc/builtins.json` is mandatory: without it the `F1` reference and the completion
+  summaries work but stay silent (the window tolerates a missing file on purpose).
+* `examples/` — lessons, typical tasks, `lib/`; **`lessons/_old/` is not shipped**
+  (user decision: that is porting material, not a lesson).
+* The read-me `ЧИТАЙ_МЕНЯ.txt`: how to start the window and the interpreter, where
+  `gui.ini` lives, that the window finds `prologd.exe` beside itself, that the lessons
+  open from `examples`, and that **Windows 10 (1903) or newer, 64-bit** is required —
+  and why (§9).
 
-## §6. Скрипт сборки
+## §6. The build script
 
-`tools/build_portable.ps1` (рядом с `check_dependencies.py` и `bench_engine.py`), шаги:
-собрать Release → `ctest` → `docs` → проверить, что PDF на месте → PyInstaller →
-разложить поставку → скопировать `prologd.exe`, три DLL, `examples`, `doc` (PDF и
-`.typ`) и памятку → прочитать версию (`prologd.exe --version`) и назвать папку
-`prologd-<версия>-win64` (для 2.0.0 это `prologd-2.0.0-win64`) → прогнать проверки
-§7, которые можно автоматизировать → упаковать папку в `prologd-2.0.0-win64.zip`
-(zip — решение пользователя, он нужен).
+`tools/build_portable.ps1` (next to `check_dependencies.py` and `bench_engine.py`),
+steps: Release build → `ctest` → `docs` → check that the PDFs are there → PyInstaller →
+lay out the package → copy `prologd.exe`, the three DLLs, `examples`, `doc` (PDFs and
+`.typ`) and the read-me → read the version (`prologd.exe --version`) and name the
+folder `prologd-<version>-win64` (for 2.0.0 that is `prologd-2.0.0-win64`) → run the
+automatable checks of §7 → zip the folder into `prologd-2.0.0-win64.zip` (the zip is a
+user decision, it is wanted).
 
-**Готово (2026-10-03).**  Скрипт написан и прогнан целиком; параметры — `-Configuration`,
-`-CrtDirectory` (по умолчанию — самый новый `Microsoft.VC*.CRT` под Visual Studio),
-`-Version`, а также `-SkipTests`, `-SkipFreeze`, `-NoTrim`, `-NoZip` для короткого
-круга.  Что он проверяет сам (§7): интерпретатор отвечает `--version` и даёт 122
-строки ключевых слов, урок 1 и `import_demo.pld` с `-I examples\lib` заканчиваются
-нулём, `check_dependencies.py` не находит подозрительных импортов, окно запускается
-(в `QT_QPA_PLATFORM=offscreen`, чтобы не мигало на рабочем столе) и пишет `gui.ini`
-рядом с собой — этот файл скрипт потом удаляет, поставка едет без него.
+**Done (2026-10-03).**  The script is written and ran end to end; its parameters are
+`-Configuration`, `-CrtDirectory` (by default the newest `Microsoft.VC*.CRT` under
+Visual Studio), `-Version`, plus `-SkipTests`, `-SkipFreeze`, `-NoTrim`, `-NoZip` for a
+short round.  What it checks itself (§7): the interpreter answers `--version` and lists
+122 keyword lines, lesson 1 and `import_demo.pld` with `-I examples\lib` end with exit
+code 0, `check_dependencies.py` finds no suspicious imports, and the window starts
+(with `QT_QPA_PLATFORM=offscreen`, so nothing flashes on the desktop) and writes
+`gui.ini` beside itself — the script then deletes that file, so the package travels
+without it.
 
-**Вычет — не только `--exclude-module`.**  Модульные исключения убирают только
-каталог `qml/` (1.7 МиБ), а DLL уходят вместе с `PySide6` целиком: замерено — `Qt6Qml`,
-`Qt6QmlModels`, `Qt6QmlMeta`, `Qt6QmlWorkerScript`, `Qt6Quick`, `Qt6Pdf`,
-`Qt6VirtualKeyboard`, `Qt6Network` остались на месте.  Поэтому скрипт снимает их (и три
-бесполезных без них плагина — `qtvirtualkeyboardplugin.dll`, `imageformats\qpdf.dll`,
-`generic\qtuiotouchplugin.dll`) **по именам из разложенной поставки**, а вычет
-оценивают два независимых арбитра: `check_dependencies.py` (первый прогон без этого
-шага дал ровно два SUSPECTS — `qpdf.dll` и `qtuiotouchplugin.dll`, ровно те, что
-удалены) и offscreen-запуск окна.  Всего уходит **19.2 МиБ**.
+**The trim, and why `--exclude-module` is not enough.**  The PySide6 hook puts every Qt
+module into the build, and a QWidget window never loads some of them.  A standard
+exclusion (`--exclude-module`) only removes the `qml/` directory (1.7 MiB) and QML/Quick
+(12.5 MiB in 5 files), `Qt6Pdf` (4.4 MiB), `Qt6VirtualKeyboard` and `Qt6Network` with TLS
+(`libcrypto-3.dll`, 5.0 MiB) — about **27 MiB of 110** — while the DLLs themselves stay:
+measured, `Qt6Qml`, `Qt6QmlModels`, `Qt6QmlMeta`, `Qt6QmlWorkerScript`, `Qt6Quick`,
+`Qt6Pdf`, `Qt6VirtualKeyboard` and `Qt6Network` all remained.  So the script removes them
+(and the three plugins that are useless without them — `qtvirtualkeyboardplugin.dll`,
+`imageformats\qpdf.dll`, `generic\qtuiotouchplugin.dll`) **by name from the laid-out
+package**: **19.2 MiB** in total.  Two independent judges assess the trim:
+`check_dependencies.py` (its first run without this step reported exactly two SUSPECTS —
+`qpdf.dll` and `qtuiotouchplugin.dll`, exactly the ones removed) and the offscreen start
+of the window, where an excess trim shows up as "SUSPECTS" (`Qt6Gui` or `qwindows.dll`
+referring to a dropped file).  `opengl32sw.dll` (19.7 MiB) stays on purpose: it is the
+software OpenGL fallback for a machine without a working driver — a school computer, a
+virtual machine or RDP.
 
-**Две грабли для тех, кто будет править скрипт.**  Первая: `Get-ChildItem` с
-подстановочным знаком внутри пути возвращает совпадения этого пути, а не содержимое
-каталога, который он называет; и `-Filter 'Microsoft.VC*.CRT'` (маска Win32) не нашёл
-ничего там, где `Where-Object { $_.Name -like … }` нашёл.  Вторая, коварная: переменная
-цикла, названная как типизированный параметр скрипта, приводится к его типу —
-`foreach ($version in …)` при `[string]$Version` превращал `DirectoryInfo` в строку, и
-`$version.FullName` был пуст; ошибка при этом указывала на чужую строку
-(«Cannot bind argument to parameter 'Path'»).  Переменная называется `$redistVersion`,
-а в шапке стоит `trap`, печатающий файл и номер строки.
+**Two traps for whoever edits the script.**  First: `Get-ChildItem` with a wildcard
+inside the path returns matches of that path, not the contents of the directory it
+names; and `-Filter 'Microsoft.VC*.CRT'` (a Win32 mask) found nothing where
+`Where-Object { $_.Name -like … }` did.  The second one is nastier: a loop variable
+named like a typed script parameter is coerced to that type — `foreach ($version in …)`
+with `[string]$Version` turned a `DirectoryInfo` into a string, so `$version.FullName`
+was empty, and the error pointed at a different line ("Cannot bind argument to parameter
+'Path'").  The variable is now `$redistVersion`, and the header has a `trap` that prints
+the file and the line number.
 
-**Проверено руками (то, что скрипт и должен делать).**  Порядок: PyInstaller →
-копия `prologd.exe`, трёх DLL из `…\VC\Redist\MSVC\14.51.36231\x64\Microsoft.VC145.CRT\`,
-пяти PDF с их `.typ` и `doc/builtins.json`, `examples` без `lessons/_old`,
-`tools/portable-readme.txt` → `ЧИТАЙ_МЕНЯ.txt`, имя папки — из `prologd.exe --version`.
-Заметки на будущее: PDF копировать **по именам**, а не «всё, что `.pdf`» — в дереве
-лежал мусорный `doc/style.pdf` от старой цели (удалён), и он заехал в первую сборку;
-памятка и скрипт проверки зависимостей пишутся один раз (`tools/`), а не генерируются
-скриптом.
+**Checked by hand (what the script is supposed to do).**  Order: PyInstaller → a copy of
+`prologd.exe`, three DLLs from `…\VC\Redist\MSVC\14.51.36231\x64\Microsoft.VC145.CRT\`,
+five PDFs with their `.typ` and `doc/builtins.json`, `examples` without `lessons/_old`,
+`tools/portable-readme.txt` → `ЧИТАЙ_МЕНЯ.txt`, the folder name from
+`prologd.exe --version`.  Notes for the future: copy the PDFs **by name**, not "all
+`.pdf`" — a stray `doc/style.pdf` from an old target was in the tree (now deleted) and
+rode into the first build; the read-me and the dependency checker are written once (in
+`tools/`), not generated by the script.
 
-**Первый запуск на новом месте (измерено 2026-10-03).**  Пользователь заметил, что
-первый запуск занимает около пяти секунд, а следующие быстрее.  Замерено здесь: в уже
-использованной папке окно готово через **0.16–0.19 с**, в свежескопированной первый
-запуск — **0.43 с**, дальше 0.17 с.  То есть эффект тот же, только диск здесь быстрый:
-первый запуск *новой копии* читает все 296 файлов (110 МиБ) с диска, и антивирус
-(Windows Defender) проверяет каждый `.exe`/`.dll`/`.pyd` по одному разу; второй запуск
-берёт всё из кэша ОС, а результаты проверки помнит.  С флешки или из папки, которую
-только что скопировал Sandbox, чтение в десятки раз медленнее — это и есть те секунды.
-Наши собственные дела при первом запуске измерены и ничтожны: `prologd --list-keywords`
-— 0.00–0.01 с (один дочерний процесс при старте), запись `gui.ini` (таблица вставок,
-десяток КБ).  И `--onedir` ничего не распаковывает: `--onefile` распаковывал бы 110 МиБ
-в `%TEMP%` при **каждом** запуске.
+**The first start in a new place (measured 2026-10-03).**  The user noticed that the
+first start takes about five seconds and later ones are faster.  Measured here: in an
+already used folder the window is ready in **0.16–0.19 s**, in a freshly copied one the
+first start takes **0.43 s**, then 0.17 s.  The effect is the same, only the disk here is
+fast: the first start of a *new copy* reads every file (296 files, 110 MiB at the time of
+the measurement; the package is now 282 files, 95.5 MiB) from the disk, and antivirus
+(Windows Defender) inspects every `.exe`/`.dll`/`.pyd` once; the second start takes
+everything from the OS cache and remembers the verdict.  From a memory stick, or from a
+folder the Sandbox has just copied, reading is tens of times slower — those are the
+seconds.  Our own work on the first start is measured and negligible:
+`prologd --list-keywords` 0.00–0.01 s (one child process at start), writing `gui.ini`
+(the paste table, a few dozen KB).  And `--onedir` unpacks nothing: `--onefile` would
+unpack 110 MiB into `%TEMP%` on **every** start.
 
-**Что можно сократить (§6).**  Хук PySide6 кладёт в сборку все модули Qt, а QWidget-окно
-часть из них не загружает никогда.  Штатным вычетом (`--exclude-module`) уходят QML/Quick
-(12.5 МиБ в 5 файлах), `Qt6Pdf` (4.4 МиБ), `Qt6VirtualKeyboard` и `Qt6Network` с TLS
-(`libcrypto-3.dll` 5.0 МиБ) — всего около **27 МиБ из 110**.  `opengl32sw.dll` (19.7 МиБ)
-остаётся сознательно: это запасной программный OpenGL для машины без работоспособного
-драйвера — то есть Школьного компьютера, виртуальной машины или RDP.  Вычет делается
-вместе со скриптом, и проверяется он `tools/check_dependencies.py`: лишний вычет сразу
-виден как «SUSPECTS» (Qt6Gui или qwindows.dll ссылаются на выброшенный файл).
+## §7. Checks (the heart of the task)
 
-## §7. Проверка (главное в задаче)
+1. **Copy elsewhere.**  Put the folder in `%TEMP%\prologd-portable` and start it there:
+   the window must find `prologd.exe` beside itself, find nothing in the source tree,
+   and work (open lesson 1, `F5`, click a marker, `drawing.pld` and the graphics
+   window, "About", `Shift+F1` — a PDF **from the package**, `F1` on a built-in name —
+   the entry from the package's `doc/builtins.json`).
+2. **The interpreter alone.**  From `cmd.exe` (not PowerShell — it encodes pipes as
+   ASCII): `prologd.exe --version` → `2.0.0`; `--list-keywords` → 110 names;
+   `prologd.exe -s examples\lessons\lesson_01.pld` — the output matches the lesson's
+   `%!` lines; `prologd.exe -I examples\lib -s examples\import_demo.pld` → `Дважды=42`.
+3. **Dependencies, statically.**  Parse the import table of `prologd.exe` with a Python
+   script and check that every name is either a system name (`api-ms-win-*`,
+   `KERNEL32`, …) or a file of the package.  The same for `prologd-gui.exe` in
+   `_internal`.
+4. **Nothing from the tree.**  Search the package files for strings with this
+   repository's path (`C:\Users\...\prologd2`) — there must be none; if they turn up
+   inside Qt or Python `.pyc` files, explain where exactly and why it is not a path to
+   our data.
+5. **A machine without tools.**  Windows Sandbox (if the edition allows) or a virtual
+   machine: copy the folder, start the window, run lessons 1 and 11; also record the
+   version of the checking system — it must be Windows 10 1903 or newer, otherwise the
+   check says nothing about the systems we support (§9).  **On the developer machine
+   this check does not exist** — the Visual C++ DLLs are in `System32`, and Qt/Python
+   sit next to the sources too.
+   **Confirmed by the user on 2026-10-03:** a clean Windows 11 in Windows Sandbox,
+   build 24H2 26100.9457 — "it started and works"; and **Windows 10 22H2**, build
+   19045.6456 — "it started and worked".  Those are exactly the two systems §9 limits
+   us to (19045 ≥ 1903, so the UTF-8 manifest is understood).
+6. **The sources are not broken.**  The usual checks on the tree: `ctest` 307/307, the
+   23 `.py` suites of `src/gui/tests` plus `protocol_smoke.py`, and `docs` (`typst`
+   exits 0).
 
-1. **Копия в другое место.** Папку — в `%TEMP%\prologd-portable` и запустить оттуда:
-   окно должно найти `prologd.exe` рядом, не найти ничего в дереве исходников и
-   работать (открыть урок 1, `F5`, клик по маркеру, `drawing.pld` и окно графики,
-   «О программе», `Shift+F1` — открывается PDF **из поставки**, `F1` на имени
-   встроенного предиката показывает запись из `doc/builtins.json` поставки).
-2. **Интерпретатор сам.** Из `cmd.exe` (не PowerShell — тот кодирует каналы в ASCII):
-   `prologd.exe --version` → `2.0.0`; `--list-keywords` → 110 имён;
-   `prologd.exe -s examples\lessons\lesson_01.pld` — вывод совпадает со строками
-   `%!` урока; `prologd.exe -I examples\lib -s examples\import_demo.pld` → `Дважды=42`.
-3. **Зависимости — статически.** Разобрать таблицу импорта `prologd.exe` скриптом на
-   Python и сверить: каждое имя либо системное (`api-ms-win-*`, `KERNEL32`, …), либо
-   лежит в поставке. То же — для `prologd-gui.exe` в `_internal`.
-4. **Ничего из дерева.** Поиск в файлах поставки строк с путём этого репозитория
-   (`C:\Users\...\prologd2`) — их быть не должно; если найдутся внутри `.pyc` Qt или
-   Python, объяснить, где именно и почему это не путь к нашим данным.
-5. **Машина без инструментов.** Windows Sandbox (если редакция позволяет) или
-   виртуальная машина: скопировать папку, запустить окно, прогнать уроки 1 и 11;
-   заодно записать версию системы проверяющего — она должна быть не ниже
-   Windows 10 1903, иначе проверка ничего не говорит о поддерживаемых системах (§9).
-   **На машине разработчика этой проверки нет** — DLL Visual C++ лежат в `System32`,
-   и Qt/Python рядом с исходниками тоже есть.
-   **Проверено пользователем 2026-10-03:** чистая Windows 11 в Windows Sandbox,
-   сборка 24H2 26100.9457 — «запустилась и работает»; и **Windows 10 22H2**, сборка
-   19045.6456 — «запустилась и работала».  Это ровно те две системы, которыми
-   ограничивает §9 (19045 ≥ 1903, то есть манифест UTF-8 понимают).
-6. **Исходники не сломаны.** Прежние проверки на дереве: `ctest` 307/307, 22 набора
-   `src/gui/tests/*.py` и `protocol_smoke.py`, `docs` (`typst=0`).
+**What is already checked (2026-10-03).**  §7.2 — `prologd.exe --version` = `2.0.0`,
+`--list-keywords` = 122 `name/arity` lines (110 distinct names), lesson 1's output
+matches its `%!` lines (16 of 16).  §7.3 — `tools/check_dependencies.py`: "every
+non-system import is a file of the package", no suspects.  §7.1 — the window started
+from the built folder finds `prologd.exe` beside itself and creates `gui.ini` beside
+itself; it adds **nothing of its own** to the import search list (2026-10-03, §4),
+while `examples/lib` is in the package for lesson 11; without `prologd.exe` beside it
+it does not exit silently but shows an explanatory window (that was added to `main.py`
+during the checks: in a `--windowed` build there is nowhere to print).  Remaining: the
+clicks (`F5`, a marker, `F1`, `Shift+F1`) — a human does those — and the clean machine
+(§7.5), also a human.  The zip is no longer pending: the script makes it (§6), and the
+last run produced `dist\prologd-2.0.0-win64.zip`, 37.7 MiB.
 
-**Что уже проверено (2026-10-03).**  §7.2 — `prologd.exe --version` = `2.0.0`,
-`--list-keywords` = 122 строки `имя/арность` (110 различных имён), вывод урока 1
-совпадает со строками `%!` (16 из 16).  §7.3 — `tools/check_dependencies.py`:
-«every non-system import is a file of the package», подозрительных нет.  §7.1 — окно
-из собранной папки запускается, находит `prologd.exe` рядом и создаёт `gui.ini` рядом
-с собой; в список поиска ИМПОРТ оно **не добавляет ничего своего** (2026-10-03, см.
-§4), а `examples/lib` лежит в поставке для урока 11; без
-`prologd.exe` рядом оно не выходит молча, а показывает окно с объяснением (это
-добавилось в `main.py` уже при проверке: в `--windowed` сборке печатать некуда).
-Осталось: клики (`F5`, маркер, `F1`, `Shift+F1`) — это делает человек, чистая машина
-(§7.5) — тоже.  Zip больше не «осталось»: его делает скрипт (§6), последний прогон
-дал `dist\prologd-2.0.0-win64.zip`, 37.5 МиБ.
+## §8. User decisions (2026-10-03)
 
-## §8. Решения пользователя (2026-10-03)
+1. **`--onedir`**, PyInstaller (§3) — a folder, not a single file.
+2. **The Visual C++ DLLs are shipped beside** the exe (§2); a static CRT is a possible
+   improvement after the first package.
+3. **`examples/lessons/_old/` is not shipped**, `examples/lib` is (§5).
+4. **`doc/*.typ` is shipped** beside the PDFs (§5).
+5. **`gui.ini` in the portable build sits beside the exe** (§4); other builds keep
+   `%LOCALAPPDATA%\PrologD\gui\gui.ini` as before.
+6. **The window adds nothing of its own to the import search path** (§4).  First the
+   decision was that `examples/lib` from the package is available at once — by writing
+   it into the settings, then by substituting it on every start; on 2026-10-03 that was
+   reverted: lesson 11 asks for the directory to be added by hand, which is clearer for
+   a student.
+7. **The folder is `prologd-2.0.0-win64`, and the zip is wanted** (§6).
+8. **The installer is the next task**, not this one; it is then that we decide how it
+   lives with `gui.ini` beside the exe.
 
-1. **`--onedir`**, PyInstaller (§3) — папка, не один файл.
-2. **DLL Visual C++ кладём рядом** с exe (§2); статический CRT — возможное
-   улучшение после первой поставки.
-3. **`examples/lessons/_old/` не кладём**, `examples/lib` кладём (§5).
-4. **`doc/*.typ` кладём** рядом с PDF (§5).
-5. **`gui.ini` в переносной сборке — рядом с exe** (§4); в других сборках остаётся
-   `%LOCALAPPDATA%\PrologD\gui\gui.ini`, как сейчас.
-6. **В список поиска ИМПОРТ окно не подставляет ничего** (§4).  Сначала решили, что
-   `examples/lib` из сборки доступен сразу — записью в настройку, потом подстановкой
-   при каждом запуске; 2026-10-03 решение отменено: урок 11 просит добавить каталог
-   руками, это прозрачнее для ученика.
-7. **Папка `prologd-2.0.0-win64`, zip нужен** (§6).
-8. **Инсталлятор — следующая задача**, в эту не входит; тогда же решается, как он
-   уживается с `gui.ini` рядом с exe.
+## §9. The oldest Windows we support
 
-## §9. Минимальная Windows
+**Windows 10 (1903) or newer, 64-bit.**  The reason is the window and the process, not
+the interpreter:
 
-**Windows 10 (1903) или новее, 64 bit.**  Причина — окно и сам процесс, а не
-интерпретатор:
+* **Qt 6** supports Windows only from Windows 10 1809: the Qt "Supported Platforms"
+  table says "Windows 10 (1809 or later)", and Windows 7 and 8.1 are not in Qt 6 at
+  all.  The package's window is PySide6 6.11.2;
+* **Python** inside the frozen build is 3.14, and CPython follows Microsoft's
+  deadlines: a new version supports the systems whose extended support has not expired
+  (PEP 11), and Windows 7 left it on 2020-01-14 while Windows 8.1 left on 2023-01-10.
+  So Python 3.14 does not work on Windows 7 and cannot be frozen there;
+* the **UTF-8 manifest** of `prologd.exe` — `<activeCodePage>UTF-8</activeCodePage>` —
+  is understood from Windows 10 1903 (ADR-013).  On older systems the exe starts but
+  the manifest is ignored: Cyrillic in the command line (`argv`) goes through the ANSI
+  code page again — exactly what the manifest prevents.  This is the strictest of the
+  three boundaries, hence 1903 in the read-me.
 
-* **Qt 6** поддерживает Windows только с Windows 10 1809: в документации Qt
-  (Supported Platforms) строка «Windows 10 (1809 or later)», а Windows 7 и 8.1 в
-  Qt 6 нет вовсе.  Окно поставки — это PySide6 6.11.2;
-* **Python** внутри замороженной сборки — 3.14, а CPython идёт за сроками Microsoft:
-  новая версия поддерживает системы, у которых не истёк срок расширенной поддержки
-  (PEP 11), а Windows 7 вне её с 2020-01-14, Windows 8.1 — с 2023-01-10.  Значит
-  Python 3.14 на Windows 7 не работает и заморозить его туда нельзя;
-* **манифест UTF-8** самого `prologd.exe` — `<activeCodePage>UTF-8</activeCodePage>`,
-  а этот элемент понимают с Windows 10 1903 (ADR-013).  На более старых системах exe
-  запустится, но манифест будет проигнорирован: кириллица в командной строке
-  (`argv`) снова пойдёт через ANSI-кодировку — ровно от этого манифест и спасает.
-  Это самая строгая из трёх границ, поэтому в памятке — 1903.
+**The interpreter alone would need less.**  It needs only the UCRT, and the UCRT is
+part of Windows 10 (see the facts: `ucrtbase.dll`, while `api-ms-win-crt-*` names are
+resolved by the loader).  On Windows 7 the UCRT has to be installed separately
+(KB2999226 or the Visual C++ redistributable), and that is a separate story we have not
+tested.
 
-**Сам интерпретатор без окна требовал бы меньше.**  Ему нужен только UCRT, а UCRT —
-часть системы с Windows 10 (см. факты: `ucrtbase.dll`, а имена `api-ms-win-crt-*`
-разрешает загрузчик).  На Windows 7 UCRT надо ставить отдельно (KB2999226 или
-распространяемый пакет Visual C++), и это отдельная, не проверяемая нами история.
+**Consequences for the package:**
 
-**Следствия для поставки:**
+* the read-me says "Windows 10 (1903) or newer, 64-bit" and gives the reason in one
+  line (Qt 6, Python 3.14 and our UTF-8 manifest);
+* the three DLLs beside `prologd.exe` are sufficient on Windows 10+, because the UCRT
+  is already in the system; §7.3 is what confirms it;
+* Windows 7 is deliberately unsupported: out of support since 2020, nothing to test
+  on, and the window would not start there anyway.
 
-* в `ЧИТАЙ_МЕНЯ.txt` пишем «Windows 10 (1903) или новее, 64 bit» и одной строкой
-  почему (Qt 6, Python 3.14 и наш манифест UTF-8);
-* три DLL рядом с `prologd.exe` — достаточное условие для Windows 10+, потому что
-  UCRT там уже в системе; проверка §7.3 это и должна подтвердить;
-* Windows 7 не поддерживаем сознательно: система вне поддержки с 2020 года,
-  проверить не на чем, а окно там не запустится в любом случае.
-
-**На будущее:** Qt 6.12 — последняя ветка с поддержкой Windows 10 (примечание в
-той же таблице Qt).  В поставке зафиксирован PySide6 6.11.2, поэтому на Windows 10
-переносная версия будет работать и дальше; терять её мы начнём только при переходе
-на Qt 6.13+.
+**For the future:** Qt 6.12 is the last branch that supports Windows 10 (a note in the
+same Qt table).  The package pins PySide6 6.11.2, so on Windows 10 the portable build
+keeps working; we would only lose it by moving to Qt 6.13+.
 
 ## Definition of done
 
-* `tools/build_portable.ps1` собирает папку одной командой на этой машине, и повторный
-  запуск даёт то же содержимое (без остатков прошлой сборки).
-* Папка, скопированная в другое место, запускается и проходит пункты 1–2 §7.
-* Пункты 3–4 §7 — статические, поэтому их видно и без чистой машины; пункт 5 отмечен
-  как непроверенный здесь и проверен там, где получится.
-* Правки §4 покрыты проверками, 22 набора GUI и `ctest` зелёные.
-* Решения §8 и §9 записаны ADR-024 (PyInstaller `--onedir`; DLL Visual C++ рядом с
-  exe; `gui.ini` рядом с exe в замороженной сборке; минимальная система —
-  Windows 10 1903), поставка описана в `src/gui/README.md` (раздел «Running» — как
-  собрать переносимую версию).
-* В папке нет `lessons/_old` и нет ничего лишнего; `prologd-2.0.0-win64.zip` лежит
-  рядом и распаковывается в ту же папку.
+* `tools/build_portable.ps1` builds the folder with one command on this machine, and a
+  second run produces the same contents (no leftovers of the previous build).
+* The folder copied elsewhere starts and passes §7.1–§7.2.
+* §7.3–§7.4 are static, so they are visible without a clean machine; §7.5 is marked as
+  not testable here and was tested where it could be.
+* The changes of §4 are covered by tests; the 23 GUI suites and `ctest` are green.
+* The decisions of §8 and §9 are recorded in ADR-024 (PyInstaller `--onedir`; the
+  Visual C++ DLLs beside the exe; `gui.ini` beside the exe in a frozen build; the
+  oldest system is Windows 10 1903), and the package is described in
+  `src/gui/README.md` (the "Running" section — how to build the portable version).
+* The folder has no `lessons/_old` and nothing superfluous;
+  `prologd-2.0.0-win64.zip` lies next to it and unpacks into the same folder.

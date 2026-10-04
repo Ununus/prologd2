@@ -13,9 +13,9 @@ reference would grow a second copy of every entry.
 ## Goal
 
 Answer «what does `КОПИЯ` do?» in the window where the question is asked.  The
-user's own words: «на память бывает трудно вспомнить что делает та или иная
-функция (пр. `КОПИЯ`), а специально открывать отдельный файл для быстрой справки
-— трудозатратно».  Today the GUI can open a built PDF (`window.py`'s
+user's own words: "it is hard to recall from memory what a given function does
+(e.g. `КОПИЯ`), and opening a separate file just for a quick reference is a lot of
+work".  Today the GUI can open a built PDF (`window.py`'s
 `_open_document`), which is the "open a separate file" the user is complaining
 about: the reader loses the caret, the page and the window.
 

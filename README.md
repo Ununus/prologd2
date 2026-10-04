@@ -6,8 +6,10 @@ arbitrary precision integers and the `НАЙТИВСЕ/3` (`findall`) predicate.
 
 The original PrologD sources (CP1251, C++/Qt) are not bundled with this
 repository; the previous implementation is published at
-<https://github.com/Ununus/prologd>. Planning, task breakdown and architecture
-notes live in `ai/`; user and technical documentation is in `doc/`.
+<https://github.com/Ununus/prologd>. The working folder of the AI agent that
+built this rewrite — plan, task breakdown, architecture decisions and the
+development journal, in English — is `ai/`; it is developer material, not user
+documentation. User and technical documentation is in `doc/` (Russian, Typst).
 
 ## Quick start
 

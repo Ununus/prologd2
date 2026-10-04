@@ -1,10 +1,10 @@
 # Status tracker
 
-Last updated: after task_60 (a question is asked only when there is someone to ask — the
-margin marker waits for `loaded`) and the two documentation rounds that followed, parts
-69--70: the five Typst documents shortened and their title dropped towards the middle of
-the page, the window's first program rewritten, the lessons' variables named by role, and
-the window taught before the console in lessons 7, 10 and 11.
+Last updated: after the portable-build task (task_61) and the documentation rounds that
+followed — parts 77--80: the two emblems on the first page of every document, `technical.typ`
+checked against the C++ sources (nine more listings, the grammar brought in line with
+`parser.cpp`), the "привычный/обычный Prolog" wording replaced by ISO Prolog, and the whole
+`ai/` folder translated into English.
 
 ## Overall
 
@@ -216,8 +216,8 @@ Added on 2026-10-03 while planning task_59:
   margin marker or the goal line), text output unchanged.  Variant B — a `bindings` field
   in the `result` event, the only way to tabulate a whole run — is recorded in
   `doc/gui.typ` §10 rather than built now;
-* the user's report «есть проблема в запуске файлов, у которых много вопросов и которые
-  что-то выводят» is **not a defect**: it is exactly why the whole run cannot be
+* the user's report «there is a problem with running files that have many questions and
+  that produce some output» is **not a defect**: it is exactly why the whole run cannot be
   tabulated — the answers of several questions arrive as one stream of text with no
   separator.  A single goal is tabulated exactly instead.
 ## Session log
@@ -610,8 +610,8 @@ Added on 2026-10-03 while planning task_59:
   is recorded in the task file as a deliberate deviation rather than quietly
   half-implemented.
 * Coverage round, part 22: **task_34 — every branch of every built-in**, the round
-  the user asked for after the stepping work ("проверим что все ветки предикатов
-  работают корректно").  The method was the point: drive the built `prologd.exe`
+  the user asked for after the stepping work ("let us check that all branches of the
+  predicates work correctly").  The method was the point: drive the built `prologd.exe`
   over each predicate's arguments — bound, free, wrong type, out of range, and the
   empty list / empty string / end-of-input — write the expectations from what came
   back, and only then decide whether a surprising answer is a defect or the port's
@@ -671,7 +671,7 @@ Added on 2026-10-03 while planning task_59:
   functions, the exact number comparison and cyclic terms, the prompt, the code
   point range, the string range rules, the type-test truth table, the database
   clamps and the graphics argument rule.
-* Question-answering round, part 23: **«где расхождение» в `КОПИЯ`**, from the
+* Question-answering round, part 23: **«where the discrepancy is» in `КОПИЯ`**, from the
   user's own lesson program.  The old interpreter answered `?сколько(идиотизм,"и",Q)`
   with `Q=3`; the port answers `Q=1`.  The difference is one branch: `КОПИЯ(с,П,Р,с4)`
   with **both position and length free**.  The program takes the prefix *before* the
@@ -942,7 +942,7 @@ Added on 2026-10-03 while planning task_59:
   went: `Engine::initialize()` loads nothing, `?СКОЛЬКО(НЕ, А)` answers 0, and
   ADR-018 records why the seven clauses could never be selected.  229 ctest tests
   (5 new), 216 Catch2 cases / 3 304 assertions.
-* GUI round, part 28: **task_36 — вопросы на полях**.  In the margin left of the
+* GUI round, part 28: **task_36 — questions in the margin**.  In the margin left of the
   line numbers every question now carries a blue triangle, and a click answers
   exactly that statement: the program is loaded *quietly* (`"questions": false`
   on `load`, protocol 5) so the pane holds the one answer and not the whole
@@ -964,7 +964,7 @@ Added on 2026-10-03 while planning task_59:
   (`#b45309`, contrast 5.02 — the tightest colour in the palette, still above
   the 4.5 threshold).  No lesson file was edited; 231/231 ctest, the 16 headless
   GUI scripts, all six Typst documents.
-* GUI round, part 29: **task_37 — справка по предикату в окне**.  The built-in
+* GUI round, part 29: **task_37 — the predicate reference inside the window**.  The built-in
   reference now has one source of data: `doc/builtins.json`, 59 records covering
   all 108 reserved names (the Russian name, its English spellings, kind, arities,
   the variadic flag, group, the `help.typ` section, a one-line summary and the
@@ -1206,1257 +1206,1386 @@ Added on 2026-10-03 while planning task_59:
   default.  Qt-free record helpers in `documents.py` (round trip, budget, junk
   lines) and a window check that closes one window over three tabs and opens the
   next one over the same settings file; 251/251 ctest, 20 GUI scripts, five PDFs.
-* GUI round, part 37 (follow-up after the first hands-on look): **«Не сохранять»
-  на «Без имени» больше не воскрешает текст**. Первый вариант писал список
-  вкладок *до* вопросов о несохранённом, и отброшенный черновик возвращался на
-  следующем запуске — ответ «не сохранять» превращался в неправду. Теперь список
-  берётся до вопросов (объекты буферов, а не копии), а записывается только после
-  успешного `close_all()`, и буферы, получившие ответ «Не сохранять», из него
-  выбрасываются. Попутно исправилось и обратное: буфер, сохранённый в файл при
-  закрытии окна, запоминается как этот файл, а не как «Без имени» с текстом.
-* GUI round, part 38: **четыре переключателя, которые оставались** — «малочи» из
-  списка task_29, и каждый из них переключатель над уже существующим поведением:
+* GUI round, part 37 (follow-up after the first hands-on look): **"Не сохранять" on
+  an untitled buffer no longer resurrects its text**.  The first version wrote the tab
+  list *before* asking about unsaved work, so a discarded draft came back on the next
+  start — the answer "do not save" turned into a lie.  The list is now taken before the
+  questions (buffer objects, not copies) and written only after a successful
+  `close_all()`, and buffers answered with "Не сохранять" are dropped from it.  The
+  reverse case was fixed along the way: a buffer saved into a file while the window
+  closes is remembered as that file, not as «Без имени» with its text.
+* GUI round, part 38: **the four switches that were left over** — the "small things"
+  from the task_29 list, each a switch over behaviour that already existed:
   «Автоотступ» (`editor/auto_indent`), «Следить за выводом» (`view/follow_output`),
-  «Спрашивать ввод» (`view/input_mode`: «в панели» / «в диалоге») и «Выводить
-  вопросы при запуске» (`execution/run_questions` — он же флаг `questions` у
-  `load`, протокол 5).  Ничего больше не поменяло форму: `Enter` либо продолжает
-  отступ строки, либо начинает строку с края (единица отступа остаётся за `Tab`);
-  панель вывода либо держит конец в виду, либо стоит на месте (она и раньше
-  переставала следовать, когда читатель прокручивал вверх, — переключатель про
-  другое: «не уводите взгляд»); вопрос программы отвечают либо в консоли под
-  выводом, либо в окне, независимо от того, что на экране; прогон либо отвечает на
-  свои `?`-строки, либо грузится одними правилами — у `run_program` аргумент
-  `questions` теперь по умолчанию берётся из настроек, а нажатие на маркер в полях
-  по-прежнему спрашивает ровно свой вопрос явным `questions=False`.  В диалоге
-  стало 32 строки (было 28), в файле 42 ключа.  Проверки: по одной на каждый
-  переключатель (`test_editor.py`, `test_output.py`, `test_window.py`) и значения
-  по умолчанию в `test_settings.py`.  251/251 ctest, 20 headless-скриптов GUI,
-  пять PDF.
-* GUI round, part 39: **тёмная тема**.  Пункт «Вид → Оформление» стал подменю из
-  трёх записей (светлое, тёмное, как в системе): одним переключателем три темы не
-  сказать, а заголовок «Системная тема (иначе светлая)» стал бы неправдой.
-  Тёмная тема — это не инверсия светлой, а **своя палитра**: одна запись
-  `theme.Palette` на тему (страница, подсветка из 15 цветов, полосы ошибки и шага,
-  находки поиска, текущая строка, полоса номеров, маркер вопроса, цвета вывода),
-  `appearance.qt_palette` переводит её в палитру виджетов, а редактор, буферы и
-  панель вывода читают цвета из неё же.  Контраст 4.5 (WCAG AA) проверяется теперь
-  не для одной светлой палитры, а по списку `Palette.readable_pairs` — для обеих и
-  против той страницы, на которой цвет действительно рисуется; светлая при этом
-  держит 4.5 везде, а проверка сразу нашла одно исключение: цвет трассы был 4.48,
-  он стал на шаг темнее (4.61).  Смена темы видна в редакторе и *в панели вывода*:
-  там запоминается вид каждой строки (`_kinds`), поэтому история перекрашивается,
-  а не остаётся написанной красным светлой темы на тёмной странице.  В параметрах
-  командной строки `--theme light|dark|system`; значение `dark` внесено в выбор
-  строки «Оформление» в диалоге (32 строки, как и было), значок `view-theme`
-  остался в аудите как картинка этого подменю.  251/251 ctest, 20 headless-скриптов
-  GUI, пять PDF.
-* GUI round, part 40: **«использовать системные цвета»** — последний пункт цветовой
-  страницы.  Вариант «как в системе» был половиной темы: палитра виджетов от
-  системы, а цвета подсветки — светлые, и на тёмном рабочем столе это ровно то, от
-  чего тёмная тема и заводилась.  Теперь `system` следует за рабочим столом
-  целиком: `appearance.apply_theme` возвращает палитру *и* стиль платформы, а
-  `appearance.theme_palette("system")` отдаёт светлую или тёмную палитру по
-  `QStyleHints.colorScheme()` (если платформа молчит — по цвету окна, который она
-  дала).  Оба ответа — «какая схема у стола» и «что он поставил» — читаются один
-  раз, при первом `apply_theme`, потому что после нашей палитры они говорят уже о
-  нас: проверка на этом сразу и поймала старый дефект (под `system` печаталась
-  «палитра платформы» #1e1e1e, то есть наша же тёмная).  Стиль запоминается
-  **именем**: установка другого стиля удаляет прежний объект, и вернуть его —
-  `RuntimeError: Internal C++ object already deleted`.  Настройка в диалоге теперь
-  называется «как в системе — системные цвета»; хинт говорит, что «тёмное» — это
-  своя палитра, а «как в системе» берёт цвета рабочего стола.  251/251 ctest,
-  20 headless-скриптов GUI, пять PDF.
-* Planning round, part 41: **два пункта списка task_29, которые не были строкой в
-  диалоге, стали задачами** — `task_45_gui_graphics_window.md` (графика: бэкенд с
-  битмапом внутри движка, события протокола 9 и снимок, холст и своё окно) и
-  `task_46_interpreter_options_and_limits.md` (путь к интерпретатору, рабочий
-  каталог процесса, профили и пределы на программу).  Пока писались, выяснилось,
-  что записанное в task_29 было пессимистично: `maxSteps`, `maxDepth`,
-  `maxNestedDepth` и `maxFindAllSolutions` в движке **уже есть** и выведены в
-  `--max-steps`/`--max-depth`, так что `task_46` — это не новые опции движка, а
-  ключ сессии, таймаут по часам и строки в диалоге; а графике нужен не только
-  интерфейс, но и ответ на `getPixel` посреди встроенного предиката — отсюда решение
-  держать пиксели в движке и посылать примитивы.  Заодно починено старое в
-  `doc/gui.typ`: §9.3 обещал 42 нарисованных значка и 7 недостающих (сейчас 43 и 6,
-  `execution-step-over` нарисован 2026-10-01, `view-theme` — картинка подменю
-  «Оформление»), а §10 всё ещё называл отдельный размер шрифта панели вывода
-  невыполненным — он есть с task_29; в §10 встали графическое окно и профили с
-  ссылками на новые задачи, а в README — точные числа аудита (49/43/6).
-* GUI round, part 42: **task_46, половина про пределы**.  Программа, ушедшая в
-  бесконечный поиск, должна кончаться сама: теперь у запуска есть четыре предела,
-  каждый называет себя, а ноль всюду значит «без предела».  В движке появились
-  именованные значения по умолчанию и `Limits` с `applyTo(EngineOptions&)` — через
-  него идут и флаги, и протокол, так что строка настроек и флаг не могут разойтись;
-  `--max-findall` встал рядом с `--max-steps`/`--max-depth` (и `--max-findall 0`
-  перестал значить «ноль решений» — теперь это «без предела», как у соседей).
-  Протокол **9**: у `load` есть объект `limits`, и он применяется *до* загрузки —
-  программу выполняет та же загрузка, и предел, поставленный после неё, опоздал бы
-  к своему прогону.  Сообщение называет предел, его значение и то, где его поднять:
-  «Превышен предел шагов выполнения: 5000 (--max-steps; «Предел шагов» в настройках
-  окна)», и строка в диалоге носит то же имя.  `НАЙТИВСЕ`, упёршийся в предел, — это
-  *диагностика*, а не тихая обрезка: список покороче, который потом считают ответом,
-  хуже ошибки.  В диалоге четыре строки («Предел шагов», «Предел глубины», «Предел
-  решений НАЙТИВСЕ», «Предел времени, с»), а прогон сам пишет в панель, с какими
-  пределами пошёл.
-  Таймаут решён **по часам окна** (`QTimer` и запрос `interrupt`), а не в движке:
-  `steady_clock::now()` в горячем месте — это плата за каждое решение, и о том, что
-  «слишком долго для урока», знает всё-таки передний край.  Отсюда два проверенных
-  следствия: считающий прогон кончается по сроку (движок и так опрашивает флаг
-  остановки на каждом шаге), а прогон, ждущий `ВВОД`, стоит *вне* решателя, и его
-  обрывает только «Остановить» — так и записано в task_46, а не обещано иначе.
-  Попутно протокол стал честнее: запрос с полем не того типа (`"maxSteps":-1`, или
-  строка вместо числа) раньше молча превращался в огромный предел, а теперь это
-  событие `error` с `kind":"protocol"`, и сессия читает следующую строку — на таком
-  запросе процесс раньше падал.
-  252/252 ctest, 20 headless-скриптов GUI, пять PDF (`gui.pdf` — 27 страниц, §6.3
-  на 19–20; `help.pdf` — 30 страниц, §15 на 24).
-* GUI round, part 42 (follow-up после разбора: **архитектура, умолчания и отмена
-  RU/EN**).  Четыре правки одного вечера.
-  (1) **Интерпретатор ничего не знает о GUI**: сообщения пределов больше не
-  называют ни флаг, ни строку настроек — «Превышена глубина рекурсии: 200»,
+  «Спрашивать ввод» (`view/input_mode`: «в панели» / «в диалоге») and «Выводить
+  вопросы при запуске» (`execution/run_questions` — also the `questions` flag of
+  `load`, protocol 5).  Nothing else changed shape: `Enter` either continues a
+  line's indentation or starts it at the margin (the indent unit stays with `Tab`);
+  the output panel either keeps the end in view or stays put (it already stopped
+  following when the reader scrolled up — the switch is about something else:
+  "don't lead the eye away"); a program's question is answered either in the
+  console below the output or in a window, regardless of what is on screen; a run
+  either answers its own `?` lines or loads with rules alone — `run_program`'s
+  `questions` argument now defaults from the settings, while clicking a marker in
+  the margin still asks exactly its own question with an explicit
+  `questions=False`.  The dialog grew to 32 rows (was 28), the file has 42 keys.
+  Checks: one per switch (`test_editor.py`, `test_output.py`, `test_window.py`)
+  and the defaults in `test_settings.py`.  251/251 ctest, 20 headless GUI scripts,
+  five PDFs.
+* GUI round, part 39: **the dark theme**.  The «Вид → Оформление» item became a
+  submenu of three entries (light, dark, as in the system): three themes cannot be
+  said with one switch, and the title «Системная тема (иначе светлая)» would have
+  become untrue.  The dark theme is not an inversion of the light one but **a
+  palette of its own**: one `theme.Palette` record per theme (page, a highlight of
+  15 colours, error and step bars, search hits, current line, number strip,
+  question marker, output colours), `appearance.qt_palette` turns it into the
+  widget palette, and the editor, the buffers and the output panel read their
+  colours from it too.  The 4.5 contrast (WCAG AA) is now checked not for one
+  light palette but over the list `Palette.readable_pairs` — for both, and against
+  the page the colour is actually painted on; the light one keeps 4.5 everywhere,
+  and the check immediately found one exception: the trace colour was 4.48 and
+  became a step darker (4.61).  The theme change is visible in the editor and *in
+  the output panel*: each line's kind is remembered there (`_kinds`), so the
+  history is repainted instead of staying written in the light theme's red on a
+  dark page.  The command line has `--theme light|dark|system`; the value `dark`
+  was added to the «Оформление» row's choices in the dialog (32 rows, as before),
+  and the `view-theme` icon stayed in the audit as the picture of that submenu.
+  251/251 ctest, 20 headless GUI scripts, five PDFs.
+* GUI round, part 40: **"use the system colours"** — the last item of the colour
+  page.  The "as in the system" option was half a theme: the widget palette came
+  from the system while the highlight colours stayed light, and on a dark desktop
+  that is exactly what the dark theme was introduced for.  Now `system` follows
+  the desktop entirely: `appearance.apply_theme` returns the palette *and* the
+  platform style, and `appearance.theme_palette("system")` yields the light or the
+  dark palette according to `QStyleHints.colorScheme()` (if the platform is
+  silent, by the window colour it gave).  Both answers — "what scheme the desktop
+  has" and "what it set" — are read once, at the first `apply_theme`, because
+  after our palette they speak about us: the check caught the old defect at once
+  (under `system` it printed the "platform palette" #1e1e1e, i.e. our own dark
+  one).  The style is remembered **by name**: installing another style deletes the
+  previous object, and bringing it back gives `RuntimeError: Internal C++ object
+  already deleted`.  The setting in the dialog is now called «как в системе —
+  системные цвета»; the hint says that «тёмное» is a palette of its own while «как
+  в системе» takes the desktop's colours.  251/251 ctest, 20 headless GUI scripts,
+  five PDFs.
+* Planning round, part 41: **two items of the task_29 list that were not a dialog
+  row became tasks** — `task_45_gui_graphics_window.md` (graphics: a bitmap backend
+  inside the engine, protocol 9 events and a snapshot, the canvas and a window of
+  its own) and `task_46_interpreter_options_and_limits.md` (the interpreter path,
+  the process working directory, profiles and per-program limits).  While they were
+  being written it turned out that what task_29 recorded was pessimistic:
+  `maxSteps`, `maxDepth`, `maxNestedDepth` and `maxFindAllSolutions` **already
+  exist** in the engine and are exposed as `--max-steps`/`--max-depth`, so task_46
+  is not new engine options but a session key, a wall-clock timeout and rows in
+  the dialog; and graphics need not only an interface but an answer to `getPixel`
+  in the middle of a built-in predicate — hence the decision to keep the pixels in
+  the engine and send primitives.  An old defect in `doc/gui.typ` was fixed along
+  the way: §9.3 promised 42 drawn icons and 7 missing (now 43 and 6,
+  `execution-step-over` drawn 2026-10-01, `view-theme` the picture of the
+  «Оформление» submenu), while §10 still called the output panel's separate font
+  size undone — it has existed since task_29; §10 gained the graphics window and
+  the profiles with links to the new tasks, and the README the exact audit numbers
+  (49/43/6).
+* GUI round, part 42: **task_46, the limits half**.  A program gone into infinite
+  search must end by itself: a run now has four limits, each names itself, and a
+  zero everywhere means "no limit".  The engine gained named defaults and a
+  `Limits` with `applyTo(EngineOptions&)` — both the flags and the protocol go
+  through it, so the settings row and the flag cannot diverge; `--max-findall`
+  joined `--max-steps`/`--max-depth` (and `--max-findall 0` stopped meaning "zero
+  solutions" — now it is "no limit", like its neighbours).  Protocol **9**: `load`
+  has a `limits` object, applied *before* loading — the same load runs the program,
+  and a limit set after it would arrive late for its own run.  The message names
+  the limit, its value and where to raise it: «Превышен предел шагов выполнения:
+  5000 (--max-steps; «Предел шагов» в настройках окна)», and the dialog row
+  carries the same name.  `НАЙТИВСЕ` hitting a limit is *diagnostics*, not silent
+  truncation: a shorter list that is later taken for the answer is worse than an
+  error.  The dialog has four rows («Предел шагов», «Предел глубины», «Предел
+  решений НАЙТИВСЕ», «Предел времени, с»), and the run itself writes into the
+  panel the limits it went with.
+  The timeout is solved **by the window's clock** (`QTimer` and an `interrupt`
+  request), not in the engine: `steady_clock::now()` in a hot place is a cost on
+  every solution, and it is the front end that knows about "too long for a lesson".
+  Two verified consequences follow: a computing run ends by the deadline (the
+  engine polls the stop flag on every step anyway), while a run waiting for `ВВОД`
+  stands *outside* the solver and only «Остановить» breaks it — that is what
+  task_46 records, and nothing else is promised.
+  Along the way the protocol became more honest: a request with a field of the
+  wrong type (`"maxSteps":-1`, or a string instead of a number) used to turn
+  silently into a huge limit, and is now an `error` event with `kind":"protocol"`,
+  and the session reads the next line — on such a request the process used to
+  crash.
+  252/252 ctest, 20 headless GUI scripts, five PDFs (`gui.pdf` — 27 pages, §6.3 on
+  19–20; `help.pdf` — 30 pages, §15 on 24).
+* GUI round, part 42 (follow-up after the review: **architecture, defaults and the
+  RU/EN cancellation**).  Four edits of one evening.
+  (1) **The interpreter knows nothing about the GUI**: the limit messages no
+  longer name either a flag or a settings row — «Превышена глубина рекурсии: 200»,
   «Превышен предел шагов выполнения: 5000», «Превышен предел решений НАЙТИВСЕ:
-  50».  ADR-020: предел — опция *запуска*, а не знание ядра; «где поднять» говорит
-  тот, кто поставил число — флаг в `--help`, строка в диалоге.  В окне это делает
-  сам прогон: строка «пределы: «Предел шагов» 5000 — строки в «Выполнении»
-  настроек» перед запуском, и только про те пределы, что отличаются от умолчаний
-  (иначе панель сообщала бы одни и те же два числа на каждом запуске).  Тесты
-  стерегут обе стороны: в сообщении есть предел и его значение и нет слова
-  «настройках».
-  (2) **Умолчания ядра — без предела** (0 у шагов, глубины и НАЙТИВСЕ): свежий
-  `prologd` ведёт программу до конца, а `--max-depth 0` перестал быть «снятием»
-  того, чего и не было.  Единственный оставшийся умолчания —
-  `kDefaultMaxNestedDepth`, и он не предел для пользователя, а защита стека
-  вложенных решателей (task_38).  Следствие записано в руководстве честно: без
-  предела убежавшую рекурсию не останавливает ничто, она растёт, пока не кончится
-  память (цепочка кадров освобождается итеративно, так что это память, а не стек
-  C++).  Отсюда и `engine_limits.cmake` теперь сам передаёт `--max-depth 10000`.
-  (3) **Умолчания окна** — 0 / 1 000 000 / 1 000 000 / 0: шаги и часы выключены,
-  глубина и решения ограничены числом, которого не заметит ни одна учебная
-  программа, а убежавшая — не переживёт.  Это окно берёт на себя решение о том,
-  что для урока безопасно, потому что ядро его не принимает.
-  (4) **RU/EN отменяется** (ADR-021): окно остаётся русским, никакого
-  `QTranslator`; английский остаётся у языка (имена встроенных, task_39) и у
-  руководства.  Пункт закрыт в task_29 и в §10 `gui.typ` — теперь он там назван
-  решением, а не долгом.
-  252/252 ctest, 20 headless-скриптов GUI, пять PDF.
-* GUI round, part 43: **task_45 — графическое окно**.  `ТОЧКА`, `ЛИНИЯ`,
-  `ОКРУЖНОСТЬ` и `ЗАКРАСКА` рисовали в пустую реализацию: программа рисовала
-  картинку, а студент не видел ничего.  Теперь экран ведёт *интерпретатор*
-  (`BitmapGraphicsBackend`: буфер 1024×768, который сам отвечает на `TOCHKA(X, Y,
-  Ц)`-чтение и сам выполняет `ЗАКРАСКА`), а окно получает каждую нарисованную
-  фигуру — протокол **10**: события `graphics` (ячейка, отрезок или прямоугольник)
-  и запрос `{"cmd":"graphics","snapshot":true}`, на который приходит `bitmap` со
-  всем экраном (base64, по четыре байта на точку).  Пиксели остаются внутри не
-  зря: `ТОЧКА(X, Y, Цвет)` читает точку, а `ЗАКРАСКА` — то, что только что
-  нарисовано, и всё это изнутри встроенного предиката; синхронный вопрос оболочке
-  посреди предиката протокол не задаёт нигде.  `graphics.py` (без Qt) повторяет
-  те же правила рисования — Брезенхам, контур прямоугольника, эллипс по
-  параметрическому уравнению, заливка по четырём соседям, отсечение по краям, — и
-  `test_graphics.py` сверяет две реализации *попиксельно*: рисует программу, берёт
-  у интерпретатора готовый растр и повторяет те же события на холсте.
-  `graphicswindow.py` — отдельное окно (`Qt.Window`, иначе виджет с родителем
-  становится дочерним и рисунок встраивается в редактор) с «Вписать в окно»,
-  «1 : 1» с прокруткой, «Очистить», «Сохранить как PNG…» и координатами точки под
-  курсором; открытость и положение окна — машинные ключи `view/graphics_visible` и
-  `view/graphics_geometry` (`saveGeometry` в base64: Qt знает про экраны, а
-  прямоугольник пришлось бы этому учить заново).  Меню больше не имеет
-  выключенных пунктов: «Графическое окно» — последний, который чего-то ждал.
-  Два дефекта нашлись ровно там, где их и обещала найти приёмка — глазами на
-  нарисованном: эллипс читался как *прямоугольник* (`ОКРУЖНОСТЬ(X, Y, R, Цвет)`
-  передаёт четыре числа как есть, а имена параметров с task_15 говорили `x1..y2`),
-  поэтому лицо из `examples/drawing.pld` выходило синим полем, а не лицом; и
-  пустой холст был *прозрачно-чёрным* (`bytearray` — нули, а нулевая альфа в
-  `RGBA8888` — прозрачность), из-за чего сквозь рисунок просвечивал рабочий стол.
-  Обе ошибки были невидимы для сверки двух реализаций: обе рисовали одинаково и
-  обе неправильно.  264/264 ctest, 21 headless-скрипт GUI, пять PDF.
-* GUI round, part 44: **task_47 и первая половина task_48 — то, что нашлось при
-  работе с уроками и окном**.  Пользователь поправил урок 12 руками, и из этого
-  выросли три задачи (`task_47`, `task_48`, `task_49`) и тринадцать замечаний;
-  этот заход закрывает первое и половину второго.
-  **Один стиль курса.**  21 из 25 программ репозитория выровнены самим
-  интерпретатором (`prologd --format`: мягкий режим, ширина 80, один таб) — до
-  этого уроки были в трёх стилях, а в `lesson_12` рядом с табами стояли пробелы.
-  Важнее самой правки проверка: новый тест «every shipped program is already in
-  the standard shape» сверяет каждый файл со его же форматированным видом и
-  называет тот, который отстал, — стиль теперь не надо держать в голове.
-  `examples/lessons/_old` не выравнивается нарочно: это образец порта, а не его
-  стиль.
-  **Что вылезло при выравнивании.**  Форматирование убирает висячие пробелы — и
-  в строках `%!` тоже, — а `lesson_07` обещал строку `Загадано число. ` с
-  пробелом (сам вывод его печатал); пробел убран из сообщения в правиле, а не из
-  обещания, и правило про это записано в `doc/lessons.typ`.  Уроки 7 и 12
-  держали запросы длиннее ширины, и мягкий режим их *переносил* — а треугольник
-  на полях читает строку, так что запрос, разорванный надвое, переставал быть
-  кликабельным; это заметил не глаз, а пришпиленные числа в `test_queries.py`
-  (`lesson_07`: 19 → 18).  Поэтому у форматтера появилось правило: **запрос и
-  директиву ширина не переносит ни в одном режиме** (комментарий и пустая строка
-  автора — переносят), и оно закреплено в `test_formatter.cpp` на ширине 20 и 80.
-  Два обещания `lesson_12` отстали от переписанного руками урока (список фигур
-  рамки и сада), а анимация была закомментирована и не печатала ничего: всё снято
-  с работающего интерпретатора, а рядом встала анимация из двух кадров (80 мс),
-  чтобы обещание «анимация окончена» осталось настоящим; 250 кадров остались
-  вопросом `%?`, который выполняется щелчком по треугольнику.
-  **Жёсткий режим** переносит и после `:-`: голова предложения стоит одна, а цели
-  тела начинаются со следующей строки — раньше первая цель пряталась в конце
-  строки с головой, там, где её как раз и пропускают.  У фактов, запросов и
-  директив форма не меняется: головы у них нет, и `:-` на отдельной строке — шум.
-  **Режим форматирования** вернулся на панель инструментов, сразу за
-  «Форматировать»: кнопка `QToolButton` со списком трёх режимов и «только
-  выделенное» (значок `edit-format-set`, нарисованный давно и никем не занятый),
-  а подменю «Правка → Формат» ушло — у органа управления одно место.
-  **Меньше значков и команд** (task_48): `help-about.png` был тем же рисунком, что
-  `prologd2.png` («О программе» теперь носит значок приложения), переключатели
-  «Номера строк» и «Панель инструментов» остались словами (их картинки убраны),
-  «Сохранить все» ушла с панели в «Файл», а команды «Найти выделенное» и «Найти
-  выделенное назад» — из «Поиска» вместе со своими значками.  Аудит значков теперь
-  45 имён, 41 нарисовано, 4 ждут (и `execution-restart`, нарисованный и никем не
-  занятый).
-  Тесты: 267/267 ctest (253 случая Catch2 — три новых: жёсткая форма головы,
-  запрос с директивой в одну строку, «все программы уже в стандартном виде»),
-  21 headless-скрипт GUI (`test_queries.py` с обновлённым списком вопросов,
-  `test_window.py` с кнопкой режима на панели и без «Сохранить все»), пять PDF.
-  Замечание про `window.close()` тоже оплачено временем: скрипт, закрывающий окно
-  с несохранёнными правками, открывает настоящий модальный вопрос и вешает прогон
-  — проверять восстановление сессии надо через `_store_session` и второй
-  `MainWindow`, а не через закрытие первого.
-* GUI round, part 45: **task_48 — вторая половина: один `Esc` и окно, которое
-  открывается само**.  Просьба была ровно такой: «`Esc` закрывает окна и панели в
-  порядке: графическое окно → поиск и замена → справка по предикату → шпаргалка по
-  вставкам» и «окно графики открывается само при первом рисующем примитиве
-  запуска, и больше в этом запуске никогда».
-  **`Esc`.**  Обработчик один и живёт на главном окне (`MainWindow.keyPressEvent`
-  плюс `_escape_closes_something`), а порядок — это цепочка `if`: графическое окно,
-  полоса поиска, панель справки, шпаргалка; когда ничего из этого нет, клавиша не
-  наша, и событие уходит дальше — тест это различает, потому что нажатие считается
-  обработанным только тогда, когда что-то закрылось.  Сделано **распространением
-  события**, а не `QShortcut`, и это не деталь: сочетание клавиш обрабатывается
-  *раньше* виджета с фокусом и отобрало бы `Esc` у списка подсказок (он закрывается
-  по `Esc`) и у поля «Найти» (там клавишу и нажали, поэтому закрыть полосу — это
-  то, что она значит).  Эти два места отвечают за себя сами, до окна такая клавиша
-  не доходит, и так и записано в `doc/gui.typ` §4.1.  У графического окна свой
-  `Esc`: у него своя клавиатурная фокусность (оно может стоять на втором экране),
-  и до главного окна эта клавиша не доходит; закрывается оно через `close()`, то
-  есть тем же путём, что и крестик, — с галочкой в меню они не расходятся.
-  **Окно, которое открывается само.**  `_on_drawn` показывает окно, если флаг
-  `_graphics_shown` пуст; флаг очищает `run_program`, ставит `show_graphics_window`
-  (кто бы ни показал — галочка, настройки или сам запуск), а скрытие окна его не
-  очищает.  Из этого и получаются обе половины просьбы: рисунок виден без поиска
-  галочки, а окно, закрытое во время длинной анимации, остаётся закрытым до конца
-  прогона.  Момент выбран по первой *фигуре*, а не по началу прогона: программа,
-  которая ничего не рисует, окна не открывает.  Догонять пропущенное не пришлось —
-  `show_graphics_window` и так спрашивает снимок, так что окно, открытое на
-  середине рисунка, получает его целиком.
-  Тесты: два новых в `test_window.py` — по одному на половину.  Порядок `Esc`
-  проверяется настоящим нажатием в *редактор* (чтобы шло распространение события),
-  а «закрытое окно не открывается снова» — программой `?ТОЧКА(1, 1, 1),
-  ЖДИ(200), ТОЧКА(6, 6, 6).`: закрытие приходится *между* двумя фигурами, иначе
-  проверка прошла бы и без флага.  267/267 ctest, 21 headless-скрипт GUI, пять PDF.
-* GUI round, part 46: **task_49 — четыре дефекта, найденные работой с окном, и
-  размер главного окна**.  Пользователь добавил одну фразу к просьбе продолжить
-  («Графическое окно сохраняет свой размер и положение, а при этом главное окно не
-  сохраняет») — она и стала пятым пунктом задачи.
-  **`Шаг` → `Стоп` → `Запуск`.**  Окно считало, что прогон всё ещё стоит на точке
-  шага, и «Запуск» шёл по пути «продолжить», то есть посылал `step` в
-  интерпретатор, который никого не ждёт: сессия отвечала именно той ошибкой
-  «нет шага, который ждёт ответа», и программа не запускалась.  Состояние живёт в
-  *сессии* (`_paused`), и снимают его события, которыми прогон кончается:
-  `result`, `loaded`, ошибка и конец процесса.  Репродукция уточнила последнюю
-  пару: вежливое «Стоп» завершает *запрос*, а не процесс, поэтому очищающим
-  событием оказывается ошибка прерванного запроса — без этого случая проверка
-  падает (и она же требует, чтобы процесс был жив, иначе «Стоп» мог бы сойти за
-  конец сессии).
-  **Две вкладки «Без имени».**  Репродукция решила, какое из двух правил было
-  неверным: неверно было восстановление — менять `*` получала вкладка, которую
-  пользователь не трогал (приветственная программа первой вкладки, рядом с ней
-  пустая вторая; с одной вкладкой всё выглядело правильно только потому, что
-  пустая вкладка вообще не запоминается).  Сессия пишется *после* вопросов при
-  закрытии, то есть после того, как каждая правка уже разрешена: вкладка, которая
-  вернулась текстом, — та, которую пользователь не трогал.  Поэтому запись о
-  вкладке везёт признак «есть несохранённое», и он теперь в **JSON** — четвёртое
-  поле через табуляцию не отличить от строки старого образца, в тексте которой
-  табуляция есть (а в тексте программы она есть всегда).
-  **Зависание на трассировке.**  Причину искали измерением, а не догадкой, и табло
-  получилось таким: панель вывода, 20 000 строк — 0,68 с до и 0,26 с после;
-  200 000 строк с пределом 50 000 — **21,9 с** до и **3,0 с** после; трассировка
-  глубокой рекурсии (16 002 строки) целиком — 2,2 с до и 0,6 с после.  Две цены
-  сложились: окно платило вызов Python на *строку*, а панель — подрезку истории
-  по строке на строку, то есть квадрат (удаление из начала документа стоит
-  примерно одинаково, сколько ни удаляй).  Теперь окно отдаёт вывод пачкой раз в
-  оборот цикла событий и склеивает соседей одного вида (это не дроссель: ничего не
-  теряется и ничего не ждёт часов — потерянная строка журнала хуже медленной), а
-  панель режет историю куском в десятую часть предела.  Отрицательный результат
-  тоже записан: сама по себе пачка не спасает (20 000 строк одним вставлением —
-  тоже 27 мкс на строку), прокрутка — не цена (32 мкс на строку с выключенным
-  слежением), и курсор — не цена (новый курсор на вставку: 7 мкс против 5 у
-  постоянного).
-  **Размер главного окна.**  Графическое окно помнит своё с `saveGeometry()` с
-  task_45, а главное — то, которое двигают первым, — не помнило ничего.  Теперь оба
-  ходят через один модуль `prologd_gui.geometry`, и ключ `view/window_geometry` —
-  машинный (это запись окна о себе, а не строка в диалоге).  Проверка ставит окно
-  в 720×520 в (60, 40), закрывает, открывает заново с тем же файлом настроек и
-  требует те же числа, а без записи — прежний размер 1000×700; и она *не* берёт
-  910 точек ширины, потому что экран offscreen-платформы — 800×800, а
-  `restoreGeometry` по-своему правильно зажимает размер, который в экран не влезает.
-  Репродукции закреплены тестами и проверены «наоборот»: со спрятанной правкой
-  каждая из них падает (`git stash` на одном файле), с правкой — проходит.
-  Тесты: 267/267 ctest, 21 headless-скрипт GUI (четыре новых проверки в
-  `test_window.py`, одна в `test_documents.py`, обновлённая в `test_output.py`),
-  пять PDF.  Осталось в task_49: живой вывод — `IoContext` отдаёт строку, сессия
-  шлёт событие на строку, и счёт печатается 3, 2, 1.
-* GUI round, part 47: **task_49 закрыт — живой вывод**.  Последний пункт задачи
-  родился из анимации урока: программа печатает строку, спит, печатает следующую, а
-  окно показывало это одним блоком в конце прогона, поэтому счёт в уроке 12
-  выглядел прыжком на последнее число.
-  Шов сделан в `IoContext`: `setOutputLineSink` — «строка, которую пишут, кончилась»,
-  и он срабатывает на `ПС` и на перевод строки, который несёт сам `ВЫВОД` (потому
-  что строка тогда кончается, хотя приглашения никто не печатал).  Хук говорит
-  *когда*, никогда *что*: текст берёт владелец из своего же потока, поэтому консоль
-  не меняется ни на байт, а программа, уведшая вывод в файл, не сообщает ничего.
-  Сессия ставит хук после `setTraceSink` и отвечает на него `flush()` — тем самым,
-  который и раньше отправлял `output` в конце запроса; гранулярность стала
-  построчной, форма события и порядок текста — нет.
-  Измерение (программа печатает три строки с `ЖДИ(60)` между ними): без хука
-  `loaded@0.15`, а за ним **одно** `output@0.15` со всеми тремя строками; с хуком
-  `output@0.01`, `output@0.08`, `output@0.14`, и только потом `loaded@0.14`.
-  Проверки: `test_io_context.cpp` (хук молчит на недописанной строке и на контексте
-  без владельца), раздел в `protocol_session.cmake` (четыре строки, каждая *до*
-  `loaded`, и позиции `one < two < three < loaded`), `protocol_smoke.py`,
-  `test_stepping.py` и новая `test_window.py::test_the_output_arrives_while_the_program_runs`
-  (первая строка в панели, пока идёт прогон, третьей ещё нет, «Запустить» выключена
-  — а потом есть и третья, и конец прогона).  Две старые проверки ожидали один блок
-  на строку-склейку и обновлены: текст тот же, крупность мельче.
-  Тесты: 268/268 ctest, 21 headless-скрипт GUI, пять PDF.
-* GUI round, part 48: **значки в тёмной теме приняты** — пользователь посмотрел
-  перерисованные значки: «иконки в тёмной теме нормальные», дорисовывать нечего.
-  Это закрывает последний хвост `task_48`, и на доске остаётся только `task_46`
-  (путь к интерпретатору, рабочий каталог процесса, профили) плюс решение, нужен ли
-  текстовому режиму `--timeout-ms`.
-* GUI round, part 49: **task_46 — путь к интерпретатору и рабочий каталог процесса;
-  `--timeout-ms` решён и отложен**.  Пользователь выбрал первые два пункта и
-  отказался от четвёртого.
-  **Интерпретатор.**  Строка `execution/interpreter` — новый тип `file` в таблице
-  настроек (со своим «Обзор…»: выбирает файл, а не каталог); пустая строка значит
-  «тот, с которым окно запущено», а заполненная главнее `--exe`, который остаётся
-  запасным (сам он, как и раньше, ищет свежую сборку).  `main.py` проверяет теперь
-  тот путь, который *действительно* запустится, — иначе на машине учителя, где
-  рядом с окном лежит свой `prologd.exe`, проверка строительного пути ошибочно
-  отказала бы.  Сессия получила `set_executable`/`executable`, и у окна появился
-  один шлюз `_start_session`, через который проходят все три места, где сессия
-  заводится (запуск, запрос, форматирование): несуществующий путь сообщается в
-  панели до всякого старта, а не половиной запущенного процесса.  Строка состояния
-  называет интерпретатор, когда строкой выбран другой (`prologd: …` справа), — то
-  есть окно видно, что работает не та сборка.
-  **Рабочий каталог процесса.**  `execution/process_directory` — выбор из трёх:
-  «каталог файла программы» (сохранённый файл пишет рядом с собой), «рабочая папка
-  окна» (прежнее поведение) и «свой каталог» (`execution/process_directory_path`).
-  Это не «Рабочая папка (ИМПОРТ)» — та строка идёт в `-I` как каталог *поиска*,
-  а эта — `QProcess.setWorkingDirectory`: от неё считаются `ЗАПИСЬ_В`, `ЧТЕНИЕ_ИЗ`
-  и остальные относительные пути.  Раньше всё это писало туда, откуда запущено окно
-  (наследуется у родителя), то есть у каждого ученика — в другое место.
-  **«Применить».**  Перемены в любом из двух пунктов не могут дойти до живого
-  процесса (программа и каталог зафиксированы стартом), поэтому живая сессия
-  перезапускается — и строка состояния об этом говорит; путь, которого нет, живую
-  сессию не трогает и пишет «интерпретатор не найден».
-  **`--timeout-ms`** — решено не делать: часы в горячем месте решателя были бы
-  платой за каждое решение, предел времени окна это уже покрывает, а у консольного
-  запуска есть таймаут оболочки.
-  Проверки: `test_settings.py` (умолчания и круговорот новых ключей, битый выбор
-  падает в `file`), `test_settingsdialog.py` (строка-файл спрашивает файл, а не
-  каталог; выбор из трёх), три новые в `test_window.py` (копия exe как «другой»
-  интерпретатор — строка доходит до сессии, прогон идёт копией, строка состояния
-  её называет; несуществующий путь сообщается в панели и сессии не заводит;
-  `ЗАПИСЬ_В` пишет в выбранный каталог — и фиксированный, и «рядом с файлом»).
-  Осталось в task_46: профили.
-* GUI round, part 50: **мелкая уборка настроек**.  Пользователь попросил свести
-  лишнее и уточнить подписи.
-  **Одна строка вместо двух для `ИМПОРТ`.**  «Рабочая папка (ИМПОРТ)» влита в
-  «Дополнительные каталоги ИМПОРТ»: был один каталог плюс список, стал один
-  список (`execution/import_paths`); ключ `execution/working_directory` исчез из
-  таблицы, а `_import_directories` собирает `-I` из командной строки и этого
-  списка.  Старый файл настроек хранит бывший ключ как незнакомый (обещание
-  «незнакомые ключи выживают»), но он больше не читается.
-  **Кнопки списка** «Добавить»/«Убрать» — без текста: остались иконки
-  (`settings-add`/`settings-remove`), текст переехал в подсказку.
-  **«Свой каталог процесса»** неактивен, пока в «Рабочем каталоге процесса» не
-  выбран «свой каталог» — поле и его «…» выключаются одним рядом; диалог держит
-  обёртку строки (`_row_holders`) и вешает её на смену выбора.
-  **Предел времени — в миллисекундах.**  Ключ `execution/timeout_seconds` →
-  `execution/timeout_milliseconds`, строка «Предел времени, мс» (потолок — час,
-  3 600 000), подсказка «по времени» вместо «по часам», `_arm_timeout`/`_on_timeout`
-  ставят таймер и пишут «N мс».
-  **Подсказки и подписи.**  «Сохранять перед запуском» уточнён (сохраняет текущий
-  файл); из подсказки «Восстанавливать вкладки» убрано про «Без имени»; тема
-  «как в системе — системные цвета» → «системное» (и в меню «Оформление» —
-  «Системное»).
-  Проверки обновлены под новое (`test_settings.py`, `test_settingsdialog.py` — в
-  том числе новая «путь неактивен до «свой каталог»», `test_window.py` — предел
-  в мс и список `-I`, `test_appearance.py`).  21 headless-скрипт GUI, пять PDF.
-* GUI round, part 51: **флаг `questions` разделён на «выполнять» и «печатать»**.
-  Один переключатель «Выводить вопросы при запуске» делал две вещи сразу, и
-  пользователь попросил их развести.  Теперь «Выполнять вопросы при запуске»
-  (`execution/run_questions`, был и остался `questions` на проводе) решает,
-  выполняются ли `?`-строки программы при запуске, а «Печатать вопросы при
-  запуске» (`execution/print_questions`, по умолчанию выключен) печатает сам
-  вопрос — `?цель.` — перед его ответом, как `-q` в командной строке.
-  Это **протокол 11**: у `load` появился `printQuestions`; эхо делает сессия в
-  `runQuery` (событие `output` перед `result`), а не окно.  Чтобы строка вопроса
-  печаталась с *именами* переменных, а не `_1`, `Engine::queryText` (общий для
-  `-q` и протокола) отдаёт печатнику словарь имён через новое поле
-  `PrintOptions::variableName` — `ВЫВОД` и остальная печать по-прежнему пишут
-  `_N`, как обещает руководство.  `-q` и раньше писал `?факт(_1).` — теперь и
-  он, и окно пишут `?факт(X).`.
-  Проверки: `protocol_session.cmake` (эхо до ответа), `test_formatter.py` и
-  `protocol_smoke.py` (protocol 11), `test_settings.py` (умолчание `print_questions`),
-  новая `test_window.py::test_print_questions_echoes_the_question_line`.  268/268
-  ctest, 21 headless-скрипт GUI, пять PDF.
-* GUI round, part 52: **справка: многострочный просмотр, алиас у имени, единые
-  имена аргументов**.  Пользователь попросил три вещи про справку и просмотр
-  справочника.
-  **Многострочный просмотр при автодополнении.**  Метка под списком показывала
-  одну строку `имя — сводка`; теперь `Reference.detail_lines` собирает
-  «имя (алиас) — сводка», затем варианты вызова, а метка переносит текст по
-  ширине 460 (`setWordWrap` + `setMaximumWidth` до `adjustSize` — иначе метка
-  размерится на одну длинную строку).
-  **Алиас у имени.**  Из `F1` убрана строка «английское имя: …»; английское имя
-  стоит рядом с русским в скобках: `ВВКОД (put_code) — …`.  Первая строка записи
-  общая для док-окна и просмотра (`reference.record_title`).
-  **Имена аргументов.**  `builtins.json` и `doc/help.typ` переведены на одно
-  словарное множество: `Ц` — целое, `Вещ` — вещественное, `Пер` — переменная,
-  `Стр` — строка, `Терм` — терм, `Спис` — список (было `X`, `с`, `ц1`, `П`,
-  `S`, `N`, `Строка` вперемешку).  Проверка вариантов против кода нашла одну
-  опечатку: у `УМНОЖЕНИЕ(ц1, П2, ц3, ц4)` делитель был `ц2`, а в коде — `ц1`
-  (для свободного второго аргумента); `СЛУЧ` разложен на три варианта (семя /
-  случайное целое / диапазон), а `ВВКОД` на два по ролям аргумента.  Сводки
-  уточнены там, где ссылались на старые имена (`УМНОЖЕНИЕ`).
-  Проверки обновлены (`test_completion.py` — многострочный текст с алиасом,
-  `test_window.py` — `F1` без «английское имя», с новыми именами).  `test_reference.py`,
-  `test_completion.py`, `test_window.py` зелёные, пять PDF.
+  50».  ADR-020: a limit is an option of the *run*, not knowledge of the core;
+  "where to raise it" is said by whoever set the number — the flag in `--help`,
+  the row in the dialog.  In the window the run itself does that: the line
+  «пределы: «Предел шагов» 5000 — строки в «Выполнении» настроек» before the
+  start, and only about those limits that differ from the defaults (otherwise the
+  panel would report the same two numbers on every run).  Tests guard both sides:
+  the message has the limit and its value and not the word "settings".
+  (2) **The core defaults — no limit** (0 for steps, depth and НАЙТИВСЕ): a fresh
+  `prologd` runs a program to the end, and `--max-depth 0` stopped being a
+  "removal" of something that was not there.  The only default left is
+  `kDefaultMaxNestedDepth`, and it is not a limit for the user but a guard of the
+  nested-solver stack (task_38).  The consequence is recorded honestly in the
+  manual: without a limit nothing stops a runaway recursion, it grows until memory
+  runs out (the frame chain is released iteratively, so it is memory, not the C++
+  stack).  Hence `engine_limits.cmake` now passes `--max-depth 10000` itself.
+  (3) **The window defaults** — 0 / 1 000 000 / 1 000 000 / 0: steps and the clock
+  off, depth and solutions bounded by a number no teaching program will notice and
+  a runaway one will not survive.  It is the window that takes the decision about
+  what is safe for a lesson, because the core does not take it.
+  (4) **RU/EN is cancelled** (ADR-021): the window stays Russian, no
+  `QTranslator`; English stays with the language (the built-in names, task_39) and
+  with the manual.  The item is closed in task_29 and in §10 of `gui.typ` — it is
+  now named there as a decision, not a debt.
+  252/252 ctest, 20 headless GUI scripts, five PDFs.
+* GUI round, part 43: **task_45 — the graphics window**.  `ТОЧКА`, `ЛИНИЯ`,
+  `ОКРУЖНОСТЬ` and `ЗАКРАСКА` drew into an empty implementation: the program drew
+  a picture and the student saw nothing.  Now the screen is driven by the
+  *interpreter* (`BitmapGraphicsBackend`: a 1024×768 buffer that itself answers the
+  `TOCHKA(X, Y, Ц)` read and executes `ЗАКРАСКА` itself), and the window receives
+  every drawn figure — protocol **10**: `graphics` events (a cell, a segment or a
+  rectangle) and the request `{"cmd":"graphics","snapshot":true}`, answered by a
+  `bitmap` of the whole screen (base64, four bytes per point).  The pixels stay
+  inside for a reason: `ТОЧКА(X, Y, Цвет)` reads a point and `ЗАКРАСКА` the thing
+  just drawn, all of it from inside a built-in predicate; a synchronous question to
+  the shell in the middle of a predicate is not defined anywhere in the protocol.
+  `graphics.py` (no Qt) repeats the same drawing rules — Bresenham, the rectangle
+  outline, an ellipse by parametric equation, four-neighbour fill, edge clipping —
+  and `test_graphics.py` compares the two implementations *pixel by pixel*: it
+  draws the program, takes the finished raster from the interpreter and repeats
+  the same events on the canvas.  `graphicswindow.py` is a window of its own
+  (`Qt.Window`, otherwise a widget with a parent becomes a child and the drawing
+  is embedded in the editor) with «Вписать в окно», «1 : 1» with scrolling,
+  «Очистить», «Сохранить как PNG…» and the coordinates of the point under the
+  cursor; the window's visibility and position are the machine keys
+  `view/graphics_visible` and `view/graphics_geometry` (`saveGeometry` in base64:
+  Qt knows about screens, and a rectangle would have had to be taught that anew).
+  The menu no longer has disabled items: «Графическое окно» was the last one
+  waiting for something.  Two defects were found exactly where the acceptance
+  promised to find them — by eye on the drawing: the ellipse was read as a
+  *rectangle* (`ОКРУЖНОСТЬ(X, Y, R, Цвет)` passes four numbers as they are, while
+  the parameter names from task_15 said `x1..y2`), so the face from
+  `examples/drawing.pld` came out as a blue field rather than a face; and the empty
+  canvas was *transparently black* (a `bytearray` is zeros, and zero alpha in
+  `RGBA8888` is transparency), so the desktop shone through the drawing.  Both
+  mistakes were invisible to the comparison of the two implementations: both drew
+  the same and both wrongly.  264/264 ctest, 21 headless GUI scripts, five PDFs.
+* GUI round, part 44: **task_47 and the first half of task_48 — what turned up
+  while working with the lessons and the window**.  The user fixed lesson 12 by
+  hand, and out of that grew three tasks (`task_47`, `task_48`, `task_49`) and
+  thirteen remarks; this round closes the first and half of the second.
+  **One style for the course.**  21 of the repository's 25 programs are aligned by
+  the interpreter itself (`prologd --format`: soft mode, width 80, one tab) —
+  before that the lessons were in three styles, and in `lesson_12` spaces stood
+  next to tabs.  More important than the fix itself is the check: a new test "every
+  shipped program is already in the standard shape" compares each file with its
+  own formatted look and names the one that lagged behind — the style no longer
+  has to be kept in one's head.  `examples/lessons/_old` is deliberately not
+  aligned: it is a sample of the port, not its style.
+  **What came out during the alignment.**  Formatting removes trailing spaces — in
+  `%!` lines too — while `lesson_07` promised the line `Загадано число. ` with a
+  space (the output itself printed it); the space was removed from the message in
+  the rule, not from the promise, and a rule about it was written into
+  `doc/lessons.typ`.  Lessons 7 and 12 held queries longer than the width, and
+  soft mode *wrapped* them — but the triangle in the margin reads a line, so a
+  query torn in two stopped being clickable; this was noticed not by eye but by
+  the pinned numbers in `test_queries.py` (`lesson_07`: 19 → 18).  So the
+  formatter gained a rule: **the width wraps neither a query nor a directive in
+  any mode** (a comment and the author's blank line are wrapped), and it is pinned
+  in `test_formatter.cpp` at widths 20 and 80.  Two promises of `lesson_12` lagged
+  behind the hand-rewritten lesson (the list of frame and garden shapes), and the
+  animation was commented out and printed nothing: everything was taken from the
+  working interpreter, and a two-frame animation (80 ms) was put next to it so
+  that the promise "animation finished" stayed true; 250 frames were left as the
+  `%?` question, which runs on a click on the triangle.
+  **Hard mode** wraps after `:-` too: the clause head stands alone, and the body
+  goals start on the next line — before, the first goal hid at the end of the head
+  line, exactly where it is skipped.  For facts, queries and directives the shape
+  does not change: they have no head, and a `:-` on a line of its own is noise.
+  **The formatting mode** came back to the toolbar, right after «Форматировать»:
+  a `QToolButton` with a list of three modes and "selection only" (the
+  `edit-format-set` icon, drawn long ago and unused by anyone), and the «Правка →
+  Формат» submenu is gone — a control has one place.
+  **Fewer icons and commands** (task_48): `help-about.png` was the same drawing as
+  `prologd2.png` («О программе» now wears the application icon), the «Номера
+  строк» and «Панель инструментов» switches stayed words (their pictures were
+  removed), «Сохранить все» moved from the toolbar into «Файл», and the «Найти
+  выделенное» and «Найти выделенное назад» commands left «Поиск» together with
+  their icons.  The icon audit is now 45 names, 41 drawn, 4 waiting (and
+  `execution-restart`, drawn and unused by anyone).
+  Tests: 267/267 ctest (253 Catch2 cases — three new: the hard head form, a query
+  with a directive on one line, «все программы уже в стандартном виде»), 21
+  headless GUI scripts (`test_queries.py` with an updated list of questions,
+  `test_window.py` with the mode button on the toolbar and without «Сохранить
+  все»), five PDFs.  The remark about `window.close()` was also paid for with
+  time: a script that closes a window with unsaved edits opens a real modal
+  question and hangs the run — session restore must be checked through
+  `_store_session` and a second `MainWindow`, not by closing the first.
+* GUI round, part 45: **task_48 — the second half: one `Esc` and a window that
+  opens itself**.  The request was exactly this: «`Esc` closes windows and panels in
+  the order: graphics window → search and replace → predicate help → insert cheat
+  sheet» and «the graphics window opens by itself on the first drawing primitive of
+  a run, and never again in that run».
+  **`Esc`.**  There is one handler, on the main window (`MainWindow.keyPressEvent`
+  plus `_escape_closes_something`), and the order is a chain of `if`s: the graphics
+  window, the search bar, the help panel, the insert cheat sheet; when there is
+  none of those, the key is not ours and the event goes on — the test tells this
+  apart, because a press counts as handled only when something closed.  It is done
+  by **propagating the event**, not with a `QShortcut`, and that is not a detail: a
+  shortcut is handled *before* the focused widget and would have taken `Esc` from
+  the completion list (it closes on `Esc`) and from the «Найти» field (the key was
+  pressed there, so closing the bar is what it means).  Those two places answer for
+  themselves, such a key never reaches the window, and that is what `doc/gui.typ`
+  §4.1 records.  The graphics window has its own `Esc`: it has its own keyboard
+  focus (it may sit on a second screen), and this key does not reach the main
+  window; it closes through `close()`, i.e. by the same path as the cross, so it
+  does not disagree with the menu tick.
+  **The window that opens itself.**  `_on_drawn` shows the window if the
+  `_graphics_shown` flag is empty; the flag is cleared by `run_program` and set by
+  `show_graphics_window` (whoever showed it — the tick, the settings or the run
+  itself), and hiding the window does not clear it.  That yields both halves of
+  the request: the drawing is visible without hunting for the tick, and a window
+  closed during a long animation stays closed until the end of the run.  The
+  moment is chosen by the first *figure*, not by the start of the run: a program
+  that draws nothing does not open the window.  Nothing had to be caught up —
+  `show_graphics_window` asks for a snapshot anyway, so a window opened in the
+  middle of a drawing gets it whole.
+  Tests: two new in `test_window.py`, one per half.  The `Esc` order is checked by
+  a real press into the *editor* (so that the event propagates), and "a closed
+  window does not open again" by the program `?ТОЧКА(1, 1, 1), ЖДИ(200), ТОЧКА(6,
+  6, 6).`: the close has to fall *between* the two figures, otherwise the check
+  would pass without the flag.  267/267 ctest, 21 headless GUI scripts, five PDFs.
+* GUI round, part 46: **task_49 — four defects found by working with the window,
+  and the main window's size**.  The user added one phrase to the request to
+  continue («the graphics window keeps its size and position, while the main window
+  does not») — and it became the fifth item of the task.
+  **`Шаг` → `Стоп` → `Запуск`.**  The window thought the run was still at a step
+  point, and «Запуск» went down the "continue" path, i.e. sent `step` to an
+  interpreter that was waiting for no one: the session answered with exactly that
+  error "no step waiting for an answer", and the program did not start.  The state
+  lives in the *session* (`_paused`), and it is cleared by the events a run ends
+  with: `result`, `loaded`, an error and the process ending.  The reproduction
+  refined the last pair: a polite «Стоп» finishes the *request*, not the process,
+  so the clearing event turns out to be the error of the interrupted request —
+  without this case the check fails (and it also requires the process to be alive,
+  otherwise «Стоп» could pass for the end of the session).
+  **Two tabs named «Без имени».**  The reproduction decided which of the two rules
+  was wrong: the restore was wrong — the `*` was given to the tab the user had not
+  touched (the welcome program of the first tab, with an empty second one next to
+  it; with a single tab everything looked right only because an empty tab is not
+  stored at all).  The session is written *after* the close questions, i.e. after
+  every edit has already been resolved: a tab that came back as text is one the
+  user did not touch.  So a tab record now carries an "has unsaved" mark, and it
+  is in **JSON** — a fourth field through a tab could not be told apart from a
+  line of the old form whose text contains a tab (and a program's text always
+  does).
+  **A hang on tracing.**  The cause was sought by measurement, not by guessing,
+  and the scoreboard came out like this: the output panel, 20 000 lines — 0.68 s
+  before and 0.26 s after; 200 000 lines with a limit of 50 000 — **21.9 s** before
+  and **3.0 s** after; tracing a deep recursion (16 002 lines) in full — 2.2 s
+  before and 0.6 s after.  Two costs had added up: the window paid a Python call
+  per *line*, and the panel trimmed the history line by line, i.e. a square
+  (removing from the start of a document costs about the same no matter how much
+  you remove).  Now the window hands out output in a batch once per event-loop
+  turn and merges same-kind neighbours (this is not a throttle: nothing is lost
+  and nothing waits on a clock — a lost log line is worse than a slow one), and
+  the panel cuts the history in chunks of a tenth of the limit.  A negative result
+  is recorded too: the batch alone does not save it (20 000 lines in one insertion
+  is also 27 µs per line), scrolling is not the cost (32 µs per line with
+  following off), and the cursor is not the cost (a new cursor per insertion: 7 µs
+  versus 5 for a permanent one).
+  **The main window's size.**  The graphics window has remembered its own with
+  `saveGeometry()` since task_45, while the main one — the one moved first —
+  remembered nothing.  Now both go through one module, `prologd_gui.geometry`, and
+  the key `view/window_geometry` is a machine one (it is the window's record about
+  itself, not a dialog row).  The check puts the window at 720×520 at (60, 40),
+  closes it, opens it again with the same settings file and requires the same
+  numbers, and without a record the old size 1000×700; and it does *not* take 910
+  points of width, because the offscreen platform's screen is 800×800 and
+  `restoreGeometry` rightly clamps a size that does not fit the screen.  The
+  reproductions are pinned by tests and checked "in reverse": with the fix hidden
+  each of them fails (`git stash` on one file), with the fix it passes.
+  Tests: 267/267 ctest, 21 headless GUI scripts (four new checks in
+  `test_window.py`, one in `test_documents.py`, an updated one in
+  `test_output.py`), five PDFs.  Left in task_49: live output — `IoContext` hands
+  out a line, the session sends an event per line, and the count prints 3, 2, 1.
+* GUI round, part 47: **task_49 closed — live output**.  The task's last item was
+  born out of the lesson's animation: the program prints a line, sleeps, prints
+  the next, and the window showed it as one block at the end of the run, so the
+  count in lesson 12 looked like a jump to the last number.
+  The seam is made in `IoContext`: `setOutputLineSink` — "the line being written is
+  finished" — and it fires on `ПС` and on the newline the `ВЫВОД` itself carries
+  (because the line then ends although no prompt was printed).  The hook says
+  *when*, never *what*: the text is taken by the owner from its own stream, so the
+  console does not change by a byte, and a program that redirected its output to a
+  file reports nothing.  The session installs the hook after `setTraceSink` and
+  answers it with `flush()` — the very one that already sent `output` at the end
+  of a request; the granularity became per line, the event's shape and the order
+  of the text did not.
+  Measurement (a program printing three lines with `ЖДИ(60)` between them): without
+  the hook `loaded@0.15` and after it **one** `output@0.15` with all three lines;
+  with the hook `output@0.01`, `output@0.08`, `output@0.14`, and only then
+  `loaded@0.14`.  Checks: `test_io_context.cpp` (the hook stays silent on an
+  unfinished line and on a context without an owner), a section in
+  `protocol_session.cmake` (four lines, each *before* `loaded`, and the positions
+  `one < two < three < loaded`), `protocol_smoke.py`, `test_stepping.py` and a new
+  `test_window.py::test_the_output_arrives_while_the_program_runs` (the first line
+  is in the panel while the run goes on, the third is not there yet, «Запустить»
+  is disabled — and afterwards there is a third and the run's end).  Two old
+  checks expected one block per joined line and were updated: the text is the
+  same, the granularity finer.
+  Tests: 268/268 ctest, 21 headless GUI scripts, five PDFs.
+* GUI round, part 48: **the icons in the dark theme accepted** — the user looked
+  at the redrawn icons: «the icons in the dark theme look fine», nothing left to draw.
+  This closes the last tail of `task_48`, and only `task_46` remains on the board
+  (the interpreter path, the process working directory, profiles) plus the
+  decision whether the text mode needs `--timeout-ms`.
+* GUI round, part 49: **task_46 — the interpreter path and the process working
+  directory; `--timeout-ms` decided and deferred**.  The user picked the first two
+  items and refused the fourth.
+  **The interpreter.**  The `execution/interpreter` row is a new `file` type in
+  the settings table (with its own «Обзор…»: it picks a file, not a directory); an
+  empty string means "the one the window is running with", and a filled one
+  overrides `--exe`, which stays the fallback (it, as before, looks for a fresh
+  build).  `main.py` now checks the path that will *really* run — otherwise on a
+  teacher's machine, where its own `prologd.exe` lies next to the window, the
+  check of the build path would wrongly refuse.  The session gained
+  `set_executable`/`executable`, and the window gained one gateway,
+  `_start_session`, through which all three places that create a session pass
+  (run, query, formatting): a nonexistent path is reported in the panel before any
+  start, not as half a launched process.  The status line names the interpreter
+  when a different one is chosen (`prologd: …` on the right) — so the window shows
+  that a build other than the usual one is at work.
+  **The process working directory.**  `execution/process_directory` — a choice of
+  three: «каталог файла программы» (a saved file writes next to itself), «рабочая
+  папка окна» (the previous behaviour) and «свой каталог»
+  (`execution/process_directory_path`).  This is not «Рабочая папка (ИМПОРТ)» —
+  that row goes into `-I` as a *search* directory, while this one is
+  `QProcess.setWorkingDirectory`: `ЗАПИСЬ_В`, `ЧТЕНИЕ_ИЗ` and the rest of the
+  relative paths are counted from it.  Before, all of this wrote to wherever the
+  window was launched from (inherited from the parent), i.e. for every student to
+  a different place.
+  **«Применить».**  Changes in either of the two items cannot reach a live process
+  (the program and the directory are fixed by the start), so a live session is
+  restarted — and the status line says so; a path that does not exist does not
+  touch the live session and writes «интерпретатор не найден».
+  **`--timeout-ms`** — decided not to do it: a clock in the solver's hot place
+  would be a cost on every solution, the window's time limit already covers it,
+  and the console run has the shell's timeout.
+  Checks: `test_settings.py` (defaults and the round trip of the new keys, a bad
+  choice falls into `file`), `test_settingsdialog.py` (the file row asks for a
+  file, not a directory; the choice of three), three new in `test_window.py` (a
+  copy of the exe as a "different" interpreter — the row reaches the session, the
+  run goes by the copy, the status line names it; a nonexistent path is reported
+  in the panel and starts no session; `ЗАПИСЬ_В` writes into the chosen directory
+  — both a fixed one and "next to the file").  Left in task_46: profiles.
+* GUI round, part 50: **a small cleanup of the settings**.  The user asked to
+  merge the superfluous and clarify the labels.
+  **One row instead of two for `ИМПОРТ`.**  «Рабочая папка (ИМПОРТ)» was merged
+  into «Дополнительные каталоги ИМПОРТ»: there was one directory plus a list, now
+  one list (`execution/import_paths`); the `execution/working_directory` key
+  disappeared from the table, and `_import_directories` builds `-I` from the
+  command line and this list.  An old settings file keeps the former key as an
+  unknown one (the promise "unknown keys survive"), but it is no longer read.
+  **The list buttons** «Добавить»/«Убрать» — without text: the icons stayed
+  (`settings-add`/`settings-remove`), the text moved into the hint.
+  **«Свой каталог процесса»** is inactive until «свой каталог» is chosen in
+  «Рабочий каталог процесса» — the field and its "…" are disabled by one row; the
+  dialog keeps a row wrapper (`_row_holders`) and hooks it to the selection
+  change.
+  **The time limit — in milliseconds.**  The key `execution/timeout_seconds` →
+  `execution/timeout_milliseconds`, the row «Предел времени, мс» (ceiling — an
+  hour, 3 600 000), the hint "by time" instead of "by the clock",
+  `_arm_timeout`/`_on_timeout` set the timer and write "N ms".
+  **Hints and labels.**  «Сохранять перед запуском» was clarified (it saves the
+  current file); «Восстанавливать вкладки»'s hint lost the part about «Без
+  имени»; the theme «как в системе — системные цвета» → «системное» (and in the
+  «Оформление» menu — «Системное»).
+  The checks were updated for the new state (`test_settings.py`,
+  `test_settingsdialog.py` — among them a new "the path is inactive until «свой
+  каталог»", `test_window.py` — the limit in ms and the `-I` list,
+  `test_appearance.py`).  21 headless GUI scripts, five PDFs.
+* GUI round, part 51: **the `questions` flag split into "run" and "print"**.  One
+  switch, «Выводить вопросы при запуске», did two things at once, and the user
+  asked to separate them.  Now «Выполнять вопросы при запуске»
+  (`execution/run_questions`, was and remains `questions` on the wire) decides
+  whether the program's `?` lines are run at startup, and «Печатать вопросы при
+  запуске» (`execution/print_questions`, off by default) prints the question
+  itself — `?цель.` — before its answer, like `-q` on the command line.  This is
+  **protocol 11**: `load` gained `printQuestions`; the echo is done by the session
+  in `runQuery` (an `output` event before `result`), not by the window.  For the
+  question line to print *variable names* rather than `_1`, `Engine::queryText`
+  (shared by `-q` and the protocol) hands the printer a name dictionary through
+  the new `PrintOptions::variableName` field — `ВЫВОД` and the rest of the
+  printing still write `_N`, as the manual promises.  `-q` already wrote
+  `?факт(_1).` — now both it and the window write `?факт(X).`.
+  Checks: `protocol_session.cmake` (the echo before the answer),
+  `test_formatter.py` and `protocol_smoke.py` (protocol 11), `test_settings.py`
+  (the `print_questions` default), a new
+  `test_window.py::test_print_questions_echoes_the_question_line`.  268/268
+  ctest, 21 headless GUI scripts, five PDFs.
+* GUI round, part 52: **help: multi-line display, the alias by the name, unified
+  argument names**.  The user asked for three things about the help and the
+  reference view.
+  **Multi-line display in completion.**  The label under the list showed one line
+  `имя — сводка`; now `Reference.detail_lines` assembles «имя (алиас) — сводка»,
+  then the call variants, and the label wraps the text at 460 px (`setWordWrap` +
+  `setMaximumWidth` before `adjustSize` — otherwise the label sizes itself to one
+  long line).
+  **The alias by the name.**  The line "английское имя: …" was removed from `F1`;
+  the English name stands next to the Russian one in parentheses: `ВВКОД
+  (put_code) — …`.  The record's first line is shared by the doc window and the
+  view (`reference.record_title`).
+  **Argument names.**  `builtins.json` and `doc/help.typ` were moved to one
+  vocabulary: `Ц` — integer, `Вещ` — real, `Пер` — variable, `Стр` — string,
+  `Терм` — term, `Спис` — list (it used to be `X`, `с`, `ц1`, `П`, `S`, `N`,
+  `Строка` mixed together).  Checking the variants against the code found one
+  typo: in `УМНОЖЕНИЕ(ц1, П2, ц3, ц4)` the divisor was `ц2` while the code has
+  `ц1` (for a free second argument); `СЛУЧ` was split into three variants (seed /
+  random integer / range), and `ВВКОД` into two by the argument's role.  The
+  summaries were clarified where they referred to the old names (`УМНОЖЕНИЕ`).
+  The checks were updated (`test_completion.py` — multi-line text with an alias,
+  `test_window.py` — `F1` without "английское имя", with the new names).
+  `test_reference.py`, `test_completion.py`, `test_window.py` are green, five
+  PDFs.
+* GUI round, part 53: **task_50 — the output panel with tabs**.  The user asked
+  to turn the output panel into four tabs: **Проблемы**, **Вывод**, **Система**,
+  **Ввод**.
+  **Tabs.**  The panel is one `QTabWidget` (`_panel_tabs`); the three read-only
+  panes are still that same `panels.OutputPane` (bounded history, colours by
+  kind, a line tail), and «Ввод» is the queue of prepared answers with the query
+  console beneath it.  The kind of a line decides the tab:
+  `OUTPUT`/`ECHO`/`TRACE` → Вывод, `NOTE` → Система, `ERROR`/`WARNING` →
+  Проблемы (`panels.KIND_TAB`, routing in `_feed_pane`).  «Сохранить вывод…»
+  writes the Вывод tab.
+  **Counted titles and colour.**  The tab title carries a count: `Вывод:5`,
+  `Проблемы:0`, `Система:3`, `Ввод:2` (Ввод counts the queue's non-empty lines
+  and updates on `textChanged`).  The word «Проблемы» is coloured by state: the
+  normal colour when empty, orange with warnings only, red when there is an
+  error (`_error_count`/`_warning_count`, `tabTextColor`).
+  **Focus.**  A run shows Вывод; diagnostics (both a warning and an error)
+  switch to Проблемы (`_show_panel_tab`); the query console raises the Ввод tab
+  when the program asks.
+  **Removed.**  The «Поле очереди ввода» setting (`view/input_queue`) and its
+  menu row are gone — the queue is a tab now; `view/output_sizes` disappeared
+  (there is no inner splitter any more); the panel is **at the bottom** by
+  default.
+  **Load timer.**  After a file runs to completion, Система gets
+  `--- база знаний загружена (N мс) ---` — the time is measured by the window's
+  `QElapsedTimer` from «Запустить» to the `loaded` event (protocol 8).
+  Checks: `test_window.py` — the new
+  `test_the_panel_has_four_tabs_with_counts` (tabs, counts, colour, focus on
+  diagnostics) and `test_a_run_focuses_the_output_and_the_system_notes_the_time`;
+  the earlier runs were moved to `system_text()`/`problems_text()` (notes and
+  diagnostics are no longer in Вывод).  `test_settings.py`/`test_settingsdialog.py`
+  — without `input_queue`, default `bottom`.  All GUI suites are green.
 
-* GUI round, part 53: **task_50 — панель вывода с вкладками**.  Пользователь
-  попросил превратить панель вывода в четыре вкладки: **Проблемы**, **Вывод**,
-  **Система**, **Ввод**.
-  **Вкладки.**  Панель — один `QTabWidget` (`_panel_tabs`); три read-only панели
-  это всё тот же `panels.OutputPane` (ограниченная история, цвета по роду, хвост
-  строки), а «Ввод» — очередь подготовленных ответов с консолью запроса под
-  ней.  Род строки решает вкладку: `OUTPUT`/`ECHO`/`TRACE` → Вывод, `NOTE` →
-  Система, `ERROR`/`WARNING` → Проблемы (`panels.KIND_TAB`, маршрутизация в
-  `_feed_pane`).  «Сохранить вывод…» пишет вкладку Вывод.
-  **Названия со счётом и цвет.**  В заголовке вкладки стоит счёт:
-  `Вывод:5`, `Проблемы:0`, `Система:3`, `Ввод:2` (Ввод считает непустые строки
-  очереди и обновляется по `textChanged`).  Слово «Проблемы» крашено по
-  состоянию: обычный цвет, когда пусто, оранжевый при одних предупреждениях,
-  красный, когда есть ошибка (`_error_count`/`_warning_count`, `tabTextColor`).
-  **Фокус.**  Запуск показывает Вывод, диагностика (и предупреждение, и ошибка)
-  переключает на Проблемы (`_show_panel_tab`); консоль запроса поднимает вкладку
-  Ввод, когда программа спрашивает.
-  **Убранное.**  Настройка «Поле очереди ввода» (`view/input_queue`) и её строка
-  меню удалены — очередь теперь вкладка; `view/output_sizes` исчез (внутреннего
-  сплиттера больше нет); панель по умолчанию **внизу**.
-  **Таймер загрузки.**  После полного выполнения файла в Систему пишется
-  `--- база знаний загружена (N мс) ---` — время меряет `QElapsedTimer` окна от
-  «Запустить» до события `loaded` (протокол 8).
-  Проверки: `test_window.py` — новая `test_the_panel_has_four_tabs_with_counts`
-  (вкладки, счёт, цвет, фокус по диагностике) и
-  `test_a_run_focuses_the_output_and_the_system_notes_the_time`; прежние прогоны
-  переведены на `system_text()`/`problems_text()` (заметки и диагностика больше не
-  в Выводе).  `test_settings.py`/`test_settingsdialog.py` — без `input_queue`,
-  умолчание `bottom`.  Все GUI-свиты зелёные.
-
-* GUI round, part 54: **настройки — секция «Подсветка»**.  Пользователь попросил
-  показать в настройках, что чем подсвечено и каким hex в каждой теме.
-  В диалоге появилась страница **«Подсветка»** — сразу после «Вид»: таблица
-  `что подсвечено · светлая · тёмная`, в которой каждая из 15 ролей подсветки
+* GUI round, part 54: **settings — the «Подсветка» section**.  The user asked the
+  settings to show what is highlighted with what, and with which hex in each
+  theme.
+  The dialogue gained a **«Подсветка»** page, right after «Вид»: a table
+  `what is highlighted · light · dark` in which each of the 15 syntax roles
   (`Комментарий`, `Вопрос в комментарии`, `Строка`, `Атом в кавычках`,
   `Служебное имя`, `Целое`/`Вещественное`, `Знаки препинания`, `Вопрос`,
-  `Выражение`, `Атом`/`Переменная` латиницей и кириллицей, `Имя из двух
-  алфавитов`) показана своим hex в обеих темах; hex залит своим цветом (текст —
-  чёрный или белый по яркости), страница read-only — менять весь набор можно
-  «Вид → Оформление».  Данные Qt-free: `theme.SYNTAX_LABELS` (имя поля → подпись)
-  и `theme.syntax_rows()` (роль, светлый hex, тёмный hex) — диалог и тест читают
-  одно и то же, так что новая роль в `Theme` сама попадает в страницу.
-  Проверки: `test_settingsdialog.py` — страница «Подсветка» в списке после «Вид»
-  и новая `test_the_syntax_page_lists_every_colour_in_both_themes` (15 ролей,
-  обе темы, первый ряд — комментарий).  `test_appearance.py`/`test_settings.py`
-  зелёные.
+  `Выражение`, `Атом`/`Переменная` in Latin and Cyrillic, `Имя из двух
+  алфавитов`) is shown with its hex in both themes; the hex is filled with its
+  colour (the text is black or white by brightness), and the page is read-only —
+  the whole set is changed with «Вид → Оформление».  The data is Qt-free:
+  `theme.SYNTAX_LABELS` (field name → caption) and `theme.syntax_rows()` (role,
+  light hex, dark hex) — the dialogue and the test read the same thing, so a new
+  role in `Theme` lands on the page by itself.
+  Checks: `test_settingsdialog.py` — the «Подсветка» page in the list after
+  «Вид» and the new
+  `test_the_syntax_page_lists_every_colour_in_both_themes` (15 roles, both
+  themes, the first row is a comment).  `test_appearance.py`/`test_settings.py`
+  are green.
 
-* GUI round, part 55: **«Подсветка» стала изменяемой**.  Пользователь спросил
-  «сможем сделать изменяемые?» — да, смогли.
-  Каждая hex-ячейка на странице «Подсветка» теперь **кнопка-свотч**: клик
-  открывает выбор цвета (заменяемый `_ask_color` — модальный `QColorDialog`
-  вешает headless-тест), и выбранный hex красится на кнопке.  «Применить» пишет
-  в настройки **только изменённые** роли, по теме: ключи `syntax/light` и
-  `syntax/dark` (JSON `поле: "#rrggbb"`, в `MACHINE_KEYS`); «Вернуть встроенные
-  цвета» сбрасывает оба.  Чтение чистит мусор: `Settings.syntax_overrides`
-  берёт только известные поля с валидным hex (`theme.clean_hex`), а
-  `Settings.palette` накладывает их на разрешённую палитру через
-  `theme.apply_syntax_overrides` — `system`-тема берёт override той палитры,
-  которую выбрал рабочий стол; хром (страница, полосы, цвета вывода) не трогается.
-  Проверки: `test_settings.py` — `test_syntax_overrides_round_trip_and_reach_the_palette`
-  (круговорот, чистка мусора, override доходит до палитры и не двигает хром),
-  `test_settingsdialog.py` — `test_a_colour_can_be_changed_and_applied` (клик по
-  свотчу, «Применить» пишет, «Вернуть встроенные» стирает).  Полные
-  `test_settings.py`/`test_settingsdialog.py` зелёные (52 ключа — 38 в диалоге,
-  14 машинных), палитровые тесты окна зелёные.
+* GUI round, part 55: **«Подсветка» became editable**.  The user asked «can we make
+  them editable?» — yes, we could.
+  Each hex cell on the «Подсветка» page is now a **swatch button**: a click opens
+  a colour chooser (the replaceable `_ask_color` — a modal `QColorDialog` hangs
+  a headless test), and the chosen hex is painted on the button.  «Применить»
+  writes **only the changed** roles to the settings, per theme: the keys
+  `syntax/light` and `syntax/dark` (JSON `поле: "#rrggbb"`, in `MACHINE_KEYS`);
+  «Вернуть встроенные цвета» resets both.  Reading cleans out junk:
+  `Settings.syntax_overrides` takes only known fields with a valid hex
+  (`theme.clean_hex`), and `Settings.palette` overlays them on the allowed
+  palette through `theme.apply_syntax_overrides` — the `system` theme takes the
+  override of the palette the desktop chose; the chrome (page, bars, output
+  colours) is untouched.
+  Checks: `test_settings.py` —
+  `test_syntax_overrides_round_trip_and_reach_the_palette` (round trip, junk
+  cleanup, the override reaches the palette and does not move the chrome),
+  `test_settingsdialog.py` — `test_a_colour_can_be_changed_and_applied` (click on
+  the swatch, «Применить» writes, «Вернуть встроенные» erases).  The full
+  `test_settings.py`/`test_settingsdialog.py` are green (52 keys — 38 in the
+  dialogue, 14 machine), the window's palette tests are green.
 
-* GUI round, part 56: **упрощённая палитра стала умолчанием**.  Пользователь
-  подобрал в «Настройки → Подсветка» свой набор (меньше разных цветов, русский
-  и английский — одинаково) и попросил зашить его в поставку.
-  В `theme.py` обновлены обе палитры: `query_comment` = цвету комментария,
-  `quoted_atom` = цвету строки, `keyword` = цвету `query`/`expression`,
-  `atom_latin == atom_cyrillic` (фиолетовый `#4f1473` / `#d47bdc`),
-  `variable_latin == variable_cyrillic` (красный `#b62222` / `#ff7878`),
-  `mixed` — ярко-красный флаг `#e30004` в обеих темах; уточнены `string`,
-  `punctuation`.  `mixed` выведен из WCAG-проверки в `readable_pairs` — это
-  сигнал, а не текст.  Проверки: `test_appearance.py` (контраст), `test_highlighter.py`
-  (комментарий про алфавиты обновлён), `test_settings.py`, `test_settingsdialog.py`,
-  `test_window.py` — зелёные.
+* GUI round, part 56: **the simplified palette became the default**.  The user
+  picked a set of his own in «Настройки → Подсветка» (fewer different colours,
+  Russian and English alike) and asked to ship it.
+  In `theme.py` both palettes were updated: `query_comment` = the comment colour,
+  `quoted_atom` = the string colour, `keyword` = the colour of
+  `query`/`expression`, `atom_latin == atom_cyrillic` (violet `#4f1473` /
+  `#d47bdc`), `variable_latin == variable_cyrillic` (red `#b62222` / `#ff7878`),
+  `mixed` — the bright-red flag `#e30004` in both themes; `string` and
+  `punctuation` were refined.  `mixed` was moved out of the WCAG check in
+  `readable_pairs` — it is a signal, not text.  Checks: `test_appearance.py`
+  (contrast), `test_highlighter.py` (the comment about the alphabets was
+  updated), `test_settings.py`, `test_settingsdialog.py`, `test_window.py` — all
+  green.
 
-* GUI round, part 57: **строка цели — история и автодополнение**.  Пользователь
-  попросил у поля цели (строка `?цель(X).` под редактором) две вещи: историю и
-  подсказки, как в основном редакторе.
-  Появился `editor.QueryLine` (подкласс `QLineEdit`) вместо голого поля:
-  **история** — `Up`/`Down` ходят по отправленным целям (до 20, старые
-  вытесняются; пустая и сразу повторённая не записываются; `Down` мимо самой
-  новой возвращает черновик); **автодополнение** — тот же
-  `completion.CompletionModel`, что у редактора: зарезервированные имена +
-  предикаты текущего документа (`document_text` — показываемый буфер),
-  `Ctrl+Пробел` или набор открывают попап, `Enter`/`Tab` вставляют каркас вызова
-  с курсором после `(`.  Placeholder дополнен подсказкой
-  `… Enter: выполнить · ↑/↓: история · Ctrl+Пробел: подсказки`.  Окно передаёт
-  полю ключевые слова (`_on_ready`), `auto_complete_after` и `completion_match_case`
-  (`apply_settings`).  Проверки: новый `test_queryline.py` (4 проверки — история,
-  лимит и дедуп, подсказки и каркас, Escape), `test_editor.py`/`test_window.py`
-  зелёные.
+* GUI round, part 57: **the goal line — history and completion**.  The user
+  asked the goal field (the `?цель(X).` line under the editor) for two things:
+  history and suggestions, as in the main editor.
+  `editor.QueryLine` (a `QLineEdit` subclass) appeared instead of a bare field:
+  **history** — `Up`/`Down` walk the submitted goals (up to 20, the oldest are
+  evicted; an empty or immediately repeated one is not recorded; `Down` past the
+  newest returns the draft); **completion** — the same
+  `completion.CompletionModel` as the editor's: reserved names + the predicates
+  of the current document (`document_text` — the displayed buffer),
+  `Ctrl+Пробел` or typing open a popup, `Enter`/`Tab` insert a call skeleton
+  with the caret after `(`.  The placeholder gained the hint
+  `… Enter: выполнить · ↑/↓: история · Ctrl+Пробел: подсказки`.  The window
+  passes the field the keywords (`_on_ready`), `auto_complete_after` and
+  `completion_match_case` (`apply_settings`).  Checks: the new
+  `test_queryline.py` (4 checks — history, limit and dedup, suggestions and
+  skeleton, Escape), `test_editor.py`/`test_window.py` green.
 
-* GUI round, part 58: **вкладка «Ввод» — только очередь; консоль запроса — под
-  строкой цели**.  Пользователь попросил разнести ввод: вкладку «Ввод» оставить
-  только очередью (и не переключаться на неё), а появляющийся при запросе
-  `LineEdit` перенести под строку цели.
-  Консоль запроса (`panels.InputPane`) ушла из вкладки «Ввод» в редакторскую
-  колонку — под строку цели; при вопросе она появляется там, а панель остаётся
-  на вкладке, которую выбрал читатель (обычно «Вывод») — `_show_panel_tab(Ввод)`
-  из `_on_input_request` убран.  Вкладка «Ввод» теперь только очередь
-  подготовленных ответов (счёт `Ввод:N` не меняется).  Проверки: новая
-  `test_window.py::test_a_request_keeps_the_panel_on_the_output` (консоль не во
-  вкладке «Ввод», панель остаётся на «Вывод», ответ проходит), полный
-  `test_window.py` зелёный.
+* GUI round, part 58: **the «Ввод» tab is the queue only; the query console sits
+  under the goal line**.  The user asked to separate the input: leave the «Ввод»
+  tab as the queue only (and never switch to it), and move the `LineEdit` that
+  appears on a request under the goal line.
+  The query console (`panels.InputPane`) left the «Ввод» tab for the editor
+  column — under the goal line; on a question it appears there, and the panel
+  stays on the tab the reader chose (usually «Вывод») — `_show_panel_tab(Ввод)`
+  was removed from `_on_input_request`.  The «Ввод» tab is now only the queue of
+  prepared answers (the `Ввод:N` count does not change).  Checks: the new
+  `test_window.py::test_a_request_keeps_the_panel_on_the_output` (the console is
+  not in the «Ввод» tab, the panel stays on «Вывод», the answer goes through),
+  the full `test_window.py` is green.
 
-* GUI round, part 59: **консоль запроса — минимальная высота**.  Пользователь
-  заметил, что появившаяся консоль растягивается на всю колонку: её `QLineEdit`
-  плавал в середине высокой пустой полосы.  У `panels.InputPane` вертикальная
-  политика размера стала `Fixed` (всегда по своему содержимому, не растягивается),
-  а текстовая область ответа `line` ограничена четырьмя строками вместо дефолтных
-  ~192 px.  Проверки: новая `test_window.py::test_the_console_stays_one_field_high`
-  (политика `Fixed` и высота ≈ sizeHint после показа окна), `test_output.py` и
-  полный `test_window.py` зелёные.
+* GUI round, part 59: **the query console — minimal height**.  The user noticed
+  that the console, once it appeared, stretched over the whole column: its
+  `QLineEdit` floated in the middle of a tall empty strip.  `panels.InputPane`'s
+  vertical size policy became `Fixed` (always its own content, no stretching),
+  and the `line` answer text area is capped at four lines instead of the default
+  ~192 px.  Checks: the new
+  `test_window.py::test_the_console_stays_one_field_high` (the `Fixed` policy and
+  a height ≈ sizeHint after the window is shown), `test_output.py` and the full
+  `test_window.py` are green.
 
-* Interpreter round, part 60: **`\+` и подсказка вместо `is/2`** (task_55,
-  2026-10-02).  Ответ на вопрос пользователя «осталось 2 существенных пункта,
-  где Пролог-Д расходится с другими: `is` и `\+ Ц`»: `\+` добавлен, `is` — нет.
-  `\+` — один токен (`TokenKind::NotGoal`: `peek(1) == '+'` в лексере, одинокий
-  `\` остаётся «недопустимым символом») и префикс уровня терма в `parseTerm`,
-  разворачивается в `НЕ/1`; приоритет ISO: `\+ A, B` — это `(\+ A), B`,
-  `\+ (A, B)` — отрицание конъюнкции, `\+ \+ Ц` — двойное отрицание;
-  `НАЙТИВСЕ(1, \+ РАВНО(1, 2), L)` отвечает `L=[1]`, а `\+ (ЛОЖЬ, РАВНО(B, 1)),
-  ПЕР(B)` — `B=_1` (связывание внутри отрицания отменяется).  Семантики,
-  диспетчера, `--list-keywords` и `doc/builtins.json` изменение не касается: это
-  запись, и проверка вызовов видит тот же `НЕ/1` (`walkGoal` его и так
-  раскрывает).  Формат читает `\+` как один токен и в строке не рвёт; в GUI
-  (`tokens.py`) он тоже один знак препинания, как `:-`.
-  Вместо `is` — подсказки: `?is(X, #2+3#).` получает предупреждение «не найдено:
-  is/2; «is» — не предикат: в Пролог-Д это «РАВНО(X, #2+3#)»» (имя при этом не
-  зарезервировано — своё `is/2` программа определить может), а `?X is 2+3.` —
-  ошибку разбора ««is» — не оператор: выражение помечают «#…#», например
-  «РАВНО(X, #2+3#)»»: без неё читатель ISO слышал только «Цель не может быть
-  переменной».  Настоящий оператор не добавлен сознательно: `#…#` — признак
-  выражения (вычисляется везде, где нужно число, а унификация обратима:
-  `РАВНО(5, #2+3#)` — ДА), и `is` ввёл бы вторую арифметику — голые `2+3` в
-  целях, — которую пришлось бы дать и сравнениям (`X < 2+1`, `=:=`), а от них уже
-  решено отказаться (task_52).  Проверки: 274/274 ctest — шесть новых случаев
-  Catch2 (лексер, парсер с сообщением про `is`, `\+` как `НЕ` в control-тестах,
-  формат) плюс тест текста предупреждения `is/2`; GUI `test_tokens.py` (новая
-  пара `\+`) и `test_reference.py` зелёные.  Руководство: §3.3 (про `is`), §4.4
-  и приложение, обе строки сравнительной таблицы; `prologd-diff.typ` — §19, §20 и
-  две строки в §14.
+* Interpreter round, part 60: **`\+` and a hint instead of `is/2`** (task_55,
+  2026-10-02).  The answer to the user's question «there are 2 significant points left
+  where Пролог-Д diverges from the others: `is` and `\+ Ц`»: `\+` was added, `is` was not.
+  `\+` is one token (`TokenKind::NotGoal`: `peek(1) == '+'` in the lexer, a lone
+  `\` stays an «недопустимый символ») and a term-level prefix in `parseTerm`,
+  unfolding to `НЕ/1`; the priority is ISO: `\+ A, B` is `(\+ A), B`,
+  `\+ (A, B)` negates the conjunction, `\+ \+ Ц` is double negation;
+  `НАЙТИВСЕ(1, \+ РАВНО(1, 2), L)` answers `L=[1]`, and `\+ (ЛОЖЬ, РАВНО(B, 1)),
+  ПЕР(B)` — `B=_1` (a binding inside a negation is undone).  The change does not
+  touch the semantics, the dispatcher, `--list-keywords` or `doc/builtins.json`:
+  it is syntax, and the call check sees the same `НЕ/1` (`walkGoal` expands it
+  anyway).  The formatter reads `\+` as one token and does not break the line; in
+  the GUI (`tokens.py`) it is also one punctuation mark, like `:-`.
+  Instead of `is` — hints: `?is(X, #2+3#).` gets the warning «не найдено:
+  is/2; «is» — не предикат: в Пролог-Д это «РАВНО(X, #2+3#)»» (the name is not
+  reserved — a program may define its own `is/2`), and `?X is 2+3.` — the parse
+  error ««is» — не оператор: выражение помечают «#…#», например
+  «РАВНО(X, #2+3#)»»: without it an ISO reader heard only «Цель не может быть
+  переменной».  A real operator was deliberately not added: `#…#` marks an
+  expression (it is evaluated wherever a number is needed, and unification is
+  reversible: `РАВНО(5, #2+3#)` — ДА), and `is` would introduce a second
+  arithmetic — bare `2+3` in goals — that comparisons (`X < 2+1`, `=:=`) would
+  have to get too, and those have already been given up (task_52).  Checks:
+  274/274 ctest — six new Catch2 cases (lexer, parser with the `is` message,
+  `\+` as `НЕ` in the control tests, the formatter) plus a test of the `is/2`
+  warning text; the GUI `test_tokens.py` (a new `\+` pair) and `test_reference.py`
+  are green.  The manual: §3.3 (about `is`), §4.4 and the appendix, both rows of
+  the comparison table; `prologd-diff.typ` — §19, §20 and two rows in §14.
 
-* Тот же день, продолжение: **пример с дизъюнкцией и формулировка про точку**.
-  `prologd-diff.typ` §16 показывает задачу «в набор годятся и дешёвые
-  инструменты, и надёжные» в трёх записях: два предложения с одним заголовком
-  (Пролог-Д 1.0), `ИЛИ/2` (одна ветвь) и `;` в теле правила (обе ветви).
-  Прогоны на собранном интерпретаторе: `?НАЙТИВСЕ(Т, годится(Т), L)` даёт
-  `L=[молоток,отвёртка,тиски,струбцина]` для `;` и двух предложений, но
-  `L=[молоток]` для `ПЕРВОЕ`; отдельный листинг — про альтернативу в середине
-  правила, где раньше повторялся общий «хвост» (`со_скидкой` в двух записях даёт
-  `L=[молоток,тиски]`).  Заодно исправлена фраза в §17, оборванная правкой
-  пользователя.  Сообщения о `;` там, где диалект 1.0 принимал её как
-  терминатор, и о пропущенной точке стали предписывающими: «предложение должно
-  заканчиваться точкой» (было «не заканчивается»; первую формулировку,
-  «предложение заканчивается точкой», пользователь забраковал ещё в task_40) —
-  правка в `parser.cpp`, двух тестах и цитате в §16 `prologd-diff.typ`.
+* The same day, continued: **the disjunction example and the wording about the
+  dot**.  `prologd-diff.typ` §16 shows the task «в набор годятся и дешёвые
+  инструменты, и надёжные» in three writings: two clauses with one head
+  (Пролог-Д 1.0), `ИЛИ/2` (one branch) and `;` in the rule body (both branches).
+  Runs on the built interpreter: `?НАЙТИВСЕ(Т, годится(Т), L)` gives
+  `L=[молоток,отвёртка,тиски,струбцина]` for `;` and for the two clauses, but
+  `L=[молоток]` for `ПЕРВОЕ`; a separate listing is about an alternative in the
+  middle of a rule where the common «tail» used to be repeated (`со_скидкой` in
+  two writings gives `L=[молоток,тиски]`).  The phrase in §17, cut off by the
+  user's edit, was fixed too.  The messages about `;` where dialect 1.0 accepted
+  it as a terminator, and about a missing dot, became prescriptive: «предложение
+  должно заканчиваться точкой» (it was «не заканчивается»; the first wording,
+  «предложение заканчивается точкой», the user rejected back in task_40) — a
+  change in `parser.cpp`, two tests and the quotation in §16 of
+  `prologd-diff.typ`.
 
-* Тот же день, продолжение: **пропущенная точка видна не только в конце файла**
-  (task_56).  Наблюдение пользователя: у двух фактов подряд без точки в конце
-  первого (`студент(вова, корчагин)` строкой выше `студент(данил, ахмеров).`)
-  выдавалось `2:1: ошибка при разборе предложения`, а полезная формулировка —
-  только когда точка пропущена у самого последнего предложения.  Причина: новый
-  перевод строки ничего не заканчивает, поэтому парсер склеивал два предложения
-  и спотыкался на имени второго — в общей ветке `parseClause`, где сообщение
-  ничего не говорит.  Теперь `beginsStatement(kind)` отличает токен, с которого
-  может начаться терм/факт/правило/запрос, от всего остального: после
-  законченного предложения это значит «нет точки», и `reportMissingDot()`
-  показывает позицию на *конце своего* предложения (`1:42` у примера выше, где
-  `)` стоит 42-м байтом).  Тот же случай в запросе (`?- a(1)` × 2 строки) и в
-  правиле.  Общая формулировка осталась там, где следующее предложение начаться
-  не может (`a(1), b(2).`) и где уже есть точная диагностика (`p :- f(a "b").`
-  — «непарные скобки»).  Проверки: `студент(вова, корчагин)` + вторая строка —
-  два новых случая Catch2 (парсер: факт, правило, запрос, «точка везде»;
-  загрузчик), ctest 276/276.
+* The same day, continued: **a missing dot is seen not only at the end of the
+  file** (task_56).  The user's observation: with two facts in a row and no dot
+  at the end of the first (`студент(вова, корчагин)` one line above
+  `студент(данил, ахмеров).`) the output was `2:1: ошибка при разборе
+  предложения`, and the helpful wording came only when the dot was missing from
+  the very last clause.  The reason: a new line ends nothing, so the parser
+  glued the two clauses together and stumbled on the name of the second — in the
+  common branch of `parseClause`, where the message says nothing.  Now
+  `beginsStatement(kind)` tells a token that can start a term/fact/rule/query
+  from everything else: after a finished clause that means «нет точки», and
+  `reportMissingDot()` shows the position at the *end of its own* clause (`1:42`
+  in the example above, where `)` is the 42nd byte).  The same case in a query
+  (`?- a(1)` × 2 lines) and in a rule.  The common wording stayed where the next
+  clause cannot begin (`a(1), b(2).`) and where there is already an exact
+  diagnostic (`p :- f(a "b").` — «непарные скобки»).  Checks:
+  `студент(вова, корчагин)` + a second line — two new Catch2 cases (parser: fact,
+  rule, query, «точка везде»; loader), ctest 276/276.
 
-* Тот же день, продолжение: **таблица сравнения открывает «Изменения языка», а
-  номера разделов считает Typst**.  Просьба пользователя: перенести таблицу в
-  самое начало, как в руководстве, и обойтись без ручной перенумерации.
-  Таблица теперь первый раздел без номера (`#heading(numbering: none)`; счётчик
-  его пропускает, главы по-прежнему начинаются с 1), в заголовках цифр нет
-  (`#set heading(numbering: "1.")`), а ссылки в тексте берут номер из счётчика:
-  `#sec(<sec:arith>)` и т. п. — `#ref` подставил бы и слово («Раздел 16»), а в
-  середине фразы нужно число.  Всё, что раньше было написано руками, посчиталось
-  само: `;` — раздел 14, `НАЙТИВСЕ` — 15, `ПЕРВОЕ` — 16, `\+` — 17, `is/2` — 18
-  (в тексте §6/§12/§14/§16/§18 и в строке таблицы).  Заодно две неточности:
-  ячейка «Дизъюнкция `;`» говорила «приоритет как у `,`», а на самом деле `,`
-  связывает *крепче* — прогон `?НАЙТИВСЕ(X, (РАВНО(X, 1), РАВНО(X, 2) ;
-  РАВНО(X, 3)), L).` даёт `L=[3]` (при обратном порядке вышло бы `L=[]`), в
-  таблице теперь «есть: `A ; B`, а `,` связывает крепче»; и `**сохранена**`
-  (двойные звёздочки в Typst ничего не выделяют, только предупреждение) стало
-  `*сохранена*`.  Документ пересобран: 22 страницы, заголовки 1–19 без цифр в
-  исходнике.
+* The same day, continued: **the comparison table opens «Изменения языка», and
+  Typst counts the section numbers**.  The user's request: move the table to the
+  very beginning, as in the manual, and do without manual renumbering.
+  The table is now the first section without a number
+  (`#heading(numbering: none)`; the counter skips it, the chapters still start
+  at 1), the headings have no digits (`#set heading(numbering: "1.")`), and
+  references in the text take the number from the counter: `#sec(<sec:arith>)`
+  and the like — `#ref` would also insert a word («Раздел 16»), but mid-sentence
+  a number is needed.  Everything that used to be written by hand counted
+  itself: `;` — section 14, `НАЙТИВСЕ` — 15, `ПЕРВОЕ` — 16, `\+` — 17, `is/2` —
+  18 (in the text of §6/§12/§14/§16/§18 and in the table row).  Two inaccuracies
+  as well: the «Дизъюнкция `;`» cell said «приоритет как у `,`», but in fact `,`
+  binds *tighter* — the run `?НАЙТИВСЕ(X, (РАВНО(X, 1), РАВНО(X, 2) ;
+  РАВНО(X, 3)), L).` gives `L=[3]` (in the reverse order it would be `L=[]`); the
+  table now says «есть: `A ; B`, а `,` связывает крепче»; and `**сохранена**`
+  (double stars in Typst emphasise nothing, only warn) became `*сохранена*`.
+  The document was rebuilt: 22 pages, headings 1–19 with no digits in the
+  source.
 
-* Interpreter round, part 61: **`ПЕРВОЕ` берёт любое число целей** (task_51,
-  2026-10-02).  Ответ на вопрос пользователя «сейчас `ПЕРВОЕ` у нас с двумя
-  аргументами, сложно ли заменить на любое количество, как у `ВЫВОД`?», решённый
-  в пользу «от арности 1»: в целом тракте (диспетчер, таблица ключевых слов,
-  проверка вызовов, `--list-keywords`, событие протокола, автодополнение)
-  `variadic` уже значит «хотя бы один аргумент», поэтому нигде не появилось
-  второго поля.  `builtinOr` стал `builtinFirst` и обходит `args` через
-  `callOnce` — первая цель, у которой есть решение, фиксируется; зашитый
-  `isVariadicBuiltin` (два сравнения имён) стал таблицей `kVariadicNames`
-  (`ВЫВОД`/`write`, `ПЕРВОЕ`/`first`), из которой читают `findBuiltin`,
-  `builtinArities` и `builtinNames`, а строка `add("ПЕРВОЕ", 2, …)` и `add`
-  больше на два имени не опираются.  Двухаргументные вызовы отвечают как
-  раньше, `;` по-прежнему дизъюнкция, а разбор, движок, лексер и `checks.cpp` не
-  тронуты.  Проверкой нашлась одна неточность в самой формулировке задачи:
-  одноаргументное `ПЕРВОЕ(Ц)` — это *фиксация* на первом решении, а не `ВЫП(Ц)`
-  (`?НАЙТИВСЕ(X, ПЕРВОЕ(p(X)), L).` → `L=[1]`, у `ВЫП(p(X))` — `L=[1,2]`), и в
-  руководстве §4.6 теперь так и написано.  Арность 0 — ошибка загрузки
-  («ПЕРВОЕ не имеет арности 0», код 2).  Руководство §4.5/§4.6,
-  `technical.typ`, §«`ПЕРВОЕ` вместо `ИЛИ`» и строка таблицы в
+* Interpreter round, part 61: **`ПЕРВОЕ` takes any number of goals** (task_51,
+  2026-10-02).  The answer to the user's question «right now `ПЕРВОЕ` has two arguments
+  for us, is it hard to change it to any number, like `ВЫВОД`?», decided
+  in favour of "arity 1 at minimum": in the whole pipeline (dispatcher, keyword table,
+  call check, `--list-keywords`, the protocol event, completion) `variadic`
+  already means "at least one argument", so no second field appeared anywhere.
+  `builtinOr` became `builtinFirst` and walks `args` through `callOnce` — the
+  first goal that has a solution is committed to; the hard-coded
+  `isVariadicBuiltin` (two name comparisons) became the `kVariadicNames` table
+  (`ВЫВОД`/`write`, `ПЕРВОЕ`/`first`), read by `findBuiltin`, `builtinArities`
+  and `builtinNames`, and the line `add("ПЕРВОЕ", 2, …)` and `add` no longer lean
+  on two names.  Two-argument calls answer as before, `;` is still disjunction,
+  and the parser, engine, lexer and `checks.cpp` are untouched.  A check found
+  one inaccuracy in the task statement itself: a one-argument `ПЕРВОЕ(Ц)` is a
+  *commitment* to the first solution, not `ВЫП(Ц)`
+  (`?НАЙТИВСЕ(X, ПЕРВОЕ(p(X)), L).` → `L=[1]`, while `ВЫП(p(X))` gives
+  `L=[1,2]`), and the manual §4.6 now says so.  Arity 0 is a load error
+  («ПЕРВОЕ не имеет арности 0», code 2).  The manual §4.5/§4.6,
+  `technical.typ`, §«`ПЕРВОЕ` вместо `ИЛИ`» and the table row in
   `prologd-diff.typ`, `doc/builtins.json` (`arities: []`, `variadic`),
-  `ai/porting_notes.md`, `gui/README.md`.  Проверки: 278/278 ctest (новый случай
-  Catch2 на вариадику и CLI-тест `ПЕРВОЕ/+`), шесть GUI-наборов
+  `ai/porting_notes.md`, `gui/README.md`.  Checks: 278/278 ctest (a new Catch2
+  case for variadics and the CLI test `ПЕРВОЕ/+`), six GUI suites
   (`test_reference`, `test_completion`, `test_keywords`, `test_queries`,
-  `test_tokens`, `test_queryline`) зелёные, три документа собираются Typst.
+  `test_tokens`, `test_queryline`) green, three documents build with Typst.
 
-* Interpreter round, part 62: **знаки сравнения — сахар над встроенными**
-  (task_52, 2026-10-02).  Ответ на «он же + ISO-сравнения»: `=`, `<`, `>`, `>=`,
-  `=<` — не новые имена, а вторая запись `РАВНО`, `МЕНЬШЕ`, `БОЛЬШЕ`.  В
-  `parser.cpp` одна таблица `kInfixOperators` (`=`→`РАВНО`, `<`→`МЕНЬШЕ`,
-  `>`→`БОЛЬШЕ`, `=<`→`НЕ(БОЛЬШЕ)`, `>=`→`НЕ(МЕНЬШЕ)`) и один слой между `#…#` и
-  всем остальным: знаки связывают крепче `,` и `;` и слабее `#…#`, цепочка
-  `0 < X < 10` — ошибка разбора с одним сообщением (««<» — не цепочка: разбейте
-  на два сравнения, «A < B, B < C»»), а `skipToTerminator` не даёт парсеру
-  сказать то же второй раз про «непарные скобки».  Всё, что ниже, о знаках не
-  знает: диспетчер, проверка вызовов, `--list-keywords`, протокол и
-  `doc/builtins.json` видят те же предикаты, поэтому `НЕ(X = 1)`,
-  `НАЙТИВСЕ(X, (X = 1), L)`, `ВЫП((X = A))` и `r([A = B])` разбираются без
-  единой правки в движке.  Четыре вещи нашлись по ходу.  (1) **Правило числа.**
-  Перенесённая запись `1.` = 1.0 съедала терминатор: `?2 > 1.` не разбиралось
-  вовсе.  Решение пользователя — правило ISO: `1.` это целое `1` и точка,
-  вещественное пишут `1.0`; это единственное место задачи, где меняется язык
-  (`#1.#` больше не загружается), и оно записано в `help.typ` §3.2 и в
-  `prologd-diff.typ`.  (2) **`#…#` — операнд.**  `parseTerm` возвращал
-  `parseArithmetic()` раньше времени на `#`, и `r(#1 + 1# = 2)` падало с
-  «непарные скобки»; теперь операнд берёт `parseOperand`, и тест на это есть.
-  (3) **Подсказки — в лексере** (`kForeignOperators`, длинные записи первыми:
-  `=:=`, `=\=`, `\==`, `\=`, `==`, `@=<`, `@>=`, `@<`, `@>`, `->`, `<=`): чужая
-  запись объясняется там, где стоит знак, и `?X <= 1.` начинается с ««<=» — не
-  оператор: «меньше или равно» записывают «=<»», а не с «Цель не может быть
-  переменной».  (4) **GUI — только подсветка**: знаки стали видом `OPERATOR`, а
-  `Ctrl+=` остался за `РАВНО(`, как решил пользователь, поэтому `shortcuts.py` не
-  изменился.  Слабое место, оставленное нарочно: `X < 2+1` (без `#…#`) даёт общее
-  «ошибка при разборе предложения» — подсказку про `#…#` там можно добавить
-  отдельно, как у `is`.  Руководство: `help.typ` §3.2/§3.3/§4.7/§5.1 и строки
-  таблицы, `prologd-diff.typ` §9 и три строки «Краткой таблицы»,
-  `technical.typ`, варианты в `doc/builtins.json`; уроки 3 и 4 получили пример
-  с короткой записью (решение пользователя: «и урок 3, и урок 4») — их `%!`
-  строки сами себе золотой ответ, поэтому `test_lessons.cpp` не менялся.
-  Проверки: 285/285 ctest (семь новых случаев), 21 набор GUI (`test_*.py`) и
-  `protocol_smoke.py`, пять PDF;
-  счётчики `test_queries.py` пришлось освежить — правка урока 4 в task_51
-  добавила вопрос (`24` → `25`), и набор был красным уже на HEAD, а примеры
-  этого раунда сдвинули ещё два (`03`: `34` → `37`, `04`: `25` → `27`): наборы
-  GUI надо гонять после любой правки `examples/`.
+* Interpreter round, part 62: **comparison signs are sugar over built-ins**
+  (task_52, 2026-10-02).  The answer to «the same + ISO comparisons»: `=`, `<`, `>`,
+  `>=`, `=<` are not new names but a second writing of `РАВНО`, `МЕНЬШЕ`,
+  `БОЛЬШЕ`.  In `parser.cpp` there is one `kInfixOperators` table (`=`→`РАВНО`,
+  `<`→`МЕНЬШЕ`, `>`→`БОЛЬШЕ`, `=<`→`НЕ(БОЛЬШЕ)`, `>=`→`НЕ(МЕНЬШЕ)`) and one
+  layer between `#…#` and everything else: the signs bind tighter than `,` and
+  `;` and looser than `#…#`, the chain `0 < X < 10` is a parse error with a
+  single message (««<» — не цепочка: разбейте на два сравнения, «A < B, B < C»»),
+  and `skipToTerminator` keeps the parser from saying the same thing a second
+  time about «непарные скобки».  Everything below knows nothing about the signs:
+  the dispatcher, call check, `--list-keywords`, the protocol and
+  `doc/builtins.json` see the same predicates, so `НЕ(X = 1)`,
+  `НАЙТИВСЕ(X, (X = 1), L)`, `ВЫП((X = A))` and `r([A = B])` parse without a
+  single engine change.  Four things turned up along the way.  (1) **The number
+  rule.**  The ported writing `1.` = 1.0 ate the terminator: `?2 > 1.` did not
+  parse at all.  The user's decision is the ISO rule: `1.` is the integer `1`
+  plus a dot, a real is written `1.0`; this is the only place in the task where
+  the language changes (`#1.#` no longer loads), and it is recorded in `help.typ`
+  §3.2 and in `prologd-diff.typ`.  (2) **`#…#` is an operand.**  `parseTerm`
+  returned `parseArithmetic()` prematurely on `#`, and `r(#1 + 1# = 2)` fell with
+  «непарные скобки»; now the operand is taken by `parseOperand`, and there is a
+  test for it.  (3) **The hints are in the lexer** (`kForeignOperators`, longer
+  writings first: `=:=`, `=\=`, `\==`, `\=`, `==`, `@=<`, `@>=`, `@<`, `@>`,
+  `->`, `<=`): a foreign writing is explained where the sign stands, and
+  `?X <= 1.` begins with ««<=» — не оператор: «меньше или равно» записывают
+  «=<»», not with «Цель не может быть переменной».  (4) **GUI — highlighting
+  only**: the signs became the `OPERATOR` kind, while `Ctrl+=` stayed on
+  `РАВНО(`, as the user decided, so `shortcuts.py` did not change.  A weak spot
+  left on purpose: `X < 2+1` (without `#…#`) gives the generic «ошибка при
+  разборе предложения» — a hint about `#…#` could be added there separately, as
+  with `is`.  The manual: `help.typ` §3.2/§3.3/§4.7/§5.1 and the table rows,
+  `prologd-diff.typ` §9 and three rows of the «Краткая таблица», `technical.typ`,
+  the variants in `doc/builtins.json`; lessons 3 and 4 got an example with the
+  short writing (the user's decision: «both lesson 3 and lesson 4») — their `%!` lines
+  are a golden answer to themselves, so `test_lessons.cpp` did not change.
+  Checks: 285/285 ctest (seven new cases), 21 GUI suites (`test_*.py`) and
+  `protocol_smoke.py`, five PDFs; the `test_queries.py` counters had to be
+  refreshed — the lesson 4 edit in task_51 added a question (`24` → `25`) and the
+  suite was already red on HEAD, and this round's examples shifted two more
+  (`03`: `34` → `37`, `04`: `25` → `27`): the GUI suites must be run after any
+  change to `examples/`.
 
 * Interpreter round, part 63: **`ВЫВОДПС`/`writeln`** (task_53, 2026-10-03).
-  Третий вариадический предикат — и первая проверка того, что таблица имён из
-  task_51 действительно данные: имя, английская пара и «хотя бы один аргумент»
-  стоят двух строк в `builtins.cpp` плюс слова в `kReservedBuiltins`, а тело —
-  `builtinWriteLine` рядом с `builtinWrite` (тот же цикл плюс один `newline()`;
-  второй вызов цели не нужен, `ВЫВОД` не отказывает).  Нулевая арность осталась
-  за `ПС`, поэтому второй записи для «просто перевод строки» нет.  Дороже всего
-  обошлась не программа, а нумерация: §6.3 — новая (место выбрал пользователь:
-  сразу после `ПС`), всё с 6.3 по 6.9 сдвинулось на один, а номера жили ещё в
-  трёх местах — ссылка в `prologd-diff.typ` («таблица кодов»), комментарии урока
-  7 и план `task_54_input_stream.md`.  Все три поправлены в этом же раунде: `section`
-  каждой записи `doc/builtins.json` обязан быть заголовком руководства, так что
-  расхождение поймал бы `test_reference.py` — но поймал бы уже после правки.
-  Урок 7 показывает короткую запись (`?ВЫВОДПС("Сумма: ", 5).`), его счётчик в
-  `test_queries.py` — `19` → `20`; в приложении английских имён запись встала
-  сама (`ВЫВОДПС — writeln`).  Проверки: 290/290 ctest (три новых случая Catch2
-  и два CLI), `--list-keywords` — 110 имён, 21 набор GUI и `protocol_smoke.py`,
-  пять PDF, страницы 16–18 и 33 просмотрены.
+  The third variadic predicate — and the first check that the name table from
+  task_51 really is data: the name, the English pair and «хотя бы один
+  аргумент» cost two lines in `builtins.cpp` plus words in `kReservedBuiltins`,
+  and the body is `builtinWriteLine` next to `builtinWrite` (the same loop plus
+  one `newline()`; a second call per goal is not needed, `ВЫВОД` does not fail).
+  Arity zero stayed with `ПС`, so there is no second writing for «просто перевод
+  строки».  What cost the most was not the program but the numbering: §6.3 is new
+  (the place was chosen by the user: right after `ПС`), everything from 6.3 to
+  6.9 shifted by one, and the numbers also lived in three more places — a
+  reference in `prologd-diff.typ` («таблица кодов»), the lesson 7 comments and
+  the plan `task_54_input_stream.md`.  All three were fixed in the same round:
+  the `section` of every `doc/builtins.json` entry must be a heading of the
+  manual, so `test_reference.py` would have caught the mismatch — but only after
+  the edit.  Lesson 7 shows the short writing (`?ВЫВОДПС("Сумма: ", 5).`), its
+  counter in `test_queries.py` — `19` → `20`; in the English-names appendix the
+  entry landed by itself (`ВЫВОДПС — writeln`).  Checks: 290/290 ctest (three new
+  Catch2 cases and two CLI), `--list-keywords` — 110 names, 21 GUI suites and
+  `protocol_smoke.py`, five PDFs, pages 16–18 and 33 looked at.
 
-* Interpreter round, part 64: **ответ оболочки — кусок входного потока**
-  (task_54, 2026-10-03).  Источников ввода четыре — файл (`-i`, `ЧТЕНИЕ_ИЗ`),
-  стандартный поток, строка `$` исходника и ответ оболочки, — и все, кроме
-  последнего, читались через `std::getline`: строка есть то, что между двумя `\n`.
-  Ответ же клался в буфер целиком, поэтому именно в окне `ВВОДСТР` возвращал
-  `\n`-ы как текст, остаток после `ВВОДСИМВ` начинался с `\n`, а `ВВКОД` читал код
-  10 между строками: программа, проверенная на файле, в окне вела себя иначе.
-  Теперь кусок принадлежит потоку — `IoContext` держит его остаток и выдаёт по
-  строке, спрашивая оболочку только когда остаток кончился.  Остальное —
-  следствия: `a\n` это одна строка, а не строка и пустая (следующее чтение идёт к
-  пользователю); `""` — одна пустая, как и было; `а\n\nб` даёт ровно то же, что те
-  же байты в файле, и это закреплено двумя чтениями — из куска и из временного
-  файла.  Второй пункт — BOM: `stripByteOrderMark` в трёх точках входа (первая
-  строка базового потока, первого файла `ЧТЕНИЕ_ИЗ` и каждого куска), потому что
-  `Notepad` ставит марку в новый файл сам, а код `65279` первым символом строки —
-  не то, что ждёт школьник; в середине куска марка остаётся данными.  Правка
-  оказалась ровно в одном месте: ни решатель, ни проверки вызовов, ни протокол не
-  изменились (`input.text` всегда мог содержать `\n`), а старый тест про обработчик
-  ввода этого не ловил — в нём каждая запись была одной строкой.  Документы поехали
-  шире кода: ADR-023, `technical.typ` §10, `help.typ` §6.5 (BOM) и §6.8 (кусок
-  окна), `gui.typ` §6.1 — абзац описывал окно до task_50 («поле ввода под панелью
-  вывода», пункт меню, которого больше нет) и обещал, что «ответ на `ВВОДСТР` может
-  быть фразой»; теперь там точный смысл — одна фраза это несколько строк ввода.
-  Плюс `gui/README.md` и подсказка настройки «Спрашивать ввод», которая тоже
-  называла поле «под выводом».  Проверки: 305/305 ctest (8 случаев `IoContext`,
-  7 через встроенные предикаты, один случай в `protocol_session.cmake` — две строки
-  в одном ответе дают один `input_request`), GUI-проверка с диалогом-«предателем»
-  (вторая строка не должна дойти до окна), пять PDF.
+* Interpreter round, part 64: **the shell answer is a chunk of the input stream**
+  (task_54, 2026-10-03).  There are four input sources — a file (`-i`,
+  `ЧТЕНИЕ_ИЗ`), the standard stream, a `$` line of the source and the shell
+  answer — and all but the last were read through `std::getline`: a line is what
+  lies between two `\n`.  The answer, though, was put into the buffer whole, so
+  it was in the window that `ВВОДСТР` returned `\n`s as text, the remainder
+  after `ВВОДСИМВ` began with `\n`, and `ВВКОД` read code 10 between lines: a
+  program verified against a file behaved differently in the window.  Now the
+  chunk belongs to the stream — `IoContext` keeps its remainder and hands out one
+  line at a time, asking the shell only when the remainder runs out.  The rest
+  are consequences: `a\n` is one line, not a line and an empty one (the next read
+  goes to the user); `""` — one empty line, as before; `а\n\nб` gives exactly what
+  the same bytes in a file give, and this is pinned by two reads — from the chunk
+  and from a temporary file.  The second item is the BOM: `stripByteOrderMark` at
+  three entry points (the first line of the base stream, the first file of
+  `ЧТЕНИЕ_ИЗ` and each chunk), because `Notepad` puts the mark into a new file by
+  itself, and code `65279` as the first character of a line is not what a
+  schoolchild expects; in the middle of a chunk the mark stays data.  The edit
+  turned out to be in exactly one place: neither the solver, nor the call checks,
+  nor the protocol changed (`input.text` could always contain `\n`), and the old
+  test about the input handler did not catch this — in it every entry was one
+  line.  The documents moved wider than the code: ADR-023, `technical.typ` §10,
+  `help.typ` §6.5 (BOM) and §6.8 (the window chunk), `gui.typ` §6.1 — a paragraph
+  described the window before task_50 («поле ввода под панелью вывода», a menu
+  item that no longer exists) and promised that «ответ на `ВВОДСТР` может быть
+  фразой»; now the exact meaning is there — one phrase is several lines of input.
+  Plus `gui/README.md` and the «Спрашивать ввод» setting hint, which also called
+  the field «под выводом».  Checks: 305/305 ctest (8 `IoContext` cases, 7 through
+  built-in predicates, one case in `protocol_session.cmake` — two lines in one
+  answer give one `input_request`), a GUI check with a «предатель» dialogue (the
+  second line must not reach the window), five PDFs.
 
-* I/O round, part 65: **неудачный `ЗАПИСЬ_В` оставлял вывод на закрытом потоке**
-  (task_57, 2026-10-03).  Нашлось при работе над task_54, когда смотрели на
-  `IoContext` целиком: `openOutput` закрывал текущий файл **до** попытки открыть
-  новый, а `output_` присваивался только при успехе, поэтому после неудачного
-  переключения он оставался на закрытом `file_output_`.  Запись в закрытый
-  `std::ofstream` теряется молча (флаг `badbit`, который никто не смотрит), и
-  пропадало не только то, что печатала программа, но и **ответы интерпретатора**:
-  `ДА`, `НЕТ` и связывания печатаются тем же `IoContext`.  Заметить это было
-  трудно именно потому, что диагностики нет: `ЗАПИСЬ_В` честно ложен, а вывод
-  просто перестаёт появляться.  Сосед по классу вёл себя правильно: неудачный
-  `ЧТЕНИЕ_ИЗ` возвращал чтение к клавиатуре, потому что `fetchLine` смотрит на
-  `input_from_file_`, а не на указатель на поток.  Правка — одна строка
-  (`output_ = base_output_` сразу после закрытия): неудачное переключение
-  возвращает поток туда, где он был бы и без него.  Вариант «сначала открыть,
-  потом закрывать прежний» отвергнут — он тихо игнорировал бы просьбу, оставив
-  программу писать в прежний файл.  Проверки: воспроизведение на собранном
-  `prologd.exe` (до правки пропадали `НЕТ` неудачного переключения и вся
-  следующая цель), два новых случая Catch2 — через `ЗАПИСЬ_В`/`ВЫВОД` и на уровне
-  `IoContext` — и одна фраза в `help.typ` §6.9 о том, куда возвращается вывод.
-  ctest 307/307.
+* I/O round, part 65: **a failed `ЗАПИСЬ_В` left the output on a closed stream**
+  (task_57, 2026-10-03).  It was found while working on task_54, looking at
+  `IoContext` as a whole: `openOutput` closed the current file **before** trying
+  to open the new one, and `output_` was assigned only on success, so after a
+  failed switch it stayed on the closed `file_output_`.  Writing to a closed
+  `std::ofstream` is lost silently (the `badbit` flag, which nobody watches), and
+  not only what the program printed disappeared but also **the interpreter's
+  answers**: `ДА`, `НЕТ` and the bindings are printed by the same `IoContext`.
+  This was hard to notice precisely because there is no diagnostic: `ЗАПИСЬ_В`
+  is honestly false, and the output simply stops appearing.  The class's
+  neighbour behaved correctly: a failed `ЧТЕНИЕ_ИЗ` returned reading to the
+  keyboard, because `fetchLine` looks at `input_from_file_`, not at the stream
+  pointer.  The fix is one line (`output_ = base_output_` right after the close):
+  a failed switch returns the stream to where it would be without it.  The
+  option «открыть сначала, потом закрывать прежний» was rejected — it would
+  silently ignore the request, leaving the program writing to the previous file.
+  Checks: a reproduction on the built `prologd.exe` (before the fix the `НЕТ` of
+  the failed switch and the whole following goal disappeared), two new Catch2
+  cases — through `ЗАПИСЬ_В`/`ВЫВОД` and at the `IoContext` level — and one
+  sentence in `help.typ` §6.9 about where the output returns.  ctest 307/307.
 
-* GUI round, part 66: **пять просьб по окну** (task_58, 2026-10-03) — и один
-  сломанный набор в начале.  `test_icons.py` краснела: пользователь перерисовал и
-  переименовал значки, а код и `assets.MISSING` за ними не пошли — причём заметила
-  она только *лишнее* имя (`view-split-editor` нарисован, но остался в списке
-  «ещё не нарисовано»), а двух потерянных картинок не заметила вовсе:
-  `view-output-right`/`view-output-bottom` были в том же списке, поэтому «есть файл
-  или записано в MISSING» проходило, и «Панель вывода» со «Сменить ориентацию
-  сплита» тихо стояли без значков.  Итог: 49 имён, 48 нарисовано, ждёт один
-  `view-theme`.  Дальше — четыре вещи про то, как окно говорит с читателем.
-  **`Shift+Del`** стало командой (`delete_line` в таблице, пункт «Удалить строку» в
-  «Правке», без значка — `edit-del` занят командой «Удалить»): строка берётся
-  целиком, курсор встаёт в первый столбец съехавшей строки, выделение сносит все
-  затронутые строки, но не ту, на начале которой остановилось, последняя строка файла
-  пустеет (документ не может остаться без блока) — и всё это одним `Ctrl+Z`.
-  **Подсветка вхождений** выделенного слова: светлая `#e8ecf5` → `#cfe0f7`, тёмная
-  `#2d3038` → `#3a4a63`.  Второе число важнее: 15 единиц светлоты от страницы
-  `#1e1e1e` — это «тускло», и именно тёмную палитру получает тёмный рабочий стол
-  через «системное» оформление.  Раньше её не измеряли: `Palette.readable_pairs`
-  проверяет контраст *текста*, а подложку с фоном — нет; теперь в
-  `test_appearance.py` есть и такое измерение, чтобы «тусклое» не вернулось молча.
-  **Строка «база знаний загружена»** появляется и после клика по маркеру вопроса на
-  полях: ранний `return` в `_on_loaded` ждал ответа и уносил строку с собой; теперь
-  она печатается по `loaded` (до `return`), и порядок совпадает с `F5`.
-  **Меню и панель**: руководство поднялось под «Справку по предикату», в
-  «Выполнении» вместо `save_before_run` — два переключателя `run_questions` и
-  `print_questions`, которые пишут те же настройки, что показывает диалог
-  (`_sync_actions` возвращает значение в галочку), с панели убрано руководство, а
-  размер шрифта встал после «Настройки…».  **«О программе»** стало «Графическая
-  оболочка Пролог-Д 2.0» с прежним списком авторов АБВГД; колонка `--` выровнена
-  пробелами (решение пользователя — без rich text), и тест сверяет, что позиция `--`
-  у всех пяти строк одна.  Проверки: три новых случая `test_editor.py`, измерение
-  подложки в `test_appearance.py`, четыре новых требования в `test_window.py`; ctest
-  307/307, все 21 набор GUI и `protocol_smoke.py`, пять PDF.
+* GUI round, part 66: **five requests about the window** (task_58, 2026-10-03) —
+  and one broken suite at the start.  `test_icons.py` went red: the user redrew
+  and renamed the icons, and the code and `assets.MISSING` did not follow them —
+  and it noticed only the *extra* name (`view-split-editor` is drawn but stayed
+  in the «ещё не нарисовано» list), while missing two lost pictures entirely:
+  `view-output-right`/`view-output-bottom` were in the same list, so «есть файл
+  или записано в MISSING» passed, and «Панель вывода» with «Сменить ориентацию
+  сплита» stood quietly without icons.  The upshot: 49 names, 48 drawn, one
+  `view-theme` waiting.  Then four things about how the window talks to the
+  reader.  **`Shift+Del`** became a command (`delete_line` in the table, the
+  «Удалить строку» item in «Правка», without an icon — `edit-del` is taken by the
+  «Удалить» command): the line is taken whole, the caret goes to the first column
+  of the shifted line, a selection removes all the affected lines but not the one
+  it stopped at the start of, the last line of the file empties (a document cannot
+  be left without a block) — and all of that with one `Ctrl+Z`.  **Occurrence
+  highlighting** of the selected word: light `#e8ecf5` → `#cfe0f7`, dark `#2d3038`
+  → `#3a4a63`.  The second number matters more: 15 units of lightness from the
+  page `#1e1e1e` is «тускло», and it is the dark palette that a dark desktop gets
+  through the «системное» appearance.  It was not measured before:
+  `Palette.readable_pairs` checks the contrast of *text*, not of a backing with a
+  background; now `test_appearance.py` has such a measurement too, so that
+  «тусклое» does not come back silently.  **The «база знаний загружена» line**
+  now appears after a click on a question marker in the margins, too: an early
+  `return` in `_on_loaded` waited for the answer and carried the line away with
+  it; now it is printed on `loaded` (before the `return`), and the order matches
+  `F5`.  **Menu and panel**: the manual rose under «Справку по предикату», in
+  «Выполнение» two switches `run_questions` and `print_questions` replaced
+  `save_before_run` and write the same settings the dialogue shows
+  (`_sync_actions` returns the value into the tick), the manual was removed from
+  the panel, and the font size moved after «Настройки…».  **«О программе»**
+  became «Графическая оболочка Пролог-Д 2.0» with the same АБВГД list of
+  authors; the `--` column is aligned with spaces (the user's decision — no rich
+  text), and the test checks that the `--` position is the same in all five
+  lines.  Checks: three new `test_editor.py` cases, the backing measurement in
+  `test_appearance.py`, four new requirements in `test_window.py`; ctest 307/307,
+  all 21 GUI suites and `protocol_smoke.py`, five PDFs.
 
-  **Доработка после первого взгляда.**  Пользователь нашёл то, чего не нашла моя
-  проверка: `Shift+Del` в редакторе не работал, а из пункта меню — работал.  Тесты
-  звали метод `delete_lines()`, а не нажимали клавишу, поэтому были зелёными при
-  сломанной клавише.  Причина — чужая: `QTextControl` забирает `Shift+Del` как
-  платформенную запись «Вырезать» (на Windows это второй, наряду с `Ctrl+X`, способ
-  её записать), поэтому `QAction` со своим `Shift+Del` до редактора не доходит, а сам
-  ключ приходит в `keyPressEvent` — где без выделения не делал ничего.  Ключ теперь
-  обрабатывается в редакторе, а проверка нажимает клавишу.  Дальше три просьбы про
-  панель и меню: поле размера шрифта убрано с панели целиком (масштаб — колесо с
-  `Ctrl` и три команды, точное значение — строка настроек), «Очистить вывод»
-  переехала из панели в «Выполнение» над «Графическим окном», а в «О программе»
-  `--` заменено на короткое тире `–`.  Заодно записано правило многоточия в заголовке
-  пункта: оно значит «команда сначала что-то спросит» и не ставится тому, что
-  действует сразу (даже если открывает своё окно).  Ещё две мелочи оттуда же:
-  `Shift+Del` кладёт удалённые строки в буфер обмена (клавиша взяла платформенное
-  значение «вырезать» — вырезанное должно вставляться), а значок `edit-clear` у
-  «Очистить вывод» удалён вместе с файлом: рисунок читался не как «очистить», и пункт
-  остался текстовым (48 имён, 47 нарисовано, ждёт один `view-theme`).
+  **Follow-up after the first look.**  The user found what my check did not: in
+  the editor `Shift+Del` did not work, while from the menu item it did.  The
+  tests called the `delete_lines()` method instead of pressing the key, so they
+  were green with a broken key.  The cause is somebody else's: `QTextControl`
+  grabs `Shift+Del` as the platform writing of «Вырезать» (on Windows it is the
+  second way, next to `Ctrl+X`, to write it), so a `QAction` with its own
+  `Shift+Del` does not reach the editor, and the key itself arrives in
+  `keyPressEvent` — where, with no selection, it did nothing.  The key is now
+  handled in the editor, and the check presses the key.  Then three requests
+  about the panel and the menu: the font-size field was removed from the panel
+  entirely (scale is the wheel with `Ctrl` and three commands, the exact value is
+  a settings row), «Очистить вывод» moved from the panel into «Выполнение» above
+  «Графическое окно», and in «О программе» `--` was replaced by the en dash `–`.
+  A rule about the ellipsis in an item title was recorded as well: it means «the
+  command will ask something first» and is not put on one that acts at once (even
+  if it opens its own window).  Two more small things from the same place:
+  `Shift+Del` puts the deleted lines into the clipboard (the key took the
+  platform meaning «вырезать» — what is cut must be pasteable), and the
+  `edit-clear` icon of «Очистить вывод» was deleted together with its file: the
+  drawing did not read as «очистить», and the item stayed textual (48 names, 47
+  drawn, one `view-theme` waiting).
 
-* GUI round, part 67: **таблица ответа** (task_59, 2026-10-03).  Вариант C,
-  выбранный пользователем: таблицу получает отдельный запрос — цель в строке
-  запроса или клик по маркеру вопроса на полях, — а целому прогону (`F5`) таблицы
-  нет и не может быть: ответы всех вопросов программы идут в текст одной лентой
-  без разделителей.  Пользователь показал это на своём примере (два факта,
-  `?студент(X, Y).`, `?цена(X, Y).` — шесть строк вывода), и это же объяснило его
-  вчерашний вопрос про «запуск файлов с многими вопросами»: не дефект, а
-  невозможность отделить один ответ от другого по тексту.  Чтобы таблица была и у
-  целого прогона, интерпретатор должен присылать решения отдельными данными — поле
-  `bindings` в событии `result` (вариант B: правка `protocol.cpp`/`protocol.py`,
-  `protocol_session.cmake`, README и тестов); записано в `doc/gui.typ` §10, а не
-  сделано сейчас.
+* GUI round, part 67: **the answer table** (task_59, 2026-10-03).  Option C, chosen
+  by the user: the table is given to a separate query — a goal in the query line or
+  a click on a question marker in the margins — while a whole run (`F5`) has no
+  table and cannot have one: the answers of all a program's questions go into the
+  text as one ribbon without separators.  The user showed this on his own example
+  (two facts, `?студент(X, Y).`, `?цена(X, Y).` — six lines of output), and this
+  also explained his yesterday's question about «running files with many
+  questions»: not a defect but an impossibility to separate one answer from
+  another by the text.  For the table to exist for a whole run too, the
+  interpreter must send solutions as separate data — a `bindings` field in the
+  `result` event (option B: edits to `protocol.cpp`/`protocol.py`,
+  `protocol_session.cmake`, README and tests); recorded in `doc/gui.typ` §10, not
+  done now.
 
-  Что в окне: пятая вкладка «Таблица» после «Ввода» (заголовок считает решения —
-  `Таблица:3`), переключатель «Выполнение → Формировать таблицу» над двумя
-  переключателями вопросов task_58 и та же строка `execution/answer_table` в
-  диалоге, по умолчанию выключено.  Ответ собирается из вывода того единственного
-  запроса: `_append_output` — единственная воронка, и в неё попадает только `OUTPUT`
-  (строка «база знаний загружена» — `NOTE`, ошибки — `ERROR`).  Собирать приходится
-  с момента отправки запроса, а не с `loaded`: у маркера программа грузится тихо, и
-  вывод загрузки может прийти уже после запроса — спасает правило формы.
+  What is in the window: the fifth tab «Таблица» after «Ввода» (the title counts
+  the solutions — `Таблица:3`), the «Выполнение → Формировать таблицу» switch
+  above the two question switches of task_58, and the same
+  `execution/answer_table` row in the dialogue, off by default.  The answer is
+  assembled from the output of that single query: `_append_output` is the only
+  funnel, and only `OUTPUT` lands in it (the «база знаний загружена» line is
+  `NOTE`, errors are `ERROR`).  Collection has to start from the moment the query
+  is sent, not from `loaded`: at a marker the program loads quietly, and the load
+  output may arrive after the query — the shape rule saves it.
 
-  Правило целиком живёт в новом Qt-free модуле `answers.py` (и проверяется
-  `test_answers.py` без Qt): связка — строка `Имя=значение`, где имя это переменная
-  по правилам лексера (`is_upper_letter` или ведущий `_`, как в `tokens.py`),
-  значение — остаток строки дословно; **повтор имени начинает новое решение** — это
-  точно, потому что `engine.cpp::runQuery` печатает все переменные запроса в его
-  порядке и внутри одного решения имя повториться не может; столбцы — в порядке
-  появления.  Оттуда же, из `runQuery`, следует форма ответа цели без переменных:
-  `ДА` один раз либо `НЕТ`, и слово со связками внутри одного запроса не
-  смешивается — поэтому `ДА`/`НЕТ` занимает в таблице одну ячейку с заголовком
-  «Ответ», а не отдельный вид пустой вкладки.  Всё, что не похоже на связку
-  (напечатанное программой внутри ответа), — `ignored`: в таблицу не попадает, в
-  «Выводе» остаётся.
+  The whole rule lives in the new Qt-free module `answers.py` (and is checked by
+  `test_answers.py` without Qt): a binding is a line `Имя=значение`, where the
+  name is a variable by the lexer's rules (`is_upper_letter` or a leading `_`, as
+  in `tokens.py`) and the value is the rest of the line verbatim; **a repeated
+  name starts a new solution** — this is exact, because `engine.cpp::runQuery`
+  prints all the query's variables in its order and within one solution a name
+  cannot repeat; the columns are in order of appearance.  From there too, from
+  `runQuery`, follows the shape of the answer of a goal with no variables: `ДА`
+  once or `НЕТ`, and within one query a word is not mixed with bindings — that is
+  why `ДА`/`НЕТ` occupies one cell in the table with the title «Ответ», not a
+  separate kind of empty tab.  Everything that does not look like a binding
+  (printed by the program inside the answer) is `ignored`: it does not enter the
+  table, it stays in «Вывод».
 
-  Мелочи, без которых было бы хуже: `Ctrl+C` над таблицей копирует выделенные
-  ячейки (столбцы через табуляцию, строки через перевод строки) — `_copy` копирует
-  «оттуда, куда смотрит пользователь» и без случая для таблицы увёл бы команду в
-  редактор; новый запуск и `Ctrl+L` таблицу очищают (она вид последнего ответа, а
-  не история); диагностика оставляет панель на «Проблемах», а таблица ждёт на своей
-  вкладке.  Таблица берёт размер шрифта вывода, сигнал `zoomChanged` и колесо с
-  `Ctrl` — то есть `_apply_output_font` теперь про пять панелей, а не про четыре.
+  Small things without which it would be worse: `Ctrl+C` over the table copies
+  the selected cells (columns by tab, rows by newline) — `_copy` copies "from wherever
+  the user is looking" and without a case for the table it would take the
+  command off to the editor; a new run and `Ctrl+L` clear the table (it is a view
+  of the last answer, not a history); diagnostics leave the panel on «Проблемах»,
+  while the table waits on its own tab.  The table takes the output font size, the
+  `zoomChanged` signal and the wheel with `Ctrl` — that is, `_apply_output_font`
+  is now about five panes, not four.
 
-  Проверки: новый `test_answers.py` (12 случаев: связки, повтор имени, `ДА`/`НЕТ`,
-  напечатанное программой `ДА` рядом со связками, мусорные строки, пустое значение,
-  CRLF, имена с `_`), девять случаев в `test_window.py` (переключатель в меню и в
-  настройках; таблица у маркера и у строки запроса; две строки-решения на примере
-  пользователя; `ДА`/`НЕТ` одной ячейкой; выключенный переключатель ничего не
-  делает; диагностика держит «Проблемы»; запуск и `Ctrl+L` чистят; размер шрифта;
-  `Ctrl+C`), а `test_the_panel_has_four_tabs_with_counts` стала пятиместной.
-  Ловушка, стоившая одного красного прогона: `wait_for_result` ждёт слово в строке
-  состояния, а она держит слово **прошлого** ответа — для второго запроса в одном
-  тесте нужен `not window._busy`.
+  Checks: the new `test_answers.py` (12 cases: bindings, a repeated name,
+  `ДА`/`НЕТ`, a program-printed `ДА` next to bindings, junk lines, an empty
+  value, CRLF, names with `_`), nine cases in `test_window.py` (the switch in the
+  menu and in the settings; the table at a marker and at the query line; two
+  solution lines on the user's example; `ДА`/`НЕТ` in one cell; the switch off
+  does nothing; diagnostics keep «Проблемы»; a run and `Ctrl+L` clean; the font
+  size; `Ctrl+C`), and `test_the_panel_has_four_tabs_with_counts` became
+  five-place.  A trap that cost one red run: `wait_for_result` waits for a word in
+  the status line, and it holds the word of the **previous** answer — for a second
+  query in one test `not window._busy` is needed.
 
-* GUI round, part 68: **вопрос после загрузки** (task_60, 2026-10-03).  Пользователь
-  спросил, что происходит при запуске строки `?0 < 5 < 4.` — окно показывает две
-  ошибки, «от файла» и «от query».  Разобрано на собранном интерпретаторе: клик по
-  маркеру делает **два** запроса — тихую загрузку файла (`questions=false`) и сам
-  вопрос отдельным запросом `query`.  `questions=false` значит «не *выполнять*
-  собственные `?`-строки программы», но файл всё равно разбирается целиком, поэтому
-  о цепочке сравнений сообщает загрузка, назвав файл (у отдельного запроса имя
-  `<query>` — так протокол различает «ошибка в файле, строка N» и «ошибка в
-  присланной строке», task_36).  Строка запроса загрузки не делает вовсе — там одна
-  ошибка; если же перед ней был `F5`, ошибка файла остаётся в «Выводе» рядом с новой
-  (панели чистит только `run_program`).
+* GUI round, part 68: **a question after the load** (task_60, 2026-10-03).  The
+  user asked what happens when the line `?0 < 5 < 4.` is run — the window shows
+  two errors, «от файла» and «от query».  It was analysed on the built
+  interpreter: a click on a marker makes **two** requests — a quiet load of the
+  file (`questions=false`) and the question itself as a separate `query` request.
+  `questions=false` means "do not *run* the program's own `?` statements", but
+  the file is still parsed whole, so the chain of comparisons is reported by the
+  load, naming the file (a separate query has the name `<query>` — that is how
+  the protocol tells «ошибка в файле, строка N» from «ошибка в присланной
+  строке», task_36).  The query line does no load at all — there is one error
+  there; if there was an `F5` before it, the file's error stays in «Вывод» next
+  to the new one (only `run_program` cleans the panes).
 
-  По дороге нашлось хуже: файл, который не разобрался, не загружает базу **вовсе**
-  (загрузчик разбирает текст целиком, прежде чем что-то добавить), а вопрос всё равно
-  отправлялся — и получал ответ «НЕТ» плюс предупреждение «`<query>:1:2: не найдено:
-  факт/1`», то есть неверный ответ с честным лицом и претензией к запросу вместо
-  файла.
+  On the way something worse was found: a file that did not parse loads no base
+  **at all** (the loader parses the whole text before adding anything), yet the
+  question was still sent — and got the answer «НЕТ» plus the warning
+  «`<query>:1:2: не найдено: факт/1`», that is, a wrong answer with an honest
+  face and a complaint about the query instead of the file.
 
-  Правка (решения пользователя): маркер спрашивает **после успешной загрузки**
-  (`_pending_query`, отправка из `_on_loaded`; ошибка загрузки выбрасывает вопрос со
-  строкой в «Системе»), а строка запроса не перечитывает программу — база одна, и
-  цель спрашивает ту, что загружена, — но грузит текущий текст, если спрашивать не у
-  кого (`_loaded` false).  Двойная ошибка снята по построению, «НЕТ» на пустую базу
-  больше не появляется, ошибка найденного в комментарии вопроса по-прежнему приходит
-  один раз и называется `<query>`.  Документы: `gui.typ` §4.2 и §6, README (маркеры и
-  строка запроса); проверки — пять новых случаев `test_window.py`.
+  The fix (the user's decisions): a marker asks **after a successful load**
+  (`_pending_query`, sent from `_on_loaded`; a load error drops the question with
+  a line in «Системе»), and the query line does not re-read the program — there
+  is one base, and the goal asks the loaded one — but it loads the current text
+  if there is nobody to ask (`_loaded` false).  The double error is gone by
+  construction, «НЕТ» on an empty base no longer appears, and an error found in a
+  question's comment still arrives once and is called `<query>`.  Documents:
+  `gui.typ` §4.2 and §6, README (markers and the query line); checks — five new
+  `test_window.py` cases.
 
-* Documentation round, part 69: **пять документов — короче, ровнее и с верным
-  числом** (2026-10-03).  Просьбы пользователя: сократить `gui.typ`, проверить
-  согласованность `technical.typ` (сокращать не надо) и опустить название ближе к
-  центру страницы.
+* Documentation round, part 69: **five documents — shorter, tidier and with a
+  correct number** (2026-10-03).  The user's requests: shorten `gui.typ`, check
+  `technical.typ` for consistency (no shortening needed) and lower the title
+  closer to the centre of the page.
 
-  `gui.typ`: 1 103 строки → 956.  У каждого раздела короткий зачин и дальше пункты;
-  твёрдые факты остались все (48 ссылок на значки и 47 нарисованных, клавиши, ключи
-  настроек, измеренные числа, ссылки на разделы).  Заодно проверка на слова со
-  смешанными алфавитами нашла в §6.1 «dве строки» (латинская `d`) — таких слов в
-  файле больше нет.
+  `gui.typ`: 1 103 lines → 956.  Every section has a short lead-in and then
+  bullet points; all the hard facts stayed (48 icon references and 47 drawn,
+  keys, settings keys, measured numbers, section references).  A check for words
+  with mixed alphabets also found in §6.1 «dве строки» (a Latin `d`) — such
+  words are no longer in the file.
 
-  Из `prologd-diff.typ` убраны две главы («`->` — не оператор» и «`is/2` — подсказка
-  вместо оператора»): документ говорит только об отличиях от первоначального
-  Пролога-Д, а в нём и в новой реализации этих операторов нет.  Их содержание
-  переехало в `help.typ`, где сравнивает с ISO-Прологом, SWI-Prolog и GNU Prolog
-  (§3.3 — `is/2` и две подсказки вместо оператора, §4.6 — «если-то» через `ПЕРВОЕ`
-  рядом с `(Условие -> Тогда ; Иначе)`), и про старую реализацию там не говорится.
+  Two chapters were removed from `prologd-diff.typ` («`->` — не оператор» and
+  «`is/2` — подсказка вместо оператора»): the document speaks only of the
+  differences from the original Пролог-Д, and neither it nor the new
+  implementation has those operators.  Their content moved to `help.typ`, which
+  compares with ISO-Пролог, SWI-Prolog and GNU Prolog (§3.3 — `is/2` and two
+  hints instead of an operator, §4.6 — «если-то» through `ПЕРВОЕ` next to
+  `(Условие -> Тогда ; Иначе)`), and the old implementation is not mentioned
+  there.
 
-  `technical.typ` не сокращался, но приведён в порядок.  §1 «Постановка задачи»
-  снят, разделы 2--10 стали 1--9, а два последних остались с прежними номерами —
-  теперь это 10 «Тестирование» и 11 «Ограничения», разрыва в нумерации нет;
-  «раздел 5.6» и «см. 5.6» ведут куда надо.  **Исправлено число, оказавшееся
-  артефактом:** «полное сканирование 100 000 предложений ≈ 20 мс» вышло вычитанием
-  двух прогонов, которые оба просматривают весь список (вопрос без переменных под
-  `ТИХО` продолжает искать решения после первого — `Engine::runQuery`), поэтому
-  разница была шумом.  Перемерено на этой машине: загрузка 100 000 фактов 0.25 с, а
-  скан — 1 000 предложений 0.3 мс, 10 000 — 3.7 мс, 100 000 — 54 мс, то есть
-  ≈ 0.5 мкс на неудачную попытку; с отсечением сразу после вызова это видно прямо
-  (`г(1)` без `!` стоит столько же, сколько `г(0)`, с `!` — ноль).  Поправлены
-  `technical.typ` §5.7 и §11, ADR-017 и отчёт task_42.
+  `technical.typ` was not shortened but was put in order.  §1 «Постановка задачи»
+  was dropped, sections 2--10 became 1--9, while the last two kept their old
+  numbers — now they are 10 «Тестирование» and 11 «Ограничения», with no gap in
+  the numbering; «раздел 5.6» and «см. 5.6» lead where they should.  **A number
+  that turned out to be an artefact was fixed:** «полное сканирование 100 000
+  предложений ≈ 20 мс» came from subtracting two runs that both scan the whole
+  list (a query with no variables under `ТИХО` keeps looking for solutions after
+  the first — `Engine::runQuery`), so the difference was noise.  Re-measured on
+  this machine: loading 100 000 facts 0.25 s, and the scan — 1 000 clauses
+  0.3 ms, 10 000 — 3.7 ms, 100 000 — 54 ms, that is ≈ 0.5 µs per failed attempt;
+  with cut-off right after the call it is visible directly (`г(1)` without `!`
+  costs as much as `г(0)`, with `!` — zero).  Fixed in `technical.typ` §5.7 and
+  §11, ADR-017 and the task_42 report.
 
-  В том же раунде: `lessons.typ` — короткий `= 1. Как устроен урок` с командами
-  запуска вместо двух вводных разделов, нумерация сдвинута; и название во всех пяти
-  документах опущено — перед блоком заголовка стоит `#v(6cm)`, то есть примерно 40 %
-  высоты страницы вместо самой кромки.
+  In the same round: `lessons.typ` — a short `= 1. Как устроен урок` with run
+  commands instead of two introductory sections, the numbering shifted; and the
+  title in all five documents was lowered — before the title block stands
+  `#v(6cm)`, that is about 40 % of the page height instead of the very edge.
 
-  Проверки: все пять документов собираются (`typst=0`), первые страницы посмотрены.
+  Checks: all five documents build (`typst=0`), first pages looked at.
 
-* Documentation round, part 70: **пример программы в окне и имена переменных в
-  уроках** (2026-10-03).  Просьбы пользователя: поменять приветственную программу
-  на `% пример программы` с `студент('Вова', 'Корчагин')` и запросом
-  `?студент(Имя, Фамилия).`, дать переменным уроков осмысленные имена там, где это
-  помогает читателю, и закрыть шероховатости, найденные работой с окном.
+* Documentation round, part 70: **the example program in the window and variable
+  names in the lessons** (2026-10-03).  The user's requests: change the welcome
+  program to `% пример программы` with `студент('Вова', 'Корчагин')` and the query
+  `?студент(Имя, Фамилия).`, give the lessons' variables meaningful names where
+  that helps the reader, and close the rough edges found while working with the
+  window.
 
-  Приветственная программа: атомы в кавычках (заглавная буква без кавычек —
-  переменная, урок 1), переменные — `Имя` и `Фамилия`.  Программа проверена
-  запуском: `Имя=Вова`, `Фамилия=Корчагин`, `Имя=Данил`, `Фамилия=Ахмеров`, без
-  диагностики, и она уже в канонической форме (`prologd --format` ничего не
-  меняет, то есть `Ctrl+I` не переписывает первый текст, который видит
-  пользователь).  Тесты окна больше не ищут префикс `% PrologD`, а сравнивают
-  текст вкладки с самим `WELCOME`; тот же пример (факты + два вопроса подряд)
-  стоит теперь и в `gui.typ` §6.5 — на нём видно, почему таблица строится только
-  для отдельного запроса.
+  The welcome program: quoted atoms (a capital without quotes is a variable,
+  lesson 1), the variables are `Имя` and `Фамилия`.  The program is checked by
+  running it: `Имя=Вова`, `Фамилия=Корчагин`, `Имя=Данил`, `Фамилия=Ахмеров`, no
+  diagnostics, and it is already in canonical form (`prologd --format` changes
+  nothing, that is, `Ctrl+I` does not rewrite the first text the user sees).  The
+  window tests no longer look for the `% PrologD` prefix but compare the tab text
+  with `WELCOME` itself; the same example (facts + two questions in a row) now
+  stands in `gui.typ` §6.5 too — it shows why the table is built only for a
+  separate query.
 
-  Уроки: имена переменных заменены на слова там, где у переменной есть роль —
+  Lessons: variable names were replaced with words where a variable has a role —
   `дед(Дед, Внук)`, `сумма(Предел, Сумма)`, `фак(Число, Часть, Факториал)`,
   `нод(Первое, Второе, Нод)`, `фиб(Число, Фибоначчи)`, `член(Элемент, [...])`,
-  `НАЙТИВСЕ(Имя, студент(Имя, Фамилия), Список)` и так по всем урокам.  Прописные
-  «Х», «У», «_» и координаты `Х1`, `У1` оставлены там, где это и есть «любое
-  значение»; буквы
-  Д, К, М, Н в задаче о бегунах — потому что проза называет их именами, а
-  Cyrillic/Latin-пара `Х` и `X` в приложении — сам предмет пункта 2 раздела 4.
-  Каждая правка тянула за собой `%!`-строки (в ответе печатается *имя*
-  переменной), прозу, которая называла буквы, и текст упражнений с ответами.
+  `НАЙТИВСЕ(Имя, студент(Имя, Фамилия), Список)` and so on through all the
+  lessons.  The capitals «Х», «У», «_» and the coordinates `Х1`, `У1` are kept
+  where they are indeed «любое значение»; the letters Д, К, М, Н in the runners
+  problem — because the prose calls them by name, and the Cyrillic/Latin pair
+  `Х` and `X` in the appendix — the very subject of item 2 of section 4.  Each
+  edit dragged along `%!` lines (the answer prints the *name* of the variable),
+  the prose that named the letters, and the text of the exercises with answers.
 
-  По дороге: `examples/lib/library.pld` и `import_demo.pld` получили те же имена
-  (`удвоить(Число, Дважды)`), за ними — регулярка теста `cli_include` (`Дважды=42`)
-  и приёмка `test_queries.py` (`?сумма(5, Сумма).`), а цитаты строк урока — в
-  `examples/lessons/README.md`, `doc/gui.typ` §4.2, `src/gui/README.md` и
-  комментарии `editor.py`.  Две мелкие поправки формулировок: третье место
-  `УМНОЖЕНИЕ/4` названо слагаемым, а не остатком (урок 3), и `встав/3` перестало
-  быть «Встав/3» (урок 5).  `ded(Д, В) → дед(Дед, Внук)` в приложении: трасса
-  печатает `_1`/`_2` решателя, поэтому её `%!`-строки не изменились.
+  Along the way: `examples/lib/library.pld` and `import_demo.pld` got the same
+  names (`удвоить(Число, Дважды)`), followed by the regexp of the `cli_include`
+  test (`Дважды=42`) and the `test_queries.py` acceptance (`?сумма(5, Сумма).`),
+  and the quotations of the lesson lines — in `examples/lessons/README.md`,
+  `doc/gui.typ` §4.2, `src/gui/README.md` and the comments of `editor.py`.  Two
+  small wording fixes: the third place of `УМНОЖЕНИЕ/4` is called a summand, not a
+  remainder (lesson 3), and `встав/3` stopped being «Встав/3» (lesson 5).
+  `ded(Д, В) → дед(Дед, Внук)` in the appendix: the trace prints the solver's
+  `_1`/`_2`, so its `%!` lines did not change.
 
-  Отдельно — ремарка в уроке 3 (просьба пользователя): `РАВНО` и его знак `=` не
-  присваивание, как в императивных языках, а унификация (урок 2) — для свободной
-  переменной подбор значения, для связанной проверка.  Пример в ремарке сверен
-  запуском: `?РАВНО(14, #2 + 3 * 4#).` отвечает ДА, `?РАВНО(15, #2 + 3 * 4#).` —
-  НЕТ.
+  Separately — a remark in lesson 3 (the user's request): `РАВНО` and its sign `=`
+  are not an assignment as in imperative languages but unification (lesson 2) —
+  for a free variable a choice of value, for a bound one a check.  The example in
+  the remark was verified by running it: `?РАВНО(14, #2 + 3 * 4#).` answers ДА,
+  `?РАВНО(15, #2 + 3 * 4#).` — НЕТ.
 
-  Следом — шероховатости, найденные пользователем при работе с окном (он же и
-  предложил их закрыть).  **Урок 10:** щелчок по маркеру загружает файл заново и
-  выполняет ровно один вопрос, поэтому вопросы, которым нужны действия
-  предыдущих, отвечают не на ту базу.  Проверено: `?дважды(4, Итог)` даёт НЕТ и
-  предупреждение «не найдено: дважды/2» (правило создаёт строка `?ДОБ(...)`), а
-  `?прим(Остался)` — тихо другое (`Остался=1`, `Остался=2` вместо `Остался=3`,
-  `Остался=2`).  Поведение менять не стали (это решение task_36/59: ответ должен
-  быть только у спрошенного вопроса), объяснение добавлено в §4 урока и в
-  указатель в шапке.  **Урок 11:** каталог поиска модулей теперь описан для окна
-  первым делом — «Настройки → Выполнение → Дополнительные каталоги ИМПОРТ»
-  (`execution/import_paths`; каждый запуск поднимает сессию с `-I`, поэтому
-  добавленный каталог действует со следующего «Запустить»), ключ `-I` — вторым.
-  **Урок 7:** так же объяснено, что в окне ответы набираются в консоли под
-  строкой цели или в поле-очереди, а файл `lesson_07.input.txt` нужен только
-  командной строке.  Те же пояснения — в `examples/lessons/README.md` (разделы
-  «Как читать урок» и «Вопросы на полях») и в `doc/lessons.typ` §1.
+  Then the rough edges the user found while working with the window (he also
+  suggested closing them).  **Lesson 10:** a click on a marker loads the file
+  anew and runs exactly one question, so questions that need the actions of
+  earlier ones answer against the wrong base.  Checked: `?дважды(4, Итог)` gives
+  НЕТ and the warning «не найдено: дважды/2» (the rule is created by the line
+  `?ДОБ(...)`), and `?прим(Остался)` — quietly something else (`Остался=1`,
+  `Остался=2` instead of `Остался=3`, `Остался=2`).  The behaviour was not
+  changed (it is the decision of task_36/59: only the asked question must have an
+  answer), an explanation was added to §4 of the lesson and to the pointer in the
+  header.  **Lesson 11:** the module search directory is now described for the
+  window first — «Настройки → Выполнение → Дополнительные каталоги ИМПОРТ»
+  (`execution/import_paths`; every run raises a session with `-I`, so an added
+  directory acts from the next «Запустить»), the `-I` key second.  **Lesson 7:**
+  it is explained likewise that in the window the answers are typed in the
+  console under the goal line or in the queue field, and the file
+  `lesson_07.input.txt` is needed only by the command line.  The same
+  explanations — in `examples/lessons/README.md` (the sections «Как читать урок»
+  and «Вопросы на полях») and in `doc/lessons.typ` §1.
 
-  Разбор вопроса пользователя про директиву: у `:- ДОБ(...)` маркера нет вовсе
-  (правило принимает только `?`-строки), а щелчок по соседнему вопросу её не
-  выполняет — тихая загрузка идёт без query runner, то есть добавляет в базу
-  только предложения.  Проверено: `?дед(аня, Y).` по щелчку отвечает НЕТ и
-  «не найдено: дед/2», а по F5 — `Y=витя`.  В `help.typ` §11 про это не писали
-  (его пример верен для консоли и для F5); `:- ИМПОРТ` — исключение, его разбирает
-  сам загрузчик, поэтому маркеры урока 11 работают.
+  Analysis of the user's question about the directive: `:- ДОБ(...)` has no marker
+  at all (the rule accepts only `?` lines), and a click on a neighbouring question
+  does not run it — the quiet load goes without a query runner, that is, it adds
+  only clauses to the base.  Checked: `?дед(аня, Y).` on a click answers НЕТ and
+  «не найдено: дед/2», while on F5 — `Y=витя`.  In `help.typ` §11 this was not
+  written (its example is true for the console and for F5); `:- ИМПОРТ` is an
+  exception, the loader itself parses it, so lesson 11's markers work.
 
-  Проверки: ctest 307/307; все 13 уроков прогнаны и сверены с их `%!` (в
-  приложении — предупреждение «не найдено: любит/2», как и обещает его раздел 4),
-  каждый файл побайтно равен выводу `prologd --format`; счёт вопросов 278 в 33
-  программах; 22 набора `src/gui/tests/test_*.py` и `protocol_smoke.py`, которые
-  надо запускать `.venv\Scripts\python.exe` (системный `python` без PySide6 роняет
-  семь из них на `No module named 'PySide6'`); `docs` (пять документов, `typst=0`).
+  Checks: ctest 307/307; all 13 lessons run and verified against their `%!` (in
+  the appendix — the warning «не найдено: любит/2», as its section 4 promises),
+  every file byte-for-byte equal to the output of `prologd --format`; the question
+  count 278 in 33 programs; 22 suites `src/gui/tests/test_*.py` and
+  `protocol_smoke.py`, which must be run with `.venv\Scripts\python.exe` (the
+  system `python` without PySide6 drops seven of them on
+  `No module named 'PySide6'`); `docs` (five documents, `typst=0`).
 
-* Planning round, part 71: **task_61 — переносная сборка для Windows** (2026-10-03).
-  Просьба пользователя: одна папка для чистой машины — окно, интерпретатор,
-  документы, примеры; и вопрос, каким инструментом.  Задача написана
-  (`ai/task_61_portable_windows_build.md`, M17, строка в `plan.md` §5 и на доске),
-  факты проверены на этой машине: `prologd.exe` — 944 КиБ и импортирует
-  `VCRUNTIME140.dll`/`MSVCP140.dll` (UCRT входит в Windows 10+, а эти две DLL — нет),
-  UTF-8 манифест вшит в образ (`/MANIFESTINPUT:src/utf8.manifest`), путь дерева
-  сборки в exe не попал; в окне три пути считаются от дерева исходников
-  (`default_executable`, `assets.DEFAULT_DIRECTORY`, `_open_document`); PyInstaller
-  6.22.3 поддерживает Python 3.14 и PySide6, но ни он, ни Nuitka, ни cx_Freeze не
-  установлены.  Решения пользователя: PyInstaller `--onedir`; DLL Visual C++ кладём
-  рядом; `_old` не кладём, `.typ` кладём; `gui.ini` в переносной сборке рядом с exe
-  (в других — AppData, как сейчас); `examples/lib` прописать сразу; папка
-  `prologd-2.0.0-win64` и zip.  Инсталлятор — следующая задача.
+* Planning round, part 71: **task_61 — a portable Windows build** (2026-10-03).
+  The user's request: one folder for a clean machine — the window, the
+  interpreter, the documents, the examples; and the question of which tool.  The
+  task was written up (`ai/task_61_portable_windows_build.md`, M17, a row in
+  `plan.md` §5 and on the board), the facts checked on this machine: `prologd.exe`
+  is 944 KiB and imports `VCRUNTIME140.dll`/`MSVCP140.dll` (the UCRT is part of
+  Windows 10+, these two DLLs are not), the UTF-8 manifest is baked into the
+  image (`/MANIFESTINPUT:src/utf8.manifest`), the build-tree path did not get
+  into the exe; in the window three paths are computed from the source tree
+  (`default_executable`, `assets.DEFAULT_DIRECTORY`, `_open_document`);
+  PyInstaller 6.22.3 supports Python 3.14 and PySide6, but neither it, nor Nuitka,
+  nor cx_Freeze is installed.  The user's decisions: PyInstaller `--onedir`; the
+  Visual C++ DLLs go alongside; `_old` is not included, `.typ` is; `gui.ini` in
+  the portable build sits next to the exe (in the others — AppData, as now);
+  `examples/lib` is written in at once; the folder `prologd-2.0.0-win64` and a
+  zip.  The installer is the next task.
 
-* Packaging round, part 72: **task_61 — первая замороженная сборка** (2026-10-03).
-  §4 сделан: `prologd_gui/paths.py` отвечает на два вопроса (папка рядом с exe в
-  сборке, корень репозитория в исходниках; `sys._MEIPASS` для значков), на него
-  переведены интерпретатор, значки, документы, настройки, строка ИМПОРТ и — четвёртым,
-  чего в задаче не было, — `doc/builtins.json` для `F1`; проверки: `test_paths.py`
-  (семь случаев с подменёнными `sys.frozen`/`sys.executable`/`sys._MEIPASS`) и случай в
-  `test_window.py`; все 23 набора GUI зелёные, ctest 307/307.
+* Packaging round, part 72: **task_61 — the first frozen build** (2026-10-03).
+  §4 was done: `prologd_gui/paths.py` answers two questions (the folder next to
+  the exe in a build, the repository root in the sources; `sys._MEIPASS` for the
+  icons), and the interpreter, icons, documents, settings, the ИМПОРТ row and —
+  fourth, which the task did not have — `doc/builtins.json` for `F1` were moved to
+  it; checks: `test_paths.py` (seven cases with substituted
+  `sys.frozen`/`sys.executable`/`sys._MEIPASS`) and a case in `test_window.py`;
+  all 23 GUI suites green, ctest 307/307.
 
-  §2–§3 сделаны на первом проходе: PyInstaller 6.22.3 поставлен в `.venv`
-  (`src/gui/requirements-build.txt` — отдельно от студенческого `requirements.txt`),
-  сборка `--onedir --windowed` занимает 27 с и даёт 112.9 МиБ в 252 файлах
-  (`prologd-gui.exe` 2.3 МиБ, в `_internal/assets` все 47 значков).  Папка
-  `dist/prologd-2.0.0-win64` — 297 файлов, 116.3 МиБ: окно, `prologd.exe` и три DLL
-  Visual C++ рядом, пять PDF с их `.typ` и `builtins.json`, `examples` без
-  `lessons/_old`, памятка `ЧИТАЙ_МЕНЯ.txt` (из `tools/portable-readme.txt`).
+  §2–§3 were done on the first pass: PyInstaller 6.22.3 was installed into `.venv`
+  (`src/gui/requirements-build.txt` — separate from the student
+  `requirements.txt`), the `--onedir --windowed` build takes 27 s and gives
+  112.9 MiB in 252 files (`prologd-gui.exe` 2.3 MiB, in `_internal/assets` all 47
+  icons).  The folder `dist/prologd-2.0.0-win64` — 297 files, 116.3 MiB: the
+  window, `prologd.exe` and the three Visual C++ DLLs alongside, five PDFs with
+  their `.typ` and `builtins.json`, `examples` without `lessons/_old`, the memo
+  `ЧИТАЙ_МЕНЯ.txt` (from `tools/portable-readme.txt`).
 
-  Проверено: `tools/check_dependencies.py` разбирает таблицу импорта каждого .exe и
-  .dll поставки и отвечает «every non-system import is a file of the package» (список
-  системных DLL пополнен тем, что нашлось на деле: `icuuc.dll` — ICU из Windows 10,
-  `d2d1`/`dwrite`/`d3d12`/`uiautomationcore` — бэкенды Qt); окно из этой папки
-  запускается, находит интерпретатор рядом и создаёт `gui.ini` рядом с собой,
-  прописывая в `execution/import_paths` свой `examples/lib`; `prologd.exe --version`
-  = `2.0.0`, `--list-keywords` = 122 строки (110 имён), вывод урока 1 совпадает со
-  строками `%!`.  При проверке нашлось и исправлено: в `--windowed` сборке некуда
-  печатать, поэтому «нет prologd.exe рядом» теперь говорит окном, а не строкой в
-  stderr; из дерева убран мусорный `doc/style.pdf` (остаток цели, которая когда-то
-  собирала `style.typ` как документ) — он заехал в первую сборку.
+  Checked: `tools/check_dependencies.py` parses the import table of every .exe and
+  .dll of the distribution and answers «every non-system import is a file of the
+  package» (the list of system DLLs was enlarged by what turned up in fact:
+  `icuuc.dll` — ICU from Windows 10, `d2d1`/`dwrite`/`d3d12`/`uiautomationcore` —
+  Qt backends); the window from this folder starts, finds the interpreter
+  alongside and creates `gui.ini` next to itself, writing its `examples/lib` into
+  `execution/import_paths`; `prologd.exe --version` = `2.0.0`, `--list-keywords`
+  = 122 lines (110 names), the output of lesson 1 matches the `%!` lines.  During
+  the check this was found and fixed: in a `--windowed` build there is nowhere to
+  print, so «нет prologd.exe рядом» now speaks through the window rather than a
+  line in stderr; the junk `doc/style.pdf` was removed from the tree (a leftover
+  of a target that once built `style.typ` as a document) — it had got into the
+  first build.
 
-* Window round, part 73: **таблица ответа включена по умолчанию** (2026-10-03).  Просьба
-  пользователя: «Формировать таблицу» должна быть включена с самого начала, а не ждать,
-  пока её найдут в «Выполнении».  Изменено там, где умолчание записано: строка
-  `Setting(ANSWER_TABLE, …)` и свойство `answer_table` в `settings.py` (оба читали
-  `False`), документация (`src/gui/README.md` — и раздел «Таблица ответа», и абзац про
-  меню; `doc/gui.typ` §6.5 получил абзац про умолчание и про переход панели на
-  вкладку) и проверка `test_the_answer_table_switch_is_in_the_menu_and_in_the_settings`,
-  которая держала старое умолчание: теперь она начинается с включённого переключателя
-  и проверяет выключение.  Поведение таблицы не менялось: она строится только для
-  отдельного запроса (строка запроса или маркер), текст ответа так же идёт в «Вывод»,
-  диагностика оставляет панель на «Проблемах», а пустой ответ не переключает вкладку.
+* Window round, part 73: **the answer table is on by default** (2026-10-03).  The
+  user's request: «Формировать таблицу» must be on from the start, not waiting
+  until it is found in «Выполнении».  Changed where the default is recorded: the
+  line `Setting(ANSWER_TABLE, …)` and the `answer_table` property in `settings.py`
+  (both read `False`), the documentation (`src/gui/README.md` — both the «Таблица
+  ответа» section and the paragraph about the menu; `doc/gui.typ` §6.5 got a
+  paragraph about the default and about the panel moving to the tab) and the check
+  `test_the_answer_table_switch_is_in_the_menu_and_in_the_settings`, which held
+  the old default: now it starts from a switch that is on and checks turning it
+  off.  The table's behaviour did not change: it is built only for a separate
+  query (the query line or a marker), the answer text still goes to «Вывод»,
+  diagnostics leave the panel on «Проблемах», and an empty answer does not switch
+  the tab.
 
-  В тот же день пользователь проверил переносную сборку на **чистой Windows 11 в
-  Windows Sandbox, 24H2 26100.9457**: «запустилась и работает».  Это §7.5 задачи
-  task_61 — единственная проверка, которой не может быть на машине разработчика
-  (здесь DLL Visual C++ лежат в `System32`, поэтому забытую DLL тут не увидеть).
+  The same day the user checked the portable build on **a clean Windows 11 in
+  Windows Sandbox, 24H2 26100.9457**: «it started and works».  This is §7.5 of
+  task_61 — the only check that cannot happen on the developer's machine (here the
+  Visual C++ DLLs are in `System32`, so a forgotten DLL cannot be seen).
 
-* Portable round, part 74: **переносная сборка и перенос папки** (2026-10-03).  Вопрос
-  пользователя: `examples/lib` записывался в `execution/import_paths` на первом
-  запуске, а сборку будут копировать (флешка → компьютер → обратно), и абсолютный
-  путь от первого запуска станет чужим.  Решение: ничего не записывать.  Правило
-  переехало в `paths.import_directories(configured)` — замороженная сборка добавляет
-  свой `examples/lib` **при каждом запуске и последним**, каталоги пользователя идут
-  раньше и выигрывают при одинаковом имени файла; в дереве исходников поведение не
-  изменилось (там по-прежнему поиск только по тому, что задано).  `seed_import_paths`
-  удалён, `_import_directories` в окне теперь одна строка, проверки перенесены в
-  `test_paths.py` («находит ли сборка свой курс», «дерево ищет только то, что ему
-  сказали»).  Там же уточнилось, что `--icons` по умолчанию — это `src/gui/assets` в
-  дереве и своя копия внутри папки сборки — в `src/gui/README.md` и в памятке
-  `tools/portable-readme.txt` («папку можно переносить куда угодно»).
+* Portable round, part 74: **the portable build and moving the folder**
+  (2026-10-03).  The user's question: `examples/lib` was written into
+  `execution/import_paths` on the first run, but the build will be copied (a USB
+  stick → a computer → back), and the absolute path from the first run will
+  become foreign.  The decision: write nothing.  The rule moved into
+  `paths.import_directories(configured)` — a frozen build appends its own
+  `examples/lib` **on every run and last**, the user's directories come earlier
+  and win on a same file name; in the source tree the behaviour did not change
+  (there the search is still only over what is configured).  `seed_import_paths`
+  was deleted, `_import_directories` in the window is now one line, the checks
+  moved to `test_paths.py` («находит ли сборка свой курс», «дерево ищет только то,
+  что ему сказали»).  It was clarified there too that `--icons` defaults to
+  `src/gui/assets` in the tree and to its own copy inside the build folder — in
+  `src/gui/README.md` and in the `tools/portable-readme.txt` memo («папку можно
+  переносить куда угодно»).
 
-* Portable round, part 75: **Windows 10 подтверждена, и почему первый запуск
-  медленнее** (2026-10-03).  Пользователь проверил сборку на **Windows 10 22H2,
-  сборка 19045.6456** — «запустилась и работала»; вместе с Windows 11 из Sandbox это
-  обе системы, которыми ограничивает §9 задачи (19045 ≥ 1903, значит манифест UTF-8
-  понимают).  Там же запрос: почему первый запуск занимает секунд пять, а следующие
-  быстрее.  Замерено здесь: в уже использованной папке окно готово через 0.16–0.19 с,
-  в свежескопированной первый запуск — 0.43 с, дальше 0.17 с.  Причина не наша:
-  первый запуск новой копии читает все 296 файлов (110 МиБ) с диска, и антивирус
-  проверяет каждый `.exe`/`.dll`/`.pyd` по разу; дальше всё берётся из кэша ОС, а
-  проверка помнится.  Своё при первом запуске измерено и ничтожно (`prologd
-  --list-keywords` — 0.00–0.01 с, запись `gui.ini` — десяток КБ), а `--onedir` в
-  отличие от `--onefile` ничего не распаковывает.  Записана и возможность сократить
-  чтение: вычетом `--exclude-module` уходят QML/Quick, `Qt6Pdf`, `Qt6VirtualKeyboard`
-  и `Qt6Network` с TLS — около 27 МиБ из 110; `opengl32sw.dll` (19.7 МиБ) остаётся
-  сознательно, это запасной программный OpenGL для машины без драйвера.  Вычет будет
-  делаться вместе со скриптом §6 и проверяться `tools/check_dependencies.py`.
+* Portable round, part 75: **Windows 10 confirmed, and why the first run is
+  slower** (2026-10-03).  The user checked the build on **Windows 10 22H2, build
+  19045.6456** — «it started and worked»; together with Windows 11 from the
+  Sandbox these are both systems the task's §9 limits to (19045 ≥ 1903, so the
+  UTF-8 manifest is understood).  There was also a question: why does the first
+  run take about five seconds while the following ones are faster.  Measured
+  here: in an already used folder the window is ready in 0.16–0.19 s, in a freshly
+  copied one the first run is 0.43 s, then 0.17 s.  The cause is not ours: the
+  first run of a new copy reads all 296 files (110 MiB) from disk, and the
+  antivirus checks every `.exe`/`.dll`/`.pyd` once; afterwards everything comes
+  from the OS cache, and the check is remembered.  Our own cost on the first run
+  was measured and is negligible (`prologd --list-keywords` — 0.00–0.01 s,
+  writing `gui.ini` — a dozen KB), and `--onedir`, unlike `--onefile`, unpacks
+  nothing.  A way to cut the reading was recorded too: by subtracting with
+  `--exclude-module` QML/Quick, `Qt6Pdf`, `Qt6VirtualKeyboard` and `Qt6Network`
+  with TLS go away — about 27 MiB of 110; `opengl32sw.dll` (19.7 MiB) stays
+  deliberately, it is the fallback software OpenGL for a machine without a
+  driver.  The subtraction will be done together with the §6 script and checked by
+  `tools/check_dependencies.py`.
 
-* Portable round, part 76: **уроки пользователя, `$` как строки ввода, `Shift+Enter`
-  и отмена подстановки `examples/lib`** (2026-10-03).  Три запроса за раз: поправленные
-  уроки, «не подавать `examples/lib`» и «запретить `Shift+Enter` в редакторе».
+* Portable round, part 76: **the user's lessons, `$` as input lines, `Shift+Enter`
+  and cancelling the `examples/lib` substitution** (2026-10-03).  Three requests at
+  once: corrected lessons, «do not supply `examples/lib`» and «forbid `Shift+Enter`
+  in the editor».
 
-  *Уроки.*  `ctest` поймал в них две вещи.  В `lesson_01.pld` строка про
-  взаимозаменяемость строки и атома начиналась с `$` — а `$` в исходном файле это
-  **не комментарий**, а строка заранее подготовленных данных для ввода:
-  `ModuleLoader::extractInputLines` вырезает её из текста ещё до лексера, поэтому при
-  запуске она исчезает молча (`exit=0`, диагностики нет), а если бы урок что-нибудь
-  читал, эти слова ушли бы в программу как ответы.  Заметно стало только потому, что
-  `--format` (и `Ctrl+I` в окне) лексет текст целиком и такой файл не форматирует:
-  «недопустимый символ».  Заменено на `%`; заодно убраны хвостовые пробелы в
-  комментариях (`lesson_01` — 3 строки, `lesson_11` — 3), форматтер их подрезает, и
-  «программа уже в стандартном виде» падало.  Ещё две опечатки в `lesson_11` —
-  «Выполенение» и «ИМПОРАТ» — исправлены.  После правки `ctest` 307/307.
+  *Lessons.*  `ctest` caught two things in them.  In `lesson_01.pld` the line about
+  the interchangeability of a string and an atom began with `$` — and `$` in a
+  source file is **not a comment** but a line of pre-prepared input data:
+  `ModuleLoader::extractInputLines` cuts it out of the text before the lexer, so at
+  a run it disappears silently (`exit=0`, no diagnostics), and if the lesson read
+  anything, those words would go into the program as answers.  It became visible
+  only because `--format` (and `Ctrl+I` in the window) lexes the whole text and
+  does not format such a file: «недопустимый символ».  Replaced with `%`; trailing
+  spaces in comments were removed as well (`lesson_01` — 3 lines, `lesson_11` — 3),
+  the formatter trims them, and «программа уже в стандартном виде» fell.  Two more
+  typos in `lesson_11` — «Выполенение» and «ИМПОРАТ» — were fixed.  After the edit
+  `ctest` 307/307.
 
-  *`examples/lib`.*  Решение от 2026-10-03 (часть 74) отменено самим пользователем:
-  окно не подставляет в список поиска ИМПОРТ **ничего своего**.  Урок 11 теперь сам
-  говорит, что каталог библиотеки надо добавить руками («Правка → Настройки… →
-  Выполнение → Дополнительные каталоги ИМПОРТ»), и так **прозрачней для ученика** — он
-  видит строку, которую заполнил, и путь, который выбрал.  `paths.import_directories`
-  остался, но только для чистки: пустые строки и повторы.  Обновлены
-  `test_paths.py` (было «сборка ищет свой курс», стало «сборка ищет только то, что
-  добавил ученик, и ничего своего»), `src/gui/README.md`, `tools/portable-readme.txt`
-  (там теперь шаг «укажите `examples\lib`») и §4/§7.1/§8 задачи 61.
+  *`examples/lib`.*  The decision of 2026-10-03 (part 74) was cancelled by the user
+  himself: the window substitutes **nothing of its own** into the ИМПОРТ search
+  list.  Lesson 11 now says itself that the library directory must be added by hand
+  («Правка → Настройки… → Выполнение → Дополнительные каталоги ИМПОРТ»), and that
+  is **more transparent for the pupil** — he sees the row he filled and the path he
+  chose.  `paths.import_directories` stayed, but only for cleanup: empty lines and
+  duplicates.  Updated: `test_paths.py` (it used to be «сборка ищет свой курс», now
+  «сборка ищет только то, что добавил ученик, и ничего своего»),
+  `src/gui/README.md`, `tools/portable-readme.txt` (there is now a step «укажите
+  `examples\lib`») and §4/§7.1/§8 of task 61.
 
-  *`Shift+Enter`.*  Замерено, чем именно он ломает нумерацию: Qt вставляет им
-  **разделитель строк** `U+2028` — виджет рисует новую строку, а `blockCount()` её не
-  считает (`\n` — 2 блока, `\v`/`\f`/NEL/`U+2028` — 1, `U+2029` — 2), поэтому номера и
-  маркеры вопросов на полях уезжают.  Интерпретатор `U+2028`, `U+2029` и NEL вообще
-  отвергает («недопустимый символ»), а `\v`/`\f` считает пробелами.  Теперь `Enter` и
-  `Shift+Enter` — одна ветка в `CodeEditor.keyPressEvent` (обычный перевод строки с
-  автоотступом; `Ctrl`/`Alt`+`Enter` по-прежнему уходят в Qt), а «вставка» не приносит
-  разделитель: `CodeEditor.insertFromMimeData` и `documents.read_text` складывают
-  `U+2028`/`U+2029` в `\n` (`tokens.plain_newlines`, с записанным замером).  Случаи в
+  *`Shift+Enter`.*  It was measured exactly how it breaks the numbering: Qt inserts
+  a **line separator** `U+2028` with it — the widget draws a new line while
+  `blockCount()` does not count it (`\n` — 2 blocks, `\v`/`\f`/NEL/`U+2028` — 1,
+  `U+2029` — 2), so the numbers and the question markers in the margins drift away.
+  The interpreter rejects `U+2028`, `U+2029` and NEL altogether («недопустимый
+  символ»), and counts `\v`/`\f` as spaces.  Now `Enter` and `Shift+Enter` are one
+  branch in `CodeEditor.keyPressEvent` (an ordinary newline with auto-indent;
+  `Ctrl`/`Alt`+`Enter` still go to Qt), and «вставка» does not bring a separator:
+  `CodeEditor.insertFromMimeData` and `documents.read_text` fold `U+2028`/`U+2029`
+  into `\n` (`tokens.plain_newlines`, with the measurement recorded).  Cases in
   `test_editor.py` («`Shift+Enter` — строка, которую полянка считает», «вставка не
-  приносит разделитель») и в `test_documents.py` (в том числе порядок: складывание
-  раньше, чем определяется CRLF).  Заодно убран устаревший «(раздел 9.3)» из
-  `doc/gui.typ` §9.2 — раздела 9.3 больше нет.
+  приносит разделитель») and in `test_documents.py` (including the order: folding
+  before CRLF is determined).  The outdated «(раздел 9.3)» was removed from
+  `doc/gui.typ` §9.2 as well — section 9.3 no longer exists.
 
-* Portable round, part 77: **скрипт сборки, вычет Qt-модулей и zip** (2026-10-03).
-  Последний пункт §6 задачи 61 — `tools/build_portable.ps1` — написан и прогнан
-  целиком: Release → `ctest` 307/307 → `docs` (пять PDF) → PyInstaller → раскладка →
-  проверки → zip; параметры `-Configuration`, `-CrtDirectory`, `-Version`, а для
-  короткого круга `-SkipTests`, `-SkipFreeze`, `-NoTrim`, `-NoZip`.  Скрипт сам
-  проверяет то, что можно без человека: `prologd.exe --version` и 122 строки ключевых
-  слов, запуск урока 1 и `import_demo.pld` с `-I examples\lib`, отсутствие
-  подозрительных импортов у `tools/check_dependencies.py` и запуск окна в `offscreen`
-  (оно пишет `gui.ini` рядом с собой — файл потом удаляется, поставка едет без него).
+* Portable round, part 77: **the build script, the Qt-module subtraction and the
+  zip** (2026-10-03).  The last item of §6 of task 61 — `tools/build_portable.ps1` —
+  was written and run end to end: Release → `ctest` 307/307 → `docs` (five PDFs) →
+  PyInstaller → layout → checks → zip; the parameters `-Configuration`,
+  `-CrtDirectory`, `-Version`, and for a short round `-SkipTests`, `-SkipFreeze`,
+  `-NoTrim`, `-NoZip`.  The script itself checks what can be checked without a
+  human: `prologd.exe --version` and 122 keyword lines, running lesson 1 and
+  `import_demo.pld` with `-I examples\lib`, the absence of suspicious imports from
+  `tools/check_dependencies.py` and starting the window in `offscreen` (it writes
+  `gui.ini` next to itself — the file is then deleted, the distribution travels
+  without it).
 
-  *Вычет.*  Одного `--exclude-module` мало: модульные исключения снесли только каталог
-  `qml/` (1.7 МиБ), а DLL — `Qt6Qml`, `Qt6QmlModels`, `Qt6QmlMeta`, `Qt6QmlWorkerScript`,
-  `Qt6Quick`, `Qt6Pdf`, `Qt6VirtualKeyboard`, `Qt6Network` — остались: PySide6-хук
-  собирает DLL на пакет целиком, не на модуль.  Скрипт снимает их по именам из
-  разложенной поставки (плюс три плагина, бесполезных без них), а судят этот шаг два
-  независимых арбитра: `check_dependencies.py` (первый прогон без него дал ровно два
-  SUSPECTS — `imageformats\qpdf.dll` и `generic\qtuiotouchplugin.dll`, те самые, что
-  удалены) и старт окна.  Всего — 19.2 МиБ; `libcrypto-3.dll` и `libssl-3.dll` остались
-  сознательно: их тянет `_ssl.pyd` самого Python, разрывать пару ради шести мегабайт не
-  стоило.  Пакет — **280 файлов, 95.4 МиБ** (было 297 и 116.3), zip — **37.5 МиБ**.
-  Решение об упаковке записано ADR-024, ссылка на скрипт — в `README.md`.
+  *Subtraction.*  One `--exclude-module` is not enough: the module exclusions
+  removed only the `qml/` directory (1.7 MiB), while the DLLs — `Qt6Qml`,
+  `Qt6QmlModels`, `Qt6QmlMeta`, `Qt6QmlWorkerScript`, `Qt6Quick`, `Qt6Pdf`,
+  `Qt6VirtualKeyboard`, `Qt6Network` — stayed: the PySide6 hook collects DLLs per
+  package, not per module.  The script takes them out by name from the laid-out
+  distribution (plus three plugins useless without them), and two independent
+  arbiters judge this step: `check_dependencies.py` (the first run without it gave
+  exactly two SUSPECTS — `imageformats\qpdf.dll` and
+  `generic\qtuiotouchplugin.dll`, the very ones deleted) and the window starting.
+  19.2 MiB in total; `libcrypto-3.dll` and `libssl-3.dll` stayed deliberately:
+  they are pulled by Python's own `_ssl.pyd`, and breaking the pair for six
+  megabytes was not worth it.  The package — **280 files, 95.4 MiB** (it was 297
+  and 116.3), the zip — **37.5 MiB**.  The packaging decision is recorded in
+  ADR-024, a reference to the script — in `README.md`.
 
-  *Грабли записаны в комментариях скрипта.*  `Get-ChildItem` с подстановочным знаком
-  внутри пути возвращает совпадения этого пути, а не содержимое каталога; `-Filter` с
-  маской Win32 не нашёл `Microsoft.VC*.CRT` там, где `Where-Object { $_.Name -like … }`
-  нашёл.  И самое коварное: переменная цикла, названная как типизированный параметр
-  скрипта (`foreach ($version in …)` при `[string]$Version`), приводится к типу
-  параметра — `DirectoryInfo` становился строкой, `$version.FullName` был пуст, а
-  ошибка при этом указывала на чужую строку.  Теперь переменная `$redistVersion`, а в
-  шапке стоит `trap`, печатающий файл и номер строки.
+  *The gotchas are recorded in the script's comments.*  `Get-ChildItem` with a
+  wildcard inside the path returns the matches of that path, not the contents of
+  the directory; `-Filter` with a Win32 mask did not find `Microsoft.VC*.CRT`
+  where `Where-Object { $_.Name -like … }` did.  And the most insidious one: a loop
+  variable named like a typed parameter of the script (`foreach ($version in …)`
+  with `[string]$Version`) is converted to the parameter's type —
+  `DirectoryInfo` became a string, `$version.FullName` was empty, and the error
+  pointed at somebody else's line.  Now the variable is `$redistVersion`, and the
+  header has a `trap` that prints the file and the line number.
 
-* Documentation round, part 78: **эмблемы проекта и вуза на первой странице**
-  (2026-10-04).  Просьба пользователя: во все документы поставить рядом `prologd2.png`
-  и `csu.png` в левый верхний угол первой страницы.  Рисует их общая функция `logos()`
-  в `doc/style.typ` — `place(top + left, stack(dir: ltr, spacing: 4mm, …))`, — а каждый
-  из пяти документов вызывает её одной строкой сразу после настройки страницы, до
-  отступа перед заголовком.  `place` места в потоке не занимает, поэтому
-  центрированный титул не сдвинулся (проверено рендером).  Замерено там же: `image` в
-  Typst — **блочный** элемент, и в обычной строке значки встают друг под друга (и `#h()`
-  между ними, и `box(a + h + b)` дают столбик) — рядом их ставит только
-  `stack(dir: ltr)` или `grid`; выбран `stack`.  Значки лежат в `doc/` (копии
-  `src/gui/assets/prologd2.png` и `csu.png`), чтобы папка `doc` собиралась сама по себе:
-  из поставки рядом с PDF едут и `*.typ`, и значки — скрипт сборки копирует их и
-  проверяет, что они на месте.  `doc/README.md` описывает и эмблемы, и почему они
-  лежат в этом каталоге.
+* Documentation round, part 78: **the project and university emblems on the first
+  page** (2026-10-04).  The user's request: put `prologd2.png` and `csu.png` side
+  by side in the top-left corner of the first page of all the documents.  They are
+  drawn by the common `logos()` function in `doc/style.typ` — `place(top + left,
+  stack(dir: ltr, spacing: 4mm, …))` — and each of the five documents calls it with
+  one line right after the page setup, before the indent in front of the title.
+  `place` takes no space in the flow, so the centred title did not move (verified
+  by a render).  Measured there too: an `image` in Typst is a **block** element,
+  and in an ordinary line the icons stack one under another (both `#h()` between
+  them and `box(a + h + b)` give a column) — only `stack(dir: ltr)` or `grid`
+  puts them side by side; `stack` was chosen.  The icons lie in `doc/` (copies of
+  `src/gui/assets/prologd2.png` and `csu.png`) so that the `doc` folder builds by
+  itself: in the distribution both the `*.typ` and the icons travel next to the
+  PDFs — the build script copies them and checks that they are in place.
+  `doc/README.md` describes both the emblems and why they lie in this directory.
 
-  Вместе с эмблемами закоммичены правки пользователя, лежавшие в дереве: в
-  `doc/help.typ` убраны упоминания SWI-Prolog и GNU Prolog (примеры переписаны на
-  `если/2` и `Т = иначе`), в `examples/lessons/appendix_debug.pld` — шапка «Нужно
-  знать» и «Как читать приложение» (то же сокращение, что раньше в уроке 11).  После
-  них зелены `ctest` 307/307, `test_reference`, `test_queries`, `test_formatter`;
-  страницы проверены рендером (эмблемы — только на первой странице).  Пакет
-  пересобран: **282 файла, 95.5 МиБ**, zip — 37.7 МиБ.
+  Along with the emblems, the user's edits that lay in the tree were committed:
+  in `doc/help.typ` mentions of SWI-Prolog and GNU Prolog were removed (the
+  examples were rewritten to `если/2` and `Т = иначе`), in
+  `examples/lessons/appendix_debug.pld` — the «Нужно знать» and «Как читать
+  приложение» header (the same shortening as earlier in lesson 11).  After them
+  `ctest` 307/307, `test_reference`, `test_queries`, `test_formatter` are green;
+  the pages were verified by a render (the emblems — only on the first page).  The
+  package was rebuilt: **282 files, 95.5 MiB**, the zip — 37.7 MiB.
 
-* Documentation round, part 79: **`technical.typ` проверен по исходникам, и листинги
-  подогнаны под ширину панели** (2026-10-04).  Запрос: «проверь весь `technical.typ`
-  --- кажется, грамматика расходится; может, добавим подробностей и больше листингов
-  из C++».
+* Documentation round, part 79: **`technical.typ` checked against the sources,
+  and the listings fitted to the panel width** (2026-10-04).  The request: «check
+  the whole `technical.typ` --- it seems the grammar diverges; maybe we could add
+  more detail and more listings from C++».
 
-  *Грамматика действительно расходилась* — и не только с кодом: §7.2 говорила
-  `Факт ::= Терм ('.' | ';')`, то есть считала `;` концом предложения, тогда как это
-  дизъюнкция.  Прав `doc/help.typ` §4.5, а лексер с разбором тем более: `;` на месте
-  точки дают ошибку «`;` --- дизъюнкция; предложение должно заканчиваться точкой».
-  Грамматика переписана по `parser.cpp`: конец предложения --- только `.`,
+  *The grammar really did diverge* — and not only from the code: §7.2 said
+  `Факт ::= Терм ('.' | ';')`, that is, it counted `;` as the end of a clause,
+  whereas it is a disjunction.  `doc/help.typ` §4.5 is right, and the lexer with
+  the parser even more so: `;` in place of a dot gives the error «`;` ---
+  дизъюнкция; предложение должно заканчиваться точкой».  The grammar was
+  rewritten after `parser.cpp`: the end of a clause is only `.`,
   `Тело ::= Дизъюнкция`, `Дизъюнкция ::= Конъюнкция {';' Конъюнкция}`,
   `Цель ::= '!' | Терм`, `Терм ::= '\+' Терм | Сравнение`,
-  `Сравнение ::= Операнд [Знак Операнд]`, а слой арифметики выписан целиком
-  (`Сложение`/`ЗнакСл`/`Умножение`/`ЗнакУм`/`Множитель`) --- в прежней грамматике
-  `Выражение ::= '#' Сложение '#'` ссылалось на неопределённое `Сложение`.
+  `Сравнение ::= Операнд [Знак Операнд]`, and the arithmetic layer was written out
+  in full (`Сложение`/`ЗнакСл`/`Умножение`/`ЗнакУм`/`Множитель`) — in the old
+  grammar `Выражение ::= '#' Сложение '#'` referred to an undefined `Сложение`.
 
-  *Что ещё было неточным (проверено по коду).*  `EnvNode` в §5.1 показывал четыре
-  поля из семи (нет `depth`, `location`, `goalFrame` --- а именно они объясняют, как
-  шаг и диагностика узнают глубину и место); `ChoicePoint` в §5.2 описывался словами
-  «снимок цепочки сред, номер предложения, отметка trail и барьер», а в коде он ещё и
-  `Kind::Clause | Kind::Alternative` (дизъюнкция --- тоже точка выбора) и хранит
-  `clauses`, `goal`, `goal_index`; унификация целого с вещественным называлась
-  «сравниваются по значению», тогда как код сравнивает **точно** (`BigInt::fromDouble`,
-  а не приведение к `double`) и помнит историю про `16777217` и `16777216.0`; у
-  числового литерала не была упомянута экспонента (`1e3`); не было сказано ни про
-  `\+` (один токен, а не знак `\` с `+`), ни про таблицу `kForeignOperators` с
-  советами для `->`, `<=`, `=:=`, `==` и `@…`, ни про порядок источников ввода
-  (строки `$`, файл `ЧТЕНИЕ_ИЗ`, ответ переднего края, базовый поток), ни про
-  `kCoordinateLimit`.
+  *What else was inaccurate (checked against the code).*  `EnvNode` in §5.1 showed
+  four fields of seven (no `depth`, `location`, `goalFrame` — and it is exactly
+  those that explain how a step and diagnostics learn the depth and the place);
+  `ChoicePoint` in §5.2 was described with the words «снимок цепочки сред, номер
+  предложения, отметка trail и барьер», while in the code it is also
+  `Kind::Clause | Kind::Alternative` (a disjunction is a choice point too) and
+  holds `clauses`, `goal`, `goal_index`; the unification of an integer with a real
+  was called «сравниваются по значению», whereas the code compares **exactly**
+  (`BigInt::fromDouble`, not a cast to `double`) and remembers the story about
+  `16777217` and `16777216.0`; the exponent (`1e3`) was not mentioned for a
+  numeric literal; nothing was said about `\+` (one token, not a `\` sign with
+  `+`), nor about the `kForeignOperators` table with hints for `->`, `<=`, `=:=`,
+  `==` and `@…`, nor about the order of input sources (`$` lines, a `ЧТЕНИЕ_ИЗ`
+  file, the front-end answer, the base stream), nor about `kCoordinateLimit`.
 
-  *Больше листингов.*  Добавлено девять: `Bindings`; две ветки `Engine::unify`;
-  `advanceEnv`; `ChoicePoint`; ветка дизъюнкции из `resolveGoal`; `releaseEnvChain`;
-  `CompoundDeleter`; внутренности `BigInt` (основание, разряды, `divModMagnitude`);
-  `ForeignOperator`; порядок поиска в `ModuleLoader::resolve`; `fetchChunkLine`;
-  интерфейс `GraphicsBackend`.
+  *More listings.*  Nine were added: `Bindings`; two branches of `Engine::unify`;
+  `advanceEnv`; `ChoicePoint`; the disjunction branch from `resolveGoal`;
+  `releaseEnvChain`; `CompoundDeleter`; the internals of `BigInt` (base, digits,
+  `divModMagnitude`); `ForeignOperator`; the search order in
+  `ModuleLoader::resolve`; `fetchChunkLine`; the `GraphicsBackend` interface.
 
-  *Ширина панели измерена.*  В строку панели помещается **62 знака** (проверено
-  рендером: 62 --- в строку, 64 --- уже с переносом), а перенос в листинге выглядит
-  висячим хвостом комментария.  Все листинги `technical.typ` теперь укладываются в 62
-  знака (было 71 строка длиннее), правило записано в `doc/README.md`.  В остальных
-  четырёх документах длиннее всего 11 строк --- это примеры на Пролог-Д с
-  выровненными `%`-комментариями, и там перенос остаётся таким же, каким был до
-  панелей.
+  *The panel width was measured.*  A panel line fits **62 characters** (verified by
+  a render: 62 — on one line, 64 — already wraps), and a wrap in a listing looks
+  like a dangling comment tail.  All the `technical.typ` listings now fit in 62
+  characters (71 lines used to be longer), the rule is recorded in `doc/README.md`.
+  In the other four documents the longest is 11 lines — these are Пролог-Д examples
+  with aligned `%` comments, and there the wrapping stays as it was before the
+  panels.
 
-  *Терминология.*  По просьбе пользователя формулировки «привычный» и «обычный»
-  про другие Прологи заменены на ISO-Пролог (слово в документах уже было, новый
-  термин не вводится).  Всего шесть мест.  В `technical.typ`: «`call/2` обычного
-  Пролога» стало «`call/2` ISO-Пролога» (`call/2` действительно в ISO-Прологе ---
-  см. перечень высших предикатов стандарта), а заголовок «два места, где эта
-  грамматика не совпадает с привычной по учебникам» --- «расходится с
-  первоначальным Прологом-Д в сторону ISO-Пролога»: первый пункт про `;`, которую
-  принимал *старый* Пролог-Д, то есть с ISO тут как раз совпадение, и назвать это
-  расхождением с ISO было бы неправдой.  В `help.typ`: «привычную запись правил»
-  (вступительный абзац), «привычные конструкции Пролога» в шапке таблицы
-  сравнения, «привычную по ISO-Прологу запись» (стало «запись `X is 2 + 3`,
-  принятую в ISO-Прологе») и «привычная запись ISO-Пролога» у `\+` (стало «запись
-  ISO-Пролога»).  Остальные «обычные» и «привычные» слова в документах --- про
-  обычные вещи, а не про Прологи (`обычный размер шрифта`, «диагностика в обычном
-  для компиляторов виде», «обычная цель», «обычными `long long`», «привычная
-  клавиша справки»), и они не тронуты; в `prologd-diff.typ` оставлено «ISO-подобную
-  или просто привычную по другим языкам» --- там речь о других языках, а не о
-  Прологах.  После правки: `docs` собран (exit 0), ctest --- **307/307**.
+  *Terminology.*  At the user's request the phrases «привычный» and «обычный» about
+  other Prologs were replaced with ISO-Пролог (the word was already in the
+  documents, no new term is introduced).  Six places in all.  In `technical.typ`:
+  «`call/2` обычного Пролога» became «`call/2` ISO-Пролога» (`call/2` really is in
+  ISO-Пролог — see the standard's list of higher-order predicates), and the heading
+  «два места, где эта грамматика не совпадает с привычной по учебникам» —
+  «расходится с первоначальным Прологом-Д в сторону ISO-Пролога»: the first item
+  is about `;`, which the *old* Пролог-Д accepted, so here it is actually a match
+  with ISO, and calling that a divergence from ISO would be untrue.  In `help.typ`:
+  «привычную запись правил» (the introductory paragraph), «привычные конструкции
+  Пролога» in the header of the comparison table, «привычную по ISO-Прологу
+  запись» (became «запись `X is 2 + 3`, принятую в ISO-Прологе») and «привычная
+  запись ISO-Пролога» at `\+` (became «запись ISO-Пролога»).  The remaining
+  «обычные» and «привычные» words in the documents are about ordinary things, not
+  Prologs (`обычный размер шрифта`, «диагностика в обычном для компиляторов виде»,
+  «обычная цель», «обычными `long long`», «привычная клавиша справки»), and they
+  are untouched; in `prologd-diff.typ` «ISO-подобную или просто привычную по
+  другим языкам» was left — there it is about other languages, not Prologs.  After
+  the edit: `docs` built (exit 0), ctest --- **307/307**.
+
+* Documentation round, part 80: **the `ai/` folder speaks English** (2026-10-04).  The user
+  asked for it in one sentence — say in the README what the folder is for, bring everything in
+  it to English, and merge the duplicate sections while doing it.
+
+  *What changed first.*  `ai/README.md` now says up front that this is the working folder of
+  the AI agent and **not** user documentation, adds a reading order for a human (plan →
+  decisions → conventions → reference notes → status → task files) and spells out the language
+  rule with its single exception: Russian survives only as *quoted data of the language under
+  test* — built-in predicate names, interpreter messages, GUI labels and menu paths, program
+  text and its output, and sentences quoted from the Russian manual.  The root `README.md`
+  says the same in one line and points a contributor at `ai/`.
+
+  *What was translated.*  Fourteen task files were rewritten in place — `task_29`, `task_35`,
+  `task_39`, `task_44`, `task_51`, `task_52`, `task_53`, `task_54`, `task_56`, `task_57`,
+  `task_58`, `task_59`, `task_60`, `task_61` — together with `status.md` (the whole journal,
+  parts 28--79) and the two READMEs.  In seven more files only the quoted user requests were
+  translated (`task_31`, `task_34`, `task_36`, `task_37`, `task_48`, `task_49`, `task_55`), and
+  six Russian titles were put into English (`task_44`, `task_50`--`task_55`).  The remaining
+  files were checked line by line and left alone: their Cyrillic is data — `НАЙТИВСЕ`,
+  «непарные скобки», «Проблемы», `?длина(Х, 2)`, `lesson_07_данные.txt`.
+
+  *Compressing on the way,* as the user asked.  Duplicated sections were merged (in `task_58`
+  the five goal bullets, two "Decisions" lists and the follow-up round became one Decisions
+  section plus a §6; in `task_29` the settings list absorbed the inline "done 2026-10-01" notes
+  and the round's findings), and stale statements were corrected where they were found:
+  `task_61` carried the package as it was before the emblems (280 files / 95.4 MiB / zip
+  37.5 MiB) and now says 282 / 95.5 / 37.7, and its count of GUI suites is 23, not 22;
+  `task_35` still said "plan (waiting for answers)" when the round was finished; `task_53`
+  promised §6.2 for `ВВОДПС` where the user had chosen §6.3.
+
+  *How it was checked.*  After every file a short script counted the lines that still contain
+  Cyrillic and listed them, so that what remains is quoted data and nothing else; the two big
+  passes over `status.md` were verified by hashing the ranges above and below the edited one,
+  and the file's own line count moved by about 1 %.  Nothing reads `ai/`: no code, no document,
+  no test, so the project's state is exactly what part 79 left — `ctest` 307/307, five PDFs,
+  and the portable package as task_61 describes it.
+
+  *Left for later:* the journal keeps its Russian *quotations* where they are evidence (what
+  `help.typ` used to say, what a message printed), which is the one place the rule allows
+  them.
 
 
 

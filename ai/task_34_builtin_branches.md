@@ -9,9 +9,9 @@
 The user asked whether *all* branches of the built-in predicates work, and to put
 every one of them — including the edge cases — into the tests:
 
-> Давай проверим что все ветки предикатов работают корректно. Добавим в тесты все
-> ветки. … также добавь краевые случаи, например — целое1 <= 0 — целое1 > длины
-> строка1 — целое2 > длины строка1
+> Let us check that every branch of every predicate works correctly.  Let us add every
+> branch to the tests. … also add the edge cases, for example — integer1 <= 0,
+> integer1 > length of string1, integer2 > length of string1
 
 So this is a verification round, not a feature round.  The method matters more
 than the tests it produced:

@@ -1,36 +1,36 @@
-# task_56 — пропущенная точка видна и в середине файла
+# task_56 — a missing dot is visible in the middle of a file too
 
-Статус: done (2026-10-02).
+Status: done (2026-10-02).
 
-## Зачем
+## Why
 
-Пользователь написал две строки
+The user wrote two lines
 
 ```prolog
 студент(вова, корчагин)
 студент(данил, ахмеров).
 ```
 
-и получил
+and got
 
 ```
 pld:2:1: error: ошибка при разборе предложения
 ```
 
-— сообщение, которое ничего не говорит, и позицию на *начале второго*
-предложения, хотя не хватает точки в конце первого.  Полезная формулировка
-(«предложение должно заканчиваться точкой») выдавалась только тогда, когда точка
-пропущена у последнего предложения в файле, — потому что только там парсер
-доходит до конца входного потока.
+— a message that says nothing, at the position of the *start of the second* statement,
+although the missing dot is at the end of the first.  The useful wording ("a statement
+must end with a dot") was printed only when the dot was missing after the last statement
+in the file, because that is the only place where the parser reaches the end of the
+input.
 
-Причина: перевод строки в этом диалекте ничего не заканчивает (как и раньше), и
-лексер склеивает два предложения в одно.  Разбор первого терма проходит
-успешно, и парсер спотыкается уже на имени второго (`parseClause`, последняя
-ветка `if (!check(TokenKind::Dot))` → общий `InvalidSentence` без текста).
+The cause: a newline ends nothing in this dialect (as before), so the lexer glues the two
+statements into one.  Parsing the first term succeeds and the parser stumbles on the name
+of the second (`parseClause`, the last branch of `if (!check(TokenKind::Dot))` → the
+generic `InvalidSentence` with no text).
 
-## Решение
+## The fix
 
-Новый хелпер в анонимном пространстве `parser.cpp`:
+A new helper in the anonymous namespace of `parser.cpp`:
 
 ```cpp
 bool beginsStatement(TokenKind kind);   // Identifier, Variable, Integer, Float,
@@ -38,39 +38,40 @@ bool beginsStatement(TokenKind kind);   // Identifier, Variable, Integer, Float,
                                         // NotGoal, LParen, LBracket
 ```
 
-Если предложение *закончено* (голова, а после `:-`/`<-` и тело, разобраны), а
-следующий токен — из этого списка, то дальше начинается следующее предложение, и
-не хватает именно точки: `reportMissingDot()` пишет «предложение должно
-заканчиваться точкой» с позицией `previous().location` — на конце *своего*
-предложения.  Ветка добавлена в `parseClause` и в `parseQueryOrDirective`
-(последняя — через `check(EndOfFile) || beginsStatement(peek().kind)`).
+When a statement is *complete* (the head, and after `:-`/`<-` the body, are parsed) and
+the next token is from that list, a new statement begins and the dot is what is missing:
+`reportMissingDot()` prints "предложение должно заканчиваться точкой" with the position of
+`previous().location` — at the end of *its own* statement.  The branch is in `parseClause`
+and in `parseQueryOrDirective` (the latter through
+`check(EndOfFile) || beginsStatement(peek().kind)`).
 
-Список намеренно узкий: `,`, `)`, `]`, знаки операций и `!` остаются с прежними
-точными сообщениями («непарные скобки», «неверное использование !», …), потому
-что с них новое предложение начаться не может.
+The list is deliberately narrow: `,`, `)`, `]`, the operator signs and `!` keep their
+earlier, precise messages ("непарные скобки", "неверное использование !", …), because a
+new statement cannot begin with them.
 
-## Прогоны (собранный интерпретатор)
+## Runs (the built interpreter)
 
-| программа | было | стало |
+| program | before | after |
 |---|---|---|
 | `студент(вова, корчагин)` + `студент(данил, ахмеров).` | `2:1: ошибка при разборе предложения` | `1:42: предложение должно заканчиваться точкой` |
 | `a(X) :- b(X)` + `a(2).` | `2:1: ошибка при разборе предложения` | `1:12: предложение должно заканчиваться точкой` |
 | `?- a(1)` + `b(2).` | `2:1: ошибка при разборе предложения` | `1:7: предложение должно заканчиваться точкой` |
-| `a(1) b(2).` (одна строка) | `1:4: ошибка при разборе предложения` | `1:4: предложение должно заканчиваться точкой` |
-| `студент(вова, корчагин).` + `студент(данил, ахмеров).` | — | без диагностик |
-| `a(1), b(2).` | `1:5: ошибка при разборе предложения` | без изменений (`,` предложение не начинает) |
-| `p :- f(a "b").` | «непарные скобки», затем общая | без изменений (точная диагностика раньше) |
+| `a(1) b(2).` (one line) | `1:4: ошибка при разборе предложения` | `1:4: предложение должно заканчиваться точкой` |
+| `студент(вова, корчагин).` + `студент(данил, ахмеров).` | — | no diagnostics |
+| `a(1), b(2).` | `1:5: ошибка при разборе предложения` | unchanged (`,` does not begin a statement) |
+| `p :- f(a "b").` | "непарные скобки", then the generic one | unchanged (the precise diagnostic comes first) |
 
-Столбцы считаются **байтами** (так во всём диалекте, см. тест «an unclosed
-bracket is reported at the opening bracket»): `студент(вова, корчагин)` — 41 байт,
-поэтому `)` в 42-м столбце.
+Columns are counted in **bytes** (as everywhere in this dialect, see the test "an unclosed
+bracket is reported at the opening bracket"): `студент(вова, корчагин)` is 41 bytes, so
+`)` is in column 42.
 
-## Что сделано
+## What was done
 
-* `parser.cpp`: `beginsStatement` + ветка в `parseClause` и `parseQueryOrDirective`.
-* `test_parser.cpp`: случай «a statement that lost its dot is told where the dot
-  belongs» — четыре раздела (факт перед фактом, правило перед фактом, запрос
-  перед фактом, «точка везде») и раздел-сторож на общую формулировку.
-* `test_diagnostics.cpp`: тот же случай через загрузчик модуля (позиция `1:42`).
+* `parser.cpp`: `beginsStatement` plus the branch in `parseClause` and
+  `parseQueryOrDirective`.
+* `test_parser.cpp`: the case "a statement that lost its dot is told where the dot
+  belongs" — four sections (a fact before a fact, a rule before a fact, a query before a
+  fact, "the dot is everywhere") and a guard section for the generic wording.
+* `test_diagnostics.cpp`: the same case through the module loader (the `1:42` position).
 
-Проверки: `prlib_tests` и `ctest` — **276/276** (было 274).
+Checks: `prlib_tests` and `ctest` — **276/276** (was 274).

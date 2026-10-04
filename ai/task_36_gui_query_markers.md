@@ -11,8 +11,8 @@ keyword source is not needed here, but the protocol is)
 Make the questions in a program **clickable**.  A lesson carries 204 queries
 (`?сумма(5, С).` and friends) and each of them prints its answer into one long
 output pane, so a reader has to guess which answer belongs to which query — the
-user's own words: «сейчас в листингах с большим количеством `?` сложно
-отследить какой вывод относится к какому примеру».  Clicking a marker next to a
+user's own words: "in listings with many `?` it is hard to track which answer belongs
+to which example".  Clicking a marker next to a
 question should run *that question alone* and print *its* answer alone.
 
 The other half of the same problem already exists in the lessons: thirteen

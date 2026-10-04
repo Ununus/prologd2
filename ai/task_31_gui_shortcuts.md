@@ -100,8 +100,8 @@ writes both out with the reason instead of hiding them
 
 ## Extra combinations worth having
 
-Confirmed with the user before implementing, and the answer was «базовые + простые
-символы»: the symbols only, **no** clause skeletons — `ФАКТ.`, `Правило(…) :- …`,
+Confirmed with the user before implementing, and the answer was "the basic and simple
+symbols": the symbols only, **no** clause skeletons — `ФАКТ.`, `Правило(…) :- …`,
 `?цель(…).`, `% комментарий` and `<- …` were dropped as writing the program for
 the user rather than helping them type it.
 
