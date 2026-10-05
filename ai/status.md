@@ -9,8 +9,10 @@ into English, the last `$` taken out of the interpreter (part 81), three built-i
 ADR-025), the examples folder given a map and a `problems/` shelf (part 83), the standard
 library started as `stdlib/` with `lists.pld`, `sets.pld`, `sorts.pld` and a checked demo
 (part 84), that library grown to five files, documented in a sixth document and found by the
-interpreter beside itself without a flag (part 85, ADR-026), and its own texts given a single
-space after a sentence, with `tail/2` beside `head/2` (part 86).
+interpreter beside itself without a flag (part 85, ADR-026), its own texts given a single
+space after a sentence, with `tail/2` beside `head/2` (part 86), and the differences
+document relieved of the `$` item while the «не A, а B» turns became plain statements
+(part 87).
 
 ## Overall
 
@@ -2889,3 +2891,41 @@ Added on 2026-10-03 while planning task_59:
 
   *Verified.*  `ctest` 320/320, `test_queries.py` green after a `PINNED` refresh, and the
   six documents rebuilt.
+
+* Documentation, part 87: **the `$` item dropped, and the «не A, а B» turns trimmed**
+  (2026-10-05).  Two requests from the user.
+
+  *Item 13 is gone.*  The section about `$`-prefixed input lines left
+  `doc/prologd-diff.typ`.  The document lost exactly one page (26 -> 25), its following
+  sections renumbered, and a search for quotations of those numbers found only the
+  historical notes in `ai/` ("`prologd-diff.typ` §15" in `task_39_english_aliases.md`,
+  and the journal itself) — they stay as the record of what was true then.  Nothing in
+  the user documents referred to them: the two "раздел N" references that look like
+  candidates (`gui.typ` §14, `technical.typ` §7.1) point at `help.typ`, whose numbering
+  did not move.
+
+  *The contrasts.*  The user's rule: phrases shaped «это не A, а B» / «это A, а не B»
+  become plain statements of the fact.  The documents were swept for the *rhetorical*
+  shape — the one that names what something is not before saying what it is — and
+  eighteen of them were rewritten: `help.typ` (the definition of `;`, `ИМПОРТ` as a
+  directive, `НЕ(…)` as a real goal, `\+` as a second spelling, the empty line, the
+  rebuilding of lines, the limit), `gui.typ` (highlighting types and alphabets, output in
+  batches, the colour readout, the answer table, why `F5` builds none), `technical.typ`
+  (the disjunction is not a predicate) and the library's own texts (`library.typ`,
+  `stdlib/README.md`, `strings.pld`, the demo header, `examples/README.md`).
+
+  *What was kept, and why.*  A trailing qualifier that carries information stays: «в
+  символах, а не в байтах», «неудача, а не ошибка», «в момент загрузки, а не в момент
+  ответа», «по скан-коду, а не по символу» — there the negative half is a fact the
+  reader needs, not a flourish.  `prologd-diff.typ` keeps its «добавка, а не замена»
+  rows for the same reason: contrast is that document's genre, and the sweep left it
+  alone.
+
+  *Layout.*  Prose edits were checked to be layout-neutral rather than assumed: every
+  document was rendered from both revisions and its page count compared — `help` 37,
+  `gui` 31, `technical` 23, `library` 10, unchanged; `prologd-diff` 26 -> 25, exactly the
+  removed section.  The junction page in `prologd-diff` (where section 13 now starts) was
+  looked at: the heading sits at the top of a page, with nothing orphaned.
+
+  *Verified.*  `ctest` 320/320, the demo still prints its promises, the library files are
+  still canonical for `--format`, and the six documents build with exit 0.
