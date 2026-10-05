@@ -35,28 +35,6 @@ MAX_GR_Y = 768
 #: `10**18`, and both sides have to compute the same clipped picture.
 COORDINATE_LIMIT = 1_000_000
 
-#: The sixteen colours of the original's screen: index → `#rrggbb`.  A lesson
-#: paints with `0`…`15` (`examples/drawing.pld` uses `0`, `1`, `14`, `15`), so the
-#: numbers a DOS-era program was written with keep meaning what they meant.
-EGA_PALETTE = (
-    "#000000",  # 0  чёрный
-    "#0000aa",  # 1  синий
-    "#00aa00",  # 2  зелёный
-    "#00aaaa",  # 3  голубой
-    "#aa0000",  # 4  красный
-    "#aa00aa",  # 5  сиреневый
-    "#aa5500",  # 6  коричневый
-    "#aaaaaa",  # 7  светлосерый
-    "#555555",  # 8  тёмносерый
-    "#5555ff",  # 9  яркосиний
-    "#55ff55",  # 10 яркозелёный
-    "#55ffff",  # 11 яркоголубой
-    "#ff5555",  # 12 яркокрасный
-    "#ff55ff",  # 13 яркосиреневый
-    "#ffff55",  # 14 жёлтый
-    "#ffffff",  # 15 белый
-)
-
 #: Every primitive the wire can carry (protocol 10).  A front-end that hears
 #: something else is talking to a newer interpreter, and says so instead of
 #: drawing a picture that is quietly wrong.
@@ -79,16 +57,15 @@ BLANK = 0
 def color_for(value: int) -> str:
     """The colour of a cell value, as `#rrggbb`.
 
-    `0`…`15` are the palette the original drew with.  Anything above is read as
-    a colour of its own, `0xRRGGBB` — the two ranges cannot be confused, because
-    a value below 16 that meant "dark blue" as `#00000a` would be a black nobody
-    asked for, and a program that wants a real colour should not have to give up
-    the palette to say so.
+    The value *is* the colour: `0xRRGGBB`, which is what the graphics predicates
+    take and what `ТОЧКА(X, Y, Цвет)` with a free colour hands back.  There is no
+    palette any more (task_63): `0` is plain black, and the names a program wants
+    (`красный`, `синий`, …) live in `stdlib/graphics.pld`, each one an `rgb/4` call —
+    one definition of a colour for the library and the window both.  The mask is
+    belt and braces: the interpreter refuses a value out of range, and a front-end
+    that hears one from somewhere else still has to draw *something*.
     """
-    if 0 <= value < len(EGA_PALETTE):
-        return EGA_PALETTE[value]
-    value &= 0xFFFFFF
-    return "#%06x" % value
+    return "#%06x" % (value & 0xFFFFFF)
 
 
 def _rgba(value: int) -> bytes:

@@ -513,7 +513,7 @@ and the picture would be embedded in the editor).  Its toolbar has «Вписа�
 pixel, with the scroll area doing the moving), «Очистить» (the *window's* picture
 — the interpreter's screen belongs to the program, and a new run starts a fresh
 interpreter and clears the canvas with it) and «Сохранить как PNG…»; to the right
-stands the cell under the pointer («x=320 y=240 цвет=14»), because "why is it
+stands the cell under the pointer («x=320 y=240 цвет=#800000»), because "why is it
 yellow" is a question the palette answers.
 
 `CanvasView` paints `graphics.Canvas.rgba` — the canvas' own buffer, wrapped in a

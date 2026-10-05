@@ -30,6 +30,7 @@ prologd -I stdlib -s задача.pld
 | `sorts.pld` | приёмы сортировки; подключает `lists.pld` |
 | `strings.pld` | строки: пробелы, слова, замена, разбор чисел; подключает `lists.pld` |
 | `math.pld` | целые числа: делители, степени, простые |
+| `graphics.pld` | цвета графики: `rgb/4` и имена цветов |
 
 Полный список предикатов с аргументами — в документе «Стандартная библиотека»
 (`doc/library.typ`, он же PDF в сборке); короткое описание каждого предиката стоит
@@ -68,7 +69,7 @@ prologd -I stdlib -s задача.pld
 | `split/2` | `words/2` (в `strings.pld`) |
 | `чиспис/2` | `to_numbers/2` (в `strings.pld`) |
 | `больше/2`, `меньше/2` | не нужны: встроенные `БОЛЬШЕ` и `МЕНЬШЕ` |
-| — (новое) | `nth/3`, `head_n/3`, `last_n/3`, `sum_list/2`, `map/3`, `filter/3`, `fold/4`, `msort/2`, `strings.pld` и `math.pld` |
+| — (новое) | `nth/3`, `head_n/3`, `last_n/3`, `sum_list/2`, `map/3`, `filter/3`, `fold/4`, `msort/2`, `strings.pld`, `math.pld` и `graphics.pld` |
 | `set/2` | `set/2`, но через `СОРТИРОВКА`: без повторов по возрастанию |
 | `delrepeat/2` | `unique/2`: без повторов, порядок первых вхождений сохраняется |
 | `subset/2`, `equalset/2`, `unionset/3`, `intersect/3`, `difset/3` | те же имена; `intersect` и `difset` собирают ответ через `НАЙТИВСЕ` |

@@ -160,6 +160,7 @@ entries of the session log below and in `ai/task_*.md`.
 | task_59_gui_answer_table | done | the answer table for a *single* goal (variant C), **on by default since 2026-10-03**; the rule lives in `answers.py`, Qt-free |
 | task_60_gui_ask_after_load | done | a question is asked only after `loaded` (`_pending_query`), and a load that fails drops it with one line in «Системе» |
 | task_61_portable_windows_build | in progress | §4 (the window's own paths, `prologd_gui/paths.py`) and §2–§3 (PyInstaller, the first frozen folder, `tools/check_dependencies.py`) are done and checked; left: `tools/build_portable.ps1`, the zip and the clean-machine run (`ai/task_61_portable_windows_build.md`) |
+| task_63_graphics_rgb | done | the 0…15 palette is gone: a colour is `0xRRGGBB` (`0`…`16777215`, anything else an error), and the names plus `rgb/4` live in `stdlib/graphics.pld` |
 
 ## Test suite
 
@@ -3193,3 +3194,64 @@ Added on 2026-10-03 while planning task_59:
 
   *Verified.*  `prologd.exe --version` → `2.1.0`; `?ВЕРСИЯ.` → `PrologD 2.1.0 (2026-10-05)`;
   `ctest` 320/320; the portable script reached «Ready: …\dist\prologd-2.1.0-win64».
+
+* Colour becomes `0xRRGGBB`, part 95: **the 0…15 palette goes, and the names move to the
+  library** (2026-10-06).  task_63, asked for by the user.
+
+  *What was already true.*  The engine never knew a palette: `GraphicsColor` is the colour
+  *value* the program wrote, and only `src/gui/prologd_gui/graphics.py` turned a value into a
+  pixel — reading anything above 15 as `0xRRGGBB` and everything below as an EGA entry.  So
+  the change is subtractive in the window and additive in the library.
+
+  *The engine guards the argument now.*  `builtins_graphics.cpp` gained `colour(...)` beside
+  `coordinate(...)`: an integer in `0`…`0xFFFFFF`, or a `TypeMismatch` whose message names the
+  range and the value («Цвет вне диапазона 0…16777215: 16777216»), and every colour argument
+  of `ТОЧКА`/`ЛИНИЯ`/`ОКРУЖНОСТЬ`/`ЗАКРАСКА` goes through it.  The window had been masking,
+  so `0xFF0000` and `0x1FF0000` drew the same pixel and still compared unequal on a read;
+  instead of the mask, a value that is not a colour is refused.  Probed by hand: all four
+  predicates exit 3 with that message, and `16777215` passes.
+
+  *The names are a library file.*  `stdlib/graphics.pld` (the sixth file) holds `rgb/4` and
+  eighteen colour names, each one an `rgb/4` call, so a colour has one definition that the
+  library and the window's reader share.  `rgb/4` works both ways and is written as two
+  guarded clauses: three components compute the colour, a bound colour gives the components
+  back (`?ТОЧКА(X, Y, Ц), красный(Ц)` is a question, not a drawing).  The guards are
+  load-bearing — an arithmetic expression over a free variable is an *error* in this dialect,
+  not a failure, so without `ЦЕЛ(...)` the second clause could never be reached.  A call that
+  leaves both the colour and a component free fails plainly: there is no generator for
+  «colours like that» here.
+
+  *The examples read like programs again.*  `examples/lessons/lesson_12.pld` and
+  `examples/drawing.pld` bind the names (`жёлтый(Мяч), ОКРУЖНОСТЬ(Х, У, 10, Мяч)`) and the
+  prose that taught «1 — чёрный, 4 — синий» is gone — it had been wrong for a while: `1`
+  was blue in the palette, not black.  Lesson 12's `%!` lines were re-recorded from the
+  interpreter, so the сад section now shows the numbers behind the names (`8421376`,
+  `65280`), which is the lesson's own point made twice.  Both files say in their header how
+  to run from the source tree (`-I stdlib`).
+
+  *Both ends of the colour table moved together.*  `graphics.py` lost `EGA_PALETTE` and the
+  palette branch of `color_for` (the value *is* the colour; the mask stayed as belt and
+  braces for a front-end that hears a stray value), the graphics window's hover line shows
+  `#rrggbb`, and `test_graphics.py` pins `color_for(4) == "#000004"` and a snapshot byte of
+  `1`.  `doc/help.typ` §14, `doc/gui.typ`, `doc/builtins.json` (the colour argument of the
+  four predicates), `doc/prologd-diff.typ` (a palette row in the comparison table),
+  `doc/library.typ` (the new file's section, a nineteen-predicate table) and the two READMEs
+  followed.
+
+  *Traps.*  (1) `test_lessons.cpp` hands a lesson the include paths of the CLI: lesson 12
+  imports the library now, so the list gained `PROLOGD_STDLIB_DIR` — the check mirrors
+  `-I examples/lib -I stdlib`, it does not invent a search order.  (2) `test_reference.py`
+  demands that every detail line of `doc/builtins.json` *starts with the predicate it
+  describes*: the first wording of the new range line («Цвет — целое …») failed there, and
+  it was rewritten to start with `ТОЧКА(X, Y, Цвет)`.  (3) `examples/stdlib_demo.pld` was
+  left alone by decision — its table is per library file and the names are already shown by
+  lesson 12 and `drawing.pld` — so `test_queries.py`'s `PINNED` did not move.
+
+  *Left open.*  No test file pins the refusal yet: the graphics suite pins colour *values*
+  (`3`, `4`, `9`, `15`), and the range error is covered by hand probes only.
+
+  *Verified.*  `ctest` 320/320 (the formatter sweep over the new and rewritten files,
+  `test_stdlib.cpp`'s every head in the document, lesson 12's promises); the six documents
+  build; `test_graphics.py`, `test_reference.py`, `test_queries.py` and `test_window.py` all
+  green; by hand: the four predicates refuse `16777216` and `-1` with the new message and
+  accept `16777215`.

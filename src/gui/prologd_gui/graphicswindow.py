@@ -229,7 +229,7 @@ class GraphicsWindow(QWidget):
             self._cell.setText(NO_CELL)
             return
         x, y, value = cell
-        self._cell.setText(f"x={x} y={y} цвет={value}")
+        self._cell.setText(f"x={x} y={y} цвет=#{value:06x}")
 
     def _set_fit(self, fit: bool) -> None:
         """One cell per pixel, or the whole screen in the window."""

@@ -151,11 +151,13 @@ TEST_CASE("ported example programs parse cleanly") {
 TEST_CASE("every lesson prints exactly what its comments promise") {
   for (const std::string& name : checkedLessons()) {
     const std::string stem = name.substr(0, name.rfind('.'));
-    // Lesson 11 imports a library, so the check searches the same two places the
-    // CLI would reach with `-I examples/lib`: next to the lesson, then the library.
+    // Lesson 11 imports a library and lesson 12 the colour names, so the check
+    // searches the same three places the CLI would reach with
+    // `-I examples/lib -I stdlib`: next to the lesson, then the two libraries.
     checkPromises("lessons/" + name, readOptional("lessons/" + stem + ".input.txt"),
                   {std::string(PROLOGD_TEST_DATA_DIR) + "/lessons",
-                   std::string(PROLOGD_TEST_DATA_DIR) + "/lib"});
+                   std::string(PROLOGD_TEST_DATA_DIR) + "/lib",
+                   std::string(PROLOGD_STDLIB_DIR)});
   }
 }
 

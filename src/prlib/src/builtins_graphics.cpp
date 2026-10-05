@@ -35,6 +35,28 @@ long long coordinate(Engine& engine, const Term& term, std::string_view predicat
   return *value;
 }
 
+/// The largest value a colour can have: `0xRRGGBB`.
+constexpr long long kColorLimit = 0xFFFFFF;
+
+/// A colour that is not free: an integer in `0`…`0xFFFFFF`.
+///
+/// The value *is* the colour — the canvas keeps the numbers a program wrote, and
+/// `ТОЧКА(X, Y, Цвет)` with a free colour hands one back — so a value outside the
+/// range is not a colour at all.  It used to be masked by the window, which meant
+/// `0xFF0000` and `0x1FF0000` drew the same pixel and compared unequal on a read.
+long long colour(Engine& engine, const Term& term, std::string_view predicate) {
+  const auto value = intArg(engine, term);
+  if (!value) {
+    badArguments(predicate);
+  }
+  if (*value < 0 || *value > kColorLimit) {
+    engine.raise(ErrorCode::TypeMismatch, "Цвет вне диапазона 0…" +
+                                               std::to_string(kColorLimit) + ": " +
+                                               std::to_string(*value));
+  }
+  return *value;
+}
+
 }  // namespace
 
 BuiltinResult builtinPoint(Engine& engine, std::span<const Term> args) {
@@ -45,7 +67,7 @@ BuiltinResult builtinPoint(Engine& engine, std::span<const Term> args) {
   if (!free_x && !free_y && !free_color) {
     graphics.setPixel(coordinate(engine, args[0], "ТОЧКА"),
                       coordinate(engine, args[1], "ТОЧКА"),
-                      static_cast<unsigned>(coordinate(engine, args[2], "ТОЧКА")));
+                      static_cast<unsigned>(colour(engine, args[2], "ТОЧКА")));
     return BuiltinResult::Continue;
   }
   if (!free_x && !free_y && free_color) {
@@ -58,16 +80,16 @@ BuiltinResult builtinPoint(Engine& engine, std::span<const Term> args) {
   }
   if (!free_x && free_y && !free_color) {
     graphics.vertical(coordinate(engine, args[0], "ТОЧКА"), 0, graphics.height(),
-                      static_cast<unsigned>(coordinate(engine, args[2], "ТОЧКА")));
+                      static_cast<unsigned>(colour(engine, args[2], "ТОЧКА")));
     return BuiltinResult::Continue;
   }
   if (free_x && !free_y && !free_color) {
     graphics.horizontal(0, coordinate(engine, args[1], "ТОЧКА"), graphics.width(),
-                        static_cast<unsigned>(coordinate(engine, args[2], "ТОЧКА")));
+                        static_cast<unsigned>(colour(engine, args[2], "ТОЧКА")));
     return BuiltinResult::Continue;
   }
   if (free_x && free_y && !free_color) {
-    graphics.clearView(static_cast<unsigned>(coordinate(engine, args[2], "ТОЧКА")));
+    graphics.clearView(static_cast<unsigned>(colour(engine, args[2], "ТОЧКА")));
     return BuiltinResult::Continue;
   }
   badArguments("ТОЧКА");
@@ -82,10 +104,10 @@ BuiltinResult builtinLine(Engine& engine, std::span<const Term> args) {
   if (!free_a1 && !free_a2 && !free_a3 && !free_a4) {
     graphics.line(coordinate(engine, args[0], "ЛИНИЯ"), coordinate(engine, args[1], "ЛИНИЯ"),
                   coordinate(engine, args[2], "ЛИНИЯ"), coordinate(engine, args[3], "ЛИНИЯ"),
-                  static_cast<unsigned>(coordinate(engine, args[4], "ЛИНИЯ")));
+                  static_cast<unsigned>(colour(engine, args[4], "ЛИНИЯ")));
     return BuiltinResult::Continue;
   }
-  const unsigned color = static_cast<unsigned>(coordinate(engine, args[4], "ЛИНИЯ"));
+  const unsigned color = static_cast<unsigned>(colour(engine, args[4], "ЛИНИЯ"));
   if (!free_a1 && free_a2 && !free_a3 && !free_a4) {
     graphics.vertical(coordinate(engine, args[0], "ЛИНИЯ"), coordinate(engine, args[2], "ЛИНИЯ"),
                       coordinate(engine, args[3], "ЛИНИЯ"), color);
@@ -120,10 +142,10 @@ BuiltinResult builtinCircle(Engine& engine, std::span<const Term> args) {
     const long long radius = coordinate(engine, args[2], "ОКРУЖНОСТЬ");
     graphics.ellipse(coordinate(engine, args[0], "ОКРУЖНОСТЬ"),
                      coordinate(engine, args[1], "ОКРУЖНОСТЬ"), radius, radius,
-                     static_cast<unsigned>(coordinate(engine, args[3], "ОКРУЖНОСТЬ")));
+                     static_cast<unsigned>(colour(engine, args[3], "ОКРУЖНОСТЬ")));
     return BuiltinResult::Continue;
   }
-  const unsigned color = static_cast<unsigned>(coordinate(engine, args[3], "ОКРУЖНОСТЬ"));
+  const unsigned color = static_cast<unsigned>(colour(engine, args[3], "ОКРУЖНОСТЬ"));
   if (!free_a1 && free_a2 && !free_a3) {
     const long long radius = coordinate(engine, args[2], "ОКРУЖНОСТЬ");
     const long long x = coordinate(engine, args[0], "ОКРУЖНОСТЬ");
@@ -148,7 +170,7 @@ BuiltinResult builtinFill(Engine& engine, std::span<const Term> args) {
   }
   engine.graphics().floodFill(coordinate(engine, args[0], "ЗАКРАСКА"),
                               coordinate(engine, args[1], "ЗАКРАСКА"),
-                              static_cast<unsigned>(coordinate(engine, args[2], "ЗАКРАСКА")));
+                              static_cast<unsigned>(colour(engine, args[2], "ЗАКРАСКА")));
   return BuiltinResult::Continue;
 }
 

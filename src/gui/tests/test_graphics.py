@@ -153,11 +153,11 @@ def test_a_run_and_the_whole_screen() -> None:
 
 
 def test_a_colour_value_becomes_a_colour_one_way() -> None:
+    # task_63: the palette is gone and the value *is* the colour, so `4` is a
+    # nearly black blue rather than "dark red"; the names live in the library.
     assert graphics.color_for(0) == "#000000"
-    assert graphics.color_for(15) == "#ffffff"
-    assert graphics.color_for(4) == "#aa0000"
-    # Above the palette the value is a colour of its own, and never a palette
-    # entry: `#00000a` would be a black nobody asked for.
+    assert graphics.color_for(4) == "#000004"
+    assert graphics.color_for(0xFFFFFF) == "#ffffff"
     assert graphics.color_for(0xFF0000) == "#ff0000"
     assert graphics.color_for(0x00FF00) == "#00ff00"
 
@@ -165,10 +165,10 @@ def test_a_colour_value_becomes_a_colour_one_way() -> None:
     # An untouched screen is opaque black, not transparent: the window would show
     # the desktop through it otherwise.
     assert plane.to_rgba() == bytes((0, 0, 0, 0xFF)) * 2
-    plane.draw({"op": "setPixel", "x": 0, "y": 0, "color": 4})
+    plane.draw({"op": "setPixel", "x": 0, "y": 0, "color": 0xAA0000})
     plane.draw({"op": "setPixel", "x": 1, "y": 0, "color": 0xFF0000})
     assert plane.to_rgba() == bytes((0xAA, 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00, 0xFF))
-    print("ok: a colour value becomes a colour, and the palette keeps its meaning")
+    print("ok: a colour value is the colour the program wrote")
 
 
 def test_a_snapshot_replaces_the_picture() -> None:
@@ -176,7 +176,7 @@ def test_a_snapshot_replaces_the_picture() -> None:
     plane.apply_bitmap(4, 2, (1).to_bytes(4, "little") * 8)
     assert plane.width == 4 and plane.height == 2
     assert plane.pixel(0, 0) == 1 and plane.pixel(3, 1) == 1
-    assert plane.to_rgba()[:4] == bytes((0x00, 0x00, 0xAA, 0xFF))  # EGA blue
+    assert plane.to_rgba()[:4] == bytes((0x00, 0x00, 0x01, 0xFF))  # the value 1
 
     # The payload a snapshot carries is the payload the engine sends: the bytes
     # go back exactly as they came.
