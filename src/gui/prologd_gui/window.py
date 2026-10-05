@@ -293,18 +293,23 @@ class MainWindow(QMainWindow):
 
         # The output panel (task_50): three read-only panes — Проблемы, Вывод,
         # Система — and the Ввод tab with the prepared answers and, under them,
-        # the per-request console.  All three are `OutputPane`, so the bounded
-        # history, the colours per kind and the tail they hold reach every tab
-        # the same way.
-        self._problems = panels.OutputPane(
+        # the per-request console.  Вывод and Система are `OutputPane`s, so the
+        # bounded history, the colours per kind and the tail they hold reach both
+        # the same way; Проблемы is a *table* (part 88): a diagnostic arrives as
+        # fields — kind, severity, message, position — and a row is what a
+        # double-click can take the editor to the line of.
+        self._problems = panels.ProblemsPane(
             font_family=self._settings.font_family,
             font_size=self._settings.output_font_size,
             line_limit=self._settings.output_line_limit,
         )
         self._problems.set_palette(self._settings.palette)
-        self._problems.setPlaceholderText("ошибки и предупреждения интерпретатора")
+        # A type and a place do not need the width of a message; the message column
+        # takes the rest, so these two are only a sensible starting point.
+        self._problems.setColumnWidth(0, 130)
+        self._problems.setColumnWidth(1, 260)
         self._problems.zoomChanged.connect(self._on_output_zoom)
-        self._problems.fileDropped.connect(self.open_path)
+        self._problems.problemActivated.connect(self._open_problem)
 
         self._output = panels.OutputPane(
             font_family=self._settings.font_family,
@@ -2189,7 +2194,7 @@ class MainWindow(QMainWindow):
         """
         self._discard_output()
         self._output.reset()
-        self._problems.reset()
+        self._problems.clear_problems()
         self._system.reset()
         self._table.set_answer(None)
         self._answer_text = None
@@ -2932,7 +2937,7 @@ class MainWindow(QMainWindow):
     def problems_text(self) -> str:
         """What the Проблемы pane holds: the run's errors and warnings."""
         self._flush_output()
-        return self._problems.toPlainText()
+        return self._problems.text()
 
     def system_text(self) -> str:
         """What the Система pane holds: the window's own notes."""
@@ -3374,13 +3379,13 @@ class MainWindow(QMainWindow):
         self._update_details()
 
     def _on_failed(self, kind: str, severity: str, message: str, position=None) -> None:
-        """A diagnostic: the pane shows it with its file, the editor marks the line.
+        """A diagnostic: a row of «Проблемы», and the line marked in the editor.
 
         The position arrives in fields of its own (protocol 3), so nothing is
         parsed out of the message — the message is what the interpreter wrote, and
-        the file and the line are put in front of it here.  A *warning* is amber
-        in the pane and counted in the status bar; it never ends the run, which is
-        why the rest of this handler only runs for an error.
+        the file and the line are put in front of it in the row (part 88).  A
+        *warning* is amber in the table and counted in the status bar; it never ends
+        the run, which is why the rest of this handler only runs for an error.
         """
         where = position.where() if position is not None else ""
         if kind == "format":
@@ -3406,10 +3411,7 @@ class MainWindow(QMainWindow):
             self._finish_polite_stop()
             return
         if severity == "warning":
-            self._append_output(
-                f"*** предупреждение: {where + ': ' if where else ''}{message}\n",
-                panels.WARNING,
-            )
+            self._problems.add_problem(kind, severity, message, position)
             self._warning_count += 1
             self._show_panel_tab(panels.TAB_PROBLEMS)
             self._refresh_panel_tabs()
@@ -3417,9 +3419,7 @@ class MainWindow(QMainWindow):
                 f"предупреждение: {where or 'без места'} (всего: {self._warning_count})"
             )
             return
-        self._append_output(
-            f"*** {kind}: {where + ': ' if where else ''}{message}\n", panels.ERROR
-        )
+        self._problems.add_problem(kind, severity, message, position)
         self._error_count += 1
         self._busy = False
         self._failed_in_load = True
@@ -3438,6 +3438,21 @@ class MainWindow(QMainWindow):
         # is a separate question, and `_sync_run_actions` asks it.
         self._sync_run_actions()
         self._update_details()
+
+    def _open_problem(self, position) -> None:
+        """Takes the editor to the line a row of «Проблемы» points at (part 88).
+
+        What a double-click in the table does.  The row already knows its
+        position, so this is the same road a fresh diagnostic takes: the file is
+        opened when it is not among the tabs, the line is marked and the caret goes
+        there — and a row with no place (a diagnostic about `<query>` or the
+        interpreter's library) says so in the status bar instead of moving a caret
+        into text the error is not about.
+        """
+        if position is None or not position.file:
+            self._status.setText("проблема не указывает место в тексте")
+            return
+        self._mark_error_line(position)
 
     def _on_trace(self, text: str) -> None:
         """The `ТРАССА` text of a traced run: the pane colours it apart."""
@@ -3671,15 +3686,22 @@ class MainWindow(QMainWindow):
         """One run of one kind, into the pane its kind belongs to (task_50)."""
         tab = panels.KIND_TAB.get(kind, panels.TAB_OUTPUT)
         if tab == panels.TAB_PROBLEMS:
-            self._problems.feed(text, kind)
+            # Diagnostics come from `_on_failed` with their fields; text of these
+            # two kinds is the window feeding itself, and it gets a row with no
+            # place to go to.
+            self._problems.add_text(text, kind)
         elif tab == panels.TAB_SYSTEM:
             self._system.feed(text, kind)
         else:
             self._output.feed(text, kind)
 
     def _flush_pane_tails(self) -> None:
-        """Ends the open half-line in every pane; nothing else will finish it."""
-        for pane in (self._output, self._problems, self._system):
+        """Ends the open half-line in every *text* pane; nothing else will finish it.
+
+        «Проблемы» is a table now: it holds whole rows, so there is no half-line to
+        complete.
+        """
+        for pane in (self._output, self._system):
             pane.flush()
         self._refresh_panel_tabs()
 
@@ -3689,9 +3711,12 @@ class MainWindow(QMainWindow):
         The table goes with them: it is a view of the answer of the *last* run, so
         a new run begins with an empty one — «таблица ответа», not a history of
         answers (`answers.py` keeps nothing).  A half-collected answer goes too.
+        «Проблемы» is a table, not a text pane, so it is emptied by its own
+        `clear_problems` (`reset` is a virtual method of Qt's view and must not be
+        the name of that operation).
         """
         self._output.reset()
-        self._problems.reset()
+        self._problems.clear_problems()
         self._system.reset()
         self._table.set_answer(None)
         self._answer_text = None

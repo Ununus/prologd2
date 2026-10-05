@@ -115,6 +115,12 @@ class PathListEditor(QWidget):
     there to show what was collected, so a multi-selection dialog would buy
     nothing.  A folder already in the list is not added twice — the same
     directory twice would only make the engine search it twice.
+
+    A path is read from its *end*: the folder that was added is the last component,
+    and `C:\\Users\\…` is the same for every row.  So the list elides the
+    *beginning* (`…\\проект\\stdlib`) and keeps the whole path in the tooltip; Qt
+    elides while painting, which is why a wider dialog reveals more of the path
+    with no code of ours behind it.
     """
 
     def __init__(self, ask, parent: QWidget | None = None) -> None:
@@ -122,6 +128,7 @@ class PathListEditor(QWidget):
         self._ask = ask
         self._list = QListWidget(self)
         self._list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
+        self._list.setTextElideMode(Qt.TextElideMode.ElideLeft)
         self._list.setMinimumHeight(72)
         add = QToolButton(self)
         add.setToolTip("Добавить…")
@@ -154,15 +161,27 @@ class PathListEditor(QWidget):
     def set_paths(self, paths) -> None:
         self._list.clear()
         for path in paths or []:
-            self._list.addItem(QListWidgetItem(str(path)))
+            self._list.addItem(self._item(str(path)))
 
     def add_path(self, path: str) -> bool:
         """Adds one folder unless it is already there; returns whether it landed."""
         text = str(path).strip()
         if not text or text in self.paths():
             return False
-        self._list.addItem(QListWidgetItem(text))
+        self._list.addItem(self._item(text))
         return True
+
+    @staticmethod
+    def _item(text: str) -> QListWidgetItem:
+        """One row: the path as its text, and the whole of it as the tooltip.
+
+        The list elides the beginning of a long path, so the tooltip is where the
+        reader can still see all of it — a list of folders is exactly the place
+        where two paths differ in the part that got elided away.
+        """
+        item = QListWidgetItem(text)
+        item.setToolTip(text)
+        return item
 
     def remove_selected(self) -> int:
         rows = sorted((index.row() for index in self._list.selectedIndexes()), reverse=True)

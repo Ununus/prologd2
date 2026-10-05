@@ -2399,9 +2399,20 @@ def test_split_and_merge_follow_the_pane_count(executable: str) -> None:
 
 
 def colour_of(pane, block: int) -> str:
-    """The colour of the first character of a block of a text pane."""
+    """The colour of a line of a text pane, or of a row of the problems table.
+
+    «Проблемы» is a table since part 88, so the colour of a diagnostic is the
+    colour of its row — every cell of it — while the other panes keep a colour per
+    line of their text.
+    """
     from PySide6.QtGui import QTextCursor
 
+    from prologd_gui import panels
+
+    if isinstance(pane, panels.ProblemsPane):
+        item = pane.item(block, 0)
+        assert item is not None, f"no row {block}"
+        return item.foreground().color().name()
     cursor = QTextCursor(pane.document())
     cursor.setPosition(pane.document().findBlockByNumber(block).position())
     cursor.movePosition(QTextCursor.MoveOperation.NextCharacter, cursor.MoveMode.KeepAnchor)
@@ -2517,6 +2528,78 @@ def test_a_diagnostic_from_an_imported_file_opens_it(executable: str, directory)
     finally:
         discard_changes(window)
     print("ok: a diagnostic from an imported file opens that file and marks its line")
+
+
+def test_the_problems_are_a_table_a_double_click_opens_the_line(
+    executable: str, directory
+) -> None:
+    """part 88: «Проблемы» is a table, and a row is the way to its line.
+
+    A diagnostic arrives as fields — kind, severity, message, position — so the tab
+    shows one row per diagnostic, names the place as `…/файл.pld:12:5` (the path in
+    front of the name is what pushes the message off the screen, and the whole of it
+    is in the cell's tooltip), and wraps a long message instead of cutting it.  A
+    double-click on the row takes the editor to that line: the row remembers the
+    position it came with, so nothing has to be parsed out of the message.
+    """
+    from prologd_gui import panels
+
+    module = directory / "модуль.pld"
+    module.write_text("ок(1).\nсломано(1.\n", encoding="utf-8")
+    main = directory / "главная.pld"
+    main.write_text(':- ИМПОРТ("модуль.pld").\n?ок(1).\n', encoding="utf-8")
+
+    window = empty_window(executable)
+    try:
+        assert isinstance(window._problems, panels.ProblemsPane), type(window._problems)
+        titles = [
+            window._problems.horizontalHeaderItem(column).text()
+            for column in range(window._problems.columnCount())
+        ]
+        assert titles == ["Тип", "Место", "Сообщение"], titles
+        assert window._problems.wordWrap() is True, "a long message must wrap"
+
+        assert window.open_path(str(main)), "the main file did not open"
+        window.run_program()
+        assert pump(window, lambda: "непарные скобки" in window.problems_text()), ascii(
+            window.problems_text()
+        )
+
+        rows = window._problems.problems()
+        assert len(rows) == 1, rows
+        kind, severity, message, position = rows[0]
+        assert (kind, severity) == ("parse", "error"), (kind, severity)
+        assert "непарные скобки" in message, message
+
+        # The place: the file name, the line and the column — not the whole path.
+        place = window._problems.item(0, 1).text()
+        assert place == "…" + os.sep + "модуль.pld:2:15", place
+        assert str(module) not in place, place
+        assert window._problems.item(0, 1).toolTip() == position.where()
+        assert window._problems.item(0, 0).text() == "parse", window._problems.item(0, 0).text()
+
+        # A double-click on the row marks that line and puts the caret on it.
+        buffer = window._buffer_for_path(str(module))
+        assert buffer is not None, [item.model.path for item in window.buffers()]
+        for view in buffer.views():
+            view.clear_marks()
+        window._problems.itemDoubleClicked.emit(window._problems.item(0, 0))
+        assert any(view.error_line() is not None for view in buffer.views()), (
+            "the double-click marked no line"
+        )
+        assert "модуль.pld:2:15" in window.status_text(), window.status_text()
+
+        # A long message takes several lines of its own row.
+        window._on_failed("parse", "error", "длинное сообщение " * 20, None)
+        assert window._problems.rowCount() == 2, window._problems.rowCount()
+        one = window._problems.fontMetrics().height()
+        assert window._problems.rowHeight(1) > one * 2, (
+            window._problems.rowHeight(1),
+            one,
+        )
+    finally:
+        discard_changes(window)
+    print("ok: «Проблемы» is a table, its rows wrap, and a double-click opens the line")
 
 
 def test_stepping_shows_the_goal_the_stack_and_the_line(executable: str) -> None:
@@ -3828,6 +3911,7 @@ def main(argv: list[str]) -> int:
         test_a_parse_error_marks_the_line_the_parser_stopped_at(executable)
         test_a_warning_is_amber_and_counted(executable)
         test_a_diagnostic_from_an_imported_file_opens_it(executable, files)
+        test_the_problems_are_a_table_a_double_click_opens_the_line(executable, files)
         test_stepping_shows_the_goal_the_stack_and_the_line(executable)
         test_the_trace_is_coloured_apart_from_the_output(executable)
         test_a_long_trace_arrives_in_batches_and_stays_bounded(executable)

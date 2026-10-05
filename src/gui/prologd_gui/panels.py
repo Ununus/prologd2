@@ -18,7 +18,7 @@ from __future__ import annotations
 import pathlib
 from dataclasses import dataclass
 
-from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtCore import QSize, Qt, QTimer, Signal
 from PySide6.QtGui import (
     QColor,
     QFont,
@@ -401,6 +401,261 @@ INPUT_PROMPTS = {
 #: A yellow frame round the answer while the program is waiting for it.  The
 #: console appears and disappears, so the colour is what actually catches the eye.
 ARMED_BORDER = "QLineEdit, QPlainTextEdit { border: 2px solid #e0b400; }"
+
+
+#: The columns of the problems table: what kind of diagnostic it is, where it
+#: points and what it says.
+PROBLEM_COLUMNS = ("Тип", "Место", "Сообщение")
+
+#: How many diagnostics the table keeps.  A program that warns in a loop can
+#: produce thousands, and the tab is read rather than scrolled for ever.
+DEFAULT_PROBLEM_LIMIT = 2_000
+
+#: The column that takes the rest of the width and carries the wrapping text.
+PROBLEM_MESSAGE_COLUMN = 2
+
+
+class ProblemsPane(QTableWidget):
+    """The diagnostics of a run as a grid: type, place, message (part 88).
+
+    A diagnostic is *data*: the protocol sends its kind, its severity, its message
+    and a position as fields of their own, so it is shown as data.  One row per
+    diagnostic, and the row remembers the `Position` it came with — which is what
+    makes a double-click able to take the editor to that line instead of leaving the
+    reader to pick a path out of the message.
+
+    A long message wraps inside its row: the tab is where a failure is *read*, and
+    a message read through a horizontal scrollbar is not read at all.
+    """
+
+    #: Emitted after `Ctrl`+wheel; carries the new point size.
+    zoomChanged = Signal(float)
+    #: Emitted when a row is activated — double-clicked or chosen with the
+    #: keyboard; carries that row's `Position` (`None` when it had none).
+    problemActivated = Signal(object)
+
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        *,
+        font_family: str = "Cascadia Mono",
+        font_size: float = 11.0,
+        line_limit: int = DEFAULT_PROBLEM_LIMIT,
+        palette: theme.Palette | None = None,
+    ) -> None:
+        super().__init__(parent)
+        # Constructed first: a resize event can arrive before the rest of this
+        # method has run, and `resizeEvent` starts this timer.
+        self._rewrap = QTimer(self)
+        self._rewrap.setSingleShot(True)
+        self._rewrap.setInterval(120)
+        self._rewrap.timeout.connect(self.resizeRowsToContents)
+        self._family = font_family
+        self._limit = max(10, int(line_limit))
+        self._palette = palette or theme.LIGHT
+        self._colors = kind_colors(self._palette)
+        #: Every diagnostic in order: `(kind, severity, message, position)`.
+        self._problems: list[tuple[str, str, str, object]] = []
+        self.setColumnCount(len(PROBLEM_COLUMNS))
+        self.setHorizontalHeaderLabels(list(PROBLEM_COLUMNS))
+        self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.setSortingEnabled(False)
+        self.setShowGrid(False)
+        # Wrapping is the whole point of a row per diagnostic: the message column
+        # takes the free width and the row grows to whatever the message needs.
+        self.setWordWrap(True)
+        self.verticalHeader().setVisible(False)
+        header = self.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        header.setSectionResizeMode(PROBLEM_MESSAGE_COLUMN, QHeaderView.ResizeMode.Stretch)
+        # Re-wrapping costs a layout pass per row, so it is done once the resizing
+        # stops rather than at every intermediate width: the eye follows the drag,
+        # and the rows catch up when it is let go.
+        header.sectionResized.connect(lambda *_args: self._rewrap.start())
+        # A double-click and the keyboard's own activation are the same act here.
+        self.itemDoubleClicked.connect(self._on_activated)
+        self.itemActivated.connect(self._on_activated)
+        self.set_font_size(font_size)
+
+    # -- what the window drives --------------------------------------------
+    def add_problem(self, kind: str, severity: str, message: str, position=None) -> None:
+        """Adds one diagnostic — the row and what the row points at.
+
+        `severity` is `"warning"` or `"error"`, as the protocol sends it; `position`
+        is the `Position` of the event, when it has one.  The kind of an *error* is
+        the interpreter's own word for it (`parse`, `runtime`, `protocol`), which is
+        what the reader sees in the type column: a name the front-end invented would
+        say less.
+        """
+        self._problems.append((kind, severity, message, position))
+        dropped = len(self._problems) - self._limit
+        if dropped > 0:
+            # The oldest go, like the output pane's history: a bounded tab is worth
+            # more than a complete one nobody can scroll to the end of.
+            del self._problems[:dropped]
+            self._reload()
+            return
+        self._append_row(len(self._problems) - 1)
+
+    def add_text(self, text: str, kind: str = ERROR) -> None:
+        """Adds diagnostics that arrived as text, one row per line.
+
+        The window feeds its own log by kind, and only the two diagnostic kinds
+        land in this tab.  Those rows have no place to go to — there is no position
+        in a line of text — which is why the real path is `add_problem`.
+        """
+        for line in text.splitlines():
+            if line:
+                self.add_problem(kind, "", line, None)
+
+    def clear_problems(self) -> None:
+        """Empties the table: a new run starts with its own diagnostics.
+
+        *Not* named `reset`: that is a virtual method of `QTableView` — Qt calls it
+        whenever the model is reset — and the obvious body (`clearContents()`) calls
+        back into it, so the two spin for ever.  `setRowCount(0)` is the same
+        emptying, and it is what the widget itself does.
+        """
+        self._problems.clear()
+        self.setRowCount(0)
+
+    def set_line_limit(self, limit: int) -> None:
+        """A new bound for the history (the settings dialog's row)."""
+        self._limit = max(10, int(limit))
+        dropped = len(self._problems) - self._limit
+        if dropped > 0:
+            del self._problems[:dropped]
+            self._reload()
+
+    def set_palette(self, palette: theme.Palette) -> None:
+        """Re-colours the whole history: the theme reaches rows already there."""
+        self._palette = palette
+        self._colors = kind_colors(palette)
+        self._reload()
+
+    def kind_colors(self) -> dict[str, str]:
+        """The colour per kind, as the theme has it now."""
+        return dict(self._colors)
+
+    def set_font_size(self, size: float) -> None:
+        size = max(MINIMUM_FONT_SIZE, min(MAXIMUM_FONT_SIZE, float(size)))
+        font = QFont(self._family)
+        font.setStyleHint(QFont.StyleHint.Monospace)
+        font.setFixedPitch(True)
+        font.setPointSizeF(size)
+        self.setFont(font)
+        self.horizontalHeader().setFont(font)
+        self.resizeRowsToContents()
+
+    def wheelEvent(self, event: QWheelEvent) -> None:  # noqa: N802 - Qt spelling
+        """`Ctrl`+wheel zooms with the rest of the window (the panes' rule)."""
+        if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            step = 1 if event.angleDelta().y() > 0 else -1
+            size = self.font().pointSizeF() + step
+            size = max(MINIMUM_FONT_SIZE, min(MAXIMUM_FONT_SIZE, size))
+            self.set_font_size(size)
+            self.zoomChanged.emit(size)
+            event.accept()
+            return
+        super().wheelEvent(event)
+
+    def resizeEvent(self, event) -> None:  # noqa: N802 - Qt spelling
+        """A wider pane means fewer wrapped lines, so the rows are measured again."""
+        super().resizeEvent(event)
+        self._rewrap.start()
+
+    # -- what the window and the tests read --------------------------------
+    def problem_count(self) -> int:
+        """How many diagnostics are showing — the count in the tab's title."""
+        return len(self._problems)
+
+    def severity_counts(self) -> tuple[int, int]:
+        """Errors and warnings, in that order."""
+        errors = sum(1 for _kind, severity, _text, _pos in self._problems if severity != "warning")
+        warnings = len(self._problems) - errors
+        return errors, warnings
+
+    def problems(self) -> list[tuple[str, str, str, object]]:
+        """The rows as records (what a test reads instead of the widget)."""
+        return list(self._problems)
+
+    def text(self) -> str:
+        """The table as the log the pane used to be: one line per diagnostic.
+
+        `*** kind: file:line:column: message` — the shape the window's own log has
+        always used, with the warnings named «предупреждение» rather than by the
+        kind they arrived with.  `problems_text()` and the tests read this, so the
+        rows and the log say the same thing.
+        """
+        return "".join(self._line(record) + "\n" for record in self._problems)
+
+    # -- the rows ----------------------------------------------------------
+    @staticmethod
+    def _line(record: tuple[str, str, str, object]) -> str:
+        kind, severity, message, position = record
+        where = position.where() if position is not None else ""
+        name = "предупреждение" if severity == "warning" else kind
+        return f"*** {name}: {where + ': ' if where else ''}{message}"
+
+    def place_text(self, position) -> str:
+        """Where a diagnostic points, as the column shows it.
+
+        The window's own shortening (`…/файл.pld`), with the line and column after
+        it: the file name is what a reader recognises, and the path in front of it
+        is the part that pushes the message off the screen.  The whole path travels
+        in the cell's tooltip.
+        """
+        if position is None or not position.file:
+            return ""
+        place = documents.short_path(position.file, parts=1)
+        if not position.line:
+            return place
+        return f"{place}:{position.line}:{position.column}"
+
+    def _append_row(self, index: int) -> None:
+        kind, severity, message, position = self._problems[index]
+        row = self.rowCount()
+        self.insertRow(row)
+        color = self._colors.get(WARNING if severity == "warning" else ERROR)
+        name = "предупреждение" if severity == "warning" else kind
+        values = (name, self.place_text(position), message)
+        for column, value in enumerate(values):
+            item = QTableWidgetItem(value)
+            item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+            if color:
+                item.setForeground(QColor(color))
+            if column == 0:
+                # Which record the row stands for: the table is the view, and the
+                # record is what a jump needs.
+                item.setData(Qt.ItemDataRole.UserRole, index)
+            self.setItem(row, column, item)
+        if position is not None and position.file:
+            tip = position.where()
+            for column in range(len(PROBLEM_COLUMNS)):
+                found = self.item(row, column)
+                if found is not None:
+                    found.setToolTip(tip)
+        self.resizeRowToContents(row)
+
+    def _reload(self) -> None:
+        """Rebuilds every row: the history shrank, or the theme changed.
+
+        The rows are dropped with `setRowCount(0)`, which takes their items with
+        them — `clearContents()` would be the same, except that it calls `reset()`
+        back (see `clear_problems`).
+        """
+        self.setRowCount(0)
+        for index in range(len(self._problems)):
+            self._append_row(index)
+
+    def _on_activated(self, item: QTableWidgetItem) -> None:
+        first = self.item(item.row(), 0)
+        if first is None:
+            return
+        record = self._problems[first.data(Qt.ItemDataRole.UserRole)]
+        self.problemActivated.emit(record[3])
 
 
 class AnswerEdit(QPlainTextEdit):

@@ -238,6 +238,13 @@ def test_the_folder_rows_and_the_insert_page(directory: pathlib.Path) -> None:
     dialog._ask_directory = lambda: None
     add.click()
     assert editor.paths() == ["C:/курс"], editor.paths()
+    # A long path is read from its *end* (part 88): the folder that was added is
+    # what has to stay visible, and the whole path is in the row's tooltip.
+    from PySide6.QtCore import Qt
+
+    listed = editor.list_widget()
+    assert listed.textElideMode() == Qt.TextElideMode.ElideLeft, listed.textElideMode()
+    assert listed.item(0).toolTip() == "C:/курс", listed.item(0).toolTip()
 
     editor.list_widget().item(0).setSelected(True)
     remove.click()

@@ -1,7 +1,7 @@
 # Status tracker
 
 Last updated: after the portable-build task (task_61) and the rounds that followed — parts
-77--86: the two emblems on the first page of every document, `technical.typ` checked against
+77--88: the two emblems on the first page of every document, `technical.typ` checked against
 the C++ sources (nine more listings, the grammar brought in line with `parser.cpp`), the
 "привычный/обычный Prolog" wording replaced by ISO Prolog, the whole `ai/` folder translated
 into English, the last `$` taken out of the interpreter (part 81), three built-ins —
@@ -12,7 +12,9 @@ library started as `stdlib/` with `lists.pld`, `sets.pld`, `sorts.pld` and a che
 interpreter beside itself without a flag (part 85, ADR-026), its own texts given a single
 space after a sentence, with `tail/2` beside `head/2` (part 86), and the differences
 document relieved of the `$` item while the «не A, а B» turns became plain statements
-(part 87).
+(part 87), and the window's «Проблемы» tab turned into a table whose rows wrap and open
+their line on a double-click, with long paths shortened in the output and in the settings
+list (part 88).
 
 ## Overall
 
@@ -2929,3 +2931,49 @@ Added on 2026-10-03 while planning task_59:
 
   *Verified.*  `ctest` 320/320, the demo still prints its promises, the library files are
   still canonical for `--format`, and the six documents build with exit 0.
+
+* The window, part 88: **«Проблемы» is a table, and a row leads to its line**
+  (2026-10-05).  Four requests from the user, all about reading a failure.
+
+  *The table.*  The tab used to be a text pane fed with `*** parse: файл:2:8: …` lines;
+  it is now `panels.ProblemsPane`, a `QTableWidget` with the columns «Тип», «Место» and
+  «Сообщение».  The data was already there and was being thrown away: `_on_failed`
+  receives kind, severity, message and position as fields of their own (protocol 3), and
+  the window was putting them back together into a line that the next front-end would
+  have had to parse apart again.  A row keeps the `Position` it came with, so the tab can
+  *do* something with it: `problemActivated` carries it to the editor, which opens the
+  file when it is not among the tabs, marks the line and puts the caret on it (the same
+  road a fresh diagnostic takes).  «Тип» names an error the way the interpreter does
+  (`parse`, `runtime`, `protocol`) and a warning as «предупреждение»; a row is coloured
+  by severity, red or amber, and a theme change re-colours the rows already there.
+
+  *A long message wraps.*  `setWordWrap(True)`, the message column stretched to the free
+  width, and `resizeRowToContents` after every added row.  The rows are measured again
+  120 ms after a column drag stops — a re-wrap is a layout pass per row, so it waits for
+  the hand to let go — and on every resize of the pane.
+
+  *The place is short.*  The old line already carried the full path, which is exactly what
+  pushes the message off the screen.  The column shows `documents.short_path(файл,
+  parts=1)` — `…\модуль.pld:2:15` — and the whole path travels in the cell's tooltip.
+  `problems_text()` renders the rows back into the log the pane used to hold
+  (`*** kind: file:line:column: message`, a warning under its own word), so every reader
+  of that text — the window's own checks and the suite — kept working unchanged.
+
+  *The settings list.*  «Настройки → Выполнение → Дополнительные каталоги ИМПОРТ» showed
+  the *beginning* of each path (`C:\Users\vasla\…`), which is the same for all of them
+  and hides the folder that was added.  The list now elides from the left
+  (`Qt.TextElideMode.ElideLeft`) and each row carries the full path as its tooltip; Qt
+  elides while painting, so a wider dialog reveals more of the path with no code of ours.
+
+  *A trap worth recording.*  The pane's first version emptied itself with `reset()` — a
+  *virtual* method of Qt's view — and `clearContents()`, the obvious body, calls back into
+  it.  The result was a `RecursionError` inside the C++ call and a table that quietly
+  ended up empty (the theme check found it: «no row 0»).  The method is now
+  `clear_problems()`, and it empties the table with `setRowCount(0)`; `_reload()` does the
+  same, and the note in `notes.md` says why.
+
+  *Verified.*  `test_window.py` «all window checks passed» — with a new check: the three
+  columns, the wrapping row, the shortened place with its tooltip, and the double-click
+  that marks the line of the file that failed; `test_settingsdialog.py` green with the
+  elide mode and the tooltip asserted; `ctest` 320/320; the six documents build with exit
+  0.

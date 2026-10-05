@@ -554,17 +554,33 @@ trace are «Вывод», the window's own notes («загрузка базы з
 are «Проблемы» — and the kind comes from the window, which knows whether it is
 feeding the program's text, a note or an error; nothing is guessed from the text.
 
-The three read-only panes are all `panels.OutputPane`: read-only, the output's
+«Проблемы» is a **table** (`panels.ProblemsPane`, part 88) rather than a text
+pane, because a diagnostic is *data*: the protocol sends its kind, its severity,
+its message and a position as fields of their own.  One row per diagnostic, the
+columns «Тип», «Место», «Сообщение» — the type is the interpreter's own word
+(`parse`, `runtime`, `protocol`), the place is the file name with the line and
+column (`…\модуль.pld:2:15`, the whole path in the cell's tooltip, since the path
+in front of the name is what pushes the message off the screen).  A long message
+*wraps* inside its row (the message column takes the free width and the rows are
+measured again when the resizing stops), and a double-click on a row opens that
+place: the file if it is not open, the marked line, the caret on it — the same
+road a fresh diagnostic takes, and a row that has no place says so in the status
+bar instead of moving the caret.
+
+The other two read-only panes are `panels.OutputPane`: read-only, the output's
 own font and zoom (task_29: the editor and the output keep two sizes, and the
 output follows the editor's while nobody has set one of its own), and never
 wrapped (a log line cut in the middle cannot be read as data).  It
 **colours by kind** — program output plain, our echo of an answer in the query
-blue, diagnostics crimson — and a marker of our own grey in «Система».  Chunks
+blue, diagnostics crimson — and a marker of our own grey in «Система», and the
+problems table colours each row the same way (red for an error, amber for a
+warning) and re-colours the rows already there when the theme changes.  Chunks
 arrive mid-line, so a line is held until its newline (or until the run ends,
 which flushes it): that is the defect this code exists to avoid, and `LineBuffer`
 keeps it Qt-free so `test_output.py` hammers it.  The history of each pane is
 bounded — 50 000 lines by default, and the limit is a setting since task_29
-(`output/line_limit`, 100…500 000: a smaller one trims the pane at once) — and
+(`output/line_limit`, 100…500 000: a smaller one trims the pane at once, and the
+same number bounds the problems table by rows) — and
 the oldest lines are dropped with `*** вывод усечён … ***` kept as the first
 line.  The view follows the end of the output until the user scrolls up to read
 something, and follows again as soon as they come back to the bottom — unless
