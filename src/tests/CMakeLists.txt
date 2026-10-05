@@ -32,7 +32,8 @@ target_link_libraries(prlib_tests PRIVATE
   prologd_utf8)
 
 target_compile_definitions(prlib_tests PRIVATE
-  PROLOGD_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/examples")
+  PROLOGD_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/examples"
+  PROLOGD_STDLIB_DIR="${CMAKE_SOURCE_DIR}/stdlib")
 
 if(MSVC)
   target_compile_options(prlib_tests PRIVATE /utf-8)

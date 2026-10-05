@@ -56,7 +56,7 @@ ctest --preset windows-msvc
 The executable is `build\src\cli\Release\prologd.exe`.
 
 The portable package — interpreter, window, the five documents, the lessons and
-`examples\lib` — is built by one script:
+the standard library — is built by one script:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools\build_portable.ps1
@@ -106,6 +106,28 @@ drift away from the interpreter unnoticed.
 Start with `examples/lessons/README.md` (the index) or `doc/lessons.typ`; two
 lessons need a little more than a plain run, and the index says which.  The
 superseded originals are kept in `examples/lessons/_old/`.
+
+## Standard library
+
+`stdlib/` holds the library the dialect ships — the list predicates
+(`member`, `length`, `min_list`, `append`, `reverse`, `flatten`, `permutation`,
+…), the set predicates built on lists (`set`, `subset`, `intersect`, …) and the
+sorting techniques (`quicksort`, `mergesort`, `treesort`, …).  It lives beside
+the executable and is imported by the file:
+
+```prolog
+:- ИМПОРТ("lists.pld").
+```
+
+```sh
+prologd -I stdlib -s examples/stdlib_demo.pld
+```
+
+`examples/stdlib_demo.pld` is a runnable tour of every predicate, with its own
+expected output in `%!` lines, and `stdlib/README.md` is the map plus the table
+`old name -> new name` for programs written against the first PrologD library.
+The built-in `СОРТИРОВКА` already sorts and de-duplicates; the sorts in
+`sorts.pld` are the study versions, kept because they show the techniques.
 
 ## Command line
 
@@ -168,6 +190,7 @@ src/tests/            Catch2 test suite and CLI integration tests
 src/3rdparty/         FetchContent dependencies (gitignored)
 doc/                  Typst documentation (Russian)
 examples/             example PrologD programs (demo, problems, lessons, lib)
+stdlib/               standard library, shipped beside the executable
 .github/workflows/    CI (Linux GCC/Clang, Windows MSVC)
 ai/                   plan, task breakdown and notes for the AI agent
 ```
@@ -183,7 +206,9 @@ stubs), `НАЙТИВСЕ/3`, the module loader (`ИМПОРТ`) and the CLI.
 Examples live in `examples/` — one demo per predicate of the language surface, the
 problems (`factorial`, the Hanoi tower, `knapsack`), the lessons and the library —
 and are covered by golden tests: a lesson or a demo carries its own expected output
-in `%!` lines, and `src/tests/test_lessons.cpp` compares the two. The PySide6 front-end in
+in `%!` lines, and `src/tests/test_lessons.cpp` compares the two.  The library the
+dialect ships is in `stdlib/`, beside the executable, and has its own runnable tour
+(`examples/stdlib_demo.pld`) checked the same way. The PySide6 front-end in
 `src/gui` drives the interpreter through the JSON protocol: tabs, syntax
 highlighting that tells Latin names from Cyrillic ones, completion built from
 the reserved names and the program's own, run/stop with a fresh interpreter per

@@ -278,23 +278,31 @@ TEST_CASE("every shipped program is already in the standard shape") {
   // holds the ported originals for comparison with the port, so it keeps their
   // spelling rather than the port's; `test_lessons.cpp` is what proves that
   // formatting a lesson did not move a printed line.
+  //
+  // `stdlib` is the second shipped folder — the standard library travels beside
+  // the executable — and it obeys the same rule: a library file is written the
+  // way the formatter writes it, or a reader who formats one gets a diff for a
+  // change of nothing.
   namespace fs = std::filesystem;
-  const fs::path root(PROLOGD_TEST_DATA_DIR);
+  const std::vector<fs::path> roots = {fs::path(PROLOGD_TEST_DATA_DIR),
+                                       fs::path(PROLOGD_STDLIB_DIR)};
   std::size_t checked = 0;
-  for (const auto& entry : fs::recursive_directory_iterator(root)) {
-    if (!entry.is_regular_file() || entry.path().extension() != ".pld") {
-      continue;
+  for (const fs::path& root : roots) {
+    for (const auto& entry : fs::recursive_directory_iterator(root)) {
+      if (!entry.is_regular_file() || entry.path().extension() != ".pld") {
+        continue;
+      }
+      if (entry.path().parent_path().filename() == "_old") {
+        continue;
+      }
+      const std::string source = readFile(entry.path());
+      INFO("file: " << entry.path().string());
+      const FormatResult result = format(source);
+      REQUIRE(result.ok());
+      REQUIRE_FALSE(result.changed);
+      REQUIRE(result.text == source);
+      ++checked;
     }
-    if (entry.path().parent_path().filename() == "_old") {
-      continue;
-    }
-    const std::string source = readFile(entry.path());
-    INFO("file: " << entry.path().string());
-    const FormatResult result = format(source);
-    REQUIRE(result.ok());
-    REQUIRE_FALSE(result.changed);
-    REQUIRE(result.text == source);
-    ++checked;
   }
   REQUIRE(checked >= 25);
 }

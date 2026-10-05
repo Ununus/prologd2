@@ -82,15 +82,17 @@ const std::vector<std::string>& checkedLessons() {
 
 /// Examples beside the lessons whose `%!` lines are checked the same way.  They
 /// are the showcase for the predicates the dialect added on top of the port
-/// (`ПЕРВОЕ`, `СОРТИРОВКА`, `ПОЛНЫЙ`, `ДЛЯВСЕХ`) and the two problems whose output
-/// is the same on every machine; `problems/monk.pld` draws and `problems/monkd.pld`
-/// reads input, so those two are only parsed (see the test below).
+/// (`ПЕРВОЕ`, `СОРТИРОВКА`, `ПОЛНЫЙ`, `ДЛЯВСЕХ`), the two problems whose output
+/// is the same on every machine and the tour of the standard library;
+/// `problems/monk.pld` draws and `problems/monkd.pld` reads input, so those two
+/// are only parsed (see the test below).
 const std::vector<std::string>& checkedExamples() {
   static const std::vector<std::string> names = {
       "first_demo.pld",
       "sort_demo.pld",
       "ground_demo.pld",
       "forall_demo.pld",
+      "stdlib_demo.pld",
       "problems/factorial.pld",
       "problems/knapsack.pld",
   };
@@ -159,7 +161,12 @@ TEST_CASE("every lesson prints exactly what its comments promise") {
 
 TEST_CASE("the example programs print what their comments promise") {
   for (const std::string& name : checkedExamples()) {
-    checkPromises(name, {}, {});
+    // `stdlib_demo.pld` imports the standard library, so the check looks where
+    // the CLI looks with `-I stdlib`; it is also the only example that reads —
+    // the numbers come from `stdlib_demo.input.txt` beside it.
+    const std::string stem = name.substr(0, name.rfind('.'));
+    checkPromises(name, readOptional(stem + ".input.txt"),
+                  {std::string(PROLOGD_STDLIB_DIR)});
   }
 }
 

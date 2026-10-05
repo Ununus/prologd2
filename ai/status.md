@@ -1,12 +1,14 @@
 # Status tracker
 
 Last updated: after the portable-build task (task_61) and the rounds that followed — parts
-77--83: the two emblems on the first page of every document, `technical.typ` checked against
+77--84: the two emblems on the first page of every document, `technical.typ` checked against
 the C++ sources (nine more listings, the grammar brought in line with `parser.cpp`), the
 "привычный/обычный Prolog" wording replaced by ISO Prolog, the whole `ai/` folder translated
 into English, the last `$` taken out of the interpreter (part 81), three built-ins —
 `СОРТИРОВКА/2`, `ПОЛНЫЙ/1`, `ДЛЯВСЕХ/2` — added in place of `bagof`/`setof` (part 82,
-ADR-025), and the examples folder given a map and a `problems/` shelf (part 83).
+ADR-025), the examples folder given a map and a `problems/` shelf (part 83), and the standard
+library started: `stdlib/` with `lists.pld`, `sets.pld`, `sorts.pld` and their checked demo
+(part 84).
 
 ## Overall
 
@@ -65,10 +67,12 @@ ADR-025), and the examples folder given a map and a `problems/` shelf (part 83).
   `file:line:column: error: message` form, with severities.
 * Examples live in `examples/` and are covered by golden tests: the course in
   `examples/lessons` is a program per lesson whose own `%!` lines are its expected
-  output, the four demos beside it (`first_demo`, `sort_demo`, `ground_demo`,
-  `forall_demo`) are checked the same way, and the tasks are in `examples/problems`
-  (`factorial`, the Hanoi tower, `knapsack`).  `examples/README.md` is the map of
-  the folder.
+  output, the five demos beside it (`first_demo`, `sort_demo`, `ground_demo`,
+  `forall_demo`, `stdlib_demo`) are checked the same way, and the tasks are in
+  `examples/problems` (`factorial`, the Hanoi tower, `knapsack`).  `examples/README.md`
+  is the map of the folder.  The standard library the dialect ships is `stdlib/` —
+  beside the executable, imported with `-I stdlib` — and `stdlib_demo.pld` is its
+  checked tour.
 * Windows verification: the library, CLI and test binary cross-compile to valid PE32+
   executables for `x86_64-windows-gnu` (Zig toolchain); the MSVC build and the whole suite
   run locally.
@@ -2726,6 +2730,73 @@ Added on 2026-10-03 while planning task_59:
 
   *Verified.*  `ctest` 317/317 (the new golden test is the 317th), the window suite green
   (`all window checks passed`), and `docs` exit 0.
+
+* Standard library, part 84: **a `stdlib` folder, and the old `lists` ported into it**
+  (2026-10-05).  The user asked to start the library the dialect ships: one folder in the root,
+  which will travel beside the executable; the first PrologD `lists` adapted to it; a comment
+  above every predicate and a blank line after its group; argument names that mean something;
+  and anything writable better written better.
+
+  *The name.*  `stdlib`, not `lib`: the folder *is* the standard library, the documents call it
+  «стандартная библиотека», and the project has an `examples/lib` for lesson 11 already — two
+  `lib` folders in one package is a question every reader asks once.  The files keep the Latin
+  predicate names of the first library (`member`, `length`, `append`, …) with Russian argument
+  names (`member(Элемент, Список)`): the names come from the library being ported, the course,
+  the comments and the readers are Russian.
+
+  *Three files.*  `lists.pld` — membership, length, edges, neighbours, min/max, append, reverse,
+  flatten, delete/delete_all/select/permutation/substitute, prefix/suffix/sublist, print_list,
+  read_numbers; `sets.pld` — set, unique, subset, equalset, unionset, intersect, difset;
+  `sorts.pld` — selectsort, insertsort, bubblesort, quicksort, mergesort, treesort and their
+  helpers.  The second and the third `:- ИМПОРТ` the first, so importing `sorts.pld` alone
+  brings the whole library, and the folder is now on the formatter's sweep.
+
+  *What the port had to change.*  `first/2` could not stay: `first` is the English name of the
+  built-in `ПЕРВОЕ`, and a clause under a built-in name is never called — the engine answers
+  with its own predicate and the clause is dead without a word — so the first element is
+  `head/2`.  `больше/2` and `меньше/2` are gone: the built-ins compare, and since part 82 they
+  share one order with `СОРТИРОВКА`, so a list of strings sorts the same way everywhere.
+  `flatten/2` is a difference-list traversal (one pass instead of the old quadratic `add/3`
+  chain) and its last clause asks `НЕ(СПИСОК(...))` — without that test a nested list has two
+  readings and the predicate answers thirteen times where it has one answer.  `min_list/2` and
+  `max_list/2` are tail-recursive with an accumulator and choose with `ПЕРВОЕ` instead of a cut;
+  `intersect/3` and `difset/3` are one `НАЙТИВСЕ` over two `member` goals plus `СОРТИРОВКА`,
+  where the old library had three mutually recursive helpers; `set/2` is now `СОРТИРОВКА` itself
+  (unique and ascending — the old one kept the order of *last* occurrences, which no reader would
+  guess), with `unique/2` as the order-preserving variant.  Argument order is consistent (the
+  list first in `delete/3`, `delete_all/3`, `substitute/4`, as it already was in `select/3`), and
+  `heapsort` was dropped: its `mergeheap` called `СЛУЧ` to choose a subtree, and a sort that
+  answers differently on every run has no place in a library.  `stdlib/README.md` carries the
+  `old name -> new name` table for programs written against the first library.
+
+  *The demo is the test.*  `examples/stdlib_demo.pld` runs every predicate of the library and
+  carries its answers as `%!` lines; `checkedExamples()` gained it, the golden test now hands the
+  run `-I stdlib` (through a new `PROLOGD_STDLIB_DIR`) and `examples/stdlib_demo.input.txt` for
+  `read_numbers` — the lesson `<name>.input.txt` idea extended to the examples.  The `%!` lines
+  were measured, not typed: every question was run on its own and its output pasted, which is how
+  `mergesort`'s wrong-way-round comparison in my first `merge/3` showed up as `[3,2,1,1]`
+  instead of `[1,1,2,3]` — the demo earned its keep before it was committed.
+
+  *Two traps.*  `create_file` writes CRLF on Windows and `prologd --format` keeps the file's
+  line endings, so all four new files had to be converted to LF before the format sweep and the
+  lesson checker would have them — the same trap part 83 hit from the Python side.  Worse,
+  `src/gui/tests/test_queries.py` was **already red** when this round started: its `PINNED` table
+  still named `factorial.pld`, `monk.pld`, `monkd.pld` and the counts lessons 5 and 10 had before
+  the `ДЛЯВСЕХ` round, so it had been failing since parts 82 and 83 — `ctest` does not run that
+  script and nobody looked.  The table is refreshed (39 programs, 351 questions) and the script
+  is green again; `ai/conventions.md` already warned about this check and now has a second
+  example of ignoring it.
+
+  *Shipped.*  `tools/build_portable.ps1` copies `stdlib` into the package, expects
+  `lists.pld`/`sets.pld`/`sorts.pld` among the needed files and runs the demo from the unpacked
+  folder with `-I stdlib -i …`; `tools/portable-readme.txt` says what the folder is and how to
+  add it to the window's ИМПОРТ list.  Nothing is seeded into that list behind the reader's back
+  (the standing decision from part 74), so the reader adds `stdlib` themselves — the demo's own
+  header says how, next to lesson 11's instruction.  The root `README.md` gained a «Standard
+  library» section and a layout line, `examples/README.md` the new row.
+
+  *Verified.*  `ctest` 317/317, `test_queries.py` green, the window suite green, and the
+  formatter idempotent over both shipped folders.
 
 
 

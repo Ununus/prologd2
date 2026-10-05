@@ -9,7 +9,8 @@
 
     What the package is: `prologd-gui.exe` with its `_internal` folder beside
     `prologd.exe`, the three Visual C++ DLLs our C++ needs, `doc` (five PDFs, their
-    `.typ` sources and `builtins.json`), `examples` (lessons, tasks, `lib`) and the
+    `.typ` sources and `builtins.json`), `examples` (lessons, tasks, `lib`),
+    `stdlib` (the standard library, which the demo imports with `-I stdlib`) and the
     memo `tools\portable-readme.txt`, copied under its Russian name (`$memoName`
     below, spelled in code points because of the ANSI reading).  The window finds the
     interpreter next to itself and keeps its settings (`gui.ini`) there too, so the
@@ -290,6 +291,11 @@ try {
     $old = Join-Path $package 'examples\lessons\_old'
     if (Test-Path $old) { Remove-Item $old -Recurse -Force }
 
+    # The standard library travels beside the interpreter: `-I stdlib` is the path the
+    # manual, the demo and `stdlib\README.md` name, and a library the user cannot
+    # find is no library.
+    Copy-Item 'stdlib' $package -Recurse -Force
+
     $docTarget = Join-Path $package 'doc'
     New-Item -ItemType Directory -Path $docTarget | Out-Null
     # By name, never "every .pdf": a stale PDF of a target that no longer exists has
@@ -334,6 +340,7 @@ try {
                        'doc\prologd2.png', 'doc\csu.png',
                        'examples\lib\library.pld', 'examples\lessons\lesson_01.pld',
                        'examples\problems\knapsack.pld',
+                       'stdlib\lists.pld', 'stdlib\sets.pld', 'stdlib\sorts.pld',
                        $memoName) {
         if (-not (Test-Path (Join-Path $package $needed))) { Fail "the package is missing $needed" }
     }
@@ -359,10 +366,13 @@ try {
         Assert-Exit 'lesson_01.pld'
         & $packagedExe -I 'examples\lib' -s 'examples\import_demo.pld' > $null 2>&1
         Assert-Exit 'import_demo.pld with -I examples\lib'
+        & $packagedExe -I 'stdlib' -i 'examples\stdlib_demo.input.txt' `
+            -s 'examples\stdlib_demo.pld' > $null 2>&1
+        Assert-Exit 'stdlib_demo.pld with -I stdlib'
     } finally {
         Pop-Location
     }
-    Write-Host "interpreter: --version = $Version, $keywords keyword lines, lesson 1 and the import demo run"
+    Write-Host "interpreter: --version = $Version, $keywords keyword lines, lesson 1, the import demo and the standard library run"
 
     & $python 'tools\check_dependencies.py' $package
     Assert-Exit 'check_dependencies.py'
