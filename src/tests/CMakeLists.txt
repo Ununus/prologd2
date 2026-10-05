@@ -66,7 +66,7 @@ if(TARGET prologd)
 
   add_test(NAME cli_version COMMAND prologd --version)
   set_tests_properties(cli_version PROPERTIES
-    PASS_REGULAR_EXPRESSION "2\\.0\\.0")
+    PASS_REGULAR_EXPRESSION "2\\.1\\.0")
 
   add_test(NAME cli_help COMMAND prologd --help)
   set_tests_properties(cli_help PROPERTIES

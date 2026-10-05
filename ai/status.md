@@ -1,7 +1,7 @@
 # Status tracker
 
 Last updated: after the portable-build task (task_61) and the rounds that followed — parts
-77--93: the two emblems on the first page of every document, `technical.typ` checked against
+77--94: the two emblems on the first page of every document, `technical.typ` checked against
 the C++ sources (nine more listings, the grammar brought in line with `parser.cpp`), the
 "привычный/обычный Prolog" wording replaced by ISO Prolog, the whole `ai/` folder translated
 into English, the last `$` taken out of the interpreter (part 81), three built-ins —
@@ -20,7 +20,8 @@ tab of that file to the front (part 90), and the GUI given a small refactoring p
 one duplicated clearing body out, and the two tables set on one shared base (part 91), and the
 goal field given its own switch while a run learned to show the hidden output panel
 (part 92), and that panel made a strip again after it had taken half of the editor column
-(part 93).
+(part 93), and the version raised to **2.1.0** with a fresh portable package built for it
+(part 94).
 
 ## Overall
 
@@ -3152,3 +3153,43 @@ Added on 2026-10-03 while planning task_59:
   editor lost a third of its height to a line of text.
 
   *Verified.*  `test_window.py` «all window checks passed».
+
+* Version 2.1.0, part 94: **the first bump of the port's own number, and a package to go
+  with it** (2026-10-05).  The user asked how a version is raised here, then chose 2.1.0.
+
+  *One source, everything else reads it.*  The version lives only in
+  `CMakeLists.txt` (`project(prologd VERSION …)`); CMake injects it into the generated
+  `version.cpp`, and from there it reaches `--version`, the `ready` event of the protocol
+  (the window shows it in «О программе» and in the status bar and keeps no copy) and the
+  built-in `ВЕРСИЯ/0`, which prints it with `PROLOGD_BUILD_DATE` — the date CMake stamps
+  when it configures, so a bump is a reconfigure.  The protocol number stays its own
+  counter (11) and did not move.
+
+  *The live copies of the literal moved with it* — found by grepping, not by memory:
+  the `cli_version` test's `PASS_REGULAR_EXPRESSION` in `src/tests/CMakeLists.txt` (ctest
+  fails without it), the example line in `examples/lessons/appendix_debug.pld`, the `ready`
+  example of `src/gui/README.md` (where the protocol number had been stale at 10 for two
+  protocol versions — now 11) and the default package path of `tools/check_dependencies.py`.
+  The `ai/` notes that quote 2.0.0 (task_61, the ADRs, the journal) are records of what was
+  true then and stay as they are.
+
+  *The rule, written down.*  A «Versioning» section went into `ai/conventions.md`: the
+  single source, the separate protocol counter, the grep-the-literal checklist, and the
+  release routine of task_61 and `tools/build_portable.ps1`.
+
+  *The package.*  `tools\build_portable.ps1` was run end to end: Release build → `ctest` →
+  `docs` → PyInstaller for the window → `dist\prologd-2.1.0-win64` (**299 files,
+  96.0 MiB**) → its eight check stages (the packaged `--version`, the keyword list, lesson
+  1, the import demo and the standard library, every non-system import a file of the package,
+  the packaged window starting and writing no `gui.ini` beside itself) →
+  `prologd-2.1.0-win64.zip` (**37.9 MiB**).  The folder is named from
+  `prologd.exe --version`, which the script reads itself and checks again inside the
+  package, so nothing had to be passed to it — and the older `prologd-2.0.0-win64` pair stays
+  in `dist/` beside the new one.
+
+  *What the script does not do.*  Its last lines list the checks left for a person (task_61
+  §7.1/§7.5): copy the folder somewhere else, open a lesson and press `F5`, click a margin
+  marker, `Shift+F1`/`F1`, and try the folder on a machine without Visual Studio.
+
+  *Verified.*  `prologd.exe --version` → `2.1.0`; `?ВЕРСИЯ.` → `PrologD 2.1.0 (2026-10-05)`;
+  `ctest` 320/320; the portable script reached «Ready: …\dist\prologd-2.1.0-win64».

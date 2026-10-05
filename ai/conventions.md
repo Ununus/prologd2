@@ -111,6 +111,33 @@ Tests are written **together with** the feature, never after.
   (`TEST`/`INPUT`/`EXPECTED`/`END` format) once the porting task is complete.
 * Long-running test programs must be bounded (iteration limits) so CI stays fast.
 
+## Versioning
+
+* The version has **one source**: `project(prologd VERSION x.y.z)` in `CMakeLists.txt`.
+  CMake injects it into the generated `src/prlib/src/version.cpp`, so it reaches
+  `--version`, the `ready` event of the protocol (the window shows it in «О программе» and
+  in the status bar, and keeps no copy of its own) and the built-in `ВЕРСИЯ/0`, which prints
+  the version with `PROLOGD_BUILD_DATE` — a `string(TIMESTAMP … UTC)` taken when CMake
+  configures, so a bump is a reconfigure (the build does that by itself).
+* The **protocol version is a counter of its own** (`PROTOCOL_VERSION` in
+  `src/gui/prologd_gui/protocol.py`, 11 as of 2.1.0, pinned by `protocol_smoke.py` and
+  `test_formatter.py`): it moves when the protocol moves, not when the program does.
+* Bumping the program version means moving every *live* copy of the literal — grep for the
+  old number rather than trusting memory:
+  * `src/tests/CMakeLists.txt` — the `cli_version` test matches `--version` against the
+    literal, and the suite fails without it;
+  * `examples/lessons/appendix_debug.pld` — the example line of the lesson about `ВЕРСИЯ`;
+  * `src/gui/README.md` — the `ready` example, with the protocol number beside it (10 was
+    left stale there for two protocol versions);
+  * `tools/check_dependencies.py` — the default package path.
+  The `ai/` notes that quote a version (`task_61`, the ADRs, the journal) are **records of
+  what was true then** and stay as they are — the rule the old section numbers follow.
+* The release routine (task_61, `tools/build_portable.ps1`): Release build → `ctest` →
+  `docs` (six PDFs) → PyInstaller for the window → `dist/prologd-<version>-win64` (the name
+  comes from `prologd.exe --version`, which the script reads itself and then checks again
+  inside the package) → the script's own checks → zip.  `-SkipTests`, `-SkipFreeze`,
+  `-NoTrim`, `-NoZip` shorten a round.
+
 ## Commit / change hygiene
 
 * Keep the build green: `cmake --build build` and `ctest --test-dir build` must

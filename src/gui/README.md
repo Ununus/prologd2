@@ -1123,7 +1123,7 @@ The screen is 1024×768, it starts black, and a primitive outside it is clipped.
 
 | Event | Meaning |
 |-------|---------|
-| `{"event":"ready","protocol":10,"version":"2.0.0","keywords":[…]} `| the session is up |
+| `{"event":"ready","protocol":11,"version":"2.1.0","keywords":[…]} `| the session is up |
 | `{"event":"output","text":"…"}` | program output (`ВЫВОД`, query results) — **one event per written line** since task_49, so it arrives while the program is still running; text written without a line end goes out with the end of the request (and a prompt with the `input_request` that follows it) |
 | `{"event":"result","found":true}` | one query finished; `found` is false when nothing matched |
 | `{"event":"loaded"}` | a `load` request is over: its program and its own `?`-statements ran (a `query` request is answered by its `result` alone) |
