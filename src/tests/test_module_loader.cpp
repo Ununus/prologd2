@@ -65,8 +65,38 @@ LoadOutcome load(const fs::path& entry, std::vector<fs::path> includes = {},
 
 }  // namespace
 
-TEST_CASE("import loads a module once") {
+TEST_CASE("the standard library is the stdlib folder beside the interpreter") {
+  // Part 84: the rule the CLI uses to find the library it ships — pure, so the test
+  // does not have to copy an interpreter beside a library.
+  TempDir empty;
+  REQUIRE(standardLibraryDirectory(empty.path()).empty());
+  REQUIRE(standardLibraryDirectory({}).empty());
+
   TempDir dir;
+  fs::create_directories(dir.path() / "stdlib");
+  REQUIRE(standardLibraryDirectory(dir.path()) == dir.path() / "stdlib");
+
+  // A *file* called `stdlib` is not a library.
+  TempDir file;
+  file.write("stdlib", "не папка\n");
+  REQUIRE(standardLibraryDirectory(file.path()).empty());
+}
+
+TEST_CASE("an import reaches the standard library beside the program") {
+  TempDir dir;
+  fs::create_directories(dir.path() / "stdlib");
+  dir.write("stdlib/lists.pld", "длина_списка([], 0).\n");
+  dir.write("программа.pld",
+            ":- ИМПОРТ(\"lists.pld\").\n"
+            "?длина_списка([], N).\n");
+  // What the CLI hands the loader: the interpreter's own `stdlib`, last.
+  const LoadOutcome outcome =
+      load(dir.path() / "программа.pld", {standardLibraryDirectory(dir.path())});
+  REQUIRE(outcome.ok);
+  REQUIRE(outcome.output == "N=0\n");
+}
+
+TEST_CASE("import loads a module once") {  TempDir dir;
   dir.write("base.pld", "факт(1).\nфакт(2).\n");
   dir.write("main.pld",
             ":- ИМПОРТ(\"base.pld\").\n"

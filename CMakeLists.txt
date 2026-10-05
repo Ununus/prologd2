@@ -150,7 +150,7 @@ add_custom_target(prologd_docs
 if(TYPST_EXECUTABLE)
   # Only the documents are listed here: doc/style.typ is a shared style file that
   # each of them imports, not a document of its own.
-  foreach(doc IN ITEMS help technical prologd-diff gui lessons)
+  foreach(doc IN ITEMS help technical prologd-diff gui lessons library)
     add_custom_command(TARGET prologd_docs POST_BUILD
       COMMAND ${TYPST_EXECUTABLE} compile
               "${CMAKE_SOURCE_DIR}/doc/${doc}.typ"

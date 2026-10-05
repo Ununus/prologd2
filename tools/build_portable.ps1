@@ -8,9 +8,9 @@
     -> zip.
 
     What the package is: `prologd-gui.exe` with its `_internal` folder beside
-    `prologd.exe`, the three Visual C++ DLLs our C++ needs, `doc` (five PDFs, their
+    `prologd.exe`, the three Visual C++ DLLs our C++ needs, `doc` (six PDFs, their
     `.typ` sources and `builtins.json`), `examples` (lessons, tasks, `lib`),
-    `stdlib` (the standard library, which the demo imports with `-I stdlib`) and the
+    `stdlib` (the standard library, which the interpreter searches beside itself) and the
     memo `tools\portable-readme.txt`, copied under its Russian name (`$memoName`
     below, spelled in code points because of the ANSI reading).  The window finds the
     interpreter next to itself and keeps its settings (`gui.ini`) there too, so the
@@ -75,7 +75,7 @@ trap {
 }
 
 #: The six documents of the target; `style.typ` is a shared style, not a document.
-$documentNames = @('help', 'technical', 'prologd-diff', 'gui', 'lessons')
+$documentNames = @('help', 'technical', 'prologd-diff', 'gui', 'lessons', 'library')
 
 #: Modules the QWidget window never loads.  Removing them keeps PyInstaller from
 #: walking into them at all (that is what takes the `qml` folder of the QML modules
@@ -366,9 +366,11 @@ try {
         Assert-Exit 'lesson_01.pld'
         & $packagedExe -I 'examples\lib' -s 'examples\import_demo.pld' > $null 2>&1
         Assert-Exit 'import_demo.pld with -I examples\lib'
-        & $packagedExe -I 'stdlib' -i 'examples\stdlib_demo.input.txt' `
+        # No `-I` here on purpose: the interpreter is meant to find the standard
+        # library beside itself, and this is where that promise is kept or broken.
+        & $packagedExe -i 'examples\stdlib_demo.input.txt' `
             -s 'examples\stdlib_demo.pld' > $null 2>&1
-        Assert-Exit 'stdlib_demo.pld with -I stdlib'
+        Assert-Exit 'stdlib_demo.pld with the standard library beside the interpreter'
     } finally {
         Pop-Location
     }

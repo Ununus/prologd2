@@ -4,6 +4,16 @@
 #include <fstream>
 #include <sstream>
 
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#endif
+
 #include "prlib/utf8.hpp"
 #include "prlib/utf8_path.hpp"
 
@@ -307,6 +317,43 @@ void ModuleLoader::reportModuleCollisions() {
       }
     }
   }
+}
+
+std::filesystem::path executableDirectory() {
+#if defined(_WIN32)
+  // A path longer than the buffer is not an error but a request to ask again with
+  // more room, which is why the call is looped rather than done once.
+  std::wstring buffer(260, L'\0');
+  for (;;) {
+    const DWORD written =
+        ::GetModuleFileNameW(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
+    if (written == 0) {
+      return {};
+    }
+    if (written < buffer.size()) {
+      buffer.resize(written);
+      break;
+    }
+    buffer.resize(buffer.size() * 2);
+  }
+  return std::filesystem::path(buffer).parent_path();
+#elif defined(__linux__)
+  std::error_code error;
+  const std::filesystem::path self = std::filesystem::read_symlink("/proc/self/exe", error);
+  return error ? std::filesystem::path{} : self.parent_path();
+#else
+  return {};
+#endif
+}
+
+std::filesystem::path standardLibraryDirectory(const std::filesystem::path& directory) {
+  if (directory.empty()) {
+    return {};
+  }
+  std::error_code error;
+  const std::filesystem::path candidate = directory / "stdlib";
+  return std::filesystem::is_directory(candidate, error) ? candidate
+                                                         : std::filesystem::path{};
 }
 
 }  // namespace prologd

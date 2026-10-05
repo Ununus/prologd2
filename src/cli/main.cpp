@@ -283,6 +283,16 @@ int main(int argc, char** argv) {
   for (const std::string& directory : includeDirectories) {
     includePaths.push_back(prologd::fromUtf8Path(directory));
   }
+  // The standard library travels beside the interpreter (part 84): a `stdlib`
+  // folder next to `prologd.exe` is searched *last*, after every `-I` directory, so
+  // a program of the same name beside the user's own file wins, and no flag is
+  // needed for `:- ИМПОРТ("lists.pld").` in the portable package.  A build tree has
+  // nothing beside the executable, which is where `-I stdlib` stays useful.
+  const std::filesystem::path standard_library =
+      prologd::standardLibraryDirectory(prologd::executableDirectory());
+  if (!standard_library.empty()) {
+    includePaths.push_back(standard_library);
+  }
 
   prologd::ModuleLoader loader(engine, includePaths);
   if (protocol == "json") {

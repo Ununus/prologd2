@@ -123,7 +123,7 @@ PINNED: dict[str, int] = {
     "problems/monk.pld": 2,
     "problems/monkd.pld": 1,
     "sort_demo.pld": 6,
-    "stdlib_demo.pld": 37,
+    "stdlib_demo.pld": 62,
 }
 
 

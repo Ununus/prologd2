@@ -23,7 +23,8 @@ add_executable(prlib_tests
   test_typical_tasks.cpp
   test_diagnostics.cpp
   test_formatter.cpp
-  test_lessons.cpp)
+  test_lessons.cpp
+  test_stdlib.cpp)
 
 target_link_libraries(prlib_tests PRIVATE
   prlib
@@ -33,7 +34,8 @@ target_link_libraries(prlib_tests PRIVATE
 
 target_compile_definitions(prlib_tests PRIVATE
   PROLOGD_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/examples"
-  PROLOGD_STDLIB_DIR="${CMAKE_SOURCE_DIR}/stdlib")
+  PROLOGD_STDLIB_DIR="${CMAKE_SOURCE_DIR}/stdlib"
+  PROLOGD_DOC_DIR="${CMAKE_SOURCE_DIR}/doc")
 
 if(MSVC)
   target_compile_options(prlib_tests PRIVATE /utf-8)

@@ -800,3 +800,33 @@ tests and the lesson material.
 
 **Status.** Accepted.
 
+
+## ADR-026: The standard library is a folder beside the interpreter, searched last
+
+**Context.** After part 84 the shipped library lived in `stdlib/`, and every program
+that used it had to name the folder: `prologd -I stdlib -s …` on the command line, the
+same row in the window's settings dialog.  ADR-018 says the engine loads no library of
+its own — that stays true — but a *search directory* is not a library.  The first
+PrologD shipped a file `lists` among the examples, and a reader had to copy it or point
+at it; a program that arrives with the interpreter should not.
+
+**Decision.** `prologd.exe` searches a `stdlib` folder beside itself, last: after the
+importing file's own folder (ADR-010) and after every `-I` directory.  The folder is
+located by asking the loader about the running module (`GetModuleFileNameW` on Windows,
+the `/proc/self/exe` link on Linux); the rule itself —
+`standardLibraryDirectory(directory)` — is a pure function of the directory, so a test
+covers it in a temporary folder instead of copying an interpreter anywhere.
+`-I stdlib` remains the way to reach the library from a build tree, where nothing sits
+beside the executable.
+
+**Consequences.** A program shipped with the interpreter needs no flag and no settings
+row for the library — `:- ИМПОРТ("lists.pld").` is the whole ceremony — and the portable
+package proves it: `build_portable.ps1` runs `stdlib_demo.pld` **without** `-I`.  The
+window's «Дополнительные каталоги ИМПОРТ» list keeps meaning what it meant, what the
+*reader* added (part 74): the folder the interpreter searches by itself is not a row in
+it, and an import that fails still reports every directory it tried, `stdlib` included.
+A user file that shares a name with a library file wins, because the folder is searched
+last.  The reference is a sixth document, `doc/library.typ`, and `test_stdlib.cpp`
+fails when a predicate defined in `stdlib/*.pld` has no line in it.
+
+**Status.** Accepted.

@@ -111,21 +111,28 @@ superseded originals are kept in `examples/lessons/_old/`.
 
 `stdlib/` holds the library the dialect ships — the list predicates
 (`member`, `length`, `min_list`, `append`, `reverse`, `flatten`, `permutation`,
-…), the set predicates built on lists (`set`, `subset`, `intersect`, …) and the
-sorting techniques (`quicksort`, `mergesort`, `treesort`, …).  It lives beside
-the executable and is imported by the file:
+…), the set predicates built on lists (`set`, `subset`, `intersect`, …), the
+sorting techniques (`msort`, `quicksort`, `mergesort`, `treesort`, …), the string
+helpers (`words`, `join`, `trim`, `replace`, `to_numbers`) and the integer
+predicates (`between`, `gcd`, `lcm`, `power`, `factorial`, `is_prime`, `primes`).
+The interpreter searches `stdlib` beside itself, last — after the importing file's
+folder and after every `-I` — so a file that ships with the interpreter needs no
+flag:
 
 ```prolog
 :- ИМПОРТ("lists.pld").
 ```
 
 ```sh
+prologd -s examples/stdlib_demo.pld
+# from a source tree, where nothing sits beside the interpreter:
 prologd -I stdlib -s examples/stdlib_demo.pld
 ```
 
 `examples/stdlib_demo.pld` is a runnable tour of every predicate, with its own
-expected output in `%!` lines, and `stdlib/README.md` is the map plus the table
-`old name -> new name` for programs written against the first PrologD library.
+expected output in `%!` lines; `doc/library.typ` is the reference (`test_stdlib.cpp`
+fails if a predicate has no line there) and `stdlib/README.md` is the map plus the
+table `old name -> new name` for programs written against the first PrologD library.
 The built-in `СОРТИРОВКА` already sorts and de-duplicates; the sorts in
 `sorts.pld` are the study versions, kept because they show the techniques.
 
@@ -213,7 +220,7 @@ dialect ships is in `stdlib/`, beside the executable, and has its own runnable t
 highlighting that tells Latin names from Cyrillic ones, completion built from
 the reserved names and the program's own, run/stop with a fresh interpreter per
 run, and the usual file handling (save prompts, line endings and encodings kept).
-Documentation is in `doc/` (`help.typ`, `gui.typ`, `technical.typ`,
+Documentation is in `doc/` (`help.typ`, `library.typ`, `gui.typ`, `technical.typ`,
 `prologd-diff.typ`, `lessons.typ`); `cmake --build build --target docs` writes the
 PDFs into the same directory when Typst is installed.
 

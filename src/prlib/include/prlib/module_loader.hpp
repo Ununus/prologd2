@@ -14,6 +14,24 @@
 
 namespace prologd {
 
+/// The directory the running interpreter lives in, empty when it cannot be found.
+///
+/// The standard library travels beside the executable (part 84), and this is how
+/// the interpreter learns where «beside» is.  Windows asks the loader about the
+/// running module (`GetModuleFileNameW`), Linux reads the `/proc/self/exe` link;
+/// where neither is available the answer is empty and `ИМПОРТ` searches only the
+/// directories it was given.
+std::filesystem::path executableDirectory();
+
+/// The standard library that belongs to an interpreter in `directory`, empty when
+/// there is none.
+///
+/// The rule is one line — a `stdlib` folder below the executable — but it is a
+/// *pure* function of the directory on purpose: a test can exercise it in a
+/// temporary folder instead of copying an interpreter next to a library.  A file,
+/// rather than a folder, named `stdlib` is not a library.
+std::filesystem::path standardLibraryDirectory(const std::filesystem::path& directory);
+
 /// Loads source files and their `ИМПОРТ(...)` dependencies into an `Engine`.
 ///
 /// Replaces the old textual preprocessor: imports are resolved relative to the

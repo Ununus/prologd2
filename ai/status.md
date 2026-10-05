@@ -1,14 +1,15 @@
 # Status tracker
 
 Last updated: after the portable-build task (task_61) and the rounds that followed — parts
-77--84: the two emblems on the first page of every document, `technical.typ` checked against
+77--85: the two emblems on the first page of every document, `technical.typ` checked against
 the C++ sources (nine more listings, the grammar brought in line with `parser.cpp`), the
 "привычный/обычный Prolog" wording replaced by ISO Prolog, the whole `ai/` folder translated
 into English, the last `$` taken out of the interpreter (part 81), three built-ins —
 `СОРТИРОВКА/2`, `ПОЛНЫЙ/1`, `ДЛЯВСЕХ/2` — added in place of `bagof`/`setof` (part 82,
-ADR-025), the examples folder given a map and a `problems/` shelf (part 83), and the standard
-library started: `stdlib/` with `lists.pld`, `sets.pld`, `sorts.pld` and their checked demo
-(part 84).
+ADR-025), the examples folder given a map and a `problems/` shelf (part 83), the standard
+library started as `stdlib/` with `lists.pld`, `sets.pld`, `sorts.pld` and a checked demo
+(part 84), and that library grown to five files, documented in a sixth document and found by
+the interpreter beside itself without a flag (part 85, ADR-026).
 
 ## Overall
 
@@ -2801,3 +2802,62 @@ Added on 2026-10-03 while planning task_59:
 
 
 
+
+* Standard library, part 85: **the library is found without a flag, and it grew**
+  (2026-10-05).  Seven suggestions from my part-84 list came back answered "да" — goals
+  as arguments (`map`, `filter`, `fold`), strings, `msort`, access by number, integers,
+  a document, and a default search path — with one correction: the user asked for
+  `head_n`, not `first_n`.  That correction is right for a reason worth remembering:
+  `first` is the English alias of the built-in `ПЕРВОЕ`, and a name that stands next to
+  it invites the mistake part 84 described.
+
+  *The search path (ADR-026).*  `prologd.exe` now searches a `stdlib` folder beside
+  itself, last: after the importing file's folder and after every `-I`.  The rule is
+  `standardLibraryDirectory(directory)` — a pure function of the directory, with the OS
+  lookup (`GetModuleFileNameW`, `/proc/self/exe`) kept apart — so the two new tests
+  exercise it in a temporary folder instead of copying an interpreter anywhere.  The
+  portable build now runs `stdlib_demo.pld` **without** `-I`, which is the promise kept
+  where it counts: on the machine of someone who only unpacked the zip.
+
+  *What joined the library.*  `lists.pld` gained `nth/3` (and `/4` with a counter, which
+  no longer builds arithmetic on the way back), `head_n/3`, `last_n/3` (through
+  `reverse` and `head_n`), `sum_list/2`, and the goal-taking `map/3`, `filter/3`,
+  `fold/4` — each with its accumulator form, because that is the shape the library
+  already had.  `sets.pld` is untouched; `sorts.pld` gained `msort/2`, the counterpart
+  of `СОРТИРОВКА` (sorted, repeats kept, and the file's other sorts are now described as
+  what they are — the study versions).  `strings.pld` is new: `trim`, `trim_left`,
+  `trim_right`, `words`, `join` (space, any separator, accumulator), `replace`,
+  `to_number`/`to_numbers` and `read_words`.  `math.pld` is new: `between`, `gcd`, `lcm`,
+  `power`, `factorial`, `is_prime`, `primes`.  The three predicates part 84 pushed to
+  "next round" — `split`, `чиспис` and `вводсписка/1` — are now `words/2`,
+  `to_numbers/2` and `read_words/1`.
+
+  *Two traps, both caught by measuring.*  `head_n` was wrong in the least interesting
+  way: the base case demanded an empty list at counter zero, so "the first two of three"
+  failed while "the first three of three" worked.  And `to_numbers` handed a non-text
+  argument to `СТРЦЕЛ`, which answers a *type error* rather than a failure — the first
+  element of the list decided whether the predicate failed politely or stopped the run.
+  `СИМВ/1` in front of the conversion fixed it and the piece became `to_number/2`, which
+  is worth having on its own.  Neither was found by reasoning; both were found by
+  running the extended demo and reading what it printed.
+
+  *The demo learned to recount its promises.*  It reads from its input file twice now
+  (`read_words`, then `read_numbers`), so measuring each question on its own is wrong —
+  the answers belong to a stream.  The measurement runs *prefixes* instead: the n-th
+  answer is what the first n questions printed beyond the first n-1, and the finished
+  file is compared with a whole run once more.  Sixty-two questions, eighty recorded
+  lines.
+
+  *A document, and a test that keeps it honest.*  `doc/library.typ` is the sixth
+  document: what the folder is, how it is found, one table per file with every predicate
+  and its arity, and a short «что менялось» section.  A reference that has fallen behind
+  is worse than none, so `src/tests/test_stdlib.cpp` extracts `name/arity` from every
+  clause head in `stdlib/*.pld` (bracket-depth aware, continuation lines skipped) and
+  requires each to appear in the document — 96 of them today.  `stdlib/README.md` keeps
+  the map and the `old name -> new name` table and now points at the document instead of
+  repeating the list of predicates.
+
+  *Verified.*  `ctest` 319/319 (the two new module-loader tests included), the library
+  document's 96 assertions, `test_queries.py` green after a `PINNED` refresh (62
+  questions in the demo), the window suite green, and `typst compile doc/library.typ`
+  with a look at four of its ten pages.
