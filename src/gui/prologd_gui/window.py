@@ -3718,21 +3718,12 @@ class MainWindow(QMainWindow):
     def _reset_panels(self) -> None:
         """Empties the read-only panes and the table; the input queue is user data.
 
-        The table goes with them: it is a view of the answer of the *last* run, so
-        a new run begins with an empty one — «таблица ответа», not a history of
-        answers (`answers.py` keeps nothing).  A half-collected answer goes too.
-        «Проблемы» is a table, not a text pane, so it is emptied by its own
-        `clear_problems` (`reset` is a virtual method of Qt's view and must not be
-        the name of that operation).
+        A new run starts clean, which is exactly the emptying «Очистить вывод» does
+        — the program's output, the diagnostics, the window's own notes and the
+        answer table all go together, and a half-collected answer goes too.  One
+        body, two names: the button, and the start of a run.
         """
-        self._output.reset()
-        self._problems.clear_problems()
-        self._system.reset()
-        self._table.set_answer(None)
-        self._answer_text = None
-        self._error_count = 0
-        self._warning_count = 0
-        self._refresh_panel_tabs()
+        self.clear_output()
 
     def _discard_output(self) -> None:
         """Drops what is queued: the panes are about to be emptied or reused."""

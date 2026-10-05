@@ -1,7 +1,7 @@
 # Status tracker
 
 Last updated: after the portable-build task (task_61) and the rounds that followed — parts
-77--90: the two emblems on the first page of every document, `technical.typ` checked against
+77--91: the two emblems on the first page of every document, `technical.typ` checked against
 the C++ sources (nine more listings, the grammar brought in line with `parser.cpp`), the
 "привычный/обычный Prolog" wording replaced by ISO Prolog, the whole `ai/` folder translated
 into English, the last `$` taken out of the interpreter (part 81), three built-ins —
@@ -15,8 +15,9 @@ document relieved of the `$` item while the «не A, а B» turns became plain 
 (part 87), and the window's «Проблемы» tab turned into a table whose rows wrap and open
 their line on a double-click, with long paths shortened in the output and in the settings
 list (part 88), the console made to name the place of a runtime error, which it used to
-print as a bare message (part 89), and a click on a row of «Проблемы» made to bring the
-tab of that file to the front (part 90).
+print as a bare message (part 89), a click on a row of «Проблемы» made to bring the
+tab of that file to the front (part 90), and the GUI given a small refactoring pass —
+one duplicated clearing body out, and the two tables set on one shared base (part 91).
 
 ## Overall
 
@@ -3047,3 +3048,36 @@ Added on 2026-10-03 while planning task_59:
 
   *Verified.*  `test_window.py` «all window checks passed», `ctest` 320/320, the six
   documents build with exit 0.
+
+* The window, part 91: **a GUI pass — one duplicated body out, two tables on one base**
+  (2026-10-05).  The user asked for a refactoring review: duplication, inaccuracies, and
+  anything worth moving to a file of its own.
+
+  *Duplication removed.*  Two instances, both in the window's tables and panes.
+
+  - «Очистить вывод» and the clearing at the start of a run were the same six lines written
+    twice under two docstrings.  `_reset_panels` now delegates to `clear_output`: one body,
+    two names — the button, and the start of a run.
+
+  - `TablePane` and `ProblemsPane` each carried their own `zoomChanged` signal, their own
+    clamp-and-apply `set_font_size` and their own `Ctrl`+wheel handler — and the details had
+    already drifted: the answer table emitted `zoomChanged` from `set_font_size` and kept one
+    default row height, the problems table emitted it only from the wheel and re-measured its
+    wrapping rows.  Both now subclass one `ZoomableTable` in `panels.py`: the signal, the
+    clamped font, the wheel and the `font_size` accessor live in the base, and the single
+    difference — how rows follow a new font — is the subclass's `_relayout_for_font`.
+
+  *Inaccuracies.*  None user-visible were left: the stale comments the pass expected had
+  already been rewritten in parts 88–90.  The real drift was behavioural — the two
+  `set_font_size`s above disagreed about when to emit — and the shared base removes it by
+  construction.
+
+  *What stays put.*  The modules are cut along their seams (one file per concern: the editor,
+  the panes, the tables and text panes, the buffers, the settings dialog, the session).  The
+  one candidate for moving — the «where does a diagnostic point» block in `window.py`
+  (`_diagnostic_buffer`, `_mark_error_line`, `_mark_trace_line`, `_open_problem`) — is ~120
+  lines glued to the buffers, the panes and the status bar: splitting it off would import
+  half the window back again, so it stays.  `ZoomableTable` is UI and belongs in `panels.py`
+  beside its two users, not in a file of its own.
+
+  *Verified.*  `test_window.py` «all window checks passed».

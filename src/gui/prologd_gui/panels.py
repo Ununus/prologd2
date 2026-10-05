@@ -415,7 +415,51 @@ DEFAULT_PROBLEM_LIMIT = 2_000
 PROBLEM_MESSAGE_COLUMN = 2
 
 
-class ProblemsPane(QTableWidget):
+class ZoomableTable(QTableWidget):
+    """The zoom the other panes have, shared by the window's two tables.
+
+    «Таблица ответа» (`TablePane`) and «Проблемы» (`ProblemsPane`) are both
+    `QTableWidget`s read next to the log, so both follow the output's font size and
+    take `Ctrl`+wheel through one code path — the window's zoom handling stays a
+    single road whether a table or a text pane was resized.  The subclass decides
+    how its rows follow a new font (`_relayout_for_font`): the answer table keeps
+    one default row height for its possibly thousands of solutions, the problems
+    table re-measures its wrapping rows.
+    """
+
+    #: Emitted after `Ctrl`+wheel; carries the new point size.
+    zoomChanged = Signal(float)
+
+    @property
+    def font_size(self) -> float:
+        return self.font().pointSizeF()
+
+    def set_font_size(self, size: float) -> None:
+        clamped = min(MAXIMUM_FONT_SIZE, max(MINIMUM_FONT_SIZE, float(size)))
+        if abs(clamped - self.font_size) < 1e-6:
+            return
+        font = QFont(self._family)
+        font.setPointSizeF(clamped)
+        self.setFont(font)
+        self.horizontalHeader().setFont(font)
+        self._relayout_for_font(font)
+        self.zoomChanged.emit(clamped)
+
+    def wheelEvent(self, event: QWheelEvent) -> None:  # noqa: N802 - Qt spelling
+        if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            delta = event.angleDelta().y()
+            if delta:
+                self.set_font_size(self.font_size + (1 if delta > 0 else -1))
+            event.accept()
+            return
+        super().wheelEvent(event)
+
+    def _relayout_for_font(self, font: QFont) -> None:
+        """How the rows follow a new font — the subclass's own rule."""
+        raise NotImplementedError
+
+
+class ProblemsPane(ZoomableTable):
     """The diagnostics of a run as a grid: type, place, message (part 88).
 
     A diagnostic is *data*: the protocol sends its kind, its severity, its message
@@ -428,8 +472,6 @@ class ProblemsPane(QTableWidget):
     a message read through a horizontal scrollbar is not read at all.
     """
 
-    #: Emitted after `Ctrl`+wheel; carries the new point size.
-    zoomChanged = Signal(float)
     #: Emitted when a row is activated — double-clicked or chosen with the
     #: keyboard; carries that row's `Position` (`None` when it had none).
     problemActivated = Signal(object)
@@ -539,27 +581,9 @@ class ProblemsPane(QTableWidget):
         """The colour per kind, as the theme has it now."""
         return dict(self._colors)
 
-    def set_font_size(self, size: float) -> None:
-        size = max(MINIMUM_FONT_SIZE, min(MAXIMUM_FONT_SIZE, float(size)))
-        font = QFont(self._family)
-        font.setStyleHint(QFont.StyleHint.Monospace)
-        font.setFixedPitch(True)
-        font.setPointSizeF(size)
-        self.setFont(font)
-        self.horizontalHeader().setFont(font)
+    def _relayout_for_font(self, font: QFont) -> None:
+        """The rows wrap, so their height follows the font row by row."""
         self.resizeRowsToContents()
-
-    def wheelEvent(self, event: QWheelEvent) -> None:  # noqa: N802 - Qt spelling
-        """`Ctrl`+wheel zooms with the rest of the window (the panes' rule)."""
-        if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
-            step = 1 if event.angleDelta().y() > 0 else -1
-            size = self.font().pointSizeF() + step
-            size = max(MINIMUM_FONT_SIZE, min(MAXIMUM_FONT_SIZE, size))
-            self.set_font_size(size)
-            self.zoomChanged.emit(size)
-            event.accept()
-            return
-        super().wheelEvent(event)
 
     def resizeEvent(self, event) -> None:  # noqa: N802 - Qt spelling
         """A wider pane means fewer wrapped lines, so the rows are measured again."""
@@ -1049,7 +1073,7 @@ VERDICT_COLUMN = "Ответ"
 MAX_COLUMN_WIDTH = 480
 
 
-class TablePane(QTableWidget):
+class TablePane(ZoomableTable):
     """The answer of one goal as a grid: variables are columns, solutions rows.
 
     Only a *single* goal is tabulated (task_59): a whole run answers all of its
@@ -1061,9 +1085,6 @@ class TablePane(QTableWidget):
     `zoomChanged` signal and `Ctrl`+wheel, so the window's zoom handling stays one
     code path.  Values are text, exactly as printed: nothing is parsed out of them.
     """
-
-    #: Emitted after `Ctrl`+wheel; carries the new point size.
-    zoomChanged = Signal(float)
 
     def __init__(
         self,
@@ -1157,32 +1178,11 @@ class TablePane(QTableWidget):
         ]
 
     # -- font and zoom ------------------------------------------------------
-    @property
-    def font_size(self) -> float:
-        return self.font().pointSizeF()
-
-    def set_font_size(self, size: float) -> None:
-        clamped = min(MAXIMUM_FONT_SIZE, max(MINIMUM_FONT_SIZE, float(size)))
-        if abs(clamped - self.font_size) < 1e-6:
-            return
-        font = QFont(self._family)
-        font.setPointSizeF(clamped)
-        self.setFont(font)
-        self.horizontalHeader().setFont(font)
+    def _relayout_for_font(self, font: QFont) -> None:
         # Row heights follow the font through one default size, not through a walk
         # over every row: a runaway `?цель(X)` may answer with thousands of them.
         self.verticalHeader().setDefaultSectionSize(QFontMetrics(font).lineSpacing() + 6)
         self.resizeColumnsToContents()
-        self.zoomChanged.emit(clamped)
-
-    def wheelEvent(self, event: QWheelEvent) -> None:  # noqa: N802 - Qt spelling
-        if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
-            delta = event.angleDelta().y()
-            if delta:
-                self.set_font_size(self.font_size + (1 if delta > 0 else -1))
-            event.accept()
-            return
-        super().wheelEvent(event)
 
     # -- the lines between the cells ----------------------------------------
     def paintEvent(self, event) -> None:  # noqa: N802 - Qt spelling
