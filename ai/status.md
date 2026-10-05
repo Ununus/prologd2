@@ -1,7 +1,7 @@
 # Status tracker
 
 Last updated: after the portable-build task (task_61) and the rounds that followed — parts
-77--92: the two emblems on the first page of every document, `technical.typ` checked against
+77--93: the two emblems on the first page of every document, `technical.typ` checked against
 the C++ sources (nine more listings, the grammar brought in line with `parser.cpp`), the
 "привычный/обычный Prolog" wording replaced by ISO Prolog, the whole `ai/` folder translated
 into English, the last `$` taken out of the interpreter (part 81), three built-ins —
@@ -19,7 +19,8 @@ print as a bare message (part 89), a click on a row of «Проблемы» made
 tab of that file to the front (part 90), and the GUI given a small refactoring pass —
 one duplicated clearing body out, and the two tables set on one shared base (part 91), and the
 goal field given its own switch while a run learned to show the hidden output panel
-(part 92).
+(part 92), and that panel made a strip again after it had taken half of the editor column
+(part 93).
 
 ## Overall
 
@@ -3129,3 +3130,25 @@ Added on 2026-10-03 while planning task_59:
   *Verified.*  `test_window.py` «all window checks passed»; `test_settings.py`,
   `test_settingsdialog.py` and `test_shortcuts.py` green; the six documents build with
   exit 0.
+
+* The window, part 93: **the goal panel is a strip again** (2026-10-05).  A report from the
+  user: after part 92 the goal line shared the editor column's height with the editor, half
+  and half.
+
+  *Why.*  The switch of part 92 put the line and its console into one `QWidget`, and a plain
+  `QWidget` has no vertical wish of its own: the editor column has room to spare, so the
+  layout handed the new panel half of it and the line floated in the middle of a tall empty
+  strip.  That is exactly the defect the *console* had before task_50 — its check even says
+  so («its one field floating in the middle of a tall empty strip») — and the cure is the one
+  it got then: a size policy.  `_query_panel` now asks for `Preferred`/`Maximum` (the pair
+  `StepPane` and the find bar already use): as tall as its contents — the line, plus the
+  console while a question waits — and not a pixel more.
+
+  *Pinned, and measured.*  The part-92 check now shows the window and asserts both the
+  panel's vertical policy and that its height is its own `sizeHint`, the shape the console's
+  strip check has had since task_50.  The defect was reproduced by the hand as well: with the
+  policy the strip is 24 px and the editor column 341 px; put back to a plain widget's
+  `Preferred`/`Preferred`, the strip becomes 137 px and the column drops to 228 px — the
+  editor lost a third of its height to a line of text.
+
+  *Verified.*  `test_window.py` «all window checks passed».

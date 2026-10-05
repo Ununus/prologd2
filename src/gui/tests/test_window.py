@@ -777,20 +777,39 @@ def test_the_goal_field_hides_and_a_run_shows_the_output_panel(executable: str) 
     """part 92: «Вид → Панель ввода цели», and a run brings the output panel back.
 
     The goal field and the console under it are one panel, so the new switch hides
-    both.  The output panel is the other half of the request: a run has output to
-    show, so a panel the user hid appears for it — while the *preference* stays
-    where the user put it and only their own act writes it (the rule the followed
-    font size already follows, task_58).
+    both — and that panel is a *strip*: a plain `QWidget` has no vertical wish of its
+    own, so it shared the column's spare height with the editor and the goal line
+    floated in the middle of a tall empty panel (the defect the console had, cured
+    the same way — part 93).  The output panel is the other half of the request: a
+    run has output to show, so a panel the user hid appears for it — while the
+    *preference* stays where the user put it and only their own act writes it (the
+    rule the followed font size already follows, task_58).
     """
+    from PySide6.QtWidgets import QApplication, QSizePolicy
+
     from prologd_gui.settings import Settings
     from prologd_gui.window import MainWindow
 
     window = empty_window(executable)
     path = window._settings.path
     try:
+        window.show()
+        QApplication.processEvents()
         assert window.query_visible() is True, "the goal field is shown out of the box"
         assert window._actions["query"].isChecked() is True
         assert window._input_console.parent() is window.query_panel(), "one panel, two parts"
+
+        # The strip takes the height of its contents and never the column's spare
+        # room: the line alone when nothing is asked, the line and the console while
+        # a question waits.
+        panel = window.query_panel()
+        assert (
+            panel.sizePolicy().verticalPolicy() == QSizePolicy.Policy.Maximum
+        ), "the goal panel can still be stretched by the column"
+        assert panel.height() <= panel.sizeHint().height() + 4, (
+            panel.height(),
+            panel.sizeHint().height(),
+        )
 
         # The switch itself: hidden means hidden, and it is stored.
         window._actions["query"].setChecked(False)

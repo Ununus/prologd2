@@ -30,6 +30,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMenu,
     QMessageBox,
+    QSizePolicy,
     QSplitter,
     QTabWidget,
     QToolBar,
@@ -468,6 +469,15 @@ class MainWindow(QMainWindow):
         # off the Вывод tab, and «Вид → Панель ввода цели» hides the two together
         # (an answer box under nothing would be a puzzle — part 92).
         self._query_panel = QWidget()
+        # A plain `QWidget` has no vertical wish of its own, and the editor column has
+        # room to spare: without this the strip shared that room with the editor and
+        # the goal line floated in the middle of a tall empty panel — the very defect
+        # the console had, which cured it with a policy of its own (task_50).
+        # `Maximum` means «as tall as the line, plus the console while a question
+        # waits, and not a pixel more».
+        self._query_panel.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum
+        )
         query_layout = QVBoxLayout(self._query_panel)
         query_layout.setContentsMargins(0, 0, 0, 0)
         query_layout.addWidget(self._query_line)
