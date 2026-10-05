@@ -1,10 +1,12 @@
 # Status tracker
 
 Last updated: after the portable-build task (task_61) and the documentation rounds that
-followed — parts 77--81: the two emblems on the first page of every document, `technical.typ`
+followed — parts 77--82: the two emblems on the first page of every document, `technical.typ`
 checked against the C++ sources (nine more listings, the grammar brought in line with
 `parser.cpp`), the "привычный/обычный Prolog" wording replaced by ISO Prolog, the whole
-`ai/` folder translated into English, and the last `$` taken out of the interpreter (part 81).
+`ai/` folder translated into English, the last `$` taken out of the interpreter (part 81), and
+three built-ins — `СОРТИРОВКА/2`, `ПОЛНЫЙ/1`, `ДЛЯВСЕХ/2` — added in place of `bagof`/`setof`
+(part 82, ADR-025).
 
 ## Overall
 
@@ -15,7 +17,7 @@ checked against the C++ sources (nine more listings, the grammar brought in line
   left on the board is `task_46`'s named profiles.
 * Build: the `windows-msvc` preset (Visual Studio 18 2026, MSVC 19.51) is green locally,
   tests included; the Linux presets, including `-Werror`, build cleanly.
-* Tests: 306/306 in about five seconds — 289 Catch2 cases plus 17 command-line and
+* Tests: 316/316 in about six seconds — 299 Catch2 cases plus 17 command-line and
   integration tests.  The window has its own 23 offscreen scripts plus `protocol_smoke.py`;
   they need PySide6, so CI runs the C++ suite only.
 * Interpreter surface: `-s/--source` (repeatable), positional files, stdin, `-i`/`-o`/`-e`,
@@ -31,8 +33,8 @@ checked against the C++ sources (nine more listings, the grammar brought in line
 
 ## What works now
 
-* UTF-8 lexer with Cyrillic support, 110 reserved Russian built-in names, each with an
-  English alias, and trailing-dot floats (`1.`).
+* UTF-8 lexer with Cyrillic support, 116 reserved built-in names — every Russian one with
+  an English alias — and trailing-dot floats (`1.`).
 * Recursive-descent parser with semantic error categories, `(A, B)` conjunction, `;` as
   the backtrackable disjunction, `\+` as the second spelling of `НЕ`, the short
   comparison signs as sugar over `РАВНО`/`МЕНЬШЕ`/`БОЛЬШЕ`, and source-ordered
@@ -48,6 +50,9 @@ checked against the C++ sources (nine more listings, the grammar brought in line
   `УМНОЖЕНИЕ/3,4`, `abs`, `sqrt`, `sin`, `cos`, `tan`, `exp`, `is_whole`, `is_number`,
   `СЛУЧ`, `ЦЕЛВЕЩ`, `СТРЦЕЛ`, `СТРВЕЩ`, `СТРСПИС`.
 * Strings (code-point based): `БУКВА`, `ЦИФРА`, `СЦЕП`, `КОПИЯ`, `ДЛИНА` and the rest.
+* Lists: `СОРТИРОВКА/2` (`sort`) — ascending, repeats dropped, in the dialect's own
+  order; `ПОЛНЫЙ/1` (`ground`) — no free variable anywhere, cycle-safe; `ДЛЯВСЕХ/2`
+  (`forall`) — no solution of the condition fails the action (ADR-025).
 * I/O: `ВЫВОД`, `ВЫВОДПС`, `ВВКОД`, `ВВОДЦЕЛ`, `ВВОДВЕЩ`, `ВВОДСИМВ`, `ВВОДСТР`,
   `ЧТЕНИЕ_ИЗ`, `ЗАПИСЬ_В`; the front-end's answer is a piece of the input stream
   (ADR-023).
@@ -2626,6 +2631,52 @@ Added on 2026-10-03 while planning task_59:
   *Verified.*  Release build clean; `ctest` 306/306 (5.8 s); `docs` exit 0 with the five PDFs
   rebuilt; and by hand — a `$` line is an error, while `?X = #1 + 1#, ВЫВОД(X).` still answers
   `X=2`.
+
+* Language round, part 82: **three built-ins — `СОРТИРОВКА/2`, `ПОЛНЫЙ/1`, `ДЛЯВСЕХ/2`**
+  (2026-10-05).  The user asked whether `bagof`/`setof` could be added and what else was worth
+  adding; the answer took the form of an analysis of what this machine can and cannot do, and
+  ended in three deterministic predicates.  The reasoning that refused `bagof`/`setof` is
+  ADR-025; here is what was built.
+
+  *The code.*  `СОРТИРОВКА` (`sort`) is a built-in in a new file `builtins_lists.cpp`: the list
+  is walked with the tail dereferenced at every step, anything that is not a proper, acyclic
+  list of comparable elements is refused, the *whole* list is checked before the sort (so the
+  type error never depends on which pairs the algorithm happens to compare), the sort is
+  `std::stable_sort`, equal neighbours are dropped with `std::unique`, and the second argument
+  is unified with the result.  Its comparison is not a copy of `БОЛЬШЕ`'s — it *is* `БОЛЬШЕ`'s,
+  now exported as `detail::compareOrder` and shared by both (the old `compareGreater` keeps its
+  behaviour and its messages, and `test_builtins_arith` still pins them).  `ПОЛНЫЙ` (`ground`)
+  is a type test in `builtins.cpp` whose walk carries the printer's path guard, so a term that
+  contains itself answers `ДА` instead of walking forever.  `ДЛЯВСЕХ` (`forall`) is
+  `Engine::hasCounterexample` — a nested solve over the condition with a callback that stops at
+  the first solution whose action does not solve — and the built-in on top of it is two lines.
+
+  *The five places, three times.*  Every name went into the dispatch table with its English
+  alias (`sort`, `ground`, `forall`), into the lexer's reserved set (both spellings), into
+  `doc/builtins.json` (63 records now), into `help.typ` (new sections 3.7 and 4.8, a line in 9,
+  and four rows in the SWI/GNU table — including an honest "`bagof`/`setof`: нет"), and into
+  `prologd-diff.typ` (rows in the short table plus a section with было/стало).  `checks.cpp`
+  learned that both arguments of `ДЛЯВСЕХ` are goals, so a misspelled name inside them is a
+  warning — without that the call-site check would have been silent (now pinned by a test).
+
+  *What the tests say.*  Ten new Catch2 cases: `sort` over numbers, over text (an atom and a
+  string in one list), the `1`/`1.0` case, the unification of the second argument, and six
+  refusals (mixed types, a compound, `[1 | 2]`, a non-list, a free variable, and a list that
+  contains itself — the one a plain walk would follow forever); `forall` in five shapes plus
+  "a number is not a goal" and the call-site warning; `ground` over the term kinds, the
+  cyclic term included.  `ctest` is **316/316** (Catch2 299 plus the 17 CLI tests), and the GUI
+  checks pass unchanged — `test_reference.py` now covers 63 records over 116 reserved names and
+  knows the new `lists` group.
+
+  *The lessons.*  `lesson_05` gained section 9 «Готовая сортировка» (its intro no longer claims
+  that `СПИСОК/1` is the only list built-in), and `lesson_10` gained «Полный ли терм» and «Для
+  всех» with a `хранить/1` guard in front of `ДОБ`, two exercises and two summary bullets.  Both
+  lessons stay machine-checked: every new `%!` line was taken from a run of the built
+  interpreter, and `test_lessons` compares the whole output.  The course tables
+  (`doc/lessons.typ`, `examples/lessons/README.md`) name the new predicates in lessons 5 and 10;
+  `doc/technical.typ` says why `ПОЛНЫЙ` reuses the printer's cycle guard, that `ДЛЯВСЕХ` is a
+  nested solve, and that `СОРТИРОВКА` and `БОЛЬШЕ` share one order.  Nothing was renamed and no
+  name collided: the course sorts with `вставсорт/2` and `быстрсорт/2`, which are not reserved.
 
 
 

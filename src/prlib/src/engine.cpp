@@ -761,6 +761,31 @@ bool Engine::hasSolution(const Term& goal) {
   return found;
 }
 
+bool Engine::hasCounterexample(const Term& condition, const Term& action) {
+  const std::size_t mark = bindings_.trailMark();
+  bool found = false;
+  Solver nested(*this);
+  const Term single = condition;
+  if (++nested_depth_ > options_.maxNestedDepth) {
+    --nested_depth_;
+    bindings_.unwind(mark);
+    raise(ErrorCode::StackOverflow);
+  }
+  nested.run(std::span<const Term>(&single, 1), [&]() {
+    // The condition's bindings are in force here, and `hasSolution` undoes only
+    // what the action bound, so the next solution of the condition starts where
+    // this one did.
+    if (!hasSolution(action)) {
+      found = true;  // one counterexample is enough
+      return false;
+    }
+    return true;
+  });
+  --nested_depth_;
+  bindings_.unwind(mark);
+  return found;
+}
+
 bool Engine::callOnce(const Term& goal) {
   const std::size_t mark = bindings_.trailMark();
   bool found = false;

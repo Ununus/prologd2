@@ -64,22 +64,33 @@ BuiltinResult unifyValue(Engine& engine, const Term& target, const ArithValue& v
 
 BuiltinResult compareGreater(Engine& engine, const Term& first, const Term& second,
                              bool swap) {
+  const int cmp = detail::compareOrder(engine, first, second, swap ? "МЕНЬШЕ" : "БОЛЬШЕ");
+  const bool greater = swap ? cmp < 0 : cmp > 0;
+  return greater ? BuiltinResult::Continue : BuiltinResult::Fail;
+}
+}  // namespace
+
+namespace detail {
+
+int compareOrder(Engine& engine, const Term& first, const Term& second,
+                 std::string_view predicate) {
   const auto left = asNumeric(engine, first);
   const auto right = asNumeric(engine, second);
   if (left && right) {
-    const int cmp = compareValues(*left, *right);
-    const bool greater = swap ? cmp < 0 : cmp > 0;
-    return greater ? BuiltinResult::Continue : BuiltinResult::Fail;
+    return compareValues(*left, *right);
   }
   const auto leftText = asText(engine, first);
   const auto rightText = asText(engine, second);
   if (leftText && rightText) {
-    const bool greater = swap ? (*leftText < *rightText) : (*leftText > *rightText);
-    return greater ? BuiltinResult::Continue : BuiltinResult::Fail;
+    if (*leftText < *rightText) {
+      return -1;
+    }
+    return *leftText > *rightText ? 1 : 0;
   }
-  badArguments(swap ? "МЕНЬШЕ" : "БОЛЬШЕ");
+  badArguments(predicate);
 }
-}  // namespace
+
+}  // namespace detail
 
 BuiltinResult builtinGreater(Engine& engine, std::span<const Term> args) {
   return compareGreater(engine, args[0], args[1], false);

@@ -145,6 +145,14 @@ BuiltinResult builtinNot(Engine& engine, std::span<const Term> args) {
   return engine.hasSolution(args[0]) ? BuiltinResult::Fail : BuiltinResult::Continue;
 }
 
+BuiltinResult builtinForall(Engine& engine, std::span<const Term> args) {
+  // «Нет такого решения Условия, для которого Следствие не решается» — то же,
+  // что `НЕ((Условие, НЕ(Следствие)))`, но читается как утверждение и не
+  // оставляет переменных связанными.  Это и есть ISO `forall/2`.
+  return engine.hasCounterexample(args[0], args[1]) ? BuiltinResult::Fail
+                                                    : BuiltinResult::Continue;
+}
+
 BuiltinResult builtinFirst(Engine& engine, std::span<const Term> args) {
   // `ПЕРВОЕ` (renamed from "ИЛИ", task_44) commits to the first solution of the
   // first goal that has one; the full disjunction is `A ; B` (task_41).  Any
@@ -213,6 +221,46 @@ BuiltinResult builtinIsList(Engine& engine, std::span<const Term> args) {
                                                   : BuiltinResult::Fail;
 }
 
+namespace {
+
+/// One walk for `ПОЛНЫЙ`: a free variable anywhere means «не полный».
+///
+/// `path` is the chain of compounds being walked, so a term that contains itself
+/// stops at the second visit instead of walking forever --- the guard the printer
+/// uses, and for the same reason (`РАВНО(X, f(X))` is legal here: there is no
+/// occurs check).  A cycle holds no free variable, so it counts as ground.
+bool isGroundWalk(const Bindings& bindings, const Term& term,
+                  std::vector<const CompoundTerm*>& path) {
+  if (term.kind == TermKind::Var) {
+    return false;
+  }
+  if (term.kind != TermKind::Compound || term.compound == nullptr) {
+    return true;  // an atom, a whole number, a real, a string
+  }
+  const CompoundTerm* cell = term.compound.get();
+  if (std::find(path.begin(), path.end(), cell) != path.end()) {
+    return true;
+  }
+  path.push_back(cell);
+  for (const Term& argument : term.compound->args) {
+    if (!isGroundWalk(bindings, bindings.deref(argument), path)) {
+      path.pop_back();
+      return false;
+    }
+  }
+  path.pop_back();
+  return true;
+}
+
+}  // namespace
+
+BuiltinResult builtinIsGround(Engine& engine, std::span<const Term> args) {
+  std::vector<const CompoundTerm*> path;
+  const Term resolved = engine.bindings().deref(args[0]);
+  return isGroundWalk(engine.bindings(), resolved, path) ? BuiltinResult::Continue
+                                                         : BuiltinResult::Fail;
+}
+
 // ---------------------------------------------------------------------------
 // НАЙТИВСЕ/3
 // ---------------------------------------------------------------------------
@@ -269,11 +317,13 @@ constexpr std::pair<std::string_view, std::string_view> kEnglishNames[] = {
     {"ЛОЖЬ", "fail"},         {"ТРАССА", "trace"},
     {"НЕТ_ТРАССЫ", "no_trace"}, {"ТИХО", "quiet"},
     {"ВЕРСИЯ", "version"},      {"НЕ", "not"},
-    {"ПЕРВОЕ", "first"},      {"РАВНО", "equal"},
+    {"ДЛЯВСЕХ", "forall"},      {"ПЕРВОЕ", "first"},
+    {"РАВНО", "equal"},
     {"ПС", "nl"},            {"ЖДИ", "wait"},
     {"ПЕР", "var"},           {"ЦЕЛ", "integer"},
     {"ВЕЩ", "float"},         {"СИМВ", "is_text"},
-    {"СПИСОК", "is_list"},      {"НАЙТИВСЕ", "findall"},
+    {"СПИСОК", "is_list"},      {"ПОЛНЫЙ", "ground"},
+    {"НАЙТИВСЕ", "findall"},    {"СОРТИРОВКА", "sort"},
     {"БОЛЬШЕ", "greater"},      {"МЕНЬШЕ", "less"},
     {"СЛОЖЕНИЕ", "plus"},       {"УМНОЖЕНИЕ", "mul"},
     {"СЛУЧ", "random"},       {"ЦЕЛВЕЩ", "int_to_float"},
@@ -356,6 +406,7 @@ const BuiltinTable& builtinTable() {
     add("ТИХО", 0, builtinQuiet);
     add("ВЕРСИЯ", 0, builtinVersion);
     add("НЕ", 1, builtinNot);
+    add("ДЛЯВСЕХ", 2, builtinForall);
     add("РАВНО", 2, builtinEqual);
     add("ПС", 0, builtinNewline);
     add("ЖДИ", 1, builtinWait);
@@ -366,9 +417,13 @@ const BuiltinTable& builtinTable() {
     add("ВЕЩ", 1, builtinIsFloat);
     add("СИМВ", 1, builtinIsSymbol);
     add("СПИСОК", 1, builtinIsList);
+    add("ПОЛНЫЙ", 1, builtinIsGround);
 
     // findall.
     add("НАЙТИВСЕ", 3, builtinFindAll);
+
+    // Lists.
+    add("СОРТИРОВКА", 2, builtinSort);
 
     // Arithmetic.
     add("БОЛЬШЕ", 2, builtinGreater);

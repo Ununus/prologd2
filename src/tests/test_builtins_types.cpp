@@ -33,7 +33,8 @@ TEST_CASE("a type test with an unregistered arity is an error") {
   // Each of these names has exactly one arity, so a two-argument call can never
   // succeed; the load stops with the message instead of a silent `НЕТ`.
   for (const std::string& goal :
-       {"ПЕР(X, X)", "ЦЕЛ(1, 1)", "ВЕЩ(1.0, 1.0)", "СИМВ(a, a)", "СПИСОК([], [])"}) {
+       {"ПЕР(X, X)", "ЦЕЛ(1, 1)", "ВЕЩ(1.0, 1.0)", "СИМВ(a, a)", "СПИСОК([], [])",
+        "ПОЛНЫЙ([], [])"}) {
     const auto result = runProgram("?" + goal + ".\n");
     REQUIRE_FALSE(result.loaded);
     REQUIRE(result.error.find("не имеет арности 2 (есть 1)") != std::string::npos);
@@ -179,4 +180,32 @@ TEST_CASE("a cyclic term cannot be copied") {
     REQUIRE(result.runtimeError);
     REQUIRE(result.error.find("Циклический терм") != std::string::npos);
   }
+}
+
+TEST_CASE("the ground test finds a free variable anywhere in the term") {
+  // The whole term is walked, not only its top: a variable inside a compound or
+  // inside a list tail is an unbound variable all the same.
+  const auto result = runProgram(
+      "?ПОЛНЫЙ(5).\n"
+      "?ПОЛНЫЙ(а).\n"
+      "?ПОЛНЫЙ(\"строка\").\n"
+      "?ПОЛНЫЙ([]).\n"
+      "?ПОЛНЫЙ(Х).\n"
+      "?ПОЛНЫЙ(факт(1, [2, 3])).\n"
+      "?ПОЛНЫЙ(факт(1, [2, Х])).\n"
+      "?ПОЛНЫЙ([1 | 2]).\n"                        // не список, но весь связан
+      "?РАВНО(_Г, [1, 2]), ПОЛНЫЙ(_Г).\n"
+      "?РАВНО(_В, 1), ПОЛНЫЙ(факт(_В)).\n"          // связанная переменная — не свободная
+      "?ground(факт(1)).\n");                       // английское имя
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "ДА\nДА\nДА\nДА\nНЕТ\nДА\nНЕТ\nДА\nДА\nДА\nДА\n");
+}
+
+TEST_CASE("ground walks a term that contains itself instead of looping") {
+  // `РАВНО(X, f(X))` is legal in this dialect (there is no occurs check), and
+  // such a term holds no free variable: it is ground.  The walk carries the same
+  // guard the printer uses, so the answer is `ДА` rather than no answer at all.
+  const auto result = runProgram("?РАВНО(_Ц, ц(_Ц)), ПОЛНЫЙ(_Ц).\n");
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "ДА\n");
 }

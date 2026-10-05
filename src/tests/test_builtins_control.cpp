@@ -253,3 +253,42 @@ TEST_CASE("the trace flags turn tracing on and off") {
   REQUIRE_FALSE(result.runtimeError);
   REQUIRE(result.output == "ДА\nДА\nX=1\n");
 }
+
+TEST_CASE("forall holds when no solution of the first goal fails the second") {
+  const auto result = runProgram(
+      "человек(аня).\n"
+      "человек(боря).\n"
+      "совершеннолетний(аня).\n"
+      "?ДЛЯВСЕХ(человек(_Х), совершеннолетний(_Х)).\n"   // боря — контрпример
+      "?ДЛЯВСЕХ(совершеннолетний(_Х), человек(_Х)).\n"
+      "?ДЛЯВСЕХ(человек(_Х), человек(_Х)).\n"
+      "?ДЛЯВСЕХ(ЛОЖЬ, совершеннолетний(_Х)).\n"          // решений нет — «для всех» пусто
+      "?ДЛЯВСЕХ(человек(_Х), НЕ(человек(_Х))).\n"
+      "?forall(человек(_Х), человек(_Х)).\n");            // английское имя
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "НЕТ\nДА\nДА\nДА\nНЕТ\nДА\n");
+}
+
+TEST_CASE("forall leaves the bindings of the caller alone") {
+  const auto result = runProgram(
+      "человек(аня).\n"
+      "?РАВНО(Х, 5), ДЛЯВСЕХ(человек(_Ч), человек(_Ч)), ВЫВОД(Х), ПС.\n");
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "5\nХ=5\n");
+}
+
+TEST_CASE("forall takes goals, and the goals inside it are checked") {
+  // A number is not a goal: the nested solver says so, like it does for `НЕ`.
+  const auto notAGoal = runProgram("?ДЛЯВСЕХ(1, 2).\n");
+  REQUIRE(notAGoal.loaded);
+  REQUIRE(notAGoal.runtimeError);
+  REQUIRE(notAGoal.error.find("Цель должна быть предикатом") != std::string::npos);
+
+  // Both arguments are goals, so the call-site check opens them (`checks.cpp`): a
+  // misspelled name inside is a warning, not silence.
+  const auto checked =
+      runProgram("человек(аня).\n?ДЛЯВСЕХ(человек(_Х), нет_такого(_Х)).\n");
+  REQUIRE(checked.loaded);
+  REQUIRE(checked.output == "НЕТ\n");
+  REQUIRE(checked.error.find("не найдено: нет_такого/1") != std::string::npos);
+}

@@ -736,12 +736,67 @@ reversible.
   `docs` → freeze → lay out → checks → zip, with `-SkipTests`/`-SkipFreeze`/`-NoTrim`
   for a shorter round.
 
-**Consequences.** A release is one folder (`dist\prologd-2.0.0-win64`, 280 files,
-95.4 MiB, zip 37.5 MiB) with no installer, which is what the lessons and the memo
+**Consequences.** A release is one folder (`dist\prologd-2.0.0-win64`, 282 files,
+95.5 MiB, zip 37.7 MiB) with no installer, which is what the lessons and the memo
 describe.  An installer, if it ever comes, is a *second* front end to the same folder
 and has to answer what it does with `gui.ini` beside the exe.  The cost of the choice
 is the size and a build that needs a Windows machine with the toolchain: no
 cross-compilation, and the zip is built by hand — by the script — not by CI.
+
+**Status.** Accepted.
+
+## ADR-025: Three built-ins instead of `bagof` and `setof`
+
+**Context.** The user asked whether `bagof/3` and `setof/3` could be added, and what
+else was worth adding.  The collecting half of `findall` already existed
+(`Engine::collectAll`: a nested solver, a copied template per solution, the bindings
+undone afterwards), so the question was which ISO conveniences fit this dialect.
+
+`bagof`/`setof` were refused, and the reasons are structural rather than stylistic:
+
+* `BuiltinResult` is `Continue`/`Fail`/`Handled` — a built-in gives one verdict and
+  the machine moves on, so it cannot leave a choice point of its own.  `bagof` with
+  its witness grouping *must* yield one list per group on backtracking: it would
+  need a new kind of frame in the machine, not a new entry in a table.
+* `setof` sorts by the *standard order of terms*, and this dialect deliberately has
+  no such order: `БОЛЬШЕ`/`МЕНЬШЕ` compare two numbers or two text constants and
+  raise a type error for anything else, while the ISO `@<`-family is rejected with a
+  hint (task_52).  A term order over variables, numbers, atoms, compounds *and* this
+  dialect's separate string type is a language design question, not a predicate.
+* The grouping needs `^` (`bagof(X, Y^p(X, Y), L)`) — one more ISO operator this
+  dialect says no to.
+
+**Decision.** Three predicates, covering the deterministic part of what people reach
+for `setof`/`forall`/`ground` to do:
+
+* `СОРТИРОВКА(Список, Результат)` (`sort`) — ascending, repeats dropped, the second
+  argument unified with the result.  The order is the dialect's own, shared with
+  `БОЛЬШЕ`/`МЕНЬШЕ` through `detail::compareOrder`: numbers by value, text by code
+  point, anything else a type error.  The whole list is checked *before* the sort, so
+  a mixed list is refused once instead of depending on which pairs the algorithm
+  happens to compare.  `1` and `1.0` count as one value, because the dialect's own
+  comparison calls them equal (`РАВНО(1, 1.0)` holds).
+* `ДЛЯВСЕХ(Условие, Следствие)` (`forall`) — ISO `forall/2` exactly: true when no
+  solution of the condition fails the action, implemented as
+  `Engine::hasCounterexample`, a nested solve that stops at the first counterexample.
+  It is sugar over `НЕ((Усл, НЕ(След)))`, and it is worth having because the
+  affirmative form is what a check reads like.
+* `ПОЛНЫЙ(Терм)` (`ground`) — no free variable anywhere in the term.  Unlike the
+  other two it cannot be written reliably in the language itself: the walk needs the
+  cycle guard the printer already uses, or `РАВНО(X, f(X))` sends the Prolog version
+  past the depth limit (measured); and such a term has no free variable, so the
+  honest answer is «полный».
+
+**Consequences.** The names are honest — `sort/2`, `forall/2` and `ground/1` do what
+ISO says — so the alias table (help.typ §17) stays a table of synonyms rather than a
+list of near-misses.  `bagof`/`setof` stay absent and `help.typ` says so in its
+comparison table: a reader coming from SWI looks for them, finds nothing, and gets
+`СОРТИРОВКА` instead.  No lesson broke: the course sorts with `вставсорт/2` and
+`быстрсорт/2`, which are not reserved names, so the hand-written exercises stay
+exercises (checked before the names were added).  Each new predicate costs the usual
+five places — the dispatch table with its English alias, the reserved-name set,
+`doc/builtins.json`, a section of `help.typ` and a line in `prologd-diff.typ` — plus
+tests and the lesson material.
 
 **Status.** Accepted.
 

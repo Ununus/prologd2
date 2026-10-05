@@ -16,6 +16,7 @@ add_library(prlib STATIC
   src/builtins_arith.cpp
   src/builtins_io.cpp
   src/builtins_string.cpp
+  src/builtins_lists.cpp
   src/builtins_database.cpp
   src/builtins_graphics.cpp
   src/io.cpp

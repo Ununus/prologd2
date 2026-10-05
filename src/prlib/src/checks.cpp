@@ -253,6 +253,12 @@ void walkGoal(const Term& goal, const SourceLocation& location,
     visit(name, 1, location);
     return;
   }
+  if ((name == "ДЛЯВСЕХ" || name == "forall") && arity == 2) {
+    walkGoal(args[0], location, visit);
+    walkGoal(args[1], location, visit);
+    visit(name, 2, location);
+    return;
+  }
   if ((name == "ПЕРВОЕ" || name == "first") && arity == 2) {
     walkGoal(args[0], location, visit);
     walkGoal(args[1], location, visit);

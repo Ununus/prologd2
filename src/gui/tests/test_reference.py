@@ -171,7 +171,7 @@ def test_sections_and_summaries() -> None:
 def test_the_groups_are_known() -> None:
     known = {
         "control", "debug", "arith", "types", "strings", "io", "database",
-        "modules", "graphics",
+        "modules", "graphics", "lists",
     }
     for record in load_records():
         group = record.get("group")

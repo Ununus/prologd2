@@ -231,6 +231,11 @@ class Engine {
 
   // ---- nested solving ----
   bool hasSolution(const Term& goal);
+  /// True when some solution of `condition` leaves `action` without a solution
+  /// — the single thing `ДЛЯВСЕХ` looks for.  The condition is enumerated to
+  /// exhaustion, its bindings are undone before returning, and the bindings of
+  /// the caller are left as they were.
+  bool hasCounterexample(const Term& condition, const Term& action);
   /// Solve `goal` once and keep the bindings of the first solution on success
   /// (undoing them on failure).  Used by `ПЕРВОЕ`.
   bool callOnce(const Term& goal);

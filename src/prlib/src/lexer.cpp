@@ -10,10 +10,10 @@ namespace {
 
 const std::unordered_set<std::string> kReservedBuiltins = {
     // Control / logic, with the English spelling of each name (task_39).
-    "ЛОЖЬ", "ТРАССА", "НЕТ_ТРАССЫ", "ВЫП", "НЕ", "ПЕРВОЕ", "РАВНО", "ТИХО",
-    "ВЕРСИЯ", "ПС",
-    "fail", "trace", "no_trace", "call", "not", "first", "equal", "quiet",
-    "version", "nl",
+    "ЛОЖЬ", "ТРАССА", "НЕТ_ТРАССЫ", "ВЫП", "НЕ", "ДЛЯВСЕХ", "ПЕРВОЕ", "РАВНО",
+    "ТИХО", "ВЕРСИЯ", "ПС",
+    "fail", "trace", "no_trace", "call", "not", "forall", "first", "equal",
+    "quiet", "version", "nl",
     // Arithmetic
     "БОЛЬШЕ", "МЕНЬШЕ", "СЛОЖЕНИЕ", "УМНОЖЕНИЕ", "СЛУЧ", "float", "mod", "div",
     "greater", "less", "plus", "mul", "random", "abs", "sqrt", "sin",
@@ -27,16 +27,18 @@ const std::unordered_set<std::string> kReservedBuiltins = {
     "БУКВА", "ЦИФРА", "СЦЕП", "КОПИЯ", "ДЛИНА",
     "is_letter", "is_digit", "concat", "substring", "strlen",
     // Type tests and conversions
-    "ПЕР", "ЦЕЛ", "ВЕЩ", "СИМВ", "СПИСОК", "СТРСПИС", "СТРЦЕЛ", "СТРВЕЩ",
-    "ЦЕЛВЕЩ",
-    "var", "integer", "is_text", "is_list", "str_to_list", "str_to_int",
-    "str_to_float", "int_to_float",
+    "ПЕР", "ЦЕЛ", "ВЕЩ", "СИМВ", "СПИСОК", "ПОЛНЫЙ", "СТРСПИС", "СТРЦЕЛ",
+    "СТРВЕЩ", "ЦЕЛВЕЩ",
+    "var", "integer", "is_text", "is_list", "ground", "str_to_list",
+    "str_to_int", "str_to_float", "int_to_float",
     // Database
     "СКОЛЬКО", "ПРЕДЛ", "ТЕРМ", "ДОБ", "УДАЛЕНИЕ",
     "clause_count", "clause_at", "univ", "assert", "retract",
     // Graphics
     "ТОЧКА", "ЛИНИЯ", "ОКРУЖНОСТЬ", "ЗАКРАСКА",
     "point", "line", "circle", "fill",
+    // Lists
+    "СОРТИРОВКА", "sort",
     // Newcomers
     "НАЙТИВСЕ", "ИМПОРТ", "findall", "import",
 };

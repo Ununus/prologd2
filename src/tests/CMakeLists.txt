@@ -11,6 +11,7 @@ add_executable(prlib_tests
   test_builtins_types.cpp
   test_builtins_arith.cpp
   test_builtins_string.cpp
+  test_builtins_lists.cpp
   test_builtins_io.cpp
   test_builtins_database.cpp
   test_findall.cpp

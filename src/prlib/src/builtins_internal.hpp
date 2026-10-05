@@ -28,6 +28,13 @@ bool unifyInteger(Engine& engine, const Term& argument, const BigInt& value);
 bool unifyFloat(Engine& engine, const Term& argument, double value);
 bool unifyText(Engine& engine, const Term& argument, const std::string& value);
 
+/// `-1`, `0` or `1` for two values in the dialect's own order: numbers among
+/// themselves by value, text among itself by code point.  Anything else is
+/// `badArguments(predicate)`.  Shared by `БОЛЬШЕ`/`МЕНЬШЕ` and `СОРТИРОВКА` so
+/// that «сравнить» and «отсортировать» are the same rule.
+int compareOrder(Engine& engine, const Term& first, const Term& second,
+                 std::string_view predicate);
+
 [[noreturn]] void badArguments(std::string_view predicate);
 
 }  // namespace prologd::detail
@@ -41,6 +48,7 @@ BuiltinResult builtinNoTrace(Engine&, std::span<const Term>);
 BuiltinResult builtinQuiet(Engine&, std::span<const Term>);
 BuiltinResult builtinVersion(Engine&, std::span<const Term>);
 BuiltinResult builtinNot(Engine&, std::span<const Term>);
+BuiltinResult builtinForall(Engine&, std::span<const Term>);
 BuiltinResult builtinOr(Engine&, std::span<const Term>);
 BuiltinResult builtinEqual(Engine&, std::span<const Term>);
 BuiltinResult builtinNewline(Engine&, std::span<const Term>);
@@ -52,6 +60,10 @@ BuiltinResult builtinIsInt(Engine&, std::span<const Term>);
 BuiltinResult builtinIsFloat(Engine&, std::span<const Term>);
 BuiltinResult builtinIsSymbol(Engine&, std::span<const Term>);
 BuiltinResult builtinIsList(Engine&, std::span<const Term>);
+BuiltinResult builtinIsGround(Engine&, std::span<const Term>);
+
+// ---- lists ----
+BuiltinResult builtinSort(Engine&, std::span<const Term>);
 
 // ---- findall ----
 BuiltinResult builtinFindAll(Engine&, std::span<const Term>);
