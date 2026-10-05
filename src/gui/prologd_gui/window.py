@@ -3442,16 +3442,26 @@ class MainWindow(QMainWindow):
     def _open_problem(self, position) -> None:
         """Takes the editor to the line a row of «Проблемы» points at (part 88).
 
-        What a double-click in the table does.  The row already knows its
-        position, so this is the same road a fresh diagnostic takes: the file is
-        opened when it is not among the tabs, the line is marked and the caret goes
-        there — and a row with no place (a diagnostic about `<query>` or the
-        interpreter's library) says so in the status bar instead of moving a caret
-        into text the error is not about.
+        What a double-click in the table does.  The row already knows its position,
+        so this is the same road a fresh diagnostic takes — plus the one thing the
+        click is for: the tab of that file is brought to the front.  A diagnostic
+        never switches to a tab that is *already* open (it marks the line where it
+        is, so a run cannot pull the user out of what they are reading), while a
+        file it has to open is shown at once — showing what it opens is what
+        opening a file does (part 90).
+
+        A row with no place (a diagnostic about `<query>` or the interpreter's
+        library) says so in the status bar instead of moving a caret into text the
+        error is not about.
         """
         if position is None or not position.file:
             self._status.setText("проблема не указывает место в тексте")
             return
+        buffer = self._diagnostic_buffer(position)
+        if buffer is not None:
+            # `set_current` also covers the file the run already opened: the tab
+            # exists, but the one showing is the program's.
+            self.active_pane().set_current(buffer)
         self._mark_error_line(position)
 
     def _on_trace(self, text: str) -> None:

@@ -563,7 +563,9 @@ column (`…\модуль.pld:2:15`, the whole path in the cell's tooltip, since
 in front of the name is what pushes the message off the screen).  A long message
 *wraps* inside its row (the message column takes the free width and the rows are
 measured again when the resizing stops), and a double-click on a row opens that
-place: the file if it is not open, the marked line, the caret on it — the same
+place: the file if it is not open, its tab brought to the front (the click's own
+work: a diagnostic marks the line of an imported file where it already is, while a
+click asks to be taken there), the marked line, the caret on it — the same
 road a fresh diagnostic takes, and a row that has no place says so in the status
 bar instead of moving the caret.
 

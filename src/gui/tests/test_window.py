@@ -2557,6 +2557,9 @@ def test_a_runtime_error_in_an_imported_file_opens_it(executable: str, directory
         assert any(view.error_line() == 2 for view in buffer.views()), [
             view.error_line() for view in buffer.views()
         ]
+        # Opening a file shows it, so the run left the module's tab in front; the tab
+        # that is *already* open is what the click on the row is for (part 90).
+        assert window.current_buffer() is buffer, "the module's tab is not showing"
     finally:
         discard_changes(window)
     print("ok: a runtime error in an imported file opens it and marks its line")
@@ -2615,11 +2618,24 @@ def test_the_problems_are_a_table_a_double_click_opens_the_line(
         assert buffer is not None, [item.model.path for item in window.buffers()]
         for view in buffer.views():
             view.clear_marks()
+        # The diagnostic opened the file, and it is showing: showing what it opens is
+        # what opening a file does.  What the click has to cover is the other case —
+        # the tab that already exists with another file in front of it.
+        assert window.current_buffer() is buffer, "the module was not opened"
         window._problems.itemDoubleClicked.emit(window._problems.item(0, 0))
         assert any(view.error_line() is not None for view in buffer.views()), (
             "the double-click marked no line"
         )
         assert "модуль.pld:2:15" in window.status_text(), window.status_text()
+
+        # The same row with the module's tab hidden behind the program's: the file is
+        # not opened a second time, and the click brings its tab to the front.
+        program = window._buffer_for_path(str(main))
+        assert window.active_pane().set_current(program), "the program's tab did not come back"
+        opened = len(window.buffers())
+        window._problems.itemDoubleClicked.emit(window._problems.item(0, 0))
+        assert window.current_buffer() is buffer, "the click did not raise the open tab"
+        assert len(window.buffers()) == opened, [item.model.path for item in window.buffers()]
 
         # A long message takes several lines of its own row.
         window._on_failed("parse", "error", "длинное сообщение " * 20, None)
@@ -2631,7 +2647,7 @@ def test_the_problems_are_a_table_a_double_click_opens_the_line(
         )
     finally:
         discard_changes(window)
-    print("ok: «Проблемы» is a table, its rows wrap, and a double-click opens the line")
+    print("ok: the problems are a table, its rows wrap, and a double-click opens the line")
 
 
 def test_stepping_shows_the_goal_the_stack_and_the_line(executable: str) -> None:

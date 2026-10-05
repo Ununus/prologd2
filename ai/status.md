@@ -1,7 +1,7 @@
 # Status tracker
 
 Last updated: after the portable-build task (task_61) and the rounds that followed — parts
-77--89: the two emblems on the first page of every document, `technical.typ` checked against
+77--90: the two emblems on the first page of every document, `technical.typ` checked against
 the C++ sources (nine more listings, the grammar brought in line with `parser.cpp`), the
 "привычный/обычный Prolog" wording replaced by ISO Prolog, the whole `ai/` folder translated
 into English, the last `$` taken out of the interpreter (part 81), three built-ins —
@@ -14,8 +14,9 @@ space after a sentence, with `tail/2` beside `head/2` (part 86), and the differe
 document relieved of the `$` item while the «не A, а B» turns became plain statements
 (part 87), and the window's «Проблемы» tab turned into a table whose rows wrap and open
 their line on a double-click, with long paths shortened in the output and in the settings
-list (part 88), and the console made to name the place of a runtime error, which it used to
-print as a bare message (part 89).
+list (part 88), the console made to name the place of a runtime error, which it used to
+print as a bare message (part 89), and a click on a row of «Проблемы» made to bring the
+tab of that file to the front (part 90).
 
 ## Overall
 
@@ -3011,3 +3012,38 @@ Added on 2026-10-03 while planning task_59:
 
   *Verified.*  `ctest` 320/320 (with the new case), `test_window.py` «all window checks
   passed», the six documents build with exit 0.
+
+* The window, part 90: **a double-click brings the file's tab to the front**
+  (2026-10-05).  A request from the user: «двойной щелчок по строке проблемы ещё
+  открывал таб с нужным файлом, если таба нет — открывал сам файл».
+
+  *What was missing.*  The click already took the editor to the line: the row keeps the
+  `Position` it came with, `_diagnostic_buffer` finds the open tab or opens the file, and
+  the line is marked with the caret on it.  What it did not do was *show* that tab —
+  `show_line` moved the caret inside a view that another tab was covering — so a click on
+  a diagnostic from a file the run itself had opened looked like nothing happened.
+  `_open_problem` now calls `active_pane().set_current(buffer)` before the mark, which
+  covers both halves at once: the tab that exists behind another file, and the one that
+  had to be opened at all (every pane shows every open document, so the active pane always
+  has it).
+
+  *What moves the eyes, and when.*  A diagnostic never switches to a tab that is
+  *already* open: it marks the line where it is, so a run cannot pull the user out of the
+  program they are reading.  A file it has to *open* is shown at once, because showing
+  what it opens is what opening a file does — the rule since task_50 — so the click and
+  the diagnostic agree there.  The click is the one act that raises the tab of a file
+  that already exists, which is exactly the case that used to leave the user looking at
+  the program while the line was marked in a tab they could not see.
+
+  *Pinned.*  The double-click check in `test_window.py` now pins the whole order: the run
+  opened the module and marked line 2 (and it is showing, since opening shows a file),
+  then the module's tab is hidden behind the program's and the click brings it back
+  without opening the file a second time.  The «runtime error in an imported file» check
+  (part 89) pins the diagnostic's half of the rule: the line is marked, and the file that
+  had to be opened is the one showing.
+
+  *Documentation.*  `doc/gui.typ` and `src/gui/README.md` describe the click in order:
+  the file is opened if it is not open, its tab comes to the front, the line is marked.
+
+  *Verified.*  `test_window.py` «all window checks passed», `ctest` 320/320, the six
+  documents build with exit 0.
