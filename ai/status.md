@@ -1,7 +1,7 @@
 # Status tracker
 
 Last updated: after the portable-build task (task_61) and the rounds that followed — parts
-77--88: the two emblems on the first page of every document, `technical.typ` checked against
+77--89: the two emblems on the first page of every document, `technical.typ` checked against
 the C++ sources (nine more listings, the grammar brought in line with `parser.cpp`), the
 "привычный/обычный Prolog" wording replaced by ISO Prolog, the whole `ai/` folder translated
 into English, the last `$` taken out of the interpreter (part 81), three built-ins —
@@ -14,7 +14,8 @@ space after a sentence, with `tail/2` beside `head/2` (part 86), and the differe
 document relieved of the `$` item while the «не A, а B» turns became plain statements
 (part 87), and the window's «Проблемы» tab turned into a table whose rows wrap and open
 their line on a double-click, with long paths shortened in the output and in the settings
-list (part 88).
+list (part 88), and the console made to name the place of a runtime error, which it used to
+print as a bare message (part 89).
 
 ## Overall
 
@@ -2977,3 +2978,36 @@ Added on 2026-10-03 while planning task_59:
   that marks the line of the file that failed; `test_settingsdialog.py` green with the
   elide mode and the tooltip asserted; `ctest` 320/320; the six documents build with exit
   0.
+
+* The console, part 89: **a runtime error names its place, in the console too**
+  (2026-10-05).  A question from the user — «если в `library.pld` есть ошибка, мы её не
+  увидим?» — turned into a check of every way an imported file can fail.
+
+  *What was already true.*  A file that does not parse, that is missing, or that fails
+  inside a nested import is reported with *that* file's name, line and column, and the load
+  stops with exit code 2; the same diagnostic reaches the window as an `error` event
+  carrying `file`/`line`/`column`, so the tab of the imported file is opened and the line
+  marked.  A warning (an unknown predicate inside the module) is amber and changes nothing.
+  `examples/lib/library.pld` itself runs clean — exit 0, no diagnostics.
+
+  *The gap.*  A *runtime* error was printed as `error.what()` — the message alone: `деление
+  на ноль` with nowhere to look, in the main file and in an imported one alike.  The place
+  was known all along: `Engine::raise` puts `current_location_` (the clause being solved)
+  into the `PrologError`, which is exactly what the protocol sends to the window, and
+  `DiagnosticSink::format` already printed `file:line:column: error: message`.  Both catches
+  in `src/cli/main.cpp` now use it, so the line reads
+  `…/lib.pld:1:1: error: деление на ноль` and an error inside an imported file names that
+  file in the console as well as in the window.  The exit code stays 3.
+
+  *Pinned.*  `cli_diagnostics.cmake` gained a fourth promise — a runtime error exits 3 and
+  names its clause, matched on the ASCII part of the line (`cli_runtime.pld:1:N: error:`),
+  because `execute_process` decodes the child's output with the build console's code page —
+  and `test_window.py` gained «a runtime error in an imported file opens it and marks its
+  line», the other half of the promise the parse-error check already covered.
+
+  *Documentation.*  `doc/help.typ`: the paragraph about a failed directive and the list of
+  what a place points at now say that a runtime error carries a place too, and that the
+  place is the clause that was being solved, wherever it lives.
+
+  *Verified.*  `ctest` 320/320 (with the new case), `test_window.py` «all window checks
+  passed», the six documents build with exit 0.

@@ -2530,6 +2530,38 @@ def test_a_diagnostic_from_an_imported_file_opens_it(executable: str, directory)
     print("ok: a diagnostic from an imported file opens that file and marks its line")
 
 
+def test_a_runtime_error_in_an_imported_file_opens_it(executable: str, directory) -> None:
+    """part 89: a *runtime* error in an `ИМПОРТ`ed file marks the line there too.
+
+    The check above covers a file that does not parse; this is the other half of
+    the same promise.  The engine keeps the clause being solved next to its
+    environment, so the diagnostic names the *imported* file rather than the one
+    that asked the question — and the window, which marks the line of whatever
+    file a diagnostic names, opens it.
+    """
+    module = directory / "модуль.pld"
+    module.write_text("ок(1).\nдели(Х) :- БОЛЬШЕ(1, #1/0#).\n", encoding="utf-8")
+    main = directory / "главная.pld"
+    main.write_text(':- ИМПОРТ("модуль.pld").\n?дели(1).\n', encoding="utf-8")
+
+    window = empty_window(executable)
+    try:
+        assert window.open_path(str(main)), "the main file did not open"
+        window.run_program()
+        assert pump(window, lambda: "деление на ноль" in window.problems_text()), ascii(
+            window.problems_text()
+        )
+        assert "модуль.pld:2:" in window.problems_text(), ascii(window.problems_text())
+        buffer = window._buffer_for_path(str(module))
+        assert buffer is not None, [item.model.path for item in window.buffers()]
+        assert any(view.error_line() == 2 for view in buffer.views()), [
+            view.error_line() for view in buffer.views()
+        ]
+    finally:
+        discard_changes(window)
+    print("ok: a runtime error in an imported file opens it and marks its line")
+
+
 def test_the_problems_are_a_table_a_double_click_opens_the_line(
     executable: str, directory
 ) -> None:
@@ -3911,6 +3943,7 @@ def main(argv: list[str]) -> int:
         test_a_parse_error_marks_the_line_the_parser_stopped_at(executable)
         test_a_warning_is_amber_and_counted(executable)
         test_a_diagnostic_from_an_imported_file_opens_it(executable, files)
+        test_a_runtime_error_in_an_imported_file_opens_it(executable, files)
         test_the_problems_are_a_table_a_double_click_opens_the_line(executable, files)
         test_stepping_shows_the_goal_the_stack_and_the_line(executable)
         test_the_trace_is_coloured_apart_from_the_output(executable)

@@ -307,7 +307,12 @@ int main(int argc, char** argv) {
     try {
       engine.runQuery(query);
     } catch (const prologd::PrologRuntimeError& error) {
-      engine.io().errorStream() << error.what() << '\n';
+      // The place is part of the error, not a decoration: `raise` keeps the clause
+      // being solved next to it, so a runtime error is printed in the same
+      // `file:line:column: error: message` shape as a parse error — and an error
+      // inside an `ИМПОРТ`ed file names *that* file (part 89).  `what()` alone used
+      // to drop it, which left «деление на ноль» with nowhere to look.
+      engine.io().errorStream() << prologd::DiagnosticSink::format(error.error()) << '\n';
       exit_code = 3;
     }
   });
@@ -350,7 +355,9 @@ int main(int argc, char** argv) {
       }
     }
   } catch (const prologd::PrologRuntimeError& error) {
-    engine.io().errorStream() << error.what() << '\n';
+    // Same line as above: the place travels with the error (`PrologError` carries
+    // the location, `what()` carries the message alone).
+    engine.io().errorStream() << prologd::DiagnosticSink::format(error.error()) << '\n';
     exit_code = 3;
   }
 
