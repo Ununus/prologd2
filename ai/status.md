@@ -1,15 +1,16 @@
 # Status tracker
 
 Last updated: after the portable-build task (task_61) and the rounds that followed — parts
-77--85: the two emblems on the first page of every document, `technical.typ` checked against
+77--86: the two emblems on the first page of every document, `technical.typ` checked against
 the C++ sources (nine more listings, the grammar brought in line with `parser.cpp`), the
 "привычный/обычный Prolog" wording replaced by ISO Prolog, the whole `ai/` folder translated
 into English, the last `$` taken out of the interpreter (part 81), three built-ins —
 `СОРТИРОВКА/2`, `ПОЛНЫЙ/1`, `ДЛЯВСЕХ/2` — added in place of `bagof`/`setof` (part 82,
 ADR-025), the examples folder given a map and a `problems/` shelf (part 83), the standard
 library started as `stdlib/` with `lists.pld`, `sets.pld`, `sorts.pld` and a checked demo
-(part 84), and that library grown to five files, documented in a sixth document and found by
-the interpreter beside itself without a flag (part 85, ADR-026).
+(part 84), that library grown to five files, documented in a sixth document and found by the
+interpreter beside itself without a flag (part 85, ADR-026), and its own texts given a single
+space after a sentence, with `tail/2` beside `head/2` (part 86).
 
 ## Overall
 
@@ -2861,3 +2862,30 @@ Added on 2026-10-03 while planning task_59:
   document's 96 assertions, `test_queries.py` green after a `PINNED` refresh (62
   questions in the demo), the window suite green, and `typst compile doc/library.typ`
   with a look at four of its ten pages.
+
+* Standard library, part 86: **one space after a sentence, and `tail` beside `head`**
+  (2026-10-05).  Two small things from the user, both about the library's own text.
+
+  *Spacing.*  The library's files now use a single space after a sentence-ending period,
+  the way the user asked.  The `.pld` files could not simply be edited by hand:
+  `prologd --format` keeps a comment it does not reflow, so double spaces survived in
+  exactly the lines that fit on one line, while `lists.pld` looked clean only because
+  the formatter had reflowed it.  Four spots needed the hand — two in `sorts.pld`, one in
+  the demo's header, one in `doc/library.typ` — and the `.typ` file is not the
+  formatter's business at all.  Verified the only way that means anything: `--format`
+  over every library file afterwards says `canonical` for all six, and the demo still
+  prints exactly what its comments promise.  The rest of the repository (the course, the
+  other documents, the user's own files) keeps its two spaces — they asked for the
+  library, and the library is what changed.
+
+  *`tail/2`.*  The user asked whether `last/2` should be called `tail/2`, since the pair
+  of `head` is `tail`.  No: in this dialect's own comments `Хвост` is what follows
+  `[Голова|Хвост]`, so `tail` would name the *rest* of the list, not its last element —
+  and `last/2` is the standard name for that.  The pair the question was really after
+  now exists: `tail/2` was added next to `head/2`, and `last/2` keeps its name.  The new
+  predicate has its line in `doc/library.typ` (the completeness check would have failed
+  without it) and its own question in the demo — sixty-three questions now, with the
+  recorded answers still measured.
+
+  *Verified.*  `ctest` 320/320, `test_queries.py` green after a `PINNED` refresh, and the
+  six documents rebuilt.
