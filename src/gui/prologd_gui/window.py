@@ -463,10 +463,17 @@ class MainWindow(QMainWindow):
         editor_layout.addWidget(self._find_bar)
         editor_layout.addWidget(self._editor_splitter)
         editor_layout.addWidget(self._step_pane)
-        editor_layout.addWidget(self._query_line)
-        # The per-request console lives under the goal line: it appears where the
-        # question is answered, without moving the panel off the Вывод tab.
-        editor_layout.addWidget(self._input_console)
+        # The goal line and the per-request console under it are *one* panel: the
+        # console appears where the question is answered, without moving the panel
+        # off the Вывод tab, and «Вид → Панель ввода цели» hides the two together
+        # (an answer box under nothing would be a puzzle — part 92).
+        self._query_panel = QWidget()
+        query_layout = QVBoxLayout(self._query_panel)
+        query_layout.setContentsMargins(0, 0, 0, 0)
+        query_layout.addWidget(self._query_line)
+        query_layout.addWidget(self._input_console)
+        self._query_panel.setVisible(self._settings.query_visible)
+        editor_layout.addWidget(self._query_panel)
 
         # The tabbed output panel (task_50): one `QTabWidget` with the three
         # read-only panes, the Ввод tab and, since task_59, the answer table.
@@ -639,6 +646,7 @@ class MainWindow(QMainWindow):
             "find_prev": lambda: self.find_step(True),
             "toolbar": self._toggle_toolbar,
             "output": self._toggle_output,
+            "query": self._toggle_query,
             "graphics": self.show_graphics_window,
             "split": self.split_editor,
             "merge": self.merge_editor,
@@ -940,21 +948,39 @@ class MainWindow(QMainWindow):
         self._actions["split"].setEnabled(len(self._panes) < 2)
         self._actions["merge"].setEnabled(len(self._panes) > 1)
 
+    def _set_checked(self, key: str, checked: bool) -> None:
+        """Sets a checkable entry *without* running the handler behind it.
+
+        A handler writes the preference it belongs to, and `_sync_actions` is not
+        the user: letting the signal through is how showing the output panel for a
+        run overwrote the fact that the user had hidden it (part 92).  The entry
+        still shows the state — that is the whole point of syncing it.
+        """
+        action = self._actions[key]
+        blocked = action.blockSignals(True)
+        action.setChecked(bool(checked))
+        action.blockSignals(blocked)
+
     def _sync_actions(self) -> None:
-        """Makes the checkable entries agree with the settings and the panes."""
+        """Makes the checkable entries agree with the settings and the panes.
+
+        Reading a widget's state back into the entry that would *write* it is what
+        `_set_checked` is for: the entries follow, the preferences do not move.
+        """
         # `isHidden`, not `isVisible`: a toolbar of a window that was never shown
         # is not visible either, and reading that as "the user hid it" would write
         # the wrong preference on the first start.
-        self._actions["toolbar"].setChecked(not self._toolbar.isHidden())
-        self._actions["line_numbers"].setChecked(self._settings.line_numbers)
-        self._actions["wrap"].setChecked(self._settings.wrap)
-        self._actions["save_before_run"].setChecked(self._settings.save_before_run)
-        self._actions["run_questions"].setChecked(self._settings.run_questions)
-        self._actions["print_questions"].setChecked(self._settings.print_questions)
-        self._actions["answer_table"].setChecked(self._settings.answer_table)
-        self._actions["full_screen"].setChecked(self.isFullScreen())
-        self._actions["output"].setChecked(self.output_visible())
-        self._actions["graphics"].setChecked(self._settings.graphics_visible)
+        self._set_checked("toolbar", not self._toolbar.isHidden())
+        self._set_checked("line_numbers", self._settings.line_numbers)
+        self._set_checked("wrap", self._settings.wrap)
+        self._set_checked("save_before_run", self._settings.save_before_run)
+        self._set_checked("run_questions", self._settings.run_questions)
+        self._set_checked("print_questions", self._settings.print_questions)
+        self._set_checked("answer_table", self._settings.answer_table)
+        self._set_checked("full_screen", self.isFullScreen())
+        self._set_checked("output", self.output_visible())
+        self._set_checked("query", self.query_visible())
+        self._set_checked("graphics", self._settings.graphics_visible)
         self._sync_pane_actions()
         self._sync_undo_actions()
         self._sync_run_actions()
@@ -1234,6 +1260,23 @@ class MainWindow(QMainWindow):
         shown reads as visible — the same trap the toolbar switch has)."""
         return not self._panel_tabs.isHidden()
 
+    def query_visible(self) -> bool:
+        """Whether the goal field is shown (`isHidden`, for the same reason)."""
+        return not self._query_panel.isHidden()
+
+    def _reveal_output_panel(self) -> None:
+        """Shows the output panel for a run — without writing the preference.
+
+        «Скрыта» is a temporary state the user chose, and a run has output to show,
+        so the panel comes back for it (part 92).  The *key* is left alone: the
+        first run would otherwise erase the choice for ever — the rule the
+        followed font size already follows (task_58), where a side effect of
+        running writes nothing and only the user's own act does.
+        """
+        if self._panel_tabs.isHidden():
+            self._panel_tabs.setVisible(True)
+            self._sync_actions()
+
     def _apply_output_position(self, remember: bool = True) -> None:
         """Puts the panel on the side the settings name, with its sizes."""
         bottom = self._settings.output_position == "bottom"
@@ -1265,6 +1308,14 @@ class MainWindow(QMainWindow):
         self._settings.output_visible = bool(visible)
         self._panel_tabs.setVisible(bool(visible))
         self._status.setText("панель вывода показана" if visible else "панель вывода скрыта")
+
+    def _toggle_query(self, visible: bool) -> None:
+        """«Вид → Панель ввода цели»: show or hide the goal field."""
+        self._settings.query_visible = bool(visible)
+        self._query_panel.setVisible(bool(visible))
+        self._status.setText(
+            "панель ввода цели показана" if visible else "панель ввода цели скрыта"
+        )
 
     def _save_panel_state(self) -> None:
         """Remembers the side of the panel and the splitter's two sizes."""
@@ -1457,7 +1508,10 @@ class MainWindow(QMainWindow):
         self._discard_output()
         self._reset_panels()
         # The panel shows the program's output while the run is going (task_50);
-        # a diagnostic switches it to «Проблемы» later.
+        # a diagnostic switches it to «Проблемы» later.  A run has output to show,
+        # so a panel the user hid comes back for it — and only for it: the key is
+        # not written, so the choice survives (part 92).
+        self._reveal_output_panel()
         self._show_panel_tab(panels.TAB_OUTPUT)
         # The clock of the run, read by `_on_loaded` for the
         # «база знаний загружена (N мс)» line.
@@ -1789,6 +1843,9 @@ class MainWindow(QMainWindow):
             return
         self._busy = True
         self._arm_answer_table()
+        # A goal typed into the line answers into the output panel: asking it with
+        # that panel hidden would look like nothing happened at all (part 92).
+        self._reveal_output_panel()
         self._session.run_query(text)
         self._sync_run_actions()
         self._update_details()
@@ -2797,8 +2854,9 @@ class MainWindow(QMainWindow):
         time anyway.
 
         Where it asks is the «Спрашивать ввод» switch (task_29): in the console
-        under the output — the field takes the answer and the box is what is left
-        when that panel is hidden — or in a box every time.
+        under the goal line — the field takes the answer and the box is what is
+        left when either that panel or the goal field itself is hidden (part 92) —
+        or in a box every time.
         """
         if self._stopped_input:
             # Cancelled earlier in this run: the interpreter is on its way out and
@@ -2811,7 +2869,11 @@ class MainWindow(QMainWindow):
             self._session.answer_input(line)
             self._status.setText(f"ввод из поля, осталось строк — {len(self._queued_input)}")
             return
-        if not self._panel_tabs.isHidden() and self._settings.input_mode == "panel":
+        if (
+            not self._panel_tabs.isHidden()
+            and not self._query_panel.isHidden()
+            and self._settings.input_mode == "panel"
+        ):
             # The console appears under the goal line, and the panel stays on
             # the tab the reader chose (usually Вывод) — the question never pulls
             # the eye off the output it belongs to (task_50).
@@ -2915,6 +2977,10 @@ class MainWindow(QMainWindow):
     def input_pane(self) -> ZoomablePlainTextEdit:
         """The input queue under the output: one line per answer."""
         return self._input_pane
+
+    def query_panel(self) -> QWidget:
+        """The goal field and the console under it — one panel (part 92)."""
+        return self._query_panel
 
     def pending_input(self) -> list[str]:
         """The prepared answers that are left for the running program."""
@@ -3166,6 +3232,7 @@ class MainWindow(QMainWindow):
 
         self._toolbar.setVisible(self._settings.toolbar_visible)
         self._panel_tabs.setVisible(self._settings.output_visible)
+        self._query_panel.setVisible(self._settings.query_visible)
         self._apply_output_position(remember=False)
         self._refresh_panel_tabs()
         appearance.apply_theme(QApplication.instance(), self._settings.theme)

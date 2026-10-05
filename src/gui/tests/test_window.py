@@ -476,10 +476,15 @@ def test_the_console_answers_once_the_prepared_lines_run_out(executable: str) ->
 
 
 def test_the_dialog_is_the_last_resort(executable: str) -> None:
-    """With the panel hidden there is nowhere to put a console, so a box asks."""
+    """With the panel hidden there is nowhere to put a console, so a box asks.
+
+    A run shows the panel by itself (part 92), so the panel is hidden *in the middle
+    of* the run here — which is what pressing `F4` while a program waits does.  The
+    first question still has its console (armed, and answered through it); the
+    second one finds the panel gone and comes as a box.
+    """
     window = empty_window(executable)
     try:
-        window._actions["output"].setChecked(False)  # hides the whole panel
         window.editor().setPlainText(READS_TWO)
         asked: list[str] = []
 
@@ -489,10 +494,16 @@ def test_the_dialog_is_the_last_resort(executable: str) -> None:
 
         window._ask_input = answer
         window.run_program()
+        assert pump(window, lambda: window._input_console.waiting()), window.status_text()
+
+        # `F4` in the middle of the run: the panel goes, and the *next* question has
+        # nowhere to put the console.  The one that is already armed still answers.
+        window._actions["output"].setChecked(False)
+        window._input_console._line.setText("9")
+        window._input_console.send()
         wait_for_result(window)
 
-        # The program reads two values, so the box is asked twice.
-        assert asked == ["token", "token"], asked
+        assert asked == ["token"], asked
         assert printed_lines(window) == ["9", "9", "А=9", "Б=9"], printed_lines(window)
         print("ok: a hidden panel leaves the dialog as the only place to ask")
     finally:
@@ -652,10 +663,16 @@ def test_a_run_focuses_the_output_and_the_system_notes_the_time(executable: str)
 
 
 def test_cancelling_input_stops_the_run(executable: str) -> None:
-    """«Отмена» stops the program and the run asks nothing else."""
+    """«Отмена» stops the program and the run asks nothing else.
+
+    The goal field is hidden, which is the third reason a question comes as a box
+    (part 92): with that panel gone there is nowhere to put the console — and a run
+    does not show it back, since only the output panel is revealed by a run.
+    """
     window = empty_window(executable)
     try:
-        window._actions["output"].setChecked(False)  # the dialog needs a reason to be used
+        window._actions["query"].setChecked(False)  # the dialog needs a reason to be used
+        assert window.query_visible() is False
         window.editor().setPlainText(READS_TWO)
         asked: list[str] = []
         window._ask_input = lambda kind: asked.append(kind) or None
@@ -754,6 +771,69 @@ def test_the_output_panel_moves_and_hides(executable: str) -> None:
         print("ok: the panel moves with Ctrl+F4, hides with F4, and comes back")
     finally:
         discard_changes(reopened)
+
+
+def test_the_goal_field_hides_and_a_run_shows_the_output_panel(executable: str) -> None:
+    """part 92: «Вид → Панель ввода цели», and a run brings the output panel back.
+
+    The goal field and the console under it are one panel, so the new switch hides
+    both.  The output panel is the other half of the request: a run has output to
+    show, so a panel the user hid appears for it — while the *preference* stays
+    where the user put it and only their own act writes it (the rule the followed
+    font size already follows, task_58).
+    """
+    from prologd_gui.settings import Settings
+    from prologd_gui.window import MainWindow
+
+    window = empty_window(executable)
+    path = window._settings.path
+    try:
+        assert window.query_visible() is True, "the goal field is shown out of the box"
+        assert window._actions["query"].isChecked() is True
+        assert window._input_console.parent() is window.query_panel(), "one panel, two parts"
+
+        # The switch itself: hidden means hidden, and it is stored.
+        window._actions["query"].setChecked(False)
+        assert window.query_visible() is False
+        assert window.query_panel().isHidden() is True
+        assert window._settings.query_visible is False, "the switch was not stored"
+        window._actions["query"].setChecked(True)
+        assert window.query_panel().isHidden() is False
+        assert window._settings.query_visible is True
+
+        # A run with the output panel hidden: it comes back for the run, the key is
+        # left where the user put it, and the goal field stays as it was.
+        window.editor().setPlainText("факт(1).\n")
+        window._actions["query"].setChecked(False)
+        window._actions["output"].setChecked(False)
+        assert window._panel_tabs.isHidden() is True
+        window.run_program()
+        assert pump(window, lambda: not window._panel_tabs.isHidden()), (
+            "the run left the panel hidden"
+        )
+        assert window._settings.output_visible is False, "the run wrote the preference"
+        assert window.query_panel().isHidden() is True, "the run showed the goal field too"
+
+        # A goal typed into the line asks into the output panel the same way.
+        window._actions["output"].setChecked(False)
+        window._query_line.setText("?факт(1).")
+        window._query_line.returnPressed.emit()
+        assert pump(window, lambda: not window._panel_tabs.isHidden()), (
+            "the goal left the panel hidden"
+        )
+        assert window._settings.output_visible is False, "asking wrote the preference"
+    finally:
+        discard_changes(window)
+
+    stored = Settings(path)
+    assert stored.query_visible is False, "the goal field's state was not remembered"
+    reopened = MainWindow(executable, [], stored)
+    try:
+        assert reopened.query_visible() is False, "the goal field did not stay hidden"
+        assert reopened._actions["query"].isChecked() is False
+    finally:
+        discard_changes(reopened)
+    print("ok: the goal field hides from the menu, and a run shows the hidden output panel")
 
 
 def test_the_title_and_the_tabs_show_the_file_state(
@@ -3932,6 +4012,7 @@ def main(argv: list[str]) -> int:
         test_the_split_survives_a_restart(executable)
         test_split_and_merge_follow_the_pane_count(executable)
         test_the_output_panel_moves_and_hides(executable)
+        test_the_goal_field_hides_and_a_run_shows_the_output_panel(executable)
         test_the_graphics_window_follows_the_program(executable)
         test_a_run_that_draws_opens_the_picture_by_itself(executable)
         test_escape_closes_the_picture_then_the_bar_then_the_docks(executable)

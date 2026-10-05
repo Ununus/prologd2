@@ -215,6 +215,15 @@ with `Enter`.  It has the two things a goal needs beside the language itself:
 The placeholder spells the three: `?цель(X). — Enter: выполнить · ↑/↓: история ·
 Ctrl+Пробел: подсказки`.
 
+The field is a **panel** — «Вид → Панель ввода цели» (`view/query_visible`, on by
+default) hides it together with the console under it, and a *run* brings the
+output panel back if that one was hidden: a question typed with the output panel
+hidden would otherwise look like nothing happened.  Revealing it for a run does
+**not** write `view/output_visible` — the preference stays where the user put it and
+the next start of the window begins with the panel hidden again, which is the rule
+the followed font size already follows (task_58): a side effect of running writes
+nothing, and only the user's own act does.
+
 ## Questions in the margin
 
 Every question of a lesson — a `?Цель.` line, and also a query parked in a
@@ -736,8 +745,9 @@ queue below is split because the `>` echo and the «осталось строк�
 and its lines are one per request anyway.
 
 Answers are taken in this order: the **prepared lines** (one per request), then
-the console, and the **modal dialog** only when the whole panel is hidden by `F4`
-— there is nowhere to put a console then.  The prepared lines are user data: a run
+the console, and the **modal dialog** only when the output panel is hidden by `F4`
+or the goal field itself is («Вид → Панель ввода цели») — there is nowhere to put a
+console then.  The prepared lines are user data: a run
 consumes only its *copy* (`_queued_input`), and «Очистить вывод» never touches
 them.  «Спрашивать ввод» in the settings dialog (`view/input_mode`) chooses
 between the two *places* a question is put: `в панели вывода` (the console, the
@@ -886,7 +896,7 @@ table).
 | Section | What is in it |
 | --- | --- |
 | Редактор | font family and size, line numbers, the current-line band, word wrap, tabs or spaces and the width, auto-indent, completion (on/off, after how many letters, `Учитывать регистр`) |
-| Вид | theme (light, dark or system), toolbar, the output panel (shown; right or bottom, the bottom being the default since task_50), where a program's input question is asked (console or dialog), the output's font size, its line limit and whether it follows the end |
+| Вид | theme (light, dark or system), toolbar, the output panel (shown; right or bottom, the bottom being the default since task_50), the goal field, where a program's input question is asked (console or dialog), the output's font size, its line limit and whether it follows the end |
 | Формат | the formatter's mode, width, indent and unit, «только выделенное» |
 | Выполнение | whether a run answers the program's own `?`-questions, save before run, the four limits (steps, depth, НАЙТИВСЕ solutions, milliseconds), **the interpreter path** (empty = the one the window was started with), **the process directory** (the running file's folder, the window's folder, or a fixed one — `ЗАПИСЬ_В`/`ЧТЕНИЕ_ИЗ` open relative to it), the `ИМПОРТ` search folders |
 | Файлы | autosave in minutes (0 = off), how many recent files to remember, restoring the open tabs at start-up |

@@ -58,6 +58,9 @@ WINDOW_GEOMETRY = "view/window_geometry"
 TOOLBAR = "view/toolbar"
 OUTPUT_POSITION = "view/output_position"
 OUTPUT_VISIBLE = "view/output_visible"
+#: The goal field under the editor — and the console that appears under *it*
+#: (part 92).  One key for the two: an answer box under nothing would be a puzzle.
+QUERY_VISIBLE = "view/query_visible"
 PANEL_SIZES = "view/panel_sizes"
 SAVE_BEFORE_RUN = "execution/save_before_run"
 FORMAT_MODE = "format/mode"
@@ -298,6 +301,7 @@ SETTINGS: tuple[Setting, ...] = (
             hint="Тёмное — своя палитра подсветки и своя страница; «системное» — цвета рабочего стола, и виджетов, и подсветки"),
     Setting(TOOLBAR, "Панель инструментов", "Вид", "bool", True),
     Setting(OUTPUT_VISIBLE, "Панель вывода", "Вид", "bool", True),
+    Setting(QUERY_VISIBLE, "Панель ввода цели", "Вид", "bool", True),
     Setting(OUTPUT_POSITION, "Панель вывода", "Вид", "choice",
             DEFAULT_OUTPUT_POSITION,
             choices=(("right", "справа"), ("bottom", "снизу"))),
@@ -953,6 +957,15 @@ class Settings:
     @output_visible.setter
     def output_visible(self, value: bool) -> None:
         self._write(OUTPUT_VISIBLE, bool(value))
+
+    @property
+    def query_visible(self) -> bool:
+        """Whether the goal field is shown at all (part 92)."""
+        return self._flag(QUERY_VISIBLE, True)
+
+    @query_visible.setter
+    def query_visible(self, value: bool) -> None:
+        self._write(QUERY_VISIBLE, bool(value))
 
     @property
     def output_font_size(self) -> float:

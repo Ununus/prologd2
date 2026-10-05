@@ -169,6 +169,10 @@ ACTIONS: tuple[Action, ...] = (
     # right side and the bottom (`split_orientation` keeps the reference's name
     # for the command; the icon hints at the *other* position).
     Action("output", "Панель вывода", "view-output", ("F4",), checkable=True),
+    # The goal field and the console under it.  No key of its own: a run shows the
+    # output panel by itself (part 92), and hiding the goal field is an act in the
+    # menu rather than something that happens while a question is typed.
+    Action("query", "Панель ввода цели", None, checkable=True),
     Action("split", "Разделить редактор", "view-split-editor", ("Ctrl+\\",)),
     Action("merge", "Объединить редакторы", "view-unite-editor", ("Ctrl+Shift+\\",)),
     Action("next_tab", "Следующая вкладка", None, ("Ctrl+Tab",)),
@@ -290,6 +294,7 @@ MENUS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "toolbar",
             SEPARATOR,
             "output",
+            "query",
             SEPARATOR,
             "split",
             "merge",

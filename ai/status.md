@@ -1,7 +1,7 @@
 # Status tracker
 
 Last updated: after the portable-build task (task_61) and the rounds that followed — parts
-77--91: the two emblems on the first page of every document, `technical.typ` checked against
+77--92: the two emblems on the first page of every document, `technical.typ` checked against
 the C++ sources (nine more listings, the grammar brought in line with `parser.cpp`), the
 "привычный/обычный Prolog" wording replaced by ISO Prolog, the whole `ai/` folder translated
 into English, the last `$` taken out of the interpreter (part 81), three built-ins —
@@ -17,7 +17,9 @@ their line on a double-click, with long paths shortened in the output and in the
 list (part 88), the console made to name the place of a runtime error, which it used to
 print as a bare message (part 89), a click on a row of «Проблемы» made to bring the
 tab of that file to the front (part 90), and the GUI given a small refactoring pass —
-one duplicated clearing body out, and the two tables set on one shared base (part 91).
+one duplicated clearing body out, and the two tables set on one shared base (part 91), and the
+goal field given its own switch while a run learned to show the hidden output panel
+(part 92).
 
 ## Overall
 
@@ -3081,3 +3083,49 @@ Added on 2026-10-03 while planning task_59:
   beside its two users, not in a file of its own.
 
   *Verified.*  `test_window.py` «all window checks passed».
+
+* The window, part 92: **the goal field's own switch, and a run that shows the panel**
+  (2026-10-05).  Two requests from the user — and one trap the first of them walked into.
+
+  *The goal field is a panel.*  The goal line and the console under it were two widgets
+  stacked in the editor column; they are now one `QWidget` (`_query_panel`), because the new
+  «Вид → Панель ввода цели» (`view/query_visible`, on by default) hides the two together —
+  an answer box under nothing would be a puzzle.  The entry sits after «Панель вывода» in
+  the menu and in the dialog's «Вид» section, and the panel is remembered the way the output
+  panel is (`isHidden` rather than `isVisible`, so a window that was never shown does not
+  read as hidden).  The console is that panel's second half, so the «Спрашивать ввод» rule
+  grew the obvious third case: with the goal field hidden there is nowhere to put the
+  console, and the question comes as a dialog — the fallback `F4` already had.
+
+  *A run shows the output panel.*  `run_program` — and a goal typed into the line — reveals
+  the output panel when the user had hidden it, because a run has output to show and a
+  hidden panel made the answer look like nothing happened.  The *preference* is not written:
+  `view/output_visible` stays as the user left it, so the next start begins with the panel
+  hidden again — the rule the followed font size already follows (task_58), where a side
+  effect of running writes nothing and only the user's own act does.
+
+  *The trap.*  The first version of the reveal called `_sync_actions`, and the checkable
+  entry's `setChecked(True)` emitted `toggled`, which ran its own handler — the one that
+  *writes* the preference.  The user's «hidden» was overwritten by the act of showing the
+  panel for a run, silently, and the new test caught it («the run wrote the preference»).
+  `_sync_actions` now sets every checkable entry through `_set_checked`, which blocks the
+  signal: the entry follows the state, the preference does not move.  The same trap existed
+  in every `apply_settings` before this — harmless only because the value written back was
+  the one just read.
+
+  *Tests.*  `test_window.py` gained «the goal field hides from the menu, and a run shows the
+  hidden output panel»: the switch and its persistence over a reopen; a run with both panels
+  hidden revealing only the output one and writing no preference; a goal typed into the line
+  doing the same.  Two older checks had hidden the output panel to force a question into a
+  box, which a run no longer allows: «the dialog is the last resort» now presses `F4` *in the
+  middle of* a run — the first question still has its armed console, the second finds the
+  panel gone — and «cancelling input stops the run» hides the *goal field* instead, which is
+  the third reason a question comes as a box and the one a run does not undo.
+
+  *Documentation.*  `doc/gui.typ` (the layout, the goal line, the console's order, the
+  dialog's rows and the menu) and `src/gui/README.md` (the goal field, the console, the
+  settings table).
+
+  *Verified.*  `test_window.py` «all window checks passed»; `test_settings.py`,
+  `test_settingsdialog.py` and `test_shortcuts.py` green; the six documents build with
+  exit 0.
