@@ -167,7 +167,7 @@ src/gui/              PySide6 front-end (drives the CLI over the JSON protocol)
 src/tests/            Catch2 test suite and CLI integration tests
 src/3rdparty/         FetchContent dependencies (gitignored)
 doc/                  Typst documentation (Russian)
-examples/             example PrologD programs
+examples/             example PrologD programs (demo, problems, lessons, lib)
 .github/workflows/    CI (Linux GCC/Clang, Windows MSVC)
 ai/                   plan, task breakdown and notes for the AI agent
 ```
@@ -180,8 +180,10 @@ arithmetic with a hand-written `BigInt`, all documented built-in predicate
 groups (control, types, conversions, strings, I/O, program database, graphics
 stubs), `НАЙТИВСЕ/3`, the module loader (`ИМПОРТ`) and the CLI.
 
-Ported examples live in `examples/` (lessons, typical tasks, the required
-`НАЙТИВСЕ` demo) and are covered by golden tests. The PySide6 front-end in
+Examples live in `examples/` — one demo per predicate of the language surface, the
+problems (`factorial`, the Hanoi tower, `knapsack`), the lessons and the library —
+and are covered by golden tests: a lesson or a demo carries its own expected output
+in `%!` lines, and `src/tests/test_lessons.cpp` compares the two. The PySide6 front-end in
 `src/gui` drives the interpreter through the JSON protocol: tabs, syntax
 highlighting that tells Latin names from Cyrillic ones, completion built from
 the reserved names and the program's own, run/stop with a fresh interpreter per

@@ -80,6 +80,39 @@ const std::vector<std::string>& checkedLessons() {
   return names;
 }
 
+/// Examples beside the lessons whose `%!` lines are checked the same way.  They
+/// are the showcase for the predicates the dialect added on top of the port
+/// (`ПЕРВОЕ`, `СОРТИРОВКА`, `ПОЛНЫЙ`, `ДЛЯВСЕХ`) and the two problems whose output
+/// is the same on every machine; `problems/monk.pld` draws and `problems/monkd.pld`
+/// reads input, so those two are only parsed (see the test below).
+const std::vector<std::string>& checkedExamples() {
+  static const std::vector<std::string> names = {
+      "first_demo.pld",
+      "sort_demo.pld",
+      "ground_demo.pld",
+      "forall_demo.pld",
+      "problems/factorial.pld",
+      "problems/knapsack.pld",
+  };
+  return names;
+}
+
+/// Run one file and compare the whole output with the `%!` lines it carries.
+void checkPromises(const std::string& relative, const std::string& input,
+                   std::vector<std::filesystem::path> include_paths) {
+  const std::string source = readExample(relative);
+  INFO("file: " << relative);
+  REQUIRE(source.find("%!") != std::string::npos);
+  // Lesson files are stored with LF ends; a stray CR would end up in the expected
+  // text and never match what the interpreter prints.
+  REQUIRE(source.find('\r') == std::string::npos);
+  const auto result = runProgramWithIncludes(source, input, std::move(include_paths));
+  INFO("errors: " << result.error);
+  REQUIRE(result.loaded);
+  REQUIRE_FALSE(result.runtimeError);
+  REQUIRE(result.output == expectedOutput(source));
+}
+
 /// Remove query/directive lines so the file can be loaded without running it.
 std::string withoutQueries(const std::string& source) {
   std::istringstream input(source);
@@ -100,9 +133,9 @@ std::string withoutQueries(const std::string& source) {
 
 TEST_CASE("ported example programs parse cleanly") {
   const std::vector<std::string> files = {
-      "factorial.pld",        "file_io.pld",         "drawing.pld",
-      "monk.pld",             "monkd.pld",           "findall_demo.pld",
-      "import_demo.pld",      "lib/library.pld",
+      "problems/factorial.pld", "problems/monk.pld",     "problems/monkd.pld",
+      "file_io.pld",           "drawing.pld",           "findall_demo.pld",
+      "import_demo.pld",       "lib/library.pld",
   };
   for (const std::string& file : files) {
     const auto result = runProgram(withoutQueries(readExample(file)));
@@ -115,24 +148,18 @@ TEST_CASE("ported example programs parse cleanly") {
 
 TEST_CASE("every lesson prints exactly what its comments promise") {
   for (const std::string& name : checkedLessons()) {
-    const std::string source = readExample("lessons/" + name);
-    INFO("lesson: " << name);
-    REQUIRE(source.find("%!") != std::string::npos);
-    // Lesson files are stored with LF ends; a stray CR would end up in the
-    // expected text and never match what the interpreter prints.
-    REQUIRE(source.find('\r') == std::string::npos);
     const std::string stem = name.substr(0, name.rfind('.'));
     // Lesson 11 imports a library, so the check searches the same two places the
     // CLI would reach with `-I examples/lib`: next to the lesson, then the library.
-    const auto result =
-        runProgramWithIncludes(source,
-                               readOptional("lessons/" + stem + ".input.txt"),
-                               {std::string(PROLOGD_TEST_DATA_DIR) + "/lessons",
-                                std::string(PROLOGD_TEST_DATA_DIR) + "/lib"});
-    INFO("errors: " << result.error);
-    REQUIRE(result.loaded);
-    REQUIRE_FALSE(result.runtimeError);
-    REQUIRE(result.output == expectedOutput(source));
+    checkPromises("lessons/" + name, readOptional("lessons/" + stem + ".input.txt"),
+                  {std::string(PROLOGD_TEST_DATA_DIR) + "/lessons",
+                   std::string(PROLOGD_TEST_DATA_DIR) + "/lib"});
+  }
+}
+
+TEST_CASE("the example programs print what their comments promise") {
+  for (const std::string& name : checkedExamples()) {
+    checkPromises(name, {}, {});
   }
 }
 

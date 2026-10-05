@@ -333,6 +333,7 @@ try {
                        'doc\help.pdf', 'doc\builtins.json',
                        'doc\prologd2.png', 'doc\csu.png',
                        'examples\lib\library.pld', 'examples\lessons\lesson_01.pld',
+                       'examples\problems\knapsack.pld',
                        $memoName) {
         if (-not (Test-Path (Join-Path $package $needed))) { Fail "the package is missing $needed" }
     }

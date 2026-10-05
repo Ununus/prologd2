@@ -1134,7 +1134,7 @@ prologd --source examples/findall_demo.pld
 Например:
 
 ```sh
-prologd --format=hard -s examples/monk.pld
+prologd --format=hard -s examples/problems/monk.pld
 prologd --format --format-width 100 -s program.pld > neat.pld
 ```
 

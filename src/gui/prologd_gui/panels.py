@@ -591,7 +591,9 @@ class ElidedLabel(QLabel):
     the *end* of the text, because the end of a place in a file (the file's own
     name, then the line and the column) is the part being read.  Qt's own
     `elidedText(…, ElideMiddle, …)` was measured first and reads badly on a path:
-    at a third of the width it turns `…\\examples\\monk.pld:2:1` into `…\\e…2:1`.
+    at a third of the width the middle of `…\\examples\\problems\\monk.pld:2:1` is
+    all that is left — the file's name and the line are gone, which is exactly the
+    part being read.
     """
 
     def display_text(self) -> str:

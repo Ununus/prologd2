@@ -32,7 +32,7 @@ try:
 except ImportError:  # pragma: no cover - main() reports it
     QApplication = None  # type: ignore[assignment]
 
-EXAMPLE = pathlib.Path(__file__).resolve().parents[3] / "examples" / "factorial.pld"
+EXAMPLE = pathlib.Path(__file__).resolve().parents[3] / "examples" / "problems" / "factorial.pld"
 ANSWER = "Ф=720\n"
 
 #: task_36's files: the lesson whose `?сумма(5, Сумма).` must answer `Сумма=15`
@@ -686,7 +686,10 @@ def test_a_run_uses_the_tab_that_is_showing(executable: str) -> None:
         assert window.tab_count() == 2
         # The same program with a different goal: if the run used the *first*
         # tab, the answer would be 720.
-        program = EXAMPLE.read_text(encoding="utf-8").replace("(6,Ф)", "(5,Ф)")
+        program = EXAMPLE.read_text(encoding="utf-8").replace("(6, Ф)", "(5, Ф)")
+        # The example's second query (20!) is dropped before running: `720` is a
+        # piece of `2432902008176640000`, and the check below looks for it.
+        program = program.replace("?факториал(20, Ф).", "%?факториал(20, Ф).")
         window.editor().setPlainText(program)
         window.run_program()
         assert pump(window, lambda: "Ф=120" in window.output_text()), ascii(window.output_text())

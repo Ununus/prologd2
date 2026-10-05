@@ -1,12 +1,12 @@
 # Status tracker
 
-Last updated: after the portable-build task (task_61) and the documentation rounds that
-followed — parts 77--82: the two emblems on the first page of every document, `technical.typ`
-checked against the C++ sources (nine more listings, the grammar brought in line with
-`parser.cpp`), the "привычный/обычный Prolog" wording replaced by ISO Prolog, the whole
-`ai/` folder translated into English, the last `$` taken out of the interpreter (part 81), and
-three built-ins — `СОРТИРОВКА/2`, `ПОЛНЫЙ/1`, `ДЛЯВСЕХ/2` — added in place of `bagof`/`setof`
-(part 82, ADR-025).
+Last updated: after the portable-build task (task_61) and the rounds that followed — parts
+77--83: the two emblems on the first page of every document, `technical.typ` checked against
+the C++ sources (nine more listings, the grammar brought in line with `parser.cpp`), the
+"привычный/обычный Prolog" wording replaced by ISO Prolog, the whole `ai/` folder translated
+into English, the last `$` taken out of the interpreter (part 81), three built-ins —
+`СОРТИРОВКА/2`, `ПОЛНЫЙ/1`, `ДЛЯВСЕХ/2` — added in place of `bagof`/`setof` (part 82,
+ADR-025), and the examples folder given a map and a `problems/` shelf (part 83).
 
 ## Overall
 
@@ -63,8 +63,12 @@ three built-ins — `СОРТИРОВКА/2`, `ПОЛНЫЙ/1`, `ДЛЯВСЕХ/
   failure that names the directories tried.
 * CLI11 front-end with UTF-8 console setup on Windows and diagnostics in the
   `file:line:column: error: message` form, with severities.
-* Examples ported to the new syntax and covered by golden tests; the course in
-  `examples/lessons` is a program per lesson whose own `%!` lines are its expected output.
+* Examples live in `examples/` and are covered by golden tests: the course in
+  `examples/lessons` is a program per lesson whose own `%!` lines are its expected
+  output, the four demos beside it (`first_demo`, `sort_demo`, `ground_demo`,
+  `forall_demo`) are checked the same way, and the tasks are in `examples/problems`
+  (`factorial`, the Hanoi tower, `knapsack`).  `examples/README.md` is the map of
+  the folder.
 * Windows verification: the library, CLI and test binary cross-compile to valid PE32+
   executables for `x86_64-windows-gnu` (Zig toolchain); the MSVC build and the whole suite
   run locally.
@@ -2677,6 +2681,51 @@ Added on 2026-10-03 while planning task_59:
   `doc/technical.typ` says why `ПОЛНЫЙ` reuses the printer's cycle guard, that `ДЛЯВСЕХ` is a
   nested solve, and that `СОРТИРОВКА` and `БОЛЬШЕ` share one order.  Nothing was renamed and no
   name collided: the course sorts with `вставсорт/2` and `быстрсорт/2`, which are not reserved.
+
+* Examples round, part 83: **the examples folder gets a map and a `problems/` shelf**
+  (2026-10-05).  The user asked to reformat `examples/*`: add examples for the predicates the
+  dialect gained (`ПЕРВОЕ`, `СОРТИРОВКА`, `ПОЛНЫЙ`, `ДЛЯВСЕХ`), and put `factorial`, `monk*` and a
+  new knapsack under `problems/`.
+
+  *What moved and what is new.*  `factorial.pld`, `monk.pld` and `monkd.pld` moved into
+  `examples/problems/` (with `git mv`, so the history follows) and got a header comment saying
+  what the program is and how to run it; `problems/knapsack.pld` is new — subsets by recursion,
+  the best one as «нет более дорогого» (the double negation of lesson 4), and the feasible sets
+  collected with `НАЙТИВСЕ` and printed as a list.  Beside them sit four demos, one per
+  predicate: `first_demo.pld` (the commit, and «если — то — иначе» as a rule), `sort_demo.pld`
+  (the order, the repeats, the check by unification, `НАЙТИВСЕ` + `СОРТИРОВКА` as a set),
+  `ground_demo.pld` (the whole term, the cyclic term, the guard in front of `ДОБ`) and
+  `forall_demo.pld` (no counterexample, and the same thing written with `НЕ`).  Each carries
+  `%!` lines, and `examples/README.md` is the map of the folder.
+
+  *They cannot go stale.*  `test_lessons.cpp` grew a second golden test — `the example programs
+  print what their comments promise` — over a new `checkedExamples()` list (`first_demo`,
+  `sort_demo`, `ground_demo`, `forall_demo`, `problems/factorial`, `problems/knapsack`), with
+  the comparison itself extracted into `checkPromises()` so lessons and examples share one
+  implementation.  `problems/monk.pld` draws and `problems/monkd.pld` reads input, so those two
+  stay in the parse-only list.
+
+  *Three traps, all measured.*  Python's `write_text` made every new file CRLF on Windows, which
+  the lesson checker rejects (a stray `\r` would end up in the expected text) and the formatter
+  then rewrites; and a hand-written program is not in *the standard shape* the formatter
+  produces, so the idempotency sweep failed on the first demo.  The routine for a new example is
+  now: write it, then run `prologd --format -s file` and keep the output — `%!` lines are
+  comments and survive it untouched (verified by comparing them before and after).  The third
+  came from the window suite: `test_a_run_uses_the_tab_that_is_showing` builds its second tab by
+  replacing `(6,Ф)` in the factorial example, and the canonical spelling has a space in
+  `(6, Ф)`; the test now comments the example's `20!` query out as well, because `720` is a
+  piece of `2432902008176640000`.
+
+  *Every reference, once.*  The moved paths were followed through the docs and the tooling:
+  `src/tests/test_lessons.cpp`, `src/gui/tests/test_window.py`, `doc/help.typ`,
+  `doc/prologd-diff.typ`, `doc/lessons.typ`, `doc/gui.typ`, `src/gui/README.md`, `panels.py`,
+  `examples/lessons/README.md`, the root `README.md`, `tools/portable-readme.txt` and the
+  packaged-file check in `tools/build_portable.ps1`.  Older notes in this folder still name the
+  old paths (`task_18_examples_acceptance.md`, parts 40, 41 and 76) — they are the record of
+  what was true then.
+
+  *Verified.*  `ctest` 317/317 (the new golden test is the 317th), the window suite green
+  (`all window checks passed`), and `docs` exit 0.
 
 
 
