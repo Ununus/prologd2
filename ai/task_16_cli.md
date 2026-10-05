@@ -23,7 +23,7 @@ Provide a modern console application that mirrors the original
   * Bare arguments are treated as source files.
   * No arguments and stdin is a TTY → REPL; otherwise read the program from
     stdin.
-- [ ] `$`-prefixed preloaded input lines and `-i` file input.
+- [x] (dropped in part 81) `$`-prefixed preloaded input lines; `-i` file input was kept.
 - [ ] Exit codes: 0 success, 1 usage error, 2 parse error, 3 runtime error
   (document exact mapping in `help.typ`/`README.md`).
 - [ ] UTF-8 setup: on Windows `SetConsoleOutputCP(CP_UTF8)` and

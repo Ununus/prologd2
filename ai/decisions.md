@@ -658,7 +658,7 @@ it compares pictures rather than calls.
 ## ADR-023: An answer is a piece of the input stream
 
 **Context.** Every source of input is supposed to behave the same — a file (`-i`,
-`ЧТЕНИЕ_ИЗ`), stdin, a `$`-line of the source, and the answer a front-end gives
+`ЧТЕНИЕ_ИЗ`), stdin, and the answer a front-end gives
 through `setInputRequestHandler`.  They did not.  The answer was put into the
 interactive buffer whole, so an answer holding a `\n` was *one* line however many
 separators it had: `ВВОДСТР` returned the separators as text, a `ВВОДСИМВ` followed
@@ -682,7 +682,7 @@ a file behaved differently, which is what made the multi-line console a trap.
   line of the base stream, the first line of each file opened by `ЧТЕНИЕ_ИЗ`, and
   the start of each answer are stripped with the same helper the lexer uses on a
   source (`Notepad` writes the mark into a new data file by default).  Anywhere
-  else it is text; `$`-lines need nothing, coming from the lexer.
+  else it is text.  (The `$` lines that also needed nothing were removed in part 81.)
 * The protocol does not change: `input.text` was always free to contain `\n`, and
   the interpreter is now what splits it.
 

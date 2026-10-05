@@ -36,7 +36,8 @@ Core seams (the only changes `prlib` was allowed to take):
 
 - [x] `IoContext::setInputRequestHandler` — interactive reads ask the front-end
       instead of a stream; `InputRequestKind` tells a token from a line from a
-      code point.  Preloaded `$` lines and `ЧТЕНИЕ_ИЗ` redirection keep priority.
+      code point.  `ЧТЕНИЕ_ИЗ` redirection keeps priority (the `$` lines that also
+      had it were removed in part 81).
 - [x] `EngineOptions::externalStop` — polled by the solver next to its own flag,
       so a signal handler only has to set a flag (ADR-013/014).
 - [x] CLI: SIGINT/SIGTERM handler feeding `externalStop`.
@@ -56,8 +57,8 @@ Front-end (`src/gui`):
 - [x] CTest `cli_json_protocol` drives a full session (`load`, `query`,
       `input_request`/`input`, `quit`), a parse failure (exit code 2) and the
       `-o` conflict (exit code 1) through `src/tests/protocol_session.cmake`.
-- [x] Catch2 `test_io_context.cpp`: handler routing, kind reporting, preloaded
-      and redirected precedence, `externalStop` interrupting a runaway query.
+- [x] Catch2 `test_io_context.cpp`: handler routing, kind reporting, redirected
+      precedence, `externalStop` interrupting a runaway query.
 - [x] `python src/gui/tests/protocol_smoke.py`: the Python client against the
       built interpreter.
 

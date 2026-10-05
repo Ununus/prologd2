@@ -114,28 +114,6 @@ TEST_CASE("interactive reads go through the input request handler") {
   REQUIRE(script.kindNames() == "token,line,codepoint,codepoint,");
 }
 
-TEST_CASE("preloaded lines are served before the input request handler") {
-  std::istringstream input;
-  std::ostringstream output;
-  std::ostringstream error;
-  IoContext io(input, output, error);
-
-  ScriptedInput script;
-  script.queue("динамически");
-  io.setInputRequestHandler([&script](InputRequestKind kind) { return script(kind); });
-  io.pushPreloadedLine("заранее");
-
-  const auto preloaded = io.readToken();
-  REQUIRE(preloaded.has_value());
-  REQUIRE(*preloaded == "заранее");
-  REQUIRE(script.calls() == 0);
-
-  const auto dynamic = io.readToken();
-  REQUIRE(dynamic.has_value());
-  REQUIRE(*dynamic == "динамически");
-  REQUIRE(script.calls() == 1);
-}
-
 TEST_CASE("input redirection wins over the input request handler") {
   const TempFile file("из файла\n");
   std::istringstream input;

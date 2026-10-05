@@ -479,7 +479,7 @@ saved file by its path, an unnamed buffer by its title («Без имени 2»,
 the tab) — so a diagnostic in it belongs to that buffer and is marked there;
 `<buffer>` is the protocol's default for a load that named nothing, and the window
 still reads it as «the showing tab».  `<library>` is the interpreter's own
-preloaded text and `<query>` is the one statement of a `query` request (typed in
+library and `<query>` is the one statement of a `query` request (typed in
 the query line or clicked in the margin) — neither has a line in any tab, so they
 are shown in the pane and the caret is left alone.
 Marking line 1 of the program for a failed query is exactly what that rule fixed:
@@ -1113,9 +1113,9 @@ failure (for example an interrupted query).
 
 ### Notes for front-ends
 
-* **A run is a new session.**  The clause database, the `СЛУЧ` seed, the
-  `ЗАПИСЬ_В`/`ЧТЕНИЕ_ИЗ` redirection and the preloaded `$` input lines all live
-  in the interpreter process, so loading a second program into a session that
+* **A run is a new session.**  The clause database, the `СЛУЧ` seed and the
+  `ЗАПИСЬ_В`/`ЧТЕНИЕ_ИЗ` redirection all live in the interpreter process, so
+  loading a second program into a session that
   already ran one *accumulates* clauses and prints every solution twice.  Start a
   fresh process for a run — that is what **Запустить** does — and keep one session
   only for the queries that belong together.  A request written before the

@@ -14,7 +14,7 @@ class Engine;
 
 /// Options controlling term printing.
 struct PrintOptions {
-  /// Called for `$expr` terms to obtain their numeric value.  May be empty, in
+  /// Called for `#expr` terms to obtain their numeric value.  May be empty, in
   /// which case expressions print as `#_?_#`.
   std::function<Term(const Term&)> evaluate;
   /// How deep a nested term may be before the rest is written as `...`.

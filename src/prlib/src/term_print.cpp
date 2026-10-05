@@ -123,7 +123,7 @@ class TermWriter {
     PathGuard guard(path_);
     guard.push(term.compound.get());
     // Arithmetic expression: evaluate when possible.
-    if (term.compound->name == "$expr" && term.compound->args.size() == 1 &&
+    if (term.compound->name == kExpressionFunctor && term.compound->args.size() == 1 &&
         options_.evaluate) {
       try {
         const Term value = options_.evaluate(term);

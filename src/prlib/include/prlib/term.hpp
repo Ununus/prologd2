@@ -74,6 +74,11 @@ struct Term {
 inline constexpr std::string_view kListFunctor = ".";
 inline constexpr std::string_view kNilAtom = "[]";
 
+/// Reserved functor of the wrapper the parser builds around a `#...#`
+/// arithmetic expression.  It starts with `#`, so no identifier can spell it:
+/// a user program cannot forge a wrapper by accident.
+inline constexpr std::string_view kExpressionFunctor = "#expr";
+
 Term makeVar(VarId id, std::string_view name = {});
 Term makeAtom(std::string_view name);
 Term makeInt(BigInt value);

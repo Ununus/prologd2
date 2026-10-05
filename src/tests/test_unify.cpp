@@ -76,7 +76,7 @@ TEST_CASE("list unification binds head and tail") {
 TEST_CASE("arithmetic expressions evaluate during unification") {
   Engine engine;
   const Term expression =
-      makeCompound("$expr", {makeCompound("+", {makeInt(1), makeInt(2)})});
+      makeCompound(kExpressionFunctor, {makeCompound("+", {makeInt(1), makeInt(2)})});
   REQUIRE(engine.unify(expression, makeInt(3)));
   REQUIRE_FALSE(engine.unify(expression, makeInt(4)));
 }

@@ -14,7 +14,7 @@ tab), task_29 (the «Спрашивать ввод» switch), task_11 (the readi
 Make every source of input obey **one rule**, so that a program written against a file
 behaves the same in the window:
 
-* a file (`-i`, `ЧТЕНИЕ_ИЗ`), stdin, a `$`-line and a front-end answer are all *pieces of
+* a file (`-i`, `ЧТЕНИЕ_ИЗ`), stdin and a front-end answer are all *pieces of
   one input stream*;
 * a *line* is what lies between two `\n`, and the end of a piece ends its last line —
   exactly like the end of a file;
@@ -32,7 +32,7 @@ tests:
 | `-i` file, LF, with an empty line and a leading space | one line per read, `\r`/`\n` dropped, an empty line is an empty string, the last line without a terminator is read, EOF is a failure |
 | `-i` file, CRLF | `len=4 codes=[99,114,108,102]` — no `13` |
 | `ВВОДСИМВ` + `ВВОДСТР` on `name rest of it` (file) | `name` and ` rest of it` — the remainder of the same line, the leading space kept |
-| `$`-lines, `ЧТЕНИЕ_ИЗ`, stdin | the same rule |
+| `ЧТЕНИЕ_ИЗ`, stdin | the same rule |
 | **file with a BOM** (Notepad's default) | `codes=[65279,98,111,109,…]` — the BOM is *not* stripped and becomes the first character of the first line |
 | **window** (console answers, a multi-line field) | `ВВОДСТР` returns the whole answer *with* the `\n`s; `ВВОДСИМВ` then `ВВОДСТР` gives a remainder that starts with `\n`; `ВВКОД` sees code `10` between the lines |
 
@@ -43,7 +43,7 @@ answer is a one-line chunk anyway.
 ## The rule of a chunk (the whole implementation, in three lines)
 
 ```
-fetchLine:  preloaded line → file (if ЧТЕНИЕ_ИЗ redirected) → pending chunk → base stream
+fetchLine:  file (if ЧТЕНИЕ_ИЗ redirected) → pending chunk → base stream
 pending_:   take up to '\n' (dropping a '\r' before it); no '\n' → the whole rest,
             because the end of the chunk ends its last line; then ask the front-end for
             another chunk only when pending_ is empty
@@ -73,7 +73,7 @@ The consequences, all of them wanted:
   helper the lexer, the formatter and the module loader use) at the *start* of a stream: the
   first line of the base stream, the first line of each file opened by `ЧТЕНИЕ_ИЗ`, and the
   start of every chunk (an answer is a stream of its own).  A `U+FEFF` anywhere else stays
-  data.  `$`-lines need nothing: they come from the lexer, which already strips the mark.
+  data.
 * `src/cli/protocol.cpp`: a comment only — `answerInputRequest` hands over the reply's
   `text` as a chunk (the JSON string already carries `\n`, nothing to parse or split).
 * `src/gui/prologd_gui/panels.py`: the hint of the multi-line console says what the field
@@ -132,8 +132,7 @@ The consequences, all of them wanted:
 4. **The BOM is stripped at the start of a stream.**  The same `stripByteOrderMark` in three
    places: the first line of the base stream, the first line of each `ЧТЕНИЕ_ИЗ` file, and
    the start of every chunk; the flags are `base_stream_started_`/`file_stream_started_`,
-   the second reset in `openInput`.  `$`-lines were not touched: the lexer already cleans
-   them.
+   the second reset in `openInput`.
 5. **The shell still splits its own chunk.**  The queue is the «Ввод» tab, and it is split
    for the sake of `>` and «осталось строк — N»: that is bookkeeping, not reading.
 6. **The multi-line console field stays multi-line** (decided 2026-10-02): under this rule
@@ -163,11 +162,12 @@ The consequences, all of them wanted:
 
 ## What must not change
 
-* Files, stdin and `$`-lines: exactly as verified above (the same code path,
+* Files and stdin: exactly as verified above (the same code path,
   `std::getline`).
-* "`ЧТЕНИЕ_ИЗ` wins over the front-end", and `$`-lines are consumed first — the order in
+* "`ЧТЕНИЕ_ИЗ` wins over the front-end" — the order in
   `fetchLine` stays as it is; a pending chunk simply waits while a file is redirected and is
-  read again when the input returns to the base stream.
+  read again when the input returns to the base stream.  (The `$` lines that used to be read
+  before the file were removed in part 81, so `fetchLine` now starts with the file.)
 * The window's queue: split by `\n`, blank lines dropped, `>` echo per answer, «осталось
   строк — N».  The split stays because the counter and the echo need it.
 * The protocol: no new field, no new event — the answer's `text` is simply read as a chunk.

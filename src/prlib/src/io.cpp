@@ -33,8 +33,6 @@ void IoContext::newline() {
   }
 }
 
-void IoContext::pushPreloadedLine(std::string line) { preloaded_.push_back(std::move(line)); }
-
 void IoContext::setInputRequestHandler(InputRequestHandler handler) {
   input_handler_ = std::move(handler);
 }
@@ -57,11 +55,6 @@ void IoContext::writeTrace(std::string_view text) {
 }
 
 bool IoContext::fetchLine(std::string& line, InputRequestKind kind) {
-  if (!preloaded_.empty()) {
-    line = std::move(preloaded_.front());
-    preloaded_.pop_front();
-    return true;
-  }
   if (input_from_file_) {
     if (!std::getline(file_input_, line)) {
       return false;

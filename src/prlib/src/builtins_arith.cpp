@@ -29,7 +29,7 @@ std::mt19937_64& randomEngine() {
 
 bool isExpressionWrapper(const Term& term) {
   return term.kind == TermKind::Compound && term.compound != nullptr &&
-         term.compound->name == "$expr" && term.compound->args.size() == 1;
+         term.compound->name == kExpressionFunctor && term.compound->args.size() == 1;
 }
 
 int compareValues(const ArithValue& left, const ArithValue& right) {

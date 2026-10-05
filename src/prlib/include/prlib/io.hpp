@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstddef>
-#include <deque>
 #include <fstream>
 #include <functional>
 #include <istream>
@@ -45,14 +44,11 @@ class IoContext {
   /// One Unicode code point.
   std::optional<CodePoint> readCodePoint();
 
-  /// Preloaded input lines (the historical `$...` source feature).
-  void pushPreloadedLine(std::string line);
-
   /// Route interactive reads through `handler` instead of the base input
   /// stream.  A GUI uses it to pop up an input dialog; the JSON protocol uses
   /// it to emit an `input_request` event and wait for the reply.  Redirection
-  /// set up by `ЧТЕНИЕ_ИЗ` still wins, and preloaded lines are consumed first.
-  /// Pass an empty function to read the base stream again.
+  /// set up by `ЧТЕНИЕ_ИЗ` still wins.  Pass an empty function to read the
+  /// base stream again.
   ///
   /// An answer is a *piece of the input stream*, not a line: a `\n` inside it
   /// separates lines and its end ends its last line, exactly as the end of a
@@ -122,7 +118,6 @@ class IoContext {
   std::string input_name_;
   std::string output_name_;
 
-  std::deque<std::string> preloaded_;
   std::string current_line_;
   std::size_t current_pos_ = 0;
   bool has_current_line_ = false;

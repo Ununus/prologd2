@@ -1400,8 +1400,8 @@ class MainWindow(QMainWindow):
         """Runs the current buffer in a fresh interpreter.
 
         A run starts from a clean slate: a fresh interpreter (no clauses, RNG
-        seed, redirected files or preloaded input left from the previous run)
-        and an empty output pane.  Reusing the session accumulates clauses —
+        seed or redirected files left from the previous run) and an empty
+        output pane.  Reusing the session accumulates clauses —
         with a duplicated `факториал/2` the factorial example returns 64
         solutions instead of one, which looks like a loop — so `start()` stops
         a live process first.
@@ -3524,9 +3524,9 @@ class MainWindow(QMainWindow):
             return self.current_buffer()
         if name.startswith("<"):
             # `<query>` — the one statement of a `query` request (the query line
-            # or a margin marker); `<library>` — the interpreter's own preloaded
-            # text.  Neither has a line in any tab: marking the current one would
-            # say the program broke where it did not.
+            # or a margin marker); `<library>` — the interpreter's own library.
+            # Neither has a line in any tab: marking the current one would say
+            # the program broke where it did not.
             return None
         # An unnamed buffer is named by its tab title («Без имени 2»): the text is
         # the window's own, and its lines are that buffer's lines.

@@ -161,8 +161,9 @@ for the reversible cases.
 | `ЖДИ(N)` | Sleep `N` ms; always true. |
 
 Input semantics: if an input file is open, whitespace-separated tokens are
-consumed; otherwise the interactive reader is used. In the CLI a line starting
-with `$` in the source preloads one input line (test harness feature).
+consumed; otherwise the interactive reader is used. In the original CLI a line
+starting with `$` in the source preloads one input line (test harness feature) —
+the port had it too and dropped it in part 81, at the user's request.
 
 ### Strings
 

@@ -109,7 +109,7 @@ struct ChoicePoint {
 
 bool isExpression(const Term& term) {
   return term.kind == TermKind::Compound && term.compound != nullptr &&
-         term.compound->name == "$expr" && term.compound->args.size() == 1;
+         term.compound->name == kExpressionFunctor && term.compound->args.size() == 1;
 }
 
 /// Releases a chain of environments without recursing through it.

@@ -37,7 +37,7 @@ std::optional<ArithValue> asNumeric(Engine& engine, const Term& term) {
     case TermKind::Float:
       return ArithValue::ofFloat(resolved.real);
     case TermKind::Compound:
-      if (resolved.compound != nullptr && resolved.compound->name == "$expr" &&
+      if (resolved.compound != nullptr && resolved.compound->name == kExpressionFunctor &&
           resolved.compound->args.size() == 1) {
         return engine.evaluateArithmetic(resolved);
       }

@@ -1,10 +1,10 @@
 # Status tracker
 
 Last updated: after the portable-build task (task_61) and the documentation rounds that
-followed — parts 77--80: the two emblems on the first page of every document, `technical.typ`
+followed — parts 77--81: the two emblems on the first page of every document, `technical.typ`
 checked against the C++ sources (nine more listings, the grammar brought in line with
-`parser.cpp`), the "привычный/обычный Prolog" wording replaced by ISO Prolog, and the whole
-`ai/` folder translated into English.
+`parser.cpp`), the "привычный/обычный Prolog" wording replaced by ISO Prolog, the whole
+`ai/` folder translated into English, and the last `$` taken out of the interpreter (part 81).
 
 ## Overall
 
@@ -15,8 +15,8 @@ checked against the C++ sources (nine more listings, the grammar brought in line
   left on the board is `task_46`'s named profiles.
 * Build: the `windows-msvc` preset (Visual Studio 18 2026, MSVC 19.51) is green locally,
   tests included; the Linux presets, including `-Werror`, build cleanly.
-* Tests: 307/307 in about five seconds — 290 Catch2 cases plus 17 command-line and
-  integration tests.  The window has its own 22 offscreen scripts plus `protocol_smoke.py`;
+* Tests: 306/306 in about five seconds — 289 Catch2 cases plus 17 command-line and
+  integration tests.  The window has its own 23 offscreen scripts plus `protocol_smoke.py`;
   they need PySide6, so CI runs the C++ suite only.
 * Interpreter surface: `-s/--source` (repeatable), positional files, stdin, `-i`/`-o`/`-e`,
   `-q`, `-t`, `-I`, `--no-warnings`, `--max-depth`/`--max-steps`/`--max-findall`,
@@ -49,8 +49,8 @@ checked against the C++ sources (nine more listings, the grammar brought in line
   `СЛУЧ`, `ЦЕЛВЕЩ`, `СТРЦЕЛ`, `СТРВЕЩ`, `СТРСПИС`.
 * Strings (code-point based): `БУКВА`, `ЦИФРА`, `СЦЕП`, `КОПИЯ`, `ДЛИНА` and the rest.
 * I/O: `ВЫВОД`, `ВЫВОДПС`, `ВВКОД`, `ВВОДЦЕЛ`, `ВВОДВЕЩ`, `ВВОДСИМВ`, `ВВОДСТР`,
-  `ЧТЕНИЕ_ИЗ`, `ЗАПИСЬ_В`, preloaded `$...` input lines; the front-end's answer is a
-  piece of the input stream (ADR-023).
+  `ЧТЕНИЕ_ИЗ`, `ЗАПИСЬ_В`; the front-end's answer is a piece of the input stream
+  (ADR-023).
 * Program database: `СКОЛЬКО`, `ПРЕДЛ`, `ТЕРМ`, `ДОБ`, `УДАЛЕНИЕ`.
 * Graphics over `GraphicsBackend` (a null one, a recording one, and the window's bitmap).
 * `НАЙТИВСЕ/3` reproduces the required examples.
@@ -2586,6 +2586,46 @@ Added on 2026-10-03 while planning task_59:
   *Left for later:* the journal keeps its Russian *quotations* where they are evidence (what
   `help.typ` used to say, what a message printed), which is the one place the rule allows
   them.
+
+* Language round, part 81: **the last `$` leaves the interpreter** (2026-10-05).  One request —
+  remove `$` from the interpreter completely, it is an artefact of the old implementation and
+  there is no reason to support it — and now nothing in the tree spells `$`: neither the
+  `$`-lines of a source nor the internal `$expr` functor.
+
+  *What the `$` lines were.*  The feature came straight from the original CLI, where
+  `prologdc.cpp` had `constexpr char input_signal_char = '$'`: a source line beginning with `$`
+  was taken out of the text before the lexer saw it (`ModuleLoader::extractInputLines`) and
+  pushed into `IoContext` as a *preloaded input line*, which `fetchLine` served before the
+  `ЧТЕНИЕ_ИЗ` file, the front-end and the base stream.  A test-harness convenience, kept in the
+  port and written into `help.typ` (§6.8 and the CLI section), `technical.typ` (§8 and §9),
+  `gui.typ` (the fresh-run sentence), the root `README.md` and the window's notes.  All of it is
+  gone: `pushPreloadedLine`, the `preloaded_` deque, the branch in `fetchLine`,
+  `extractInputLines` and both of its call sites — `loadFile` and `loadSource`, which had the
+  same feature on stdin.  A line that begins with `$` now behaves like any other forbidden sign:
+  `файл:2:1: error: недопустимый символ`, exit code 2 (checked by hand on the built exe).
+  Reading has three sources left, in this order: the `ЧТЕНИЕ_ИЗ` file, the front-end's answer,
+  the base stream (`-i` or stdin).
+
+  *The internal `$expr`.*  The parser wrapped every `#...#` in a compound named `$expr`, and
+  five places compared that literal — the parser, the engine, `asNumeric`, the arithmetic checks
+  and the printer.  It is now `kExpressionFunctor = "#expr"`, defined once in `term.hpp` beside
+  `kListFunctor` and `kNilAtom`, so the five copies of the string became one name.  It is still
+  unforgeable by an identifier (`#` cannot start one), and the printer still evaluates a wrapper
+  or writes `#_?_#`.
+
+  *What else moved with it.*  `test_io_context.cpp` lost its `preloaded lines are served before
+  the input request handler` case — the one test that pinned the feature — so the Catch2 count is
+  289 (was 290) and `ctest` is **306/306** in about six seconds.  Statements in the notes were
+  put right where they described *current* behaviour (`task_54`'s table, pseudo-code, Decisions 4
+  and "What must not change"; ADR-023's context and BOM bullet; `task_21`, `task_28`,
+  `reference_notes.md`), and the two check-list items that had asked for the feature (`task_11`,
+  `task_16`) are marked *(dropped in part 81)*.  The `$` in the character-code table of
+  `help.typ` stays: it is code 36 of a character, not the feature.  The journal's own history
+  (part 76 and the `$` lines it mentions) stays too — that is what a record is for.
+
+  *Verified.*  Release build clean; `ctest` 306/306 (5.8 s); `docs` exit 0 with the five PDFs
+  rebuilt; and by hand — a `$` line is an error, while `?X = #1 + 1#, ВЫВОД(X).` still answers
+  `X=2`.
 
 
 

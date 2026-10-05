@@ -122,28 +122,6 @@ std::optional<std::filesystem::path> ModuleLoader::resolve(
   return std::nullopt;
 }
 
-void ModuleLoader::extractInputLines(std::string& text) const {
-  std::string cleaned;
-  cleaned.reserve(text.size());
-  std::size_t start = 0;
-  while (start <= text.size()) {
-    const std::size_t end = text.find('\n', start);
-    const std::size_t length = (end == std::string::npos ? text.size() : end) - start;
-    const std::string_view line(text.data() + start, length);
-    if (!line.empty() && line.front() == '$') {
-      engine_.io().pushPreloadedLine(std::string(line.substr(1)));
-    } else {
-      cleaned.append(line);
-      cleaned.push_back('\n');
-    }
-    if (end == std::string::npos) {
-      break;
-    }
-    start = end + 1;
-  }
-  text = std::move(cleaned);
-}
-
 bool ModuleLoader::loadFile(const std::filesystem::path& path, std::string* error) {
   std::error_code code;
   const auto canonical = std::filesystem::weakly_canonical(path, code);
@@ -178,10 +156,8 @@ bool ModuleLoader::loadFile(const std::filesystem::path& path, std::string* erro
   if (!text) {
     return false;
   }
-  std::string source = *text;
-  extractInputLines(source);
   const auto file_path = code ? path : canonical;
-  ParsedProgram program = engine_.parseSource(source, key);
+  ParsedProgram program = engine_.parseSource(*text, key);
   if (!program.ok) {
     if (error != nullptr) {
       *error = "Ошибка при разборе файла: " + key;
@@ -206,9 +182,7 @@ bool ModuleLoader::loadFile(const std::filesystem::path& path, std::string* erro
 
 bool ModuleLoader::loadSource(std::string_view source, const std::string& virtual_name,
                               std::string* error) {
-  std::string text(source);
-  extractInputLines(text);
-  ParsedProgram program = engine_.parseSource(text, virtual_name);
+  ParsedProgram program = engine_.parseSource(source, virtual_name);
   if (!program.ok) {
     if (error != nullptr) {
       *error = "Ошибка при разборе: " + virtual_name;

@@ -44,8 +44,8 @@ Run
 - [x] **Запуск с трассировкой**: the same with the trace enabled, so the
       reference-style trace text appears in the pane (grey).
 - [x] Restart policy: **every run starts a fresh interpreter process** and clears
-      the output pane.  The clause database, the RNG seed, file redirection and
-      the preloaded input lines all live in the process, so a reused session
+      the output pane.  The clause database, the RNG seed and file redirection all live in
+      the process, so a reused session
       accumulates clauses and prints every solution twice — found by hand in the
       skeleton, where a second **Запустить** doubled the output.  A tab switch, a
       run after a stop and a crashed child also start fresh; one session is kept

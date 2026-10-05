@@ -26,9 +26,10 @@ input/output deterministically.
   * `ЧТЕНИЕ_ИЗ/1`, `ЗАПИСЬ_В/1` (open/close/query current file; `""`/`con:` =
     console; append `.pld` when the name has no extension, as documented).
   * `ТИХО` interaction with solution printing.
-- [ ] `$`-prefixed preloaded input lines: parse them out of the source before
-  interpretation (test harness feature from the original CLI); support also
-  `-i FILE`.
+- [x] (dropped in part 81) `$`-prefixed preloaded input lines were parsed out of the
+  source before interpretation (test harness feature from the original CLI); `-i FILE`
+  stays on its own.  The `$` lines were removed at the user's request: an artefact of the
+  first implementation, with no reason to keep it.
 
 ## Design notes
 
@@ -49,7 +50,7 @@ input/output deterministically.
 - [ ] `test_builtins_io.cpp` using `StringIo`:
       * `ВЫВОД` of int/float/atom/string/list/compound, no trailing newline;
       * `ПС` newline; `ВВКОД` write/read;
-      * `ВВОДЦЕЛ`/`ВВОДВЕЩ`/`ВВОДСИМВ`/`ВВОДСТР` with preloaded input and with a
+      * `ВВОДЦЕЛ`/`ВВОДВЕЩ`/`ВВОДСИМВ`/`ВВОДСТР` with a prefilled stream and with a
         temp file;
       * `ЗАПИСЬ_В`/`ЧТЕНИЕ_ИЗ` round-trip through a temp file;
       * error cases from the original `prologd_test/test.txt` (`Input Int Error`,

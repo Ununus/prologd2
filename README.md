@@ -140,8 +140,7 @@ prologd examples/findall_demo.pld
 prologd --source examples/findall_demo.pld
 ```
 
-Lines starting with `$` in a source file are preloaded as program input (the
-historical test-harness feature). Diagnostics use the usual compiler format:
+Diagnostics use the usual compiler format:
 `file:line:column: error: message`.
 
 Exit codes: `0` success, `1` usage error, `2` a source file could not be loaded

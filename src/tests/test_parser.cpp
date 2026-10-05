@@ -289,10 +289,10 @@ TEST_CASE("the comparison signs are sugar over the built-ins") {
     REQUIRE(body.size() == 4);
     REQUIRE(body[0].compound->args[0].compound->name == "РАВНО");
     REQUIRE(body[1].compound->args[0].compound->args[0].compound->name == "РАВНО");
-    // `r(#1 + 1# = 2)`: the argument is `РАВНО($expr(1 + 1), 2)`.
+    // `r(#1 + 1# = 2)`: the argument is `РАВНО(#expr(1 + 1), 2)`.
     const Term& argument = body[2].compound->args[0];
     REQUIRE(argument.compound->name == "РАВНО");
-    REQUIRE(argument.compound->args[0].compound->name == "$expr");
+    REQUIRE(argument.compound->args[0].compound->name == kExpressionFunctor);
     REQUIRE(body[3].compound->name == "ВЫП");
   }
   SECTION("`,` and `;` still bind looser") {
@@ -332,7 +332,7 @@ TEST_CASE("parser builds lists and arithmetic expressions") {
   REQUIRE(isListCell(head.compound->args[0]));
   const Term& expression = head.compound->args[1];
   REQUIRE(expression.kind == TermKind::Compound);
-  REQUIRE(expression.compound->name == "$expr");
+  REQUIRE(expression.compound->name == kExpressionFunctor);
 }
 
 TEST_CASE("parser records imports") {

@@ -135,8 +135,8 @@ class PrologSession(QObject):
         """Starts a *fresh* interpreter.
 
         This is how a front-end gets a clean slate: the clause database, the
-        `СЛУЧ` seed, `ЗАПИСЬ_В`/`ЧТЕНИЕ_ИЗ` redirection and the preloaded `$`
-        input lines all live in the process.  Loading a second program into a
+        `СЛУЧ` seed and the `ЗАПИСЬ_В`/`ЧТЕНИЕ_ИЗ` redirection all live in the
+        process.  Loading a second program into a
         session that already ran one accumulates the clauses and duplicates every
         solution, so a run starts a new process.
 

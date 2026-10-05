@@ -64,8 +64,6 @@ class ModuleLoader {
   bool withinRoot(const std::filesystem::path& candidate) const;
   static std::optional<std::string> readFileText(const std::filesystem::path& path,
                                                  std::string* error);
-  /// Remove the historical `$...` preloaded input lines from source text.
-  void extractInputLines(std::string& text) const;
 
   /// Warn once per predicate whose clauses came from two files that do not
   /// import one another: `ИМПОРТ` merges everything into one database, so two

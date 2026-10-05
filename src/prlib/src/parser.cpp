@@ -6,7 +6,6 @@
 namespace prologd {
 
 namespace {
-constexpr std::string_view kExpressionWrapper = "$expr";
 /// The import directive has two spellings: the Russian name the original
 /// dialect used, and its English alias (task_39).
 constexpr std::string_view kImportNames[] = {"ИМПОРТ", "import"};
@@ -521,7 +520,7 @@ Term Parser::parseArithmetic() {
     report(ErrorCode::InvalidArithmeticExpression, hash.location,
            "Не закрыто арифметическое выражение");
   }
-  return makeCompound(kExpressionWrapper, {std::move(expression)});
+  return makeCompound(kExpressionFunctor, {std::move(expression)});
 }
 
 Term Parser::parseAdditive() {
