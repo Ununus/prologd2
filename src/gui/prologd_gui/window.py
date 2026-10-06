@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pathlib
 
-from PySide6.QtCore import QElapsedTimer, QSize, Qt, QTimer, QUrl
+from PySide6.QtCore import QElapsedTimer, QPoint, QSize, Qt, QTimer, QUrl
 from PySide6.QtGui import (
     QAction,
     QActionGroup,
@@ -514,6 +514,14 @@ class MainWindow(QMainWindow):
         self._panel_tabs.addTab(self._input_tab, "Ввод")
         self._panel_tabs.addTab(self._table, "Таблица")
         self._refresh_panel_tabs()
+        # A right click on this bar offers «Очистить вывод» on the «Вывод» tab
+        # (task_71), the way the tab bar of an editor pane offers its own command.
+        self._panel_tabs.tabBar().setContextMenuPolicy(
+            Qt.ContextMenuPolicy.CustomContextMenu
+        )
+        self._panel_tabs.tabBar().customContextMenuRequested.connect(
+            self._on_panel_tab_context
+        )
 
         # One splitter, two orientations: side by side when the panel is on the
         # right, stacked when it is at the bottom.  The order (editor first) is the
@@ -1974,6 +1982,35 @@ class MainWindow(QMainWindow):
         self._session.run_query(text, variable_mode=self._variable_mode())
         self._sync_run_actions()
         self._update_details()
+
+    def _on_panel_tab_context(self, point: QPoint) -> None:
+        """Shows the panel's tab menu — nothing where there is no command (task_71)."""
+        index = self._panel_tabs.tabBar().tabAt(point)
+        if index < 0:
+            return
+        menu = self._prepare_panel_tab_menu(index)
+        if menu is None:
+            return
+        menu.exec(self._panel_tabs.tabBar().mapToGlobal(point))
+
+    def _prepare_panel_tab_menu(self, index: int) -> QMenu | None:
+        """The menu of the output panel's tab bar, or `None` — showing it is the caller's.
+
+        The titles of these tabs carry a counter (`Вывод:5`), so a tab is told apart
+        by the pane it shows and not by its text.  The entries are the shared
+        `QAction`s of the action table, the same objects the menu bar hands out, so
+        «Очистить вывод» here and `Ctrl+L` elsewhere are one command.  The tab is
+        not made current the way the editor's menu does it: that command acts on the
+        Вывод pane whether or not it is in front, and switching tabs under a right
+        click would move the reader for nothing.  Built in a method of its own so a
+        headless test can look at the menu without opening it.
+        """
+        if self._panel_tabs.widget(index) is not self._output:
+            return None
+        menu = QMenu(self)
+        for key in actions.PANEL_TAB_CONTEXT:
+            menu.addAction(self._actions[key])
+        return menu
 
     def _on_tab_context_requested(self, pane: Pane, index: int, point) -> None:
         """Shows a tab's context menu (task_68)."""

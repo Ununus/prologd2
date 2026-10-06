@@ -4277,6 +4277,38 @@ def test_the_tab_menu_shows_the_clicked_file(executable: str, directory: pathlib
         discard_changes(window)
 
 
+def test_the_output_tab_offers_clear(executable: str) -> None:
+    """A right click on the «Вывод» tab offers «Очистить», and there alone (task_71).
+
+    The titles of the panel's tabs carry a counter (`Вывод:5`), so the menu is built
+    for the pane the tab shows and not for its text.  The entry is the shared
+    `QAction` of the action table — the same one `Ctrl+L` reaches — and the other
+    tabs have no command of their own, where a menu with nothing in it would be a
+    puzzle.
+    """
+    window = empty_window(executable)
+    try:
+        tabs = window.panel_tabs()
+        output = tabs.indexOf(window._output)
+        assert output >= 0, "the panel carries the Вывод tab"
+        window._append_output("строка вывода\n")
+        assert window.output_text(), "there is something to clear"
+
+        menu = window._prepare_panel_tab_menu(output)
+        assert menu is not None
+        assert [entry.text() for entry in menu.actions()] == ["Очистить вывод"]
+        menu.actions()[0].trigger()
+        assert window.output_text() == "", "the entry clears the pane"
+
+        elsewhere = [index for index in range(tabs.count()) if index != output]
+        assert window._prepare_panel_tab_menu(elsewhere[0]) is None, (
+            "only the Вывод tab has a menu of its own"
+        )
+        print("ok: the output tab's menu clears the pane")
+    finally:
+        discard_changes(window)
+
+
 def test_f12_opens_the_file_of_an_import_directive(executable: str, directory: pathlib.Path) -> None:
     """`F12` on an `ИМПОРТ` line opens the file it names, in a tab (task_69).
 
@@ -4446,6 +4478,7 @@ def main(argv: list[str]) -> int:
         test_the_first_line_sets_the_naming_mode_of_the_highlighting(executable)
         test_a_question_of_a_mode_one_file_keeps_its_names(executable)
         test_the_tab_menu_shows_the_clicked_file(executable, files)
+        test_the_output_tab_offers_clear(executable)
         test_f12_opens_the_file_of_an_import_directive(executable, files)
     print("all window checks passed")
     del application

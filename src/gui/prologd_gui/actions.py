@@ -143,9 +143,10 @@ ACTIONS: tuple[Action, ...] = (
     Action("select_all", "Выделить всё", "select-all", ("Ctrl+A",)),
     Action("comment", "Закомментировать", "edit-comment", ("Ctrl+K",)),
     Action("uncomment", "Раскомментировать", "edit-uncomment", ("Ctrl+U",)),
-    # Text-only by decision (task_58): the `edit-clear` picture was drawn and
-    # thrown away — it read as something other than «clear the output».
-    Action("clear_output", "Очистить вывод", None, ("Ctrl+L",)),
+    # The picture is `execution-clear` (task_71): the first try, `edit-clear`, was
+    # drawn and thrown away in task_58 — it read as something other than «clear the
+    # output» — so the command went word-only until a glyph of its own arrived.
+    Action("clear_output", "Очистить вывод", "execution-clear", ("Ctrl+L",)),
     Action("format", "Форматировать", "edit-format", ("Ctrl+I",)),
     # «Настройки…» was the last disabled entry that named a task file (task_29).
     # No key of its own: the menu is where it is looked for, and every `Ctrl`
@@ -380,6 +381,12 @@ TOOLBAR: tuple[str, ...] = (
 #: file, and showing it where it lives is what a right click on a tab most often
 #: wants.
 TAB_CONTEXT: tuple[str, ...] = ("reveal",)
+
+#: The context menu of the panel's own tab bar (task_71).  Only the «Вывод» tab has
+#: a command of its own: the other tabs show what the interpreter said, and there is
+#: nothing to do *to* them, so a right click elsewhere in that bar offers no menu at
+#: all — an empty one would be a puzzle.
+PANEL_TAB_CONTEXT: tuple[str, ...] = ("clear_output",)
 
 #: The editor's context menu, built from the same actions.
 CONTEXT: tuple[str, ...] = (

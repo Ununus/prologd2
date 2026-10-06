@@ -168,6 +168,7 @@ entries of the session log below and in `ai/task_*.md`.
 | task_68_tab_context_menu | done | a right click on a tab shows a menu built from `actions.TAB_CONTEXT` — «Показать в проводнике» (`explorer /select,<path>` and its two cousins), with the picture of «Открыть…» and the keys `Ctrl+E`; the pointed-at tab is made current first, the entry follows the buffer's path, and the command goes through a replaceable seam |
 | task_69_open_import | done | `F12` opens the file an `ИМПОРТ` directive names, in a tab: `paths.resolve_import` repeats the interpreter's search order (the importing file's folder, the `-I` folders, `stdlib`), the menu entry is enabled only while the caret sits on such a line, and `tokens.literal_text` unwraps the quoted name the editor's tokenizer hands over |
 | task_70_variable_mode_row | done | the window's «Имена переменных» row lost «по первой строке файла» — it said exactly what «как в ISO» said (the marker beats the row in the engine *and* in the window, and mode 0 never travels on the wire); three items now with ISO as the default, and a settings file still holding the old `auto` reads as `0` |
+| task_71_output_tab_menu | done | a right click on the output panel's «Вывод» tab offers «Очистить вывод» — the shared `clear_output` `QAction` of the action table (the one `Ctrl+L` reaches), offered on that tab alone and without switching tabs, because the command acts on the pane and not on the tab in front (the titles carry a counter, so the tab is told apart by the pane it shows) |
 
 ## Test suite
 
@@ -3527,3 +3528,24 @@ Added on 2026-10-03 while planning task_59:
 `test_variable_modes.py` (правило окна против интерпретатора), `test_window.py`
 (кейс маркера дополнен проверкой умолчания строки) — зелёные; `typst compile
 doc/gui.typ` без замечаний.
+
+### 102. Меню вкладки «Вывод» (2026-10-06)
+
+Учитель попросил контекстное меню над вкладкой «Вывод» с пунктом «очистить».
+Панель вывода — свой `QTabWidget` (Проблемы, Вывод, Система, Ввод, Таблица), а не
+`Pane` редактора, поэтому своей полосы вкладок у неё не было; теперь у неё те же две
+строки настройки контекстного меню, а само меню собирает `_prepare_panel_tab_menu`.
+
+Пункт — тот же `QAction` «Очистить вывод» из общей таблицы, что в меню «Выполнение» и
+на `Ctrl+L`: команда не может существовать дважды, и новый кейс проверяет именно это.
+Вкладку узнают по панели, которую она показывает: заголовки здесь со счётчиком
+(`Вывод:5`), поэтому сравнение по надписи развалилось бы при первом же прогоне
+программы.  Вкладку не переключают, в отличие от меню вкладки редактора: «Очистить
+вывод» действует на панель, а не на то, что впереди.  У остальных вкладок панели
+своей команды нет, и там правый клик не показывает меню вовсе — пустое меню хуже,
+чем никакого.  Значок пункта — `execution-clear.png`: с task_58 «Очистить вывод» была
+без картинки (первый вариант, `edit-clear`, забраковали — он читался не как
+«очистить вывод»), и теперь одна картинка стоит у команды во всех местах.
+
+*Verified.*  `test_window.py` (новый кейс «the output tab's menu clears the pane»),
+`test_shortcuts.py` — зелёные; `typst compile doc/gui.typ` без замечаний.
