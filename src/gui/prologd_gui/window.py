@@ -1586,7 +1586,8 @@ class MainWindow(QMainWindow):
             # against the file's own directory and diagnostics name the file.
             self._session.load_file(path, step=step, trace=trace, questions=questions,
                                     print_questions=self._settings.print_questions,
-                                    limits=limits)
+                                    limits=limits,
+                                    variable_mode=buffer.variable_mode())
             self._status.setText(f"выполняется {pathlib.Path(path).name}")
         else:
             # Otherwise the text comes from the editor, and the path, when there
@@ -1601,7 +1602,8 @@ class MainWindow(QMainWindow):
             self._session.load_text(buffer.text(), path or buffer.title(), step=step,
                                     trace=trace, questions=questions,
                                     print_questions=self._settings.print_questions,
-                                    limits=limits)
+                                    limits=limits,
+                                    variable_mode=buffer.variable_mode())
             name = pathlib.Path(path).name if path else buffer.title()
             self._status.setText(f"выполняется {name} (есть несохранённые правки)")
         return True
@@ -1852,6 +1854,7 @@ class MainWindow(QMainWindow):
             unit=self._settings.format_unit,
             selection=region is not None,
             name="<buffer>",
+            variable_mode=self._variable_mode(),
         )
 
     def _on_formatted(self, text: str, changed: bool) -> None:
@@ -1897,6 +1900,21 @@ class MainWindow(QMainWindow):
         view.setTextCursor(restored)
         self._status.setText("отформатировано")
 
+    def _variable_mode(self) -> int:
+        """How the program in front of the user reads names (task_67).
+
+        The file's own `:- ИМЕНА(N).` first line, else the window's row — the same
+        answer the highlighter is given.  A run and a formatting request carry it,
+        and so does a question of its own: a statement typed into the goal line or
+        clicked on a margin marker arrives *without* the file's first line, so the
+        interpreter cannot read a mode out of it, and without this a question about
+        a mode-1 program would read its constants as variables.
+        """
+        buffer = self.current_buffer()
+        if buffer is not None:
+            return buffer.variable_mode()
+        return self._settings.variable_mode_number
+
     def _run_query(self) -> None:
         text = self._query_line.text().strip()
         if not text:
@@ -1925,7 +1943,7 @@ class MainWindow(QMainWindow):
         # A goal typed into the line answers into the output panel: asking it with
         # that panel hidden would look like nothing happened at all (part 92).
         self._reveal_output_panel()
-        self._session.run_query(text)
+        self._session.run_query(text, variable_mode=self._variable_mode())
         self._sync_run_actions()
         self._update_details()
 
@@ -1981,7 +1999,7 @@ class MainWindow(QMainWindow):
         if statement is None:
             return
         self._arm_answer_table()
-        self._session.run_query(statement)
+        self._session.run_query(statement, variable_mode=self._variable_mode())
 
     def _drop_pending_query(self, note: str = "") -> None:
         """Forgets a question whose program never loaded, saying so if asked.
@@ -3293,6 +3311,9 @@ class MainWindow(QMainWindow):
                 self._settings.auto_complete_after,
                 self._settings.completion_match_case,
             )
+            # How this file's names are read (task_67): its own first line, else the
+            # row that just changed.
+            buffer.refresh_variable_mode()
         # The goal field follows the same two knobs (task_50).
         self._query_line.set_auto_complete_after(self._settings.auto_complete_after)
         self._query_line.set_completion_match_case(self._settings.completion_match_case)

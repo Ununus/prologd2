@@ -9,6 +9,11 @@ namespace prologd {
 namespace {
 
 const std::unordered_set<std::string> kReservedBuiltins = {
+    // The marker that sets how names are read (task_67).  Reserved in every mode,
+    // or the loader could not recognise it: a capitalised name is a variable in
+    // mode 0 and a string constant in modes 1 and 2.
+    "ИМЕНА",
+    "variables",
     // Control / logic, with the English spelling of each name (task_39).
     "ЛОЖЬ", "ТРАССА", "НЕТ_ТРАССЫ", "ВЫП", "НЕ", "ДЛЯВСЕХ", "ПЕРВОЕ", "РАВНО",
     "ТИХО", "ВЕРСИЯ", "ПС",
@@ -117,8 +122,37 @@ bool isReservedBuiltinName(std::string_view name) {
   return kReservedBuiltins.count(text) != 0 || kRetiredBuiltinNames.count(text) != 0;
 }
 
-Lexer::Lexer(std::string_view source, std::string file_name)
-    : source_(stripByteOrderMark(source)), file_name_(std::move(file_name)) {}
+std::optional<std::pair<VariableMode, std::size_t>> readVariableMarker(
+    std::string_view source) {
+  const std::size_t newline = source.find('\n');
+  const std::string_view first_line =
+      source.substr(0, newline == std::string_view::npos ? source.size() : newline);
+  DiagnosticSink quiet;
+  Lexer lexer(first_line, "<marker>");
+  const std::vector<Token> tokens = lexer.tokenize(quiet);
+  if (quiet.hasErrors() || tokens.size() != 7) {
+    return std::nullopt;
+  }
+  const bool shape = tokens[0].kind == TokenKind::ColonDash &&
+                     tokens[1].kind == TokenKind::Identifier && tokens[1].text == "ИМЕНА" &&
+                     tokens[2].kind == TokenKind::LParen &&
+                     tokens[3].kind == TokenKind::Integer &&
+                     tokens[4].kind == TokenKind::RParen && tokens[5].kind == TokenKind::Dot &&
+                     tokens[6].kind == TokenKind::EndOfFile;
+  if (!shape || tokens[3].text.size() != 1) {
+    return std::nullopt;
+  }
+  const int value = tokens[3].text[0] - '0';
+  if (value < 0 || value > 2) {
+    return std::nullopt;
+  }
+  return std::pair{static_cast<VariableMode>(value),
+                   newline == std::string_view::npos ? source.size() : newline};
+}
+
+Lexer::Lexer(std::string_view source, std::string file_name, LexerOptions options)
+    : source_(stripByteOrderMark(source)), file_name_(std::move(file_name)),
+      options_(options) {}
 
 char Lexer::peek(std::size_t lookahead) const {
   const std::size_t index = offset_ + lookahead;
@@ -163,6 +197,19 @@ Token Lexer::makeToken(TokenKind kind, std::string text, SourceLocation location
   return token;
 }
 
+/// The old dialect's variable names (task_67): one letter, optionally followed by a
+/// single `_` — `д`, `Б`, `A_`, `X_`.  Anything longer is a string constant when it
+/// is capitalised and an atom otherwise.
+bool isOldVariableName(const DecodeResult& first, const std::string& text) {
+  if (!first.valid || !isLetter(first.code_point)) {
+    return false;
+  }
+  if (text.size() == first.length) {
+    return true;
+  }
+  return text.size() == first.length + 1 && text.back() == '_';
+}
+
 Token Lexer::lexIdentifier(DiagnosticSink* sink) {
   (void)sink;
   const SourceLocation start = here();
@@ -179,12 +226,45 @@ Token Lexer::lexIdentifier(DiagnosticSink* sink) {
   if (text.empty() || text.front() == '_') {
     return makeToken(TokenKind::Variable, std::move(text), start);
   }
-  const bool startsUpper = first.valid && isUpperCaseLetter(first.code_point);
-  if (startsUpper && !isReservedBuiltinName(text)) {
-    return makeToken(TokenKind::Variable, std::move(text), start);
+  // A reserved name is a predicate whatever its case is, in every mode: the table
+  // is the language's, and a mode is only a way of reading names (ADR-005).
+  if (isReservedBuiltinName(text)) {
+    return makeToken(TokenKind::Identifier, std::move(text), start);
   }
-  if (sink != nullptr && startsUpper && isReservedBuiltinName(text)) {
-    // Reserved names are atoms on purpose; nothing to report.
+  // The old dialect's long variable names: a name followed by an apostrophe.  The
+  // apostrophe is only a *suffix* — at the start of a token it is still the quote
+  // of `'атом'` — which is why it is read here and not in `lexQuotedAtom`.
+  if (peek() == '\'') {
+    if (options_.variables == VariableMode::SingleLetterApostrophe) {
+      advanceByte(1);
+      text.push_back('\'');
+      return makeToken(TokenKind::Variable, std::move(text), start);
+    }
+    if (options_.variables == VariableMode::SingleLetter) {
+      // The one place mode 1 differs from mode 2, and the place a student meets
+      // it: say which mode they meant instead of leaving an unterminated quote.
+      reportInvalidSign(sink, start,
+                        "апостроф в конце имени — это режим 2 (`:- ИМЕНА(2).`); "
+                        "в режиме 1 переменная — одна буква");
+      advanceByte(1);
+    }
+  }
+  if (options_.variables != VariableMode::Iso) {
+    // Modes 1 and 2: the old dialect's variables are one letter, upper or lower,
+    // with at most one `_` after it (`д`, `Б`, `A_`) …
+    if (isOldVariableName(first, text)) {
+      return makeToken(TokenKind::Variable, std::move(text), start);
+    }
+    // … and a capitalised name is a string constant, the way the original kept
+    // strings and symbolic constants in one storage.
+    if (first.valid && isUpperCaseLetter(first.code_point)) {
+      return makeToken(TokenKind::String, std::move(text), start);
+    }
+    return makeToken(TokenKind::Identifier, std::move(text), start);
+  }
+  const bool starts_upper = first.valid && isUpperCaseLetter(first.code_point);
+  if (starts_upper) {
+    return makeToken(TokenKind::Variable, std::move(text), start);
   }
   return makeToken(TokenKind::Identifier, std::move(text), start);
 }

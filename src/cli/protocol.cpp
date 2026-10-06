@@ -43,7 +43,8 @@ using Json = nlohmann::json;
 /// 11: `load` takes `printQuestions` — a run question echoes itself
 ///    (`?цель.`) before its answer, the way `-q` does on the command line
 ///    (task_46: `questions` was split into *run* and *print*).
-constexpr int kProtocolVersion = 11;
+// 12: `load`, `query` and `format` carry the naming mode (`vars`, task_67).
+constexpr int kProtocolVersion = 12;
 
 [[nodiscard]] std::string graphicsOpName(GraphicsOp op) {
   switch (op) {
@@ -330,6 +331,16 @@ class Session {
     // the program's own `?`-statements and directives run during the load, so the
     // step hook has to be armed around it, not only around `query`.
     engine_.setTrace(request.value("trace", false));
+    // How this run reads its names (task_67): a file's own `:- ИМЕНА(N).` first
+    // line wins over this, and a request that names no mode means mode 0.  Set on
+    // every load, like the trace flag, or a mode asked for once would outlive the
+    // request it was meant for.
+    const int vars = request.value("vars", 0);
+    if (vars < 0 || vars > 2) {
+      fail(command, command + ": режим имён должен быть 0, 1 или 2");
+      return;
+    }
+    engine_.options().variableMode = static_cast<prologd::VariableMode>(vars);
     const bool stepping = request.value("step", false);
     if (stepping) {
       armStepping();
@@ -464,6 +475,14 @@ class Session {
                               : IndentUnit::Tab;
     options.selection_only = request.value("selection", false);
     options.source_name = request.value("name", std::string("<format>"));
+    // The mode of the text being laid out (task_67); its own `:- ИМЕНА(N).` line
+    // wins over this one.
+    const int vars = request.value("vars", 0);
+    if (vars < 0 || vars > 2) {
+      fail("format", "format: режим имён должен быть 0, 1 или 2");
+      return;
+    }
+    options.variables = static_cast<prologd::VariableMode>(vars);
     const FormatResult formatted =
         formatSource(request.at("text").get<std::string>(), options);
     if (!formatted.ok()) {

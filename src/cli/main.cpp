@@ -92,6 +92,9 @@ int main(int argc, char** argv) {
   std::optional<std::size_t> maxDepth;
   std::optional<std::size_t> maxSteps;
   std::optional<std::size_t> maxFindAll;
+  // 0 = ISO (the default), 1 = the old dialect's single-letter variables, 2 = the
+  // same plus apostrophe names (task_67).
+  int variableMode = 0;
 
   app.add_option("-s,--source", sources, "Interpret the given source file (repeatable)");
   app.add_option("-I,--include", includeDirectories, "Add an import search directory");
@@ -108,6 +111,10 @@ int main(int argc, char** argv) {
                  "Step limit for one query (0 = unlimited; default: no limit)");
   app.add_option("--max-findall", maxFindAll,
                  "Solution limit for one НАЙТИВСЕ (0 = unlimited; default: no limit)");
+  app.add_option("--vars", variableMode,
+                 "How names are read: 0 ISO (default), 1 single-letter variables "
+                 "and unquoted string constants, 2 plus apostrophe names")
+      ->check(CLI::Range(0, 2));
   app.add_option("--protocol", protocol, "Front-end protocol: text (default) or json")
       ->check(CLI::IsMember({"text", "json"}));
   app.add_flag("--list-keywords", listKeywords,
@@ -170,6 +177,8 @@ int main(int argc, char** argv) {
       std::cerr << "error: --format expects soft, hard or line, not " << formatMode << '\n';
       return 1;
     }
+    // The mode of the run (task_67) — a file's own `:- ИМЕНА(N).` wins over it.
+    formatOptions.variables = static_cast<prologd::VariableMode>(variableMode);
     formatOptions.width = formatWidth;
     formatOptions.indent_steps = formatIndent;
     formatOptions.indent_unit =
@@ -278,6 +287,7 @@ int main(int argc, char** argv) {
     limits.maxFindAllSolutions = *maxFindAll;
   }
   limits.applyTo(engine.options());
+  engine.options().variableMode = static_cast<prologd::VariableMode>(variableMode);
 
   std::vector<std::filesystem::path> includePaths;
   for (const std::string& directory : includeDirectories) {

@@ -164,6 +164,7 @@ entries of the session log below and in `ai/task_*.md`.
 | task_64_interrupt_during_a_run | open | a session solves a request *inside* `dispatch`, so `interrupt` written while a query solves is dispatched only after it — «Остановить» and «Предел времени» fall back on killing the process (the cure is a session that watches the stream while it solves) |
 | task_65_output_in_slices | done | events reach the window in slices (`EVENTS_PER_TURN` = 250 per turn of the event loop), so a program that floods the panes or the picture can still be stopped; nothing is dropped, and over `FLOOD_EVENTS` (20 000/s) the pane says so once |
 | task_66_output_limit | done | «Предел вывода» — the window counts the output events of a run (a text line, a drawing primitive, a trace line) and stops it past the cap; the stream's *decode* is bounded by bytes too |
+| task_67_variable_modes | done | `--vars 0\|1\|2` and the lexer rule, the first-line marker `:- ИМЕНА(N).` with its own diagnostic, the window (row, highlighter, and the file's mode travelling with `load`/`query`/`format` — protocol 12), `examples/lessons/_old/` (six files) plus the three new old-format examples checked like lessons, and the documents |
 
 ## Test suite
 
@@ -3344,3 +3345,77 @@ Added on 2026-10-03 while planning task_59:
   *Verified.*  `test_session.py`, `test_output.py`, `test_settings.py`, `protocol_smoke.py` and the
   four window tests green; the full `test_window.py` runs in the background; the six documents
   build.
+
+* Name modes, part 98: **a file says how its names are read, and the old course proves it**
+  (2026-10-06).  task_67 steps 2 and 4.
+
+  *The marker (step 2).*  `:- ИМЕНА(0|1|2).` as the *first* line of a file is read by the loader
+  before the lexer runs — a mode has to be known before a name is classified — and the line is then
+  dropped: the real lexing starts at its newline, so every later line keeps its number and its
+  diagnostics.  `ИМЕНА/1` is registered as a reserved built-in only so that the marker line lexes
+  the same way in every mode, and the English alias `variables` had to be reserved with it:
+  `reservedKeywords()` is built from the lexer's set, so without it `test_keywords.cpp` and
+  `test_reference.py` both failed («records name things the interpreter does not have»).  Anywhere
+  but the first line the directive reaches the built-in, which answers «режим имён задаётся первой
+  строкой файла: `:- ИМЕНА(0|1|2).`» with the file, line and column.
+
+  *The old corpus (step 4).*  `examples/lessons/_old/` is now the acceptance test for the mode: six
+  of its eight files start with the marker, carry their old `?` questions uncommented and record
+  what they print as `%!` lines, and `test_lessons.cpp` runs all of them (`checkedOldLessons`).  The
+  questions were measured one file at a time — a prefix of the file per question, the difference is
+  that question's answer — and a question that cannot be uncommented keeps its `%` with the reason
+  written above it: `_old/lesson_1`'s `нод(30,125,н)` never finishes, `_old/lesson_4`'s `бинсорт`
+  prints megabytes of a list and never finishes, `_old/lesson_5`'s `ферзи(8,A)` answers 92 rows and
+  its `парламент(7,4,c)` never finishes, `_old/lesson_8`'s `рамка,шаг(12,12,3,1)` draws the whole
+  frame and hangs.  Two files are not touched and stay out of the list: `_old/lesson_2` no longer
+  loads at all (`РАВНО` called with one argument) and `_old/lesson_9` answers only after an
+  interactive dialogue (`оценка` asks about every writer), which a checked file cannot have.
+
+  *What the old answers look like.*  A `?` question of the old dialect prints one line per bound
+  variable (`А=блондин`, `Б=с усами`, `В_=с портфелем`), ground success is `ДА`, failure is `НЕТ`,
+  and the six files carry 79 `%!` lines between them.
+
+  *The window and the flag (step 3).*  The mode has three consumers, and only one of them
+  needs the window to work it out for itself: the highlighter, which cannot ask the
+  interpreter on every keystroke.  So the rule lives once, in C++ — `readVariableMarker`
+  moved out of `engine.cpp` into `lexer.cpp`, and the *formatter* reads the marker now too,
+  which it never did — and the window repeats it in `tokens.mode_from_first_line` for
+  colouring only.  `src/gui/tests/test_variable_modes.py` pins that repetition against the
+  interpreter's own reading, asked by behaviour: `?РАВНО(д, 1).` answers `д=1` in modes 1
+  and 2 and `НЕТ` in mode 0, and `Сумма'` answers in mode 2 alone.  The row «Имена
+  переменных» in «Выполнение» is `auto` (follow the file) or a mode for a file that says
+  nothing, the buffer watches its own first line, and `vars` travels with `load` and with
+  `format` — **protocol 12**; `--format --vars N` is the same fallback on the command line.
+
+  *The documents (step 5).*  `doc/prologd-diff.typ` gained the section, `doc/help.typ` the
+  marker beside the flag it already documented, `doc/gui.typ` the settings row and what it
+  changes, and `ai/conventions.md` the rule «a mode is per file, never per build» — with the
+  note that only the C++ side owns the rule.
+
+  *The user's three asks (part 98, continued).*  (1) A question clicked on a margin
+  marker went out in the mode of the *run* — mode 0 by default — so
+  `?студент(Вова, Корчагин).` of a mode-1 file read the two names as free variables and
+  answered with the first student.  A `query` now carries `vars` as well, and the window
+  sends the mode of the file in front of the user (`Buffer.variable_mode`,
+  `Window._variable_mode`) for the goal line, the margin marker, an ordinary run and the
+  formatting request.  (2) The old lessons write their names the way the old dialect did —
+  bare (`Боря`, not `'Боря'`) — and every one of them was measured and re-shaped again.
+  (3) The three examples the user added — `examples/lib/old_lib.pld` (mode 1),
+  `examples/lib/old_lib_2.pld` (mode 2) and `examples/use_old_names.pld` (mode 0) — were
+  rewritten with fuller descriptions, import through `lib/…` so no `-I` or settings fiddling
+  is needed, and are checked: `use_old_names.pld` promises its four answers as `%!` lines and
+  the two libraries are exercised through it.
+
+  *Two real defects this round found.*  A *piped* run of `prologd` writes its Cyrillic in the
+  ANSI code page, so reading the formatted text from `--format` through a pipe and writing it
+  back **destroyed seven files** — they were restored from the repository and rebuilt over
+  `--protocol json`, where non-ASCII travels as escapes.  And the formatter measured the raw
+  span of a string constant by scanning for its closing quote, while a mode-1 string constant
+  has no quotes at all (it is a bare capitalised name): the scan swallowed the rest of the
+  line and the formatted old lessons came back twenty times longer than the input.  `rawLength`
+  now returns the decoded name for that case, pinned by a case in `test_formatter.cpp`.
+
+  *Verified.*  `ctest` 330/330 with the six old lessons in the suite (`test_formatter`,
+  `protocol_session.cmake` and `test_reference.py` green); every converted file, run whole,
+  prints exactly its `%!` lines; the window, highlighter, settings, formatter, session,
+  tokenizer and protocol checks green, and the three touched documents compile.

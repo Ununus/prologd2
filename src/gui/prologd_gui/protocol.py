@@ -33,7 +33,8 @@ from typing import Any, Iterator
 #:    picture was made.
 #: 11: `load` takes `printQuestions` — a run question echoes itself (`?цель.`)
 #:    before its answer, the way `-q` does on the command line (task_46).
-PROTOCOL_VERSION = 11
+#: 12: `load`, `query` and `format` carry the naming mode (`vars`, task_67).
+PROTOCOL_VERSION = 12
 
 #: Event names the interpreter emits.
 EVENTS = ("ready", "output", "result", "input_request", "step", "trace", "graphics",
@@ -97,7 +98,8 @@ def encode_request(**fields: Any) -> bytes:
 def load_text(text: str, name: str = "<buffer>", *, step: bool = False,
               trace: bool = False, questions: bool = True,
               print_questions: bool = False,
-              limits: dict | None = None) -> bytes:
+              limits: dict | None = None,
+              variable_mode: int = 0) -> bytes:
     """Loads program text (the editor buffer).
 
     `step` makes the run stop at its first step point and wait for a `step`
@@ -113,30 +115,45 @@ def load_text(text: str, name: str = "<buffer>", *, step: bool = False,
     `limits` are the guards of the run (protocol 9): `maxSteps`, `maxDepth`,
     `maxFindall`, each `0` for «без предела».  The *wall-clock* timeout is not
     here — it is the front-end's own clock (task_46).
+
+    `variable_mode` is how this run reads names that no marker in the file has
+    settled (protocol 12, task_67): 0 is the ISO reading, 1 and 2 the old
+    dialect's, and a file's own `:- ИМЕНА(N).` line wins over all of them.
     """
     return encode_request(
         cmd="load", text=text, name=name,
         **_flags(step=step, trace=trace, questions=questions,
                  print_questions=print_questions),
         **_limits(limits),
+        **_variable_mode(variable_mode),
     )
 
 
 def load_file(path: str, *, step: bool = False, trace: bool = False,
               questions: bool = True, print_questions: bool = False,
-              limits: dict | None = None) -> bytes:
+              limits: dict | None = None, variable_mode: int = 0) -> bytes:
     """Loads a program from disk; imports resolve against `-I` directories."""
     return encode_request(
         cmd="load", path=path,
         **_flags(step=step, trace=trace, questions=questions,
                  print_questions=print_questions),
         **_limits(limits),
+        **_variable_mode(variable_mode),
     )
 
 
-def query(text: str, *, step: bool = False, trace: bool = False) -> bytes:
-    """Runs one statement, usually `?Goal.`."""
-    return encode_request(cmd="query", text=text, **_flags(step=step, trace=trace))
+def query(text: str, *, step: bool = False, trace: bool = False,
+          variable_mode: int = 0) -> bytes:
+    """Runs one statement, usually `?Goal.`.
+
+    `variable_mode` is how *this statement* reads names (task_67): a question typed
+    into the goal line or clicked on a margin marker arrives on its own, without a
+    file's first line, so it has to be told what the program it asks reads —
+    otherwise `?студент(Вова, Корчагин).` of a mode-1 program would read the two
+    names as variables instead of the constants the file meant.
+    """
+    return encode_request(cmd="query", text=text, **_flags(step=step, trace=trace),
+                          **_variable_mode(variable_mode))
 
 
 def graphics_snapshot() -> bytes:
@@ -165,6 +182,7 @@ def format_text(
     unit: str = "tab",
     selection: bool = False,
     name: str = "<format>",
+    variable_mode: int = 0,
 ) -> bytes:
     """Asks the interpreter to lay `text` out; the answer is `formatted`.
 
@@ -187,6 +205,7 @@ def format_text(
         fields["selection"] = True
     if name != "<format>":
         fields["name"] = name
+    fields.update(_variable_mode(variable_mode))
     return encode_request(**fields)
 
 
@@ -216,6 +235,16 @@ def _limits(limits: dict | None) -> dict:
         return {}
     asked = {name: int(value) for name, value in limits.items() if int(value) > 0}
     return {"limits": asked} if asked else {}
+
+
+def _variable_mode(mode: int) -> dict:
+    """The naming mode of a run or of a formatting request (protocol 12, task_67).
+
+    Mode 0 is left off the wire: it is the interpreter's own default, so a zero
+    would be a second way of saying «nothing was asked for».  A file's own
+    `:- ИМЕНА(N).` line still wins over whatever travels here.
+    """
+    return {"vars": int(mode)} if int(mode) else {}
 
 
 def input_answer(text: str) -> bytes:

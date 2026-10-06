@@ -4160,6 +4160,52 @@ def test_the_document_opens_from_the_package(executable: str) -> None:
     print("ok: the manual is opened from the package's own doc folder")
 
 
+def test_the_first_line_sets_the_naming_mode_of_the_highlighting(executable: str) -> None:
+    """`:- ИМЕНА(N).` is the file's business, and the window follows it (task_67)."""
+    window = empty_window(executable)
+    try:
+        buffer = window.current_buffer()
+        assert buffer is not None
+        assert buffer.highlighter.mode == 0
+        buffer.document.setPlainText(":- ИМЕНА(1).\n?ВЕРСИЯ.\n")
+        assert buffer.highlighter.mode == 1, "the first line of the file sets the mode"
+
+        # The window's own row is what a file *without* a marker is read in, and a
+        # marker still beats it — the same order `--vars` has on the command line.
+        window._settings.variable_mode = "2"
+        window.apply_settings()
+        assert buffer.highlighter.mode == 1
+        buffer.document.setPlainText("% без маркера\n")
+        window.apply_settings()
+        assert buffer.highlighter.mode == 2
+        print("ok: a file's first line sets the naming mode of its highlighting")
+    finally:
+        discard_changes(window)
+
+
+def test_a_question_of_a_mode_one_file_keeps_its_names(executable: str) -> None:
+    """A question asked on its own is read in the mode the file in front declares.
+
+    The goal line — and a click on a margin marker — loads the program quietly and
+    then asks one statement, and that statement arrives *without* the file's first
+    line, so it carries the mode itself.  Without it `?студент(Вова).` of a mode-1
+    file read `Вова` as a free variable and answered with the first student instead
+    of the one the file means (the user's find, task_67).
+    """
+    window = empty_window(executable)
+    try:
+        window.editor().setPlainText(":- ИМЕНА(1).\nстудент(Вова).\nстудент(Данил).\n")
+        window._query_line.setText("?студент(Вова).")
+        window._run_query()
+        wait_for_the_run(window)
+
+        assert "ДА" in window.output_text(), ascii(window.output_text())
+        assert "Вова=Вова" not in window.output_text(), ascii(window.output_text())
+    finally:
+        discard_changes(window)
+    print("ok: a question of a mode-1 file reads its names the way the file does")
+
+
 def main(argv: list[str]) -> int:
     if QApplication is None:
         print("skipped: PySide6 is not installed")
@@ -4285,6 +4331,8 @@ def main(argv: list[str]) -> int:
         test_an_unnamed_tab_left_unsaved_is_forgotten(executable, files)
         test_an_untouched_unnamed_tab_comes_back_clean(executable)
         test_the_document_opens_from_the_package(executable)
+        test_the_first_line_sets_the_naming_mode_of_the_highlighting(executable)
+        test_a_question_of_a_mode_one_file_keeps_its_names(executable)
     print("all window checks passed")
     del application
     return 0

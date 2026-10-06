@@ -6,6 +6,35 @@
 
 using prologd::test::runProgram;
 
+TEST_CASE("the first line of a file says how its names are read") {
+  // task_67: the marker is read by the loader *before* the file is lexed, so it is
+  // the one way a file can ask for the old dialect's names — and it does not run
+  // as a goal afterwards.
+  // `Молоко` without quotes is a string constant in mode 1, not a variable.
+  const auto result = runProgram(
+      ":- ИМЕНА(1).\n"
+      "?РАВНО(д, 1).\n"
+      "?СЦЕП(Молоко, \" и\", Х).\n");
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "д=1\nХ=Молоко и\n");
+}
+
+TEST_CASE("the second mode adds the old apostrophe names") {
+  const auto result = runProgram(":- ИМЕНА(2).\n?РАВНО(Сумма', 5).\n");
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "Сумма'=5\n");
+}
+
+TEST_CASE("a marker off the first line says where it belongs") {
+  // A comment above the marker makes it a plain directive — and a directive cannot
+  // set a mode the text above it was already read in.  The load itself succeeds, so
+  // the complaint arrives as a runtime error, not as a load failure.
+  const auto result = runProgram("% комментарий\n:- ИМЕНА(1).\n");
+  REQUIRE(result.loaded);
+  REQUIRE(result.runtimeError);
+  REQUIRE(result.error.find("первой строкой") != std::string::npos);
+}
+
 TEST_CASE("the always-false goal fails and negation turns it round") {
   const auto result = runProgram("?ЛОЖЬ.\n?ЛОЖЬ, НЕ(ЛОЖЬ).\n?НЕ(ЛОЖЬ).\n");
   REQUIRE(result.loaded);

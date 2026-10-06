@@ -11,7 +11,7 @@ from PySide6.QtGui import QColor, QFont, QSyntaxHighlighter, QTextCharFormat
 
 from .keywords import Keywords
 from .theme import Theme
-from .tokens import tokenize
+from .tokens import MODE_ISO, tokenize
 
 
 def _has_astral(text: str) -> bool:
@@ -44,10 +44,12 @@ class PrologHighlighter(QSyntaxHighlighter):
         document,
         keywords: Keywords | None = None,
         theme: Theme | None = None,
+        mode: int = MODE_ISO,
     ) -> None:
         super().__init__(document)
         self._keywords = keywords or Keywords()
         self._theme = theme or Theme()
+        self._mode = mode
         self._formats: dict[tuple[str, bool], QTextCharFormat] = {}
 
     # -- configuration ------------------------------------------------------
@@ -61,6 +63,24 @@ class PrologHighlighter(QSyntaxHighlighter):
         self._formats.clear()
         self.rehighlight()
 
+    def set_mode(self, mode: int) -> None:
+        """How this document's names are read (task_67).
+
+        A colouring decision and nothing else: the interpreter reads the file's own
+        `:- ИМЕНА(N).` line when it runs or formats it.  The window settles the
+        value — the file's first line, or its own row for a file that says nothing —
+        and a change means the colours have to be worked out again.
+        """
+        if mode == self._mode:
+            return
+        self._mode = mode
+        self.rehighlight()
+
+    @property
+    def mode(self) -> int:
+        """The mode in force, as the numbers of `tokens.MODES`."""
+        return self._mode
+
     @property
     def theme(self) -> Theme:
         return self._theme
@@ -73,7 +93,7 @@ class PrologHighlighter(QSyntaxHighlighter):
     # -- QSyntaxHighlighter -------------------------------------------------
     def highlightBlock(self, text: str) -> None:  # noqa: N802 - Qt spelling
         offsets = _utf16_offsets(text) if _has_astral(text) else None
-        for token in tokenize(text, self._keywords):
+        for token in tokenize(text, self._keywords, self._mode):
             char_format = self._format_for(token.kind, token.alphabet)
             if char_format is None:
                 continue

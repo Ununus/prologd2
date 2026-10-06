@@ -193,6 +193,37 @@ TEST_CASE("a query and a directive keep their one line") {
   }
 }
 
+TEST_CASE("the first line of a file decides how its names are read") {
+  // `Сумма'` is one variable in mode 2 and an unterminated quote in mode 0, so the
+  // very same clause parses only when the file says so (task_67).  The marker also
+  // has to *stay* the first line of the output: it is an ordinary statement.
+  const std::string clause = "длинное:-РАВНО(Сумма',5).\n";
+  const FormatResult declared = format(":- ИМЕНА(2).\n" + clause);
+  REQUIRE(declared.ok());
+  REQUIRE(declared.text.find("Сумма'") != std::string::npos);
+  REQUIRE(declared.text.rfind(":- ИМЕНА(2).", 0) == 0);
+
+  const FormatResult bare = format(clause);
+  REQUIRE_FALSE(bare.ok());
+
+  // The option is the fallback for a text without a marker — the window's row and
+  // the CLI's `--vars`.
+  FormatOptions options;
+  options.variables = prologd::VariableMode::SingleLetterApostrophe;
+  REQUIRE(format(clause, options).ok());
+}
+
+TEST_CASE("a string constant of the old dialect keeps its span") {
+  // In mode 1 a bare capitalised name is a string constant (task_67), and the
+  // formatter measures every token's raw span: assuming a quote there swallowed
+  // the rest of the line, and the formatted text of the old lessons came back
+  // twenty times longer than the input.
+  const std::string program = ":- ИМЕНА(1).\nстудент(Вова).\nстудент(Боря).\n";
+  const FormatResult formatted = format(program);
+  REQUIRE(formatted.ok());
+  REQUIRE(formatted.text == program);
+}
+
 TEST_CASE("a source that does not parse comes back untouched, with diagnostics") {
   const std::string source = "цель(Х:-часть(Х).\n";
   const FormatResult result = format(source, hard());

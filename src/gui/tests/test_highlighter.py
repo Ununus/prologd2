@@ -25,6 +25,14 @@ from PySide6.QtWidgets import QApplication  # noqa: E402
 from prologd_gui.highlighter import PrologHighlighter  # noqa: E402
 from prologd_gui.keywords import Keywords  # noqa: E402
 from prologd_gui.theme import Theme  # noqa: E402
+from prologd_gui.tokens import (  # noqa: E402
+    ATOM,
+    CYRILLIC,
+    MODE_ISO,
+    MODE_SINGLE_LETTER,
+    STRING,
+    VARIABLE,
+)
 
 TABLE = Keywords(
     [
@@ -41,10 +49,16 @@ THEME = Theme()
 class Coloured:
     """A document with the highlighter attached, and a way to ask about colours."""
 
-    def __init__(self, line: str, keywords: Keywords = TABLE, theme: Theme = THEME) -> None:
+    def __init__(
+        self,
+        line: str,
+        keywords: Keywords = TABLE,
+        theme: Theme = THEME,
+        mode: int = MODE_ISO,
+    ) -> None:
         self.line = line
         self.document = QTextDocument()
-        self.highlighter = PrologHighlighter(self.document, keywords, theme)
+        self.highlighter = PrologHighlighter(self.document, keywords, theme, mode)
         self.document.setPlainText(line)
         self.highlighter.rehighlight()
 
@@ -158,6 +172,23 @@ def test_changing_the_theme_recolours() -> None:
     print("ok: the theme is data and re-applies without touching the text")
 
 
+def test_the_naming_mode_changes_the_colours() -> None:
+    """Mode 1 reads the old dialect's names (task_67): `д` is a variable there and
+    `Молоко` a string constant, while mode 0 reads them the other way round."""
+    coloured = Coloured("голова(д,Молоко)")
+    assert coloured.colour("д") == THEME.color_for(ATOM, CYRILLIC)
+    assert coloured.colour("Молоко") == THEME.color_for(VARIABLE, CYRILLIC)
+
+    coloured.highlighter.set_mode(MODE_SINGLE_LETTER)
+    assert coloured.colour("д") == THEME.color_for(VARIABLE, CYRILLIC)
+    assert coloured.colour("Молоко") == THEME.color_for(STRING, CYRILLIC)
+    # A mode that does not move the colours must not cost a re-highlight either:
+    # the value is what a document keeps, and setting it again changes nothing.
+    coloured.highlighter.set_mode(MODE_SINGLE_LETTER)
+    assert coloured.highlighter.mode == MODE_SINGLE_LETTER
+    print("ok: the naming mode re-colours the old dialect's names")
+
+
 def test_astral_characters_do_not_shift_the_rest_of_the_line() -> None:
     """Qt counts UTF-16 units, Python counts code points; the offsets are mapped."""
     coloured = Coloured('член(😀). % привет')
@@ -175,6 +206,7 @@ def main() -> int:
     test_builtins_are_bold_and_names_are_not()
     test_changing_the_table_recolours()
     test_changing_the_theme_recolours()
+    test_the_naming_mode_changes_the_colours()
     test_astral_characters_do_not_shift_the_rest_of_the_line()
     print("all highlighter checks passed")
     del application

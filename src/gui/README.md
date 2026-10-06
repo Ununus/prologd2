@@ -1018,7 +1018,7 @@ is found — draws a program, asks for the finished bitmap and replays the very
 events the same session reported, so the two rasterisers (C++ and Python) cannot
 drift apart quietly.
 
-## Protocol contract (version 11)
+## Protocol contract (version 12)
 
 One JSON object per line in both directions; the interpreter writes nothing else
 to stdout.  The C++ side lives in `src/cli/protocol.cpp`, the Python side in
@@ -1039,7 +1039,12 @@ the wrong *type* with an `error` event instead of ending the session; version 10
 adds the drawing: `graphics` events, one per primitive, and the `graphics` request
 with `snapshot`, answered with the whole `bitmap` (task_45); version 11 adds
 `printQuestions` to `load` — a run question echoes itself (`?цель.`) before its
-answer, the way `-q` does (task_46 split `questions` into *run* and *print*).
+answer, the way `-q` does (task_46 split `questions` into *run* and *print*);
+version 12 adds `vars` to `load`, `query` and `format` — the naming mode (0, 1 or 2,
+task_67), the window's half of `--vars`, which a file's own `:- ИМЕНА(N).` first
+line overrides for that file.  A `query` needs it because a single statement
+carries no first line of its own: without it a question clicked on a margin marker
+would read a mode-1 program's constants as variables.
 Version 1 sessions are still understood by the Python client (the table is then
 empty and completion falls back to the document's own predicates).
 

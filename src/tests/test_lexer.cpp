@@ -11,6 +11,13 @@ std::vector<Token> lex(const std::string& source, DiagnosticSink& sink) {
   return lexer.tokenize(sink);
 }
 
+std::vector<Token> lexWith(const std::string& source, VariableMode mode, DiagnosticSink& sink) {
+  LexerOptions options;
+  options.variables = mode;
+  Lexer lexer(source, "test", options);
+  return lexer.tokenize(sink);
+}
+
 }  // namespace
 
 TEST_CASE("lexer recognises structural tokens") {
@@ -54,6 +61,69 @@ TEST_CASE("lexer distinguishes atoms, variables and reserved names") {
   REQUIRE(tokens[5].text == "НАЙТИВСЕ");
   REQUIRE(tokens[6].kind == TokenKind::QuotedAtom);
   REQUIRE(tokens[6].text == "quoted atom");
+}
+
+TEST_CASE("mode 0 is the dialect the corpus is written in") {
+  DiagnosticSink sink;
+  const auto tokens = lex("д Д Молоко молоко 'Молоко'", sink);
+  REQUIRE_FALSE(sink.hasErrors());
+  REQUIRE(tokens[0].kind == TokenKind::Identifier);  // д — an atom
+  REQUIRE(tokens[1].kind == TokenKind::Variable);    // Д
+  REQUIRE(tokens[2].kind == TokenKind::Variable);    // Молоко
+  REQUIRE(tokens[3].kind == TokenKind::Identifier);  // молоко
+  REQUIRE(tokens[4].kind == TokenKind::QuotedAtom);  // 'Молоко'
+}
+
+TEST_CASE("mode 1 reads the old dialect's names") {
+  // Any single letter is a variable, and a bare capitalised name is a *string*
+  // constant: the original kept strings and symbolic constants together, and old
+  // programs call string predicates on such names (task_67).
+  DiagnosticSink sink;
+  const auto tokens =
+      lexWith("д Д Молоко молоко 'Молоко' ИМПОРТ В_ A_", VariableMode::SingleLetter, sink);
+  REQUIRE_FALSE(sink.hasErrors());
+  REQUIRE(tokens[0].kind == TokenKind::Variable);
+  REQUIRE(tokens[1].kind == TokenKind::Variable);
+  REQUIRE(tokens[2].kind == TokenKind::String);
+  REQUIRE(tokens[2].text == "Молоко");
+  REQUIRE(tokens[3].kind == TokenKind::Identifier);
+  REQUIRE(tokens[4].kind == TokenKind::QuotedAtom);
+  REQUIRE(tokens[5].kind == TokenKind::Identifier);  // reserved names stay predicates
+  // The old corpus writes its variables as a letter with an underscore after it
+  // (`В_`, `A_`), which is a variable in every mode when it starts upper-case —
+  // and must stay one here, or old lessons stop answering.
+  REQUIRE(tokens[6].kind == TokenKind::Variable);
+  REQUIRE(tokens[6].text == "В_");
+  REQUIRE(tokens[7].kind == TokenKind::Variable);
+  REQUIRE(tokens[7].text == "A_");
+}
+
+TEST_CASE("mode 2 adds the apostrophe names, and a leading apostrophe stays a quote") {
+  DiagnosticSink sink;
+  const auto tokens =
+      lexWith("Сумма' X' a' 'Молоко'", VariableMode::SingleLetterApostrophe, sink);
+  REQUIRE_FALSE(sink.hasErrors());
+  REQUIRE(tokens[0].kind == TokenKind::Variable);
+  REQUIRE(tokens[0].text == "Сумма'");
+  REQUIRE(tokens[1].kind == TokenKind::Variable);
+  REQUIRE(tokens[1].text == "X'");
+  REQUIRE(tokens[2].kind == TokenKind::Variable);
+  REQUIRE(tokens[2].text == "a'");
+  REQUIRE(tokens[3].kind == TokenKind::QuotedAtom);
+  REQUIRE(tokens[3].text == "Молоко");
+}
+
+TEST_CASE("mode 1 explains an apostrophe name instead of leaving a broken quote") {
+  // The one place 1 differs from 2, and the place a student meets it: say which
+  // mode was meant rather than reporting an unterminated string.
+  DiagnosticSink sink;
+  const auto tokens = lexWith("X'", VariableMode::SingleLetter, sink);
+  REQUIRE(sink.hasErrors());
+  REQUIRE(tokens[0].kind == TokenKind::Variable);
+  REQUIRE(tokens[0].text == "X");
+  const auto& diagnostics = sink.diagnostics();
+  REQUIRE_FALSE(diagnostics.empty());
+  REQUIRE(diagnostics.back().message.find("ИМЕНА(2)") != std::string::npos);
 }
 
 TEST_CASE("`\\+` is one token, and a lone backslash is an error") {
