@@ -2441,6 +2441,7 @@ def test_the_documented_shortcuts_are_bound(executable: str) -> None:
             ("split", {"Ctrl+\\"}),
             ("next_tab", {"Ctrl+Tab"}),
             ("previous_tab", {"Ctrl+Shift+Tab"}),
+            ("open_import", {"F12"}),
         ):
             bound = {sequence.toString() for sequence in window._actions[key].shortcuts()}
             assert bound == expected, f"{key} is bound to {sorted(bound)}, documented {sorted(expected)}"
@@ -4275,6 +4276,46 @@ def test_the_tab_menu_shows_the_clicked_file(executable: str, directory: pathlib
         discard_changes(window)
 
 
+def test_f12_opens_the_file_of_an_import_directive(executable: str, directory: pathlib.Path) -> None:
+    """`F12` on an `ИМПОРТ` line opens the file it names, in a tab (task_69).
+
+    The entry is enabled only where there is something to open, and the name is
+    looked for the way the engine looks: beside the importing file first, then the
+    `-I` directories, then `stdlib` beside the interpreter.
+    """
+    from PySide6.QtGui import QTextCursor
+
+    window = empty_window(executable)
+    try:
+        library = directory / "library.pld"
+        library.write_text("факт(1).\n", encoding="utf-8", newline="\n")
+        program = directory / "program.pld"
+        program.write_text(':- ИМПОРТ("library.pld").\n?факт(1).\n', encoding="utf-8",
+                           newline="\n")
+        assert window.open_path(str(program))
+        view = window.active_pane().current_view()
+        action = window._actions["open_import"]
+
+        # Away from the directive there is nothing to open, and the entry says so.
+        cursor = view.textCursor()
+        cursor.movePosition(QTextCursor.MoveOperation.End)
+        view.setTextCursor(cursor)
+        window._update_details()
+        assert not action.isEnabled()
+
+        # On the directive the key is offered and opens the library beside the program.
+        cursor.movePosition(QTextCursor.MoveOperation.Start)
+        view.setTextCursor(cursor)
+        window._update_details()
+        assert action.isEnabled(), "the caret is on the ИМПОРТ line"
+        action.trigger()
+        opened = [buffer.model.path for buffer in window.buffers()]
+        assert str(library) in opened, opened
+        print("ok: F12 opens the file an ИМПОРТ directive names")
+    finally:
+        discard_changes(window)
+
+
 def main(argv: list[str]) -> int:
     if QApplication is None:
         print("skipped: PySide6 is not installed")
@@ -4404,6 +4445,7 @@ def main(argv: list[str]) -> int:
         test_the_first_line_sets_the_naming_mode_of_the_highlighting(executable)
         test_a_question_of_a_mode_one_file_keeps_its_names(executable)
         test_the_tab_menu_shows_the_clicked_file(executable, files)
+        test_f12_opens_the_file_of_an_import_directive(executable, files)
     print("all window checks passed")
     del application
     return 0

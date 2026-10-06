@@ -112,6 +112,10 @@ ACTIONS: tuple[Action, ...] = (
     Action("save_as", "Сохранить как…", "file-save-as", ("Ctrl+Shift+S",)),
     Action("save_all", "Сохранить все", "file-save-all"),
     Action("reload", "Перечитать с диска", "file-reload", ("Ctrl+Shift+R",)),
+    # The `ИМПОРТ` directive under the caret, opened in a tab: the one navigation
+    # command the editor has, and the reason the engine's search order lives in
+    # `paths.resolve_import` — the window must open what the run would load.
+    Action("open_import", "Открыть файл ИМПОРТ", "file-open", ("F12",)),
     # The output pane as a file: a log of the run, written as plain text.
     Action("save_output", "Сохранить вывод…", "file-save-as"),
     Action("close", "Закрыть вкладку", "file-close", ("Ctrl+W",)),
@@ -379,6 +383,8 @@ TAB_CONTEXT: tuple[str, ...] = ("reveal",)
 
 #: The editor's context menu, built from the same actions.
 CONTEXT: tuple[str, ...] = (
+    "open_import",
+    SEPARATOR,
     "undo",
     "redo",
     SEPARATOR,

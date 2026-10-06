@@ -147,3 +147,28 @@ def import_directories(configured: Iterable[str]) -> list[str]:
             continue
         result.append(text)
     return result
+
+
+def resolve_import(name: str, *, source_dir: pathlib.Path | None,
+                   directories: Iterable[str], interpreter_path: str | None) -> str | None:
+    """The file an `ИМПОРТ("…")` names, searched the way the interpreter searches it.
+
+    The engine's own order (ADR-026): an absolute name is itself; otherwise the
+    folder of the *importing* file first, then every `-I` directory, then `stdlib`
+    beside the interpreter — `prologd` finds its own library last, and the window
+    has to agree with it, or `F12` would open a different file than the one the run
+    actually loads.  `None` means nothing of that name exists in any of them.
+    """
+    path = pathlib.Path(name)
+    if path.is_absolute():
+        return str(path) if path.is_file() else None
+    candidates: list[pathlib.Path] = []
+    if source_dir is not None:
+        candidates.append(pathlib.Path(source_dir) / name)
+    candidates += [pathlib.Path(directory) / name for directory in directories]
+    if interpreter_path:
+        candidates.append(pathlib.Path(interpreter_path).parent / "stdlib" / name)
+    for candidate in candidates:
+        if candidate.is_file():
+            return str(candidate)
+    return None

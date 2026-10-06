@@ -178,6 +178,50 @@ def test_the_file_manager_is_called_the_way_its_platform_wants() -> None:
     print("ok: the file manager is called the way its platform wants")
 
 
+def test_the_import_name_is_resolved_the_way_the_interpreter_resolves_it() -> None:
+    """`F12` must open the file the run would load, or it is worse than nothing.
+
+    The engine tries the importing file's folder, then every `-I` directory, then
+    `stdlib` beside the interpreter (ADR-026); `resolve_import` repeats that order
+    (task_69).
+    """
+    with tempfile.TemporaryDirectory(prefix="prologd_import_") as name:
+        folder = pathlib.Path(name)
+        for child in ("near", "shared", "stdlib"):
+            (folder / child).mkdir()
+        (folder / "near" / "lib.pld").write_text("факт(1).\n", encoding="utf-8")
+        (folder / "shared" / "other.pld").write_text("факт(2).\n", encoding="utf-8")
+        (folder / "stdlib" / "lists.pld").write_text("факт(3).\n", encoding="utf-8")
+        side = str(folder / "prologd.exe")
+
+        found = paths.resolve_import("lib.pld", source_dir=folder / "near",
+                                    directories=[str(folder / "shared")],
+                                    interpreter_path=side)
+        assert found == str(folder / "near" / "lib.pld"), found
+        found = paths.resolve_import("other.pld", source_dir=folder / "near",
+                                    directories=[str(folder / "shared")],
+                                    interpreter_path=None)
+        assert found == str(folder / "shared" / "other.pld"), found
+        found = paths.resolve_import("lists.pld", source_dir=None, directories=[],
+                                    interpreter_path=side)
+        assert found == str(folder / "stdlib" / "lists.pld"), found
+
+        # A file of the importing folder wins over a same-named one it searches: the
+        # order is the engine's, and `F12` has to open what the run would load.
+        (folder / "shared" / "lib.pld").write_text("факт(4).\n", encoding="utf-8")
+        found = paths.resolve_import("lib.pld", source_dir=folder / "near",
+                                    directories=[str(folder / "shared")],
+                                    interpreter_path=None)
+        assert found == str(folder / "near" / "lib.pld"), found
+
+        absolute = folder / "shared" / "other.pld"
+        assert paths.resolve_import(str(absolute), source_dir=None, directories=[],
+                                    interpreter_path=None) == str(absolute)
+        assert paths.resolve_import("nowhere.pld", source_dir=folder, directories=[],
+                                    interpreter_path=None) is None
+    print("ok: an import name resolves in the order the engine uses")
+
+
 def main(argv: list[str]) -> int:
     test_a_checkout_reads_its_own_tree()
     test_a_package_finds_everything_beside_itself()
@@ -187,6 +231,7 @@ def main(argv: list[str]) -> int:
     test_a_package_searches_only_what_the_student_added()
     test_the_import_list_is_trimmed_and_deduplicated()
     test_the_file_manager_is_called_the_way_its_platform_wants()
+    test_the_import_name_is_resolved_the_way_the_interpreter_resolves_it()
     print("all path checks passed")
     return 0
 

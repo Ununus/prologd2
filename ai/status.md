@@ -166,6 +166,7 @@ entries of the session log below and in `ai/task_*.md`.
 | task_66_output_limit | done | «Предел вывода» — the window counts the output events of a run (a text line, a drawing primitive, a trace line) and stops it past the cap; the stream's *decode* is bounded by bytes too |
 | task_67_variable_modes | done | `--vars 0\|1\|2` and the lexer rule, the first-line marker `:- ИМЕНА(N).` with its own diagnostic, the window (row, highlighter, and the file's mode travelling with `load`/`query`/`format` — protocol 12), `examples/lessons/_old/` (six files) plus the three new old-format examples checked like lessons, and the documents |
 | task_68_tab_context_menu | done | a right click on a tab shows a menu built from `actions.TAB_CONTEXT` — «Показать в проводнике» (`explorer /select,<path>` and its two cousins), with the picture of «Открыть…» and the keys `Ctrl+E`; the pointed-at tab is made current first, the entry follows the buffer's path, and the command goes through a replaceable seam |
+| task_69_open_import | done | `F12` opens the file an `ИМПОРТ` directive names, in a tab: `paths.resolve_import` repeats the interpreter's search order (the importing file's folder, the `-I` folders, `stdlib`), the menu entry is enabled only while the caret sits on such a line, and `tokens.literal_text` unwraps the quoted name the editor's tokenizer hands over |
 
 ## Test suite
 
@@ -3472,3 +3473,33 @@ Added on 2026-10-03 while planning task_59:
   `_build_actions` now adds every action to the window itself, and
   `test_every_declared_key_belongs_to_a_widget` holds that — a key declared with no widget
   behind it is exactly the silence the first attempt looked like.
+
+### 100. Клавиша `F12` ведёт к файлу строки `ИМПОРТ` (2026-10-06)
+
+Директива `ИМПОРТ` называет файл, и до этого дня, чтобы его посмотреть, файл искали
+руками — по каталогам `-I`, по `stdlib`, по папке программы.  Теперь `F12` на строке
+директивы открывает нужный файл во вкладке.
+
+Порядок поиска переписан из интерпретатора (`paths.resolve_import`): абсолютное имя —
+само себя, иначе каталог *импортирующего* файла, затем «Дополнительные каталоги
+ИМПОРТ», затем `stdlib` рядом с `prologd`.  Правило должно быть одно: окно,
+открывающее не тот файл, который загрузит запуск, хуже отсутствия команды.  Окно не
+повторяет порядок по памяти — оно зовёт ту же функцию, и `test_paths.py` держит его
+(порядок, абсолютное имя, «нигде нет», и что файл рядом побеждает одноимённый в общем
+каталоге).
+
+Пункт включён только тогда, когда под курсором действительно строка с `ИМПОРТ`
+(`_refresh_navigation_actions` из `_update_details`), и живёт в общей таблице
+действий — отсюда и меню редактора, и клавиша.  Ненайденное имя называет себя в
+«Системе»: у клавиши нет другого способа сказать, что она сработала.
+
+*Строка читается токенизатором редактора, а он отдаёт литерал как написан.*  Первая
+версия искала файл с именем `"library.pld"` — вместе с кавычками — и честно писала в
+«Системе» «не найдено "library.pld"».  Лексер интерпретатора (C++) отдаёт литерал
+раскодированным, окно (Python) — нет; разница невидима, пока значение не попадёт в
+файловую систему.  `tokens.literal_text` снимает кавычки и разворачивает `\\`, `\"`,
+`''`.
+
+*Verified.*  `test_paths.py`, `test_window.py` (на строке с `ИМПОРТ` пункт доступен и
+открывает библиотеку рядом с программой; в стороне — выключен), `test_tokens.py` —
+зелёные; `doc/gui.typ` собирается без замечаний.

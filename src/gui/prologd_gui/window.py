@@ -57,6 +57,7 @@ from . import (
     settings,
     settingsdialog,
     shortcuts,
+    tokens,
 )
 from .buffers import Buffer
 from .editor import CodeEditor, QueryLine, ZoomablePlainTextEdit
@@ -642,6 +643,7 @@ class MainWindow(QMainWindow):
         return {
             "new": lambda: self.new_buffer(),
             "reveal": self._reveal_in_file_manager,
+            "open_import": self._open_import_under_cursor,
             "open": self._open_file,
             "save": lambda: self.save_buffer(),
             "save_as": self._save_as,
@@ -928,8 +930,20 @@ class MainWindow(QMainWindow):
         self._actions["step"].setEnabled(free)
         self._actions["step_over"].setEnabled(free)
 
+    def _refresh_navigation_actions(self) -> None:
+        """Offers `F12` only where it does something: on the `ИМПОРТ` line of the caret.
+
+        Called from `_update_details`, which every caret move and every tab switch
+        reaches (task_69): an enabled state that is recomputed somewhere else is a
+        state that goes stale.
+        """
+        action = getattr(self, "_actions", {}).get("open_import")
+        if action is not None:
+            action.setEnabled(self._import_under_cursor() is not None)
+
     def _update_details(self) -> None:
         """The right-hand side of the status bar: state, caret, file shape."""
+        self._refresh_navigation_actions()
         if not self._session.is_running():
             state = "интерпретатор остановлен"
         elif self._session.paused():
@@ -1985,6 +1999,64 @@ class MainWindow(QMainWindow):
         for key in actions.TAB_CONTEXT:
             menu.addAction(self._actions[key])
         return menu
+
+    def _import_under_cursor(self) -> str | None:
+        """The file named by the `ИМПОРТ` line under the caret, if that is the line.
+
+        The line is read with the editor's own tokenizer, so it may be written any way
+        the language allows — `:- ИМПОРТ("lib/x.pld").` and `:- import("x.pld").`
+        both do.  When one line names several files, the string the caret sits in wins.
+        """
+        pane = self.active_pane() if self._panes else None
+        view = pane.current_view() if pane is not None else None
+        if view is None:
+            return None
+        cursor = view.textCursor()
+        directive = False
+        names: list[tuple[int, str]] = []
+        for token in tokens.tokenize(cursor.block().text(), self._session.keywords):
+            if token.kind == tokens.DIRECTIVE or (
+                token.kind == tokens.KEYWORD and token.text in ("ИМПОРТ", "import")
+            ):
+                directive = True
+            elif directive and token.kind == tokens.STRING:
+                # The tokenizer hands a literal over as it was written — quotes and
+                # all — while the lexer's `text` is decoded (task_69).
+                names.append((token.start, tokens.literal_text(token.text)))
+        if not directive or not names:
+            return None
+        for start, name in names:
+            if start <= cursor.positionInBlock() <= start + len(name):
+                return name
+        return names[0][1]
+
+    def _open_import_under_cursor(self) -> None:
+        """Opens the file the `ИМПОРТ` line under the caret names (task_69).
+
+        Resolved the way the interpreter resolves it — `paths.resolve_import` — so
+        the tab that opens is the file the run would load.  A name that is nowhere to
+        be found says so in «Системе»: silence would look like a broken key.
+        """
+        name = self._import_under_cursor()
+        if name is None:
+            return
+        buffer = self.current_buffer()
+        source_dir = (
+            pathlib.Path(buffer.model.path).parent
+            if buffer is not None and buffer.model.path
+            else None
+        )
+        found = paths.resolve_import(
+            name,
+            source_dir=source_dir,
+            directories=self._import_directories(),
+            interpreter_path=self._interpreter_path(),
+        )
+        if found is None:
+            self._append_note(f"ИМПОРТ: не найдено {name}")
+            return
+        if not self.open_path(found):
+            self._append_note(f"ИМПОРТ: не удалось открыть {found}")
 
     def _reveal_in_file_manager(self) -> None:
         """Shows the file of the current tab where it lives (task_68).

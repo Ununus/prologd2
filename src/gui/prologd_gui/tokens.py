@@ -249,6 +249,24 @@ def tokenize(line: str, keywords: Keywords | None = None, mode: int = MODE_ISO) 
     return tokens
 
 
+def literal_text(text: str) -> str:
+    """What a `"…"` or `'…'` literal *says*, without its quotes.
+
+    The tokenizer keeps every literal as it was written — the highlighter colours the
+    characters on the line — while the interpreter's lexer hands out the decoded text.
+    A caller that wants the *value* unwraps it here: the outer quotes go, `\\` and
+    `\"` unfold, and a doubled `''` becomes one quote.  `task_69` reads the file name
+    of an `ИМПОРТ` directive with this, and it must agree with the lexer or the window
+    would look for a file called `"library.pld"`.
+    """
+    if len(text) < 2 or text[0] != text[-1] or text[0] not in "\"'":
+        return text
+    inner = text[1:-1]
+    if text[0] == '"':
+        return inner.replace("\\\\", "\\").replace('\\"', '"')
+    return inner.replace("''", "'")
+
+
 def mode_from_first_line(text: str, keywords: Keywords | None = None) -> int | None:
     """The naming mode a file declares in its first line, or `None` (task_67).
 
