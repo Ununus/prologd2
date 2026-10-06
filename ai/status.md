@@ -167,6 +167,7 @@ entries of the session log below and in `ai/task_*.md`.
 | task_67_variable_modes | done | `--vars 0\|1\|2` and the lexer rule, the first-line marker `:- ИМЕНА(N).` with its own diagnostic, the window (row, highlighter, and the file's mode travelling with `load`/`query`/`format` — protocol 12), `examples/lessons/_old/` (six files) plus the three new old-format examples checked like lessons, and the documents |
 | task_68_tab_context_menu | done | a right click on a tab shows a menu built from `actions.TAB_CONTEXT` — «Показать в проводнике» (`explorer /select,<path>` and its two cousins), with the picture of «Открыть…» and the keys `Ctrl+E`; the pointed-at tab is made current first, the entry follows the buffer's path, and the command goes through a replaceable seam |
 | task_69_open_import | done | `F12` opens the file an `ИМПОРТ` directive names, in a tab: `paths.resolve_import` repeats the interpreter's search order (the importing file's folder, the `-I` folders, `stdlib`), the menu entry is enabled only while the caret sits on such a line, and `tokens.literal_text` unwraps the quoted name the editor's tokenizer hands over |
+| task_70_variable_mode_row | done | the window's «Имена переменных» row lost «по первой строке файла» — it said exactly what «как в ISO» said (the marker beats the row in the engine *and* in the window, and mode 0 never travels on the wire); three items now with ISO as the default, and a settings file still holding the old `auto` reads as `0` |
 
 ## Test suite
 
@@ -3503,3 +3504,26 @@ Added on 2026-10-03 while planning task_59:
 *Verified.*  `test_paths.py`, `test_window.py` (на строке с `ИМПОРТ` пункт доступен и
 открывает библиотеку рядом с программой; в стороне — выключен), `test_tokens.py` —
 зелёные; `doc/gui.typ` собирается без замечаний.
+
+### 101. Строка «Имена переменных»: три пункта вместо четырёх (2026-10-06)
+
+Учитель спросил, чем «по первой строке файла» отличается от «как в ISO: строчное
+имя — атом», и заметил, что оба обещают ISO по умолчанию.  Разницы не было никакой:
+маркер `:- ИМЕНА(N).` главнее настройки и в интерпретаторе, и в окне, а режим 0
+вообще не уходит на провод, — значит, оба пункта давали один и тот же запрос и одно
+и то же поведение для любого файла.  Строка выбора работает только для файла **без**
+маркера, и там умолчание и есть ISO: «по первой строке файла» было вторым способом
+сказать то же самое.
+
+Теперь их три: «как в ISO: переменная с большой буквы» (умолчание), «по-старому:
+одна буква — переменная» и «то же плюс имена с апострофом».  Правило не двинулось:
+файл, объявивший маркер, читается по маркеру — диалект принадлежит файлу, а не
+сборке и не настройке окна, и у импортируемого файла он свой.  Конфигурация, в
+которой записано старое `auto`, читается как `0` (`_choice` при несовпадении
+возвращает умолчание), так что для непомеченного файла у тех, кто окно уже
+запускал, поведение не изменилось.
+
+*Verified.*  `test_settings.py` (42 записи, умолчания внутри границ),
+`test_variable_modes.py` (правило окна против интерпретатора), `test_window.py`
+(кейс маркера дополнен проверкой умолчания строки) — зелёные; `typst compile
+doc/gui.typ` без замечаний.

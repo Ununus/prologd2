@@ -4192,6 +4192,7 @@ def test_the_first_line_sets_the_naming_mode_of_the_highlighting(executable: str
         buffer = window.current_buffer()
         assert buffer is not None
         assert buffer.highlighter.mode == 0
+        assert window._settings.variable_mode == "0", "the row's default is the ISO reading"
         buffer.document.setPlainText(":- ИМЕНА(1).\n?ВЕРСИЯ.\n")
         assert buffer.highlighter.mode == 1, "the first line of the file sets the mode"
 

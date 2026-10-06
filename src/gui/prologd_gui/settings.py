@@ -175,13 +175,14 @@ OUTPUT_POSITIONS = ("right", "bottom")
 DEFAULT_INPUT_MODE = "panel"
 INPUT_MODES = ("panel", "dialog")
 
-#: How a file's names are read (task_67).  The old Пролог-Д wrote a variable as one
-#: letter and left a string constant unquoted, which mode 0 reads as a variable, so
-#: an old program means something else there.  `auto` follows the file's own
-#: `:- ИМЕНА(N).` first line and reads a file that says nothing in mode 0; a number
-#: is the mode a file *without* a marker is read in — the window's half of `--vars`.
+#: How a file's names are read *when the file does not say* (task_67).  The old
+#: Пролог-Д wrote a variable as one letter and left a string constant unquoted,
+#: which mode 0 reads as a variable, so an old program means something else there.
+#: A file whose first line declares `:- ИМЕНА(N).` is read that way whatever this
+#: row says — the dialect belongs to the file — and an imported file is read in its
+#: own mode, too.  So this is a fallback, and the fallback is the modern reading.
 VARIABLE_MODE = "execution/variable_mode"
-VARIABLE_MODES = ("auto", "0", "1", "2")
+VARIABLE_MODES = ("0", "1", "2")
 
 MINIMUM_FONT_SIZE = 6.0
 MAXIMUM_FONT_SIZE = 72.0
@@ -244,7 +245,7 @@ MAXIMUM_TIMEOUT_MILLISECONDS = 3_600_000
 #: A program that needs more raises the row in the dialog; `0` still means
 #: «без предела».
 DEFAULT_MAX_OUTPUT_EVENTS = 50_000
-DEFAULT_VARIABLE_MODE = "auto"
+DEFAULT_VARIABLE_MODE = "0"
 MAXIMUM_MAX_OUTPUT_EVENTS = 10_000_000
 
 #: task_46's process directory: where a program's relative file paths point.
@@ -377,11 +378,10 @@ SETTINGS: tuple[Setting, ...] = (
             hint="Сколько событий вывода (строк и примитивов рисунка) разрешено за один запуск; 0 — без предела.  При превышении прогон останавливается — от потока вывода окно не зависает"),
     Setting(VARIABLE_MODE, "Имена переменных", "Выполнение", "choice",
             DEFAULT_VARIABLE_MODE,
-            choices=(("auto", "по первой строке файла"),
-                     ("0", "как в ISO: строчное имя — атом"),
-                     ("1", "как в старом курсе: буква — переменная"),
+            choices=(("0", "как в ISO: переменная с большой буквы"),
+                     ("1", "по-старому: одна буква — переменная"),
                      ("2", "то же плюс имена с апострофом")),
-            hint="Как читать имена: 0 — имя с большой буквы — переменная; 1 и 2 — старый диалект, где переменная — одна буква, а имя с большой буквы без кавычек — строковая константа.  Строка «:- ИМЕНА(N).» первой строкой файла важнее этой настройки.  Режим меняет и подсветку, и форматирование"),
+            hint="Как читать имена в файле, который об этом молчит: 0 — имя с большой буквы — переменная; 1 и 2 — старый диалект, где переменная — одна буква, а имя с большой буквы без кавычек — строковая константа.  Строка «:- ИМЕНА(N).» первой строкой файла важнее этой настройки, и импортируемый файл читается в своём режиме.  Режим меняет подсветку и форматирование, а запуск всё равно читает маркер из файла"),
     Setting(IMPORT_PATHS, "Дополнительные каталоги ИМПОРТ", "Выполнение", "dirs", (),
             hint="Каталоги, в которых ИМПОРТ ищет файлы; передаются интерпретатору как -I, в этом порядке"),
     Setting(INTERPRETER, "Интерпретатор", "Выполнение", "file", "",
@@ -1060,11 +1060,11 @@ class Settings:
 
     @property
     def variable_mode(self) -> str:
-        """`auto` or a mode: how a file *without* a marker of its own is read.
+        """How a file *without* a marker of its own is read: `0`, `1` or `2`.
 
-        `auto` follows the file's `:- ИМЕНА(N).` first line and reads a file that
-        says nothing in mode 0 (task_67); a number is the mode such a file is read
-        in — the window's half of `--vars`.
+        The file's own `:- ИМЕНА(N).` first line beats this (task_67), so what is
+        left is the window's half of `--vars`: the mode of a file that says
+        nothing — `0`, unless the reader asks for the old dialect by name.
         """
         return self._choice(_VARIABLE_MODE_SETTING)
 
@@ -1074,9 +1074,8 @@ class Settings:
 
     @property
     def variable_mode_number(self) -> int:
-        """The same choice as the number a run takes; `auto` is mode 0."""
-        value = self.variable_mode
-        return int(value) if value in ("0", "1", "2") else 0
+        """The same choice as the number a run takes."""
+        return int(self.variable_mode)
 
     @panel_sizes.setter
     def panel_sizes(self, sizes) -> None:
