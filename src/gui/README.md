@@ -1183,13 +1183,22 @@ failure (for example an interrupted query).
   protocol mode all diagnostics travel as `error` events.
 * The answer to an `input_request` is one string; embedded newlines stay inside
   that string.
-* `interrupt` reaches the solver at every step of its loop, and a paused step
-  point answers it by ending the pause — a running query, a runaway and a read
-  waiting for input all end on the request with the runtime error of the
-  interrupted query.  **Остановить** asks first and terminates the process only
-  when the request is not answered within `STOP_GRACE_MS` (500 ms); a polite stop
-  leaves the session idle *with* its knowledge base, and stopping that idle
-  session is what unloads it.
+* `interrupt` is *dispatched* between two requests, so what it reaches is a query
+  that is waiting — for input, or at a step point — and it ends that query with
+  the runtime error of the interrupted query.  A query that is *solving* (a
+  runaway) reads the request only when that query is over, which is why
+  **Остановить** — and the «Предел времени» deadline with it — asks first and
+  terminates the process if the request is not answered within `STOP_GRACE_MS`
+  (500 ms) (task_64: a session that watches for the request while it solves is the
+  real cure).  A polite stop leaves the session idle *with* its knowledge base;
+  stopping that idle session is what unloads it.
+* The events of the interpreter are dispatched in slices — `EVENTS_PER_TURN` (250)
+  per turn of the event loop (task_65).  The process is separate, but the window's
+  own thread reads its stream, and handing a whole flood over in one call froze
+  the loop: «Остановить» and the «Предел времени» timer could not be served while
+  a program kept printing or drawing.  Nothing is dropped, so the panes and the
+  picture stay complete — only later; a program that produces more than
+  `FLOOD_EVENTS` (20 000) events a second gets one line in «Системе» saying so.
 * `-i`, `-o` and `-e` are refused together with `--protocol json`: the protocol
   owns stdin and stdout.
 
@@ -1200,7 +1209,8 @@ One piece of work is planned in a task file of its own (`ai/task_*.md`):
 * **Interpreter options, profiles and limits** —
   `ai/task_46_interpreter_options_and_limits.md`.  The limits are done: the
   session carries them on `load` (protocol 9), the dialog has a row for each of
-  them plus «Предел времени, мс», and a run names the rows it goes with before it
+  them plus «Предел времени, мс» and «Предел вывода» (the window's own guards,
+  not the engine's), and a run names the rows it goes with before it
   starts.  The interpreter path and the process directory are done too (2026-10-02):
   `execution/interpreter` picks the binary (empty = `--exe`, which stays the
   fallback), `execution/process_directory` picks where the child starts, «Применить»

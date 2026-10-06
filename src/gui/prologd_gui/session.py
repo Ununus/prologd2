@@ -8,10 +8,36 @@ never shares memory or a call stack with it.
 
 from __future__ import annotations
 
-from PySide6.QtCore import QObject, QProcess, Signal
+import time
+from collections import deque
+
+from PySide6.QtCore import QObject, QProcess, QTimer, Signal
 
 from . import graphics, protocol
 from .keywords import Keywords
+
+#: How many events one turn of the event loop is allowed to dispatch (task_65).
+#:
+#: The interpreter is a separate process, but its events are handled in the
+#: window's own thread, and they used to be handed over in one go, inside
+#: `_on_stdout`: a program that writes faster than the window can draw — a lesson
+#: printing in a loop, a picture of hundreds of thousands of primitives — kept the
+#: loop busy for the whole flood, so a click on «Остановить» and the «Предел
+#: времени» timer waited behind it and could not end the run.  The work is the
+#: same; it is handed out in slices, so that between two slices the window can be
+#: clicked, redrawn and stopped.
+#: How many bytes of the child's stream one turn may decode, and how many events
+#: it may dispatch (task_65).  Both are needed: decoding the whole read in one
+#: call froze the loop before the slices ever got to slice, and dispatching a
+#: whole flood in one call froze it after.  Together they keep a turn short, so
+#: «Остановить», painting and the «Предел времени» timer are all served while a
+#: program keeps writing.
+DECODE_BYTES_PER_TURN = 64 * 1024
+EVENTS_PER_TURN = 250
+
+#: The flood guard of task_65: this many events inside one second is more than a
+#: window can show, and the pane says so once instead of drowning silently.
+FLOOD_EVENTS = 20_000
 
 
 def read_keywords(executable: str, timeout_ms: int = 4000) -> Keywords:
@@ -75,6 +101,10 @@ class PrologSession(QObject):
     bitmap = Signal(int, int, bytes)
     #: The session ended; carries the process exit code.
     ended = Signal(int)
+    #: A program wrote more events in one second than a window can show; carries
+    #: how many.  Sent once per flood, so a front-end can say so in a line
+    #: instead of drowning (task_65).
+    flooded = Signal(int)
 
     #: The reserved names from the `ready` event.  Empty until a session is up,
     #: and stays empty with an interpreter older than protocol 2 — which is why
@@ -95,6 +125,25 @@ class PrologSession(QObject):
         # writing into a process that is still starting loses them.
         self._ready = False
         self._pending: list[bytes] = []
+        #: The events read from the child but not yet dispatched, and the slice
+        #: timer that hands them over (task_65).  The order is the order they
+        #: arrived in: a queue, never a second thread.
+        self._events: deque[dict] = deque()
+        #: The bytes read from the child but not yet decoded: the decoder itself
+        #: runs in slices, so a multi-megabyte read cannot freeze the loop either.
+        self._raw = bytearray()
+        self._draining = False
+        self._drain = QTimer(self)
+        self._drain.setSingleShot(True)
+        self._drain.timeout.connect(self._drain_events)
+        #: The flood guard's window: events produced since `_flood_clock`.
+        self._flood_count = 0
+        self._flood_clock = 0.0
+        self._flood_reported = False
+        #: The exit code of a process that ended while its events were still
+        #: queued: `ended` goes out when the queue is empty, so a front-end never
+        #: hears the end of a run whose last line is still waiting.
+        self._finished_code: int | None = None
 
         self._process = QProcess(self)
         self._process.readyReadStandardOutput.connect(self._on_stdout)
@@ -153,6 +202,14 @@ class PrologSession(QObject):
         self._paused = False
         self._ready = False
         self._pending.clear()
+        self._drain.stop()
+        self._draining = False
+        self._events.clear()
+        self._raw.clear()
+        self._finished_code = None
+        self._flood_count = 0
+        self._flood_clock = 0.0
+        self._flood_reported = False
         self._process.setProgram(self._executable)
         self._process.setArguments(arguments)
         # The relative paths of a program (`ЗАПИСЬ_В`, `ЧТЕНИЕ_ИЗ`) start here;
@@ -182,6 +239,22 @@ class PrologSession(QObject):
         self._ready = False
         self._awaiting_input = False
         self._paused = False
+        # The events of the process that just went are its own: a new session
+        # must not answer with the last one's output (task_65).
+        self._drain.stop()
+        self._draining = False
+        self._events.clear()
+        self._raw.clear()
+        # The process that just went may have finished while it was being killed,
+        # with its `ended` still deferred (task_65).  Deliver it now: `ended` is
+        # what clears the window's `_stopping`, and without it the next run would
+        # swallow every line the new interpreter prints (found by using the
+        # window, task_66).  The window's stop-suppression keys on `_stopping` and
+        # ignores the code, so the value does not matter.
+        pending = self._finished_code
+        self._finished_code = None
+        if pending is not None:
+            self.ended.emit(pending)
 
     # -- requests ----------------------------------------------------------
     def load_text(self, text: str, name: str = "<buffer>", *, step: bool = False,
@@ -278,9 +351,57 @@ class PrologSession(QObject):
             self._process.write(payload)
 
     def _on_stdout(self) -> None:
-        chunk = bytes(self._process.readAllStandardOutput())
-        for event in self._decoder.feed(chunk):
-            self._dispatch(event)
+        self._raw += bytes(self._process.readAllStandardOutput())
+        self._start_drain()
+
+    def _note_flood(self, produced: int) -> None:
+        """One line per second when a program writes faster than a pane can show.
+
+        Nothing is dropped — a picture with a primitive quietly missing looks
+        correct and is not — so the guard only *says* it; what the window does
+        about it is hand the events over in slices (`EVENTS_PER_TURN`).
+        """
+        now = time.monotonic()
+        if self._flood_clock == 0.0 or now - self._flood_clock >= 1.0:
+            self._flood_clock = now
+            self._flood_count = 0
+            self._flood_reported = False
+        self._flood_count += produced
+        if self._flood_count >= FLOOD_EVENTS and not self._flood_reported:
+            self._flood_reported = True
+            self.flooded.emit(self._flood_count)
+
+    def _start_drain(self) -> None:
+        if self._draining or (not self._events and not self._raw):
+            return
+        self._draining = True
+        self._drain.start(0)
+
+    def _drain_events(self) -> None:
+        """Decodes and dispatches one slice, then comes back to the event loop.
+
+        Both halves are bounded — the decoder by bytes, the dispatch by events —
+        because either one run to completion in a single call froze the loop for
+        as long as a flood lasted (task_65).  Between two slices the loop runs,
+        so «Остановить», painting and the «Предел времени» timer are served.
+        """
+        if self._raw:
+            produced = list(self._decoder.feed(bytes(self._raw[:DECODE_BYTES_PER_TURN])))
+            del self._raw[:DECODE_BYTES_PER_TURN]
+            self._events.extend(produced)
+            self._note_flood(len(produced))
+        for _ in range(EVENTS_PER_TURN):
+            if not self._events:
+                break
+            self._dispatch(self._events.popleft())
+        self._draining = False
+        if self._raw or self._events:
+            self._start_drain()
+            return
+        if self._finished_code is not None:
+            code = self._finished_code
+            self._finished_code = None
+            self.ended.emit(code)
 
     def _dispatch(self, event: dict) -> None:
         name = event.get("event")
@@ -357,11 +478,18 @@ class PrologSession(QObject):
             self.failed.emit("protocol", "error", f"неизвестное событие: {name}", None)
 
     def _on_finished(self, exit_code: int, _status) -> None:
-        for event in self._decoder.feed(b"\n"):
-            self._dispatch(event)
+        self._raw += bytes(self._process.readAllStandardOutput())
+        self._raw += b"\n"  # a final line the process left unterminated
         self._ready = False
         # The process is gone, so no step point can be pending: a pause that
         # outlived its interpreter would turn the next «Запуск» into a `step`
         # request (task_49).
         self._paused = False
-        self.ended.emit(exit_code)
+        # `ended` is the last thing a front-end hears: the events the process left
+        # behind are dispatched first, or a pane would report the end of a run
+        # whose last line is still in the queue (task_65).
+        if self._raw or self._events:
+            self._finished_code = exit_code
+            self._start_drain()
+        else:
+            self.ended.emit(exit_code)

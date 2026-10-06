@@ -3741,6 +3741,184 @@ def test_the_limits_stop_a_runaway_and_name_themselves(executable: str) -> None:
     print("ok: the limits reach the run, name themselves, and the deadline is the window's")
 
 
+def test_the_time_limit_ends_a_run_that_cannot_be_interrupted(executable: str) -> None:
+    """task_64: a run that is *solving* ends on «Предел времени», and not for ever.
+
+    The request the deadline sends is dispatched between two requests of the session,
+    so a query that is solving never reads it: the limit used to write its note and
+    leave the run alive.  What follows the request is the deadline of «Остановить» —
+    the process goes, and the pane says both things happened.
+    """
+    window = empty_window(executable)
+    try:
+        # A program that is *solving* for longer than the limit, and bounded: a
+        # hundred sleeps of 50 ms end on their own, so this test cannot hang the
+        # suite even if the deadline it checks never fires.
+        window.editor().setPlainText(
+            "спать(0) :- !.\n"
+            "спать(Н) :- ЖДИ(50), СЛОЖЕНИЕ(П, 1, Н), спать(П).\n"
+            "?спать(100).\n"
+        )
+        window._settings.timeout_milliseconds = 300
+        window._actions["run"].trigger()
+        assert window._timeout.isActive() is True, "the deadline was not armed"
+        assert "предел времени: 300 мс" not in window.system_text(), "fired before the run"
+
+        gone = pump(window, lambda: window.session.is_running() is False)
+        assert gone, f"the run outlived its limit: {ascii(window.system_text())}"
+        assert "предел времени: 300 мс" in window.system_text(), ascii(window.system_text())
+        assert "--- остановлено ---" in window.system_text(), ascii(window.system_text())
+    finally:
+        discard_changes(window)
+    print("ok: a solving run ends on the time limit, and the pane says by what")
+
+
+def test_a_flood_of_output_leaves_the_window_alive(executable: str) -> None:
+    """task_65: a program that floods the pane cannot take the window with it.
+
+    The interpreter is a separate process, but its events are handled in the
+    window's own thread, and a whole flood used to be handed over in one call:
+    a click on «Остановить» and the «Предел времени» timer waited behind all of
+    it, so a program that kept writing could not be stopped at all.  The events
+    are now handed over in slices, and this pins the difference the only way a
+    test can — a timer that must keep ticking *while* the flood is dispatched.
+    """
+    from prologd_gui import session as session_module
+    from PySide6.QtCore import QTimer
+
+    window = empty_window(executable)
+    ticks: list[int] = []
+    beat = QTimer()
+    beat.setInterval(20)
+    beat.timeout.connect(lambda: ticks.append(1))
+    try:
+        # The guard is deterministic — it counts events, not seconds — so it is
+        # checked directly instead of hoping that a program writes fast enough.
+        flooded: list[int] = []
+        window._session.flooded.connect(flooded.append)
+        window._session._note_flood(session_module.FLOOD_EVENTS)
+        assert flooded == [session_module.FLOOD_EVENTS], flooded
+
+        # A flood, but a bounded one: 60 000 lines are far more than the pane and
+        # the event loop can show at once, and the program ends by itself.  The
+        # loop must keep turning *while* they are dispatched (task_65).
+        window.editor().setPlainText(
+            "строка(0) :- !.\n"
+            'строка(Н) :- ВЫВОДПС("строка"), СЛОЖЕНИЕ(П, 1, Н), строка(П).\n'
+            "?строка(60000).\n"
+        )
+        # This case is about the slices, not the cap: the shipped «Предел вывода»
+        # would end this flood early.
+        window._settings.max_output_events = 0
+        window._actions["run"].trigger()
+        assert pump(window, lambda: window._busy), "the run never started"
+
+        beat.start()
+        ticks.clear()
+        turned = pump(window, lambda: len(ticks) >= 5, timeout=5.0)
+        beat.stop()
+        assert turned, f"the event loop stopped turning: {len(ticks)} ticks"
+
+        # And the run can be stopped while it is still writing — or has finished,
+        # which is the same promise: the run must not stay busy for ever.  A stop
+        # that lands after the program ended is a *polite* one (the session stays,
+        # the base too), so the promise is the run's end, not the process's.
+        window._actions["stop"].trigger()
+        assert pump(window, lambda: not window._busy), ascii(window.system_text())
+    finally:
+        beat.stop()
+        discard_changes(window)
+    print("ok: a flooding program leaves the event loop turning, and «Остановить» works")
+
+
+def test_the_output_limit_stops_a_flood(executable: str) -> None:
+    """task_66: «Предел вывода» ends a program that floods the panes by itself.
+
+    The interpreter cannot be asked to stop a query that is solving (task_64), so
+    a program that prints in a loop used to be stoppable only by hand.  The cap
+    counts what the window receives and fires the same escalation as the
+    deadline: the request, then the process after the grace.
+    """
+    window = empty_window(executable)
+    try:
+        window.editor().setPlainText(
+            "строка(0) :- !.\n"
+            'строка(Н) :- ВЫВОДПС("строка"), СЛОЖЕНИЕ(П, 1, Н), строка(П).\n'
+            "?строка(100000).\n"
+        )
+        window._settings.max_output_events = 1000
+        window._actions["run"].trigger()
+        assert pump(window, lambda: window.session.is_running() is False), (
+            ascii(window.system_text())
+        )
+        assert "предел вывода: 1000 событий" in window.system_text(), ascii(window.system_text())
+    finally:
+        discard_changes(window)
+    print("ok: the output limit stops a flooding program by itself")
+
+
+def test_stop_silences_the_panes_during_a_flood(executable: str) -> None:
+    """task_66: once «Остановить» is asked, the panes are fed no more.
+
+    A program that keeps printing would keep the event loop busy repainting the
+    panes — in a visible window that is exactly what starves the «Остановить»
+    deadline (the request first, the process after the grace).  The pane must
+    freeze the moment the stop is asked, so the loop is free for the timer.
+    """
+    window = empty_window(executable)
+    try:
+        window.editor().setPlainText('петля :- ВЫВОДПС("строка"), петля.\n?петля.\n')
+        # The cap is off: this case is about what a *stop* silences.
+        window._settings.max_output_events = 0
+        window._actions["run"].trigger()
+        assert pump(window, lambda: "строка" in window.output_text(), timeout=5.0), (
+            ascii(window.output_text())
+        )
+        window._actions["stop"].trigger()
+        assert pump(window, lambda: not window.session.is_running(), timeout=5.0), (
+            ascii(window.system_text())
+        )
+        frozen = window.output_text()
+        pump(window, lambda: False, timeout=1.0)
+        assert window.output_text() == frozen, "the pane kept growing after the stop"
+    finally:
+        discard_changes(window)
+    print("ok: stopping a flood silences the panes, and the process goes")
+
+
+def test_a_run_after_a_stop_prints_again(executable: str) -> None:
+    """task_66: a stop must not leak its `_stopping` into the next run.
+
+    The `ended` of the killed process is deferred until its queued events are
+    dispatched; a run started before that delivery used to keep `_stopping` set,
+    and the panes were fed no more — the next run printed nothing.  `start()` now
+    delivers the pending `ended` before the new process, so the flag is cleared
+    and the next run prints again.
+    """
+    window = empty_window(executable)
+    try:
+        window.editor().setPlainText('петля :- ВЫВОДПС("строка"), петля.\n?петля.\n')
+        # The cap is off: the stop, not a limit, must end this run.
+        window._settings.max_output_events = 0
+        window._actions["run"].trigger()
+        assert pump(window, lambda: "строка" in window.output_text(), timeout=5.0), (
+            ascii(window.output_text())
+        )
+        window._actions["stop"].trigger()
+        assert pump(window, lambda: not window.session.is_running(), timeout=5.0), (
+            ascii(window.system_text())
+        )
+
+        window.editor().setPlainText('?ВЫВОДПС("снова").\n')
+        window._actions["run"].trigger()
+        assert pump(window, lambda: "снова" in window.output_text(), timeout=5.0), (
+            ascii(window.output_text())
+        )
+    finally:
+        discard_changes(window)
+    print("ok: a run after a stop prints again")
+
+
 def test_stop_after_a_step_leaves_the_next_run_to_start_over(executable: str) -> None:
     """task_49: `Шаг` → `Стоп` → `Запуск` used to answer «нет шага, который ждёт ответа».
 
@@ -4018,6 +4196,11 @@ def main(argv: list[str]) -> int:
         test_print_questions_echoes_the_question_line(executable)
         test_the_input_switch_chooses_where_to_ask(executable)
         test_the_limits_stop_a_runaway_and_name_themselves(executable)
+        test_the_time_limit_ends_a_run_that_cannot_be_interrupted(executable)
+        test_a_flood_of_output_leaves_the_window_alive(executable)
+        test_the_output_limit_stops_a_flood(executable)
+        test_stop_silences_the_panes_during_a_flood(executable)
+        test_a_run_after_a_stop_prints_again(executable)
         test_the_console_appears_only_when_it_is_asked(executable)
         test_the_console_stays_one_field_high(executable)
         test_a_request_keeps_the_panel_on_the_output(executable)

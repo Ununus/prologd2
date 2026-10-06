@@ -126,7 +126,7 @@ class MainWindow(QMainWindow):
         # of the same data.
         self._session.keywords = read_keywords(self._interpreter_path())
         self._session.ready.connect(self._on_ready)
-        self._session.output.connect(self._append_output)
+        self._session.output.connect(self._on_output)
         self._session.result.connect(self._on_result)
         self._session.input_request.connect(self._on_input_request)
         self._session.failed.connect(self._on_failed)
@@ -136,6 +136,7 @@ class MainWindow(QMainWindow):
         self._session.formatted.connect(self._on_formatted)
         self._session.drawn.connect(self._on_drawn)
         self._session.bitmap.connect(self._on_bitmap)
+        self._session.flooded.connect(self._on_flooded)
         self._session.ended.connect(self._on_ended)
 
         #: Warnings seen in the current run, shown beside the answer; reset when
@@ -177,6 +178,9 @@ class MainWindow(QMainWindow):
         #: True while a stop of our own is in flight, so the exit code it produces
         #: (a termination status, not an exit code) is not reported as one.
         self._stopping = False
+        #: How many output events the run in flight has produced (task_66): the
+        #: counter behind «Предел вывода», reset when a run starts.
+        self._output_events = 0
         #: The deadline of a polite stop: the interpreter is asked to end its
         #: query first, and the process goes only if it does not (`stop_program`).
         self._stop_grace = QTimer(self)
@@ -1575,6 +1579,7 @@ class MainWindow(QMainWindow):
         note = self._limits_note()
         if note:
             self._append_note(note)
+        self._output_events = 0
         self._arm_timeout()
         if path is not None and not buffer.is_modified():
             # A saved, unmodified buffer is loaded by path: `ИМПОРТ` resolves
@@ -1651,6 +1656,54 @@ class MainWindow(QMainWindow):
             "графическое окно показано" if visible else "графическое окно скрыто"
         )
 
+    def _count_output(self) -> None:
+        """One output event of the run; stops it past «Предел вывода» (task_66).
+
+        The cap counts what the front-end receives — a line of the program's text,
+        a drawing primitive, a trace line — and it is the same escalation as the
+        «Предел времени»: the request first, the process after the grace.  It is
+        the window's guard, not the engine's, which is why it also ends a program
+        that floods output — exactly the one the request never reaches (task_64).
+        """
+        limit = self._settings.max_output_events
+        if limit <= 0 or self._stopping:
+            return
+        self._output_events += 1
+        if self._output_events > limit:
+            self._append_note(f"--- предел вывода: {limit} событий, остановлено ---\n")
+            self._status.setText(f"остановлено по пределу вывода ({limit})")
+            self._stopping = True
+            self._session.interrupt()
+            self._stop_grace.start(STOP_GRACE_MS)
+
+    def _on_output(self, text: str) -> None:
+        """One line of the program's output: counted, then shown (task_66).
+
+        While a stop is in flight the pane is *not* fed: the text keeps coming,
+        and feeding it would keep the event loop busy — the one thing the
+        «Остановить» deadline needs, in a visible window whose panes are being
+        repainted, to fire at all.  The counter keeps running until the cap trips,
+        but once the user — or a limit — asked for a stop, there is nothing left
+        to show.
+        """
+        self._count_output()
+        if not self._stopping:
+            self._append_output(text)
+
+    def _on_flooded(self, count: int) -> None:
+        """A program writes faster than the pane can show: say so once (task_65).
+
+        Nothing is dropped — the text and the picture stay complete, only later —
+        so the line is a *note*, not an error: it explains why the window lags
+        behind a program that prints or draws in a tight loop, and why
+        «Остановить» may take a moment to be served.
+        """
+        if self._stopping:
+            return
+        self._append_note(
+            f"--- программа выводит быстрее, чем окно успевает: {count} событий в секунду ---\n"
+        )
+
     def _on_drawn(self, event: dict) -> None:
         """One primitive reached the window (protocol 10).
 
@@ -1665,6 +1718,9 @@ class MainWindow(QMainWindow):
         pixels live in the interpreter, and opening a window mid-run asks for the
         snapshot (that is why `show_graphics_window` requests one).
         """
+        if self._stopping:
+            return
+        self._count_output()
         if not self._graphics_shown:
             self._graphics_shown = True
             if self._graphics_window is None or not self._graphics_window.isVisible():
@@ -1704,6 +1760,8 @@ class MainWindow(QMainWindow):
              "«Предел решений НАЙТИВСЕ»"),
             (self._settings.timeout_milliseconds, settings.DEFAULT_TIMEOUT_MILLISECONDS,
              "«Предел времени, мс»"),
+            (self._settings.max_output_events, settings.DEFAULT_MAX_OUTPUT_EVENTS,
+             "«Предел вывода»"),
         ):
             if value == default:
                 continue
@@ -1717,11 +1775,13 @@ class MainWindow(QMainWindow):
         """Starts the «Предел времени» clock of a run, if one is set (task_46).
 
         The deadline is a `QTimer` and the answer is `interrupt` — the same polite
-        stop the button uses, so the engine ends the query where it stands instead
-        of the window killing a process mid-write.  What it cannot reach is a
-        program waiting *outside* the solver (a `ВВОД` nobody answers, a `ЖДИ`):
-        the request is read when the solver looks next, and until then the run
-        keeps waiting — «Остановить» is what ends a program like that.
+        stop the button uses, so an interpreter that is *waiting* (for input, or at
+        a step point) ends the query where it stands instead of the window killing a
+        process mid-write.  What the request cannot reach is a query that is
+        *solving*: the session reads its next request only between two requests, so
+        a runaway reads the interrupt when the query it was meant for is over
+        (task_64).  That is why the polite request is followed by the deadline
+        `_on_timeout` arms below — the same `STOP_GRACE_MS` «Остановить» waits.
         """
         self._timeout.stop()
         milliseconds = self._settings.timeout_milliseconds
@@ -1729,13 +1789,22 @@ class MainWindow(QMainWindow):
             self._timeout.start(milliseconds)
 
     def _on_timeout(self) -> None:
-        """The run outlived its deadline: ask the interpreter to stop solving."""
+        """The run outlived its deadline: ask the interpreter to stop, then take it.
+
+        The request alone is not enough: a program that is solving never looks at
+        its input stream, so the run would outlive the very limit that was meant to
+        end it (found by using the window, task_64).  The deadline of «Остановить»
+        follows the note, and after it the process goes — the base is lost, which is
+        what a run nobody can interrupt costs.
+        """
         if not self._busy:
             return
         milliseconds = self._settings.timeout_milliseconds
         self._append_note(f"--- предел времени: {milliseconds} мс, остановлено ---\n")
         self._status.setText(f"остановлено по времени (предел {milliseconds} мс)")
         self._session.interrupt()
+        self._stopping = True
+        self._stop_grace.start(STOP_GRACE_MS)
 
     def format_document(self) -> None:
         """Lays the current buffer — or the selection — out (task_30).
@@ -3543,6 +3612,9 @@ class MainWindow(QMainWindow):
 
     def _on_trace(self, text: str) -> None:
         """The `ТРАССА` text of a traced run: the pane colours it apart."""
+        if self._stopping:
+            return
+        self._count_output()
         self._append_output(text, panels.TRACE)
 
     # -- stepping ----------------------------------------------------------

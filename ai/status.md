@@ -161,6 +161,9 @@ entries of the session log below and in `ai/task_*.md`.
 | task_60_gui_ask_after_load | done | a question is asked only after `loaded` (`_pending_query`), and a load that fails drops it with one line in «Системе» |
 | task_61_portable_windows_build | in progress | §4 (the window's own paths, `prologd_gui/paths.py`) and §2–§3 (PyInstaller, the first frozen folder, `tools/check_dependencies.py`) are done and checked; left: `tools/build_portable.ps1`, the zip and the clean-machine run (`ai/task_61_portable_windows_build.md`) |
 | task_63_graphics_rgb | done | the 0…15 palette is gone: a colour is `0xRRGGBB` (`0`…`16777215`, anything else an error), and the names plus `rgb/4` live in `stdlib/graphics.pld` |
+| task_64_interrupt_during_a_run | open | a session solves a request *inside* `dispatch`, so `interrupt` written while a query solves is dispatched only after it — «Остановить» and «Предел времени» fall back on killing the process (the cure is a session that watches the stream while it solves) |
+| task_65_output_in_slices | done | events reach the window in slices (`EVENTS_PER_TURN` = 250 per turn of the event loop), so a program that floods the panes or the picture can still be stopped; nothing is dropped, and over `FLOOD_EVENTS` (20 000/s) the pane says so once |
+| task_66_output_limit | done | «Предел вывода» — the window counts the output events of a run (a text line, a drawing primitive, a trace line) and stops it past the cap; the stream's *decode* is bounded by bytes too |
 
 ## Test suite
 
@@ -3255,3 +3258,89 @@ Added on 2026-10-03 while planning task_59:
   build; `test_graphics.py`, `test_reference.py`, `test_queries.py` and `test_window.py` all
   green; by hand: the four predicates refuse `16777216` and `-1` with the new message and
   accept `16777215`.
+
+* The window and the graphics example, part 96: **a loop that outlived its own limit**
+  (2026-10-06).  Three reports from the user, and one of them was a mistake of the previous
+  round.
+
+  *`drawing.pld` was rewritten wrongly.*  The task_63 rewrite replaced the example's colour
+  numbers with library names — and the fifth argument of `зубы/5` is not a colour but the
+  *number of teeth*: `зубы(220, 320, 20, 40, 10)` became `зубы(220, 320, 20, 40, Зелёный)`,
+  that is 65 280 teeth, and the picture never ended.  Restored: a count is a count, the colours
+  are the names (the unused `зелёный` binding went with it).  The file runs in 0.01 s again and
+  prints `ДА`.
+
+  *Why the window looked frozen.*  The interpreter is not a thread of the window but a
+  **separate process** (`QProcess`, `session.py`), which is what makes a crash, a restart and
+  Ctrl+C cheap.  The window still has to *read* everything that process writes, on its UI
+  thread: a runaway drawing program writes one JSON event per primitive — the teeth loop was
+  more than 300 000 of them — so the event loop is starved for as long as the flood lasts.  The
+  process was fine; the front-end was saturated.  The fix for the case at hand is the example
+  itself; a throttle for the graphics stream is not in the tree.
+
+  *«Предел времени» printed its note and stopped nothing.*  The deadline fires, writes
+  `--- предел времени: N мс, остановлено ---` and sends `interrupt` — and that was all it did.
+  Measured with a probe against `--protocol json`: a session solves a `load` *inside*
+  `dispatch` and reads its next request only once that request is over, so an `interrupt`
+  written while a query is **solving** is never dispatched while the query runs, and the
+  process stays busy for ever.  The case where the request *does* work is a query that is
+  waiting — for input, or at a step point — which is exactly the case
+  `test_stopping_a_query_asks_first_and_keeps_the_base` happens to cover, and why the gap
+  survived two rounds.  `_on_timeout` now arms the same `STOP_GRACE_MS` deadline «Остановить»
+  uses: the request first, the process after half a second.
+
+  *The documents said the opposite.*  The comment in `protocol.cpp`, `window.py`'s
+  `_arm_timeout`, the protocol bullet of `src/gui/README.md` and the paragraph in `doc/gui.typ`
+  all claimed the request reaches a solver — or that it cannot reach a *waiting* program, which
+  is the reverse of what was measured.  All four now say what happens.  The real cure — a
+  session that watches the stream while it solves, so a solving run ends politely and keeps its
+  base — is written down as **task_64** and not attempted here.
+
+  *Verified.*  `ctest` 320/320; `test_graphics.py`, `test_reference.py`, `test_queries.py` and
+  `test_window.py` green (the last with the new solving case: a counting program with a 300 ms
+  limit must leave the session gone, with both notes in the pane); the six documents build;
+  `drawing.pld` finishes in 0.01 s.
+
+  *Also in the tree, not ours.*  The user's own edit of `examples/lessons/lesson_07.pld` moved
+  its `?`-statement count (20 → 21) and left the file off the standard shape: `PINNED` in
+  `test_queries.py` was refreshed, and the file is a fixed point of `--format` again.  The
+  interrupted probe (a program reading input run without `-i`) is a reminded trap: a shipped
+  example that reads must be run with its `<stem>.input.txt`, or the process waits for ever.
+
+* The window survives a flood, part 97: **slices that slice, and a limit that stops the flood
+  itself** (2026-10-06).  task_65 finished properly, task_66 added (both asked for by the user).
+
+  *Why the window still froze.*  The first slicing bounded the *dispatch* of events but not their
+  *decode*: `_on_stdout` fed the whole read to `Decoder.feed` in one call, so a multi-megabyte
+  burst was still parsed in one go and the loop stayed busy.  The decode is now bounded too —
+  `DECODE_BYTES_PER_TURN` (64 KiB) per turn, from a raw byte buffer — and the two half-turns
+  (decode, then dispatch `EVENTS_PER_TURN` events) are both driven by the one-shot drain timer.
+  The same round fixed a defect the change itself introduced: `_start_drain` checked only the
+  event queue, and while the bytes were not yet decoded that queue was empty, so the drain never
+  started at all (`test_session.py` caught it: «queued request lost»).
+
+  *«Предел вывода» stops the flood by itself (task_66).*  A new row in «Выполнение»: how many
+  output events — a line of the program's text, a drawing primitive, a trace line — one run may
+  produce (`execution/max_output_events`, `0` = off).  The window counts what it receives and,
+  past the cap, fires the same escalation as the deadline: the request, then the process after
+  `STOP_GRACE_MS`.  It is the window's guard, not the engine's — which is exactly what a program
+  that floods output needs, because it is the one the polite request never reaches (task_64).  The
+  pane says «предел вывода: N событий, остановлено», and the run-note names the row.
+
+  *Tests.*  The window cases are all bounded now, so no endless program can hang the suite again:
+  a sleeping loop for the time limit, a 60 000-line counter for the flood, and
+  `test_the_output_limit_stops_a_flood` for the new cap — a 100 000-line program with a 1 000-event
+  cap must end by itself and leave the note in the pane.  A watchdog (`os._exit`) guards a long
+  run.
+
+  *The stop itself.*  Using the window still left «Остановить» unanswered while a flood was being
+  *repainted*: the visible panes kept consuming the stream, so the event loop stayed busy and the
+  `STOP_GRACE_MS` deadline — which needs the loop — never fired.  The panes are now fed no more the
+  moment a stop is asked (`_on_output`, `_on_drawn`, `_on_trace`, `_on_flooded` return early), which
+  frees the loop for the deadline.  A happy side effect pinned by the tests: a *bounded* flood drains
+  within the grace, the `loaded` event lands, and the stop is a polite one — the session and the base
+  survive.
+
+  *Verified.*  `test_session.py`, `test_output.py`, `test_settings.py`, `protocol_smoke.py` and the
+  four window tests green; the full `test_window.py` runs in the background; the six documents
+  build.

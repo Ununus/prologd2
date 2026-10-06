@@ -139,6 +139,12 @@ MAX_FINDALL = "execution/max_findall"
 #: the polite-stop machinery (`interrupt`), which also keeps a clock out of the
 #: solver's hot loop.
 TIMEOUT_MILLISECONDS = "execution/timeout_milliseconds"
+#: How many output events (a line of the program's text, a drawing primitive, a
+#: trace line) one run may produce; `0` is off.  Like the timeout it is the
+#: window's own guard, not the engine's — the solver has no idea how much it has
+#: printed — and the answer to a flood is the same escalation: the request, then
+#: the process.
+MAX_OUTPUT_EVENTS = "execution/max_output_events"
 #: Which `prologd` the window runs (task_46).  Empty means «the one the window
 #: was started with» — `--exe`, itself auto-detected when left out.  A row that
 #: names another build takes effect at the next session start, and the status
@@ -224,6 +230,13 @@ DEFAULT_MAX_FINDALL = 1_000_000
 MAXIMUM_MAX_FINDALL = 100_000_000
 DEFAULT_TIMEOUT_MILLISECONDS = 0
 MAXIMUM_TIMEOUT_MILLISECONDS = 3_600_000
+#: The output cap ships *on*: fifty thousand events is more than any lesson prints
+#: or draws, and much less than a runaway produces — the window handles about
+#: twenty thousand a second, so the cap fires on a runaway in a couple of seconds.
+#: A program that needs more raises the row in the dialog; `0` still means
+#: «без предела».
+DEFAULT_MAX_OUTPUT_EVENTS = 50_000
+MAXIMUM_MAX_OUTPUT_EVENTS = 10_000_000
 
 #: task_46's process directory: where a program's relative file paths point.
 #: `file` is the folder of the running file (a new, unsaved buffer falls back to
@@ -350,6 +363,9 @@ SETTINGS: tuple[Setting, ...] = (
     Setting(TIMEOUT_MILLISECONDS, "Предел времени, мс", "Выполнение", "int",
             DEFAULT_TIMEOUT_MILLISECONDS, 0, MAXIMUM_TIMEOUT_MILLISECONDS,
             hint="Остановить программу по времени; 0 — без предела.  Ждущий ввода не прерывается"),
+    Setting(MAX_OUTPUT_EVENTS, "Предел вывода", "Выполнение", "int",
+            DEFAULT_MAX_OUTPUT_EVENTS, 0, MAXIMUM_MAX_OUTPUT_EVENTS, suffix=" событий",
+            hint="Сколько событий вывода (строк и примитивов рисунка) разрешено за один запуск; 0 — без предела.  При превышении прогон останавливается — от потока вывода окно не зависает"),
     Setting(IMPORT_PATHS, "Дополнительные каталоги ИМПОРТ", "Выполнение", "dirs", (),
             hint="Каталоги, в которых ИМПОРТ ищет файлы; передаются интерпретатору как -I, в этом порядке"),
     Setting(INTERPRETER, "Интерпретатор", "Выполнение", "file", "",
@@ -1134,6 +1150,18 @@ class Settings:
     @timeout_milliseconds.setter
     def timeout_milliseconds(self, value: int) -> None:
         self._write(TIMEOUT_MILLISECONDS, int(min(MAXIMUM_TIMEOUT_MILLISECONDS, max(0, value))))
+
+    @property
+    def max_output_events(self) -> int:
+        """How many output events one run may produce; 0 is off."""
+        return int(
+            self._number(MAX_OUTPUT_EVENTS, DEFAULT_MAX_OUTPUT_EVENTS, 0,
+                         MAXIMUM_MAX_OUTPUT_EVENTS)
+        )
+
+    @max_output_events.setter
+    def max_output_events(self, value: int) -> None:
+        self._write(MAX_OUTPUT_EVENTS, int(min(MAXIMUM_MAX_OUTPUT_EVENTS, max(0, value))))
 
     def limits(self) -> dict:
         """The three caps, as the `limits` object of a `load` (protocol 9).

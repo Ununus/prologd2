@@ -305,11 +305,13 @@ class Session {
       return;
     }
     if (command == "interrupt") {
-      // The solver reads the stop flag at every step of its loop, so a query
-      // that is *solving* — a runaway included — ends with `Interrupted`; a
-      // paused step point answers the same request by ending the pause.  What
-      // the request cannot reach is a front-end that never reads, and there the
-      // process has to go.
+      // The stop flag is read by the solver at every step of its loop, but this
+      // request is *dispatched* between two requests: it reaches a query that is
+      // waiting — for input, or at a step point — and a query that is *solving*
+      // reads it only after that query is over.  A front-end that has to end a
+      // runaway politely needs to be watching the stream while the request it
+      // wants to stop is being solved (task_64); until then its own deadline
+      // covers the case, and the process goes.
       engine_.requestStop();
       return;
     }
