@@ -294,6 +294,10 @@ class MainWindow(QMainWindow):
         # they report to exists.
         self._panes: list[Pane] = []
         self._active_pane = 0
+        #: How «Показать в проводнике» shows a file (task_68).  A replaceable seam
+        #: like `_ask_save`: a test must not open a file manager, and no platform's
+        #: file manager can be asked to report whether it worked.
+        self._reveal_path = paths.reveal
         self._editor_splitter = QSplitter(Qt.Orientation.Horizontal)
 
         # The output panel (task_50): three read-only panes — Проблемы, Вывод,
@@ -626,11 +630,18 @@ class MainWindow(QMainWindow):
                 else:
                     action.triggered.connect(slot)
             self._actions[spec.key] = action
+            # The action is added to the window itself as well as to the surfaces
+            # that show it.  A `QAction`'s shortcut works only while the action
+            # belongs to a widget, and a menu that is shown on demand — the tab menu
+            # of task_68 — holds it only while it is open: `Ctrl+E` typed into the
+            # editor went nowhere, while the very same entry worked when clicked.
+            self.addAction(action)
 
     def _slot_for(self, key: str):
         """The method an action runs — one place, so nothing is wired twice."""
         return {
             "new": lambda: self.new_buffer(),
+            "reveal": self._reveal_in_file_manager,
             "open": self._open_file,
             "save": lambda: self.save_buffer(),
             "save_as": self._save_as,
@@ -1207,6 +1218,9 @@ class MainWindow(QMainWindow):
         pane.zoomChanged.connect(self._on_zoom_changed)
         pane.fileDropped.connect(self.open_path)
         pane.queryRequested.connect(self._on_query_requested)
+        pane.tabContextRequested.connect(
+            lambda index, point, pane=pane: self._on_tab_context_requested(pane, index, point)
+        )
         # Which tab is showing decides the window title and the undo state.
         pane.currentChanged.connect(self._on_tab_changed)
         pane.cursorMoved.connect(self._update_details)
@@ -1946,6 +1960,42 @@ class MainWindow(QMainWindow):
         self._session.run_query(text, variable_mode=self._variable_mode())
         self._sync_run_actions()
         self._update_details()
+
+    def _on_tab_context_requested(self, pane: Pane, index: int, point) -> None:
+        """Shows a tab's context menu (task_68)."""
+        self._prepare_tab_menu(pane, index).exec(point)
+
+    def _prepare_tab_menu(self, pane: Pane, index: int) -> QMenu:
+        """Selects the pointed-at tab and builds its menu — showing it is the caller's.
+
+        Made current first: a right click does *not* switch tabs in Qt, and the menu
+        commands act on the tab in front — «Показать в проводнике» has to act on the
+        tab the user pointed at.  The entries are the shared `QAction`s of the action
+        table, so a title, an icon or an enabled state cannot exist twice.  Built in
+        a method of its own so a headless test can look at the menu without opening
+        it: `exec` waits for a click that no test can make.
+        """
+        self._on_pane_activated(pane)
+        pane.setCurrentIndex(index)
+        buffer = pane.current_buffer()
+        self._actions["reveal"].setEnabled(
+            buffer is not None and bool(buffer.model.path)
+        )
+        menu = QMenu(self)
+        for key in actions.TAB_CONTEXT:
+            menu.addAction(self._actions[key])
+        return menu
+
+    def _reveal_in_file_manager(self) -> None:
+        """Shows the file of the current tab where it lives (task_68).
+
+        An unnamed buffer has no file to show, and the menu entry is disabled for
+        it; a file that was never saved cannot be revealed at all.
+        """
+        buffer = self.current_buffer()
+        path = buffer.model.path if buffer is not None else None
+        if path:
+            self._reveal_path(path)
 
     def _on_query_requested(self, statement: str) -> None:
         """Runs one question from the editor's margin — and the answer alone.

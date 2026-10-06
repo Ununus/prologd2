@@ -14,7 +14,7 @@ commands follow `active_pane()`.
 
 from __future__ import annotations
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QPoint, Qt, Signal
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QTabWidget
 
@@ -38,6 +38,10 @@ class Pane(QTabWidget):
     #: A question's marker was clicked in a view's margin; the window runs that
     #: statement alone (task_36).
     queryRequested = Signal(str)
+    #: A tab was right-clicked; the window shows its context menu (task_68).  The
+    #: index is the tab under the cursor — a right click does *not* switch tabs in
+    #: Qt — and the point is already in global coordinates.
+    tabContextRequested = Signal(int, QPoint)
     #: A tab's close button was pressed; the window asks about unsaved changes.
     closeRequested = Signal(object)
     #: The empty part of the tab bar was double clicked: start a new file.
@@ -61,6 +65,14 @@ class Pane(QTabWidget):
         self.currentChanged.connect(self._on_current_changed)
         self.tabBar().tabMoved.connect(self._on_tab_moved)
         self.tabBar().tabBarDoubleClicked.connect(self._on_tab_bar_double_clicked)
+        self.tabBar().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.tabBar().customContextMenuRequested.connect(self._on_tab_bar_context)
+
+    def _on_tab_bar_context(self, point: QPoint) -> None:
+        """A right click on the tab strip: ask the window for the tab's menu."""
+        index = self.tabBar().tabAt(point)
+        if index >= 0:
+            self.tabContextRequested.emit(index, self.tabBar().mapToGlobal(point))
 
     # -- what it shows ------------------------------------------------------
     def buffers(self) -> list[Buffer]:

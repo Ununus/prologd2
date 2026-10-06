@@ -20,8 +20,27 @@ from __future__ import annotations
 
 import os
 import pathlib
+import subprocess
 import sys
 from collections.abc import Iterable
+
+def reveal_command(path: str) -> list[str]:
+    """The command that shows a file where it lives (task_68).
+
+    Windows' own file manager wants the switch and the path as *one* argument, and
+    it reports a failure exit code even when it worked — so nothing checks it.
+    """
+    if sys.platform == "win32":
+        return ["explorer", f"/select,{path}"]
+    if sys.platform == "darwin":
+        return ["open", "-R", path]
+    return ["xdg-open", str(pathlib.Path(path).parent)]
+
+
+def reveal(path: str) -> None:
+    """Shows `path` in the system's file manager."""
+    subprocess.Popen(reveal_command(path))
+
 
 #: The interpreter inside a `data_root()`.
 EXECUTABLE_NAME = "prologd.exe" if os.name == "nt" else "prologd"

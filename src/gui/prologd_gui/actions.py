@@ -116,6 +116,13 @@ ACTIONS: tuple[Action, ...] = (
     Action("save_output", "Сохранить вывод…", "file-save-as"),
     Action("close", "Закрыть вкладку", "file-close", ("Ctrl+W",)),
     Action("close_all", "Закрыть все", "file-close-all"),
+    # Visible where it is useful and nowhere else: the context menu of a tab
+    # (task_68).  It wears the picture of «Открыть…» — both commands open the same
+    # thing, and one drawing is better than two that drift apart.  The keys are a
+    # plain `Ctrl`+letter on purpose: `Shift+Alt+R` (what VS Code uses) never
+    # arrived — on Windows the keyboard-layout switch eats Alt chords, and the
+    # editor simply typed an `R` — while `Ctrl+E` is free and reaches the window.
+    Action("reveal", "Показать в проводнике", "file-open", ("Ctrl+E",)),
     Action("exit", "Выход", "file-exit", ("Ctrl+Q",)),
     # -- edit
     Action("undo", "Отменить", "edit-undo", ("Ctrl+Z",)),
@@ -363,6 +370,12 @@ TOOLBAR: tuple[str, ...] = (
     SEPARATOR,
     "settings",
 )
+
+#: The context menu of an editor *tab* (task_68), built from the same table as
+#: the menu bar and the editor's own menu.  One command for now: the tab knows its
+#: file, and showing it where it lives is what a right click on a tab most often
+#: wants.
+TAB_CONTEXT: tuple[str, ...] = ("reveal",)
 
 #: The editor's context menu, built from the same actions.
 CONTEXT: tuple[str, ...] = (

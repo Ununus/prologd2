@@ -2465,6 +2465,30 @@ def test_the_documented_shortcuts_are_bound(executable: str) -> None:
         discard_changes(window)
 
 
+def test_every_declared_key_belongs_to_a_widget(executable: str) -> None:
+    """A `QAction` fires its shortcut only while it belongs to a widget.
+
+    `Ctrl+E` — «Показать в проводнике» (task_68) — was declared, connected, and did
+    nothing: the action lives in the *tab* menu, which is built when it is opened,
+    so the key had nowhere to fire while a click on the entry worked.  Exactly what
+    made the defect quiet.  `_build_actions` now adds every action to the window as
+    well, and this is the check that keeps it so.
+    """
+    window = empty_window(executable)
+    try:
+        owned = set(window.actions())
+        missing = sorted(
+            key
+            for key, action in window._actions.items()
+            if action.shortcuts() and action not in owned
+        )
+        assert not missing, f"actions that declare a key but belong to no widget: {missing}"
+        assert window._actions["reveal"].shortcuts(), "the tab menu's command keeps its key"
+        print(f"ok: all {len(owned)} window actions are reachable, keys included")
+    finally:
+        discard_changes(window)
+
+
 def test_split_and_merge_follow_the_pane_count(executable: str) -> None:
     """Both commands are enabled according to how many panes there are.
 
@@ -4206,6 +4230,51 @@ def test_a_question_of_a_mode_one_file_keeps_its_names(executable: str) -> None:
     print("ok: a question of a mode-1 file reads its names the way the file does")
 
 
+def test_the_tab_menu_shows_the_clicked_file(executable: str, directory: pathlib.Path) -> None:
+    """A right click on a tab offers «Показать в проводнике» for *that* tab (task_68).
+
+    The menu is built and not shown — `exec` waits for a click no test can make —
+    and the seam that would open a file manager is replaced, so nothing but the
+    window is exercised.  A right click does not switch tabs in Qt, so the tab the
+    user pointed at has to become current first; otherwise the command would act on
+    the tab that happened to be in front.
+    """
+    from prologd_gui import paths
+
+    shown: list[str] = []
+    original = paths.reveal
+    # Patched *before* the window is built: the window takes the seam when it is
+    # constructed, and assigning the attribute afterwards hid a missing one —
+    # `_reveal_path` was never defined and the command crashed at the first click.
+    paths.reveal = shown.append
+    window = empty_window(executable)
+    try:
+        first = directory / "first.pld"
+        second = directory / "second.pld"
+        first.write_text("факт(1).\n", encoding="utf-8", newline="\n")
+        second.write_text("факт(2).\n", encoding="utf-8", newline="\n")
+        assert window.open_path(str(first))
+        assert window.open_path(str(second))
+        pane = window.active_pane()
+
+        pane.setCurrentIndex(1)
+        menu = window._prepare_tab_menu(pane, 0)
+        assert pane.currentIndex() == 0, "the pointed-at tab is the one the menu acts on"
+        assert [entry.text() for entry in menu.actions()] == ["Показать в проводнике"]
+        assert menu.actions()[0].isEnabled(), "a saved file can be shown"
+        menu.actions()[0].trigger()
+        assert shown == [str(first)], shown
+
+        # An unnamed buffer has no file to show, and the entry says so.
+        window.new_buffer()
+        anonymous = window._prepare_tab_menu(pane, pane.currentIndex())
+        assert not anonymous.actions()[0].isEnabled()
+        print("ok: the tab menu shows the clicked tab's file in the file manager")
+    finally:
+        paths.reveal = original
+        discard_changes(window)
+
+
 def main(argv: list[str]) -> int:
     if QApplication is None:
         print("skipped: PySide6 is not installed")
@@ -4225,6 +4294,7 @@ def main(argv: list[str]) -> int:
     test_a_query_is_answered_once(executable)
     test_a_run_is_repeatable(executable)
     test_the_documented_shortcuts_are_bound(executable)
+    test_every_declared_key_belongs_to_a_widget(executable)
     with tempfile.TemporaryDirectory(prefix="prologd_gui_files_") as name:
         files = pathlib.Path(name)
         test_a_file_takes_the_place_of_the_empty_buffer(executable)
@@ -4333,6 +4403,7 @@ def main(argv: list[str]) -> int:
         test_the_document_opens_from_the_package(executable)
         test_the_first_line_sets_the_naming_mode_of_the_highlighting(executable)
         test_a_question_of_a_mode_one_file_keeps_its_names(executable)
+        test_the_tab_menu_shows_the_clicked_file(executable, files)
     print("all window checks passed")
     del application
     return 0

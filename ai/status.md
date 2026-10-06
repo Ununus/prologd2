@@ -165,6 +165,7 @@ entries of the session log below and in `ai/task_*.md`.
 | task_65_output_in_slices | done | events reach the window in slices (`EVENTS_PER_TURN` = 250 per turn of the event loop), so a program that floods the panes or the picture can still be stopped; nothing is dropped, and over `FLOOD_EVENTS` (20 000/s) the pane says so once |
 | task_66_output_limit | done | «Предел вывода» — the window counts the output events of a run (a text line, a drawing primitive, a trace line) and stops it past the cap; the stream's *decode* is bounded by bytes too |
 | task_67_variable_modes | done | `--vars 0\|1\|2` and the lexer rule, the first-line marker `:- ИМЕНА(N).` with its own diagnostic, the window (row, highlighter, and the file's mode travelling with `load`/`query`/`format` — protocol 12), `examples/lessons/_old/` (six files) plus the three new old-format examples checked like lessons, and the documents |
+| task_68_tab_context_menu | done | a right click on a tab shows a menu built from `actions.TAB_CONTEXT` — «Показать в проводнике» (`explorer /select,<path>` and its two cousins), with the picture of «Открыть…» and the keys `Ctrl+E`; the pointed-at tab is made current first, the entry follows the buffer's path, and the command goes through a replaceable seam |
 
 ## Test suite
 
@@ -3419,3 +3420,55 @@ Added on 2026-10-03 while planning task_59:
   `protocol_session.cmake` and `test_reference.py` green); every converted file, run whole,
   prints exactly its `%!` lines; the window, highlighter, settings, formatter, session,
   tokenizer and protocol checks green, and the three touched documents compile.
+
+* The tab menu, part 99: **a right click on a tab, and the file it shows** (2026-10-06).
+  task_68, asked for by the user («давай пока сделаем контекстное меню с одним пунктом —
+  показать в проводнике»), and finished the same day with the picture and the keys.
+
+  *One item, one table.*  `actions.py` gained the action `reveal` and the list `TAB_CONTEXT`
+  beside `CONTEXT`, so the tab menu is built from the same table as the menu bar, the toolbar
+  and the editor's own menu — a title, an icon or an enabled state cannot exist twice.  The
+  entry wears `file-open`, the picture of «Открыть…»: both commands open the same thing, and
+  one drawing is better than two that drift apart.  Its keys are `Ctrl+E`.  They began as
+  `Shift+Alt+R` — what VS Code uses for the same command — but that never reached the window:
+  on Windows the keyboard-layout switch eats Alt chords and the editor typed a bare `R`, so a
+  plain `Ctrl`+letter is the honest choice (`Ctrl+Shift+E` is the familiar alternative, free as
+  well).  `Pane` asks for the
+  menu (`CustomContextMenu` on the tab bar) and reports the clicked tab and the point; the
+  menu belongs to the window, as every other command does.
+
+  *The tab under the cursor.*  A right click does not switch tabs in Qt, so `_prepare_tab_menu`
+  makes the pointed-at tab current before it builds the menu — otherwise «Показать в
+  проводнике» would have acted on the tab that happened to be in front.  A saved file enables
+  the entry, an unnamed buffer disables it.  The menu is built in a method of its own, because
+  `exec` waits for a click no test can make, and the command goes through `Window._reveal_path`,
+  a replaceable seam: a test must not open a file manager.  `paths.reveal_command` is the
+  platform's own call — `explorer /select,<path>` as *one* argument (written apart, `explorer`
+  opens «Документы»), `open -R` on macOS, `xdg-open` elsewhere — and no exit code is checked,
+  because `explorer` reports failure even when it worked.
+
+  *A defect the seam itself hid.*  The first version never defined `_reveal_path` — the edit
+  that was meant to add it anchored on a line that occurs twice in the window — and the command
+  crashed on the first click.  The test did not see it: it *assigned* the attribute after the
+  window was built, which works whether or not the attribute is defined.  It now patches
+  `paths.reveal` *before* the window is constructed, so the real `_reveal_in_file_manager` runs
+  and a missing seam fails the test.  Two more slips of the same round: the board row was
+  written twice (the tool had reported the first attempt as failed) and the journal entry was
+  not written at all — both found by reading the file instead of trusting the report.
+
+  *Verified.*  `test_paths.py` (the command of the platform), `test_window.py` (the menu acts
+  on the clicked tab, the entry follows the buffer's path, the seam receives exactly that
+  path), `test_icons.py` and `test_shortcuts.py` green around them.
+
+  *Also in the tree, not ours.*  The user redrew fourteen icons of the window and asked for a
+  commit; `src/gui/assets/csu.png` turned out to be referenced by nothing — the emblems the
+  documents and the portable package use live in `doc/` — so it left with the same commit
+  (`f8d116e`).
+
+  *Why the key said nothing.*  The second key, `Ctrl+E`, was declared, connected and shown —
+  and typing it in the editor did nothing, while a click on the menu entry worked.  A
+  `QAction` fires its shortcut only while it belongs to a widget, and a menu that is built
+  when it is opened holds the action only while it is open: the key had nowhere to fire.
+  `_build_actions` now adds every action to the window itself, and
+  `test_every_declared_key_belongs_to_a_widget` holds that — a key declared with no widget
+  behind it is exactly the silence the first attempt looked like.
