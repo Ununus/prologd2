@@ -169,6 +169,7 @@ entries of the session log below and in `ai/task_*.md`.
 | task_69_open_import | done | `F12` opens the file an `ИМПОРТ` directive names, in a tab: `paths.resolve_import` repeats the interpreter's search order (the importing file's folder, the `-I` folders, `stdlib`), the menu entry is enabled only while the caret sits on such a line, and `tokens.literal_text` unwraps the quoted name the editor's tokenizer hands over |
 | task_70_variable_mode_row | done | the window's «Имена переменных» row lost «по первой строке файла» — it said exactly what «как в ISO» said (the marker beats the row in the engine *and* in the window, and mode 0 never travels on the wire); three items now with ISO as the default, and a settings file still holding the old `auto` reads as `0` |
 | task_71_output_tab_menu | done | a right click on the output panel's «Вывод» tab offers «Очистить вывод» — the shared `clear_output` `QAction` of the action table (the one `Ctrl+L` reaches), offered on that tab alone and without switching tabs, because the command acts on the pane and not on the tab in front (the titles carry a counter, so the tab is told apart by the pane it shows) |
+| task_72_pld_prose | done | the «это А, а не Б» construction is gone from twenty places in sixteen `.pld` files — statements only, the five exercise questions keep the contrast because it *is* the question; the teacher's own edits were finished (two more `%!` answers for the new students, a missing final newline, a typo), and `test_queries.py`'s `PINNED` was refreshed after being red since task_67 |
 
 ## Test suite
 
@@ -3549,3 +3550,29 @@ doc/gui.typ` без замечаний.
 
 *Verified.*  `test_window.py` (новый кейс «the output tab's menu clears the pane»),
 `test_shortcuts.py` — зелёные; `typst compile doc/gui.typ` без замечаний.
+
+### 103. Проза в примерах: «А, а не Б» — одно утверждение (2026-10-06)
+
+Учитель поправил три файла старого формата сам (`use_old_names.pld`, `old_lib.pld`,
+`old_lib_2.pld`: проза короче, у `студент/1` прибавилось два факта — `студент('Вася').`
+и `студент(Гоша).`, — и появилась строка про `F12`) и попросил сократить в примерах
+конструкции вида «это А, а не Б»: либо одно утверждение, либо два отдельных.
+
+Две правки, которые без проверки прошли бы мимо: у `old_lib_2.pld` не было перевода
+строки в конце файла, а ответы `use_old_names.pld` остались прежними — с двумя новыми
+студентами их стало четыре (`Кто=Боря`, `Кто=Вова`, `Кто=Вася`, `Кто=Гоша`).
+`test_lessons.cpp` такое и ловит: он сверяет весь вывод с `%!`-строками файла.
+
+Конструкцию переписал в двадцати местах шестнадцати файлов — там, где это было
+утверждение.  Вопросы-упражнения («Почему xor/4 записан двумя предложениями, а не
+одним?») оставлены: в них контраст и есть вопрос.  Заодно попались зеркальные «это не
+А, а Б» — переписаны так же.
+
+*Нашлось по дороге.*  `src/gui/tests/test_queries.py` был красным с task_67: счётчики
+старых уроков (`lesson_1` 15→24, `lesson_3` 1→5, `lesson_4` 3→13, `lesson_6` 2→3) и три
+новых примера (`lib/old_lib.pld`, `lib/old_lib_2.pld`, `use_old_names.pld`) в `PINNED`
+не попали.  Этот файл не входит в `ctest`, и красным его никто не видел; таблица
+обновлена по `--print`.
+
+*Verified.*  `ctest` 330/330 (в том числе сверка примеров с их `%!` и с выводом
+форматтера), `test_queries.py` — 405 вопросов в 42 примерах, как в таблице.
