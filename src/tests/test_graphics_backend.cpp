@@ -28,6 +28,31 @@ int setCells(const BitmapGraphicsBackend& backend) {
 
 }  // namespace
 
+TEST_CASE("the screen can be made another size, and it starts empty") {
+  BitmapGraphicsBackend backend(kWidth, kHeight);
+  backend.setPixel(1, 1, 7);
+  REQUIRE(backend.at(1, 1) == 7);
+
+  // A front-end asks for another screen before a run (task_73): the buffer becomes
+  // that size, and the previous picture is thrown away — a snapshot of what the run
+  // before drew would be a lie.
+  const int wider = kWidth + 4;
+  const int taller = kHeight + 2;
+  backend.reset(wider, taller);
+  REQUIRE(backend.width() == wider);
+  REQUIRE(backend.height() == taller);
+  REQUIRE(backend.pixels().size() == static_cast<std::size_t>(wider) * taller);
+  REQUIRE(setCells(backend) == 0);
+  REQUIRE(backend.at(1, 1) == 0);
+  REQUIRE(backend.getPixel(wider - 1, taller - 1) == 0);
+
+  // A size of zero or less keeps the default, the way the two-argument
+  // constructor treats it.
+  backend.reset(0, 0);
+  REQUIRE(backend.width() == kMaxGrX);
+  REQUIRE(backend.height() == kMaxGrY);
+}
+
 TEST_CASE("a point lands in the one cell it names") {
   BitmapGraphicsBackend backend(kWidth, kHeight);
   REQUIRE(backend.width() == kWidth);

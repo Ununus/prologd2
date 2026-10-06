@@ -34,7 +34,9 @@ from typing import Any, Iterator
 #: 11: `load` takes `printQuestions` — a run question echoes itself (`?цель.`)
 #:    before its answer, the way `-q` does on the command line (task_46).
 #: 12: `load`, `query` and `format` carry the naming mode (`vars`, task_67).
-PROTOCOL_VERSION = 12
+#: 13: `load` and `query` take the `screen` the picture is drawn on (`width` and
+#:    `height`), and `ready` carries the engine's own screen (task_73).
+PROTOCOL_VERSION = 13
 
 #: Event names the interpreter emits.
 EVENTS = ("ready", "output", "result", "input_request", "step", "trace", "graphics",
@@ -99,7 +101,8 @@ def load_text(text: str, name: str = "<buffer>", *, step: bool = False,
               trace: bool = False, questions: bool = True,
               print_questions: bool = False,
               limits: dict | None = None,
-              variable_mode: int = 0) -> bytes:
+              variable_mode: int = 0,
+              screen: tuple[int, int] | None = None) -> bytes:
     """Loads program text (the editor buffer).
 
     `step` makes the run stop at its first step point and wait for a `step`
@@ -119,6 +122,8 @@ def load_text(text: str, name: str = "<buffer>", *, step: bool = False,
     `variable_mode` is how this run reads names that no marker in the file has
     settled (protocol 12, task_67): 0 is the ISO reading, 1 and 2 the old
     dialect's, and a file's own `:- ИМЕНА(N).` line wins over all of them.
+
+    `screen` is the size of the picture the run draws on (protocol 13, task_73).
     """
     return encode_request(
         cmd="load", text=text, name=name,
@@ -126,12 +131,14 @@ def load_text(text: str, name: str = "<buffer>", *, step: bool = False,
                  print_questions=print_questions),
         **_limits(limits),
         **_variable_mode(variable_mode),
+        **_screen(screen),
     )
 
 
 def load_file(path: str, *, step: bool = False, trace: bool = False,
               questions: bool = True, print_questions: bool = False,
-              limits: dict | None = None, variable_mode: int = 0) -> bytes:
+              limits: dict | None = None, variable_mode: int = 0,
+              screen: tuple[int, int] | None = None) -> bytes:
     """Loads a program from disk; imports resolve against `-I` directories."""
     return encode_request(
         cmd="load", path=path,
@@ -139,11 +146,12 @@ def load_file(path: str, *, step: bool = False, trace: bool = False,
                  print_questions=print_questions),
         **_limits(limits),
         **_variable_mode(variable_mode),
+        **_screen(screen),
     )
 
 
 def query(text: str, *, step: bool = False, trace: bool = False,
-          variable_mode: int = 0) -> bytes:
+          variable_mode: int = 0, screen: tuple[int, int] | None = None) -> bytes:
     """Runs one statement, usually `?Goal.`.
 
     `variable_mode` is how *this statement* reads names (task_67): a question typed
@@ -151,9 +159,13 @@ def query(text: str, *, step: bool = False, trace: bool = False,
     file's first line, so it has to be told what the program it asks reads —
     otherwise `?студент(Вова, Корчагин).` of a mode-1 program would read the two
     names as variables instead of the constants the file meant.
+
+    `screen` is the size of the picture this statement draws on (protocol 13): the
+    graphics window is live while a question is answered, so a question carries the
+    screen the question before it used.
     """
     return encode_request(cmd="query", text=text, **_flags(step=step, trace=trace),
-                          **_variable_mode(variable_mode))
+                          **_variable_mode(variable_mode), **_screen(screen))
 
 
 def graphics_snapshot() -> bytes:
@@ -245,6 +257,20 @@ def _variable_mode(mode: int) -> dict:
     `:- ИМЕНА(N).` line still wins over whatever travels here.
     """
     return {"vars": int(mode)} if int(mode) else {}
+
+
+def _screen(size: tuple[int, int] | None) -> dict:
+    """The screen the picture is drawn on (protocol 13, task_73).
+
+    The engine's own screen is 600 × 600; a front-end that shows another size names
+    it here, and the buffer becomes that size — cleared, because the picture belongs
+    to the run that drew it.  `None` leaves the engine's default alone, the way a
+    zero naming mode is left off the wire.
+    """
+    if size is None:
+        return {}
+    width, height = size
+    return {"screen": {"width": int(width), "height": int(height)}}
 
 
 def input_answer(text: str) -> bytes:

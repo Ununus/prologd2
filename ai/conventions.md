@@ -120,7 +120,7 @@ Tests are written **together with** the feature, never after.
   the version with `PROLOGD_BUILD_DATE` — a `string(TIMESTAMP … UTC)` taken when CMake
   configures, so a bump is a reconfigure (the build does that by itself).
 * The **protocol version is a counter of its own** (`PROTOCOL_VERSION` in
-  `src/gui/prologd_gui/protocol.py`, 12 as of 2.1.0, pinned by `protocol_smoke.py` and
+  `src/gui/prologd_gui/protocol.py`, 13 as of 2.1.0, pinned by `protocol_smoke.py` and
   `test_formatter.py`): it moves when the protocol moves, not when the program does.
 * The **naming mode** is a property of a *file*, never of a build: the first line
   `:- ИМЕНА(N).` beats `--vars` and the window's row, and an imported file is read in

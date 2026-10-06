@@ -26,9 +26,12 @@ import math
 import struct
 from array import array
 
-#: The screen of the original interpreter — `kMaxGrX`/`kMaxGrY` in the engine.
-MAX_GR_X = 1024
-MAX_GR_Y = 768
+#: The screen a canvas is made with before the first snapshot — the engine's own
+#: default (`kMaxGrX`/`kMaxGrY`, 600 × 600 since task_73).  The size itself arrives
+#: with every `bitmap`, so this is only the answer for a picture nothing has drawn
+#: on yet: what the engine is asked for is the pair of rows in the window's settings.
+MAX_GR_X = 600
+MAX_GR_Y = 600
 
 #: How far outside the screen a coordinate is pulled back before it is used, the
 #: same number as `kCoordinateLimit` in the engine: a program may draw from
@@ -102,6 +105,19 @@ class Canvas:
         self.values = array("I", bytes(4 * self.width * self.height))
         # Opaque from the start: a bytearray of zeros is *transparent* black, and
         # an untouched screen showed the desktop through the window.
+        self.rgba = bytearray(_rgba(BLANK) * (self.width * self.height))
+
+    def reset(self, width: int, height: int) -> None:
+        """Makes the canvas another size, and clears it (task_73).
+
+        The screen is a setting now, and a canvas of another size would clip the
+        picture where the engine did not: the window makes its canvas the size of
+        the screen the next run draws on, and a resize starts from a blank picture,
+        the way `ЗАКРАСКА` from the corner would.
+        """
+        self.width = max(1, int(width))
+        self.height = max(1, int(height))
+        self.values = array("I", bytes(4 * self.width * self.height))
         self.rgba = bytearray(_rgba(BLANK) * (self.width * self.height))
 
     # -- reading -----------------------------------------------------------

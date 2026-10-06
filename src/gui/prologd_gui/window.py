@@ -1617,12 +1617,29 @@ class MainWindow(QMainWindow):
             self._append_note(note)
         self._output_events = 0
         self._arm_timeout()
+        # A canvas that is already there follows the setting too (task_73): the
+        # engine draws on the new screen, and the window must not keep clipping the
+        # picture at the old one.  Only on a change — a resize clears the picture.
+        if self._canvas is not None and (
+            (self._canvas.width, self._canvas.height) != self._settings.screen_size
+        ):
+            self._canvas.reset(*self._settings.screen_size)
+            if self._graphics_window is not None:
+                self._graphics_window.refresh()
+        # A canvas that is already there follows the setting too (task_73): the
+        # engine will draw on the new screen, and the window must not keep clipping
+        # the picture at the old one.  Only on a change — resizing clears it.
+        if self._canvas is not None and (
+            (self._canvas.width, self._canvas.height) != self._settings.screen_size
+        ):
+            self._canvas.reset(*self._settings.screen_size)
         if path is not None and not buffer.is_modified():
             # A saved, unmodified buffer is loaded by path: `ИМПОРТ` resolves
             # against the file's own directory and diagnostics name the file.
             self._session.load_file(path, step=step, trace=trace, questions=questions,
                                     print_questions=self._settings.print_questions,
                                     limits=limits,
+                                    screen=self._settings.screen_size,
                                     variable_mode=buffer.variable_mode())
             self._status.setText(f"выполняется {pathlib.Path(path).name}")
         else:
@@ -1639,6 +1656,7 @@ class MainWindow(QMainWindow):
                                     trace=trace, questions=questions,
                                     print_questions=self._settings.print_questions,
                                     limits=limits,
+                                    screen=self._settings.screen_size,
                                     variable_mode=buffer.variable_mode())
             name = pathlib.Path(path).name if path else buffer.title()
             self._status.setText(f"выполняется {name} (есть несохранённые правки)")
@@ -1646,9 +1664,12 @@ class MainWindow(QMainWindow):
 
     # -- the graphics window (task_45) -------------------------------------
     def canvas(self) -> graphics.Canvas:
-        """The picture, created on first use."""
+        """The picture, created on first use — the size of the screen of the run."""
         if self._canvas is None:
-            self._canvas = graphics.Canvas()
+            # The engine draws on the screen the settings name (task_73), and this
+            # canvas is that same screen: a canvas of another size would clip the
+            # picture where the engine did not.
+            self._canvas = graphics.Canvas(*self._settings.screen_size)
         return self._canvas
 
     def graphics_window(self) -> graphicswindow.GraphicsWindow:
@@ -1979,7 +2000,8 @@ class MainWindow(QMainWindow):
         # A goal typed into the line answers into the output panel: asking it with
         # that panel hidden would look like nothing happened at all (part 92).
         self._reveal_output_panel()
-        self._session.run_query(text, variable_mode=self._variable_mode())
+        self._session.run_query(text, variable_mode=self._variable_mode(),
+                                screen=self._settings.screen_size)
         self._sync_run_actions()
         self._update_details()
 
@@ -2158,7 +2180,8 @@ class MainWindow(QMainWindow):
         if statement is None:
             return
         self._arm_answer_table()
-        self._session.run_query(statement, variable_mode=self._variable_mode())
+        self._session.run_query(statement, variable_mode=self._variable_mode(),
+                                screen=self._settings.screen_size)
 
     def _drop_pending_query(self, note: str = "") -> None:
         """Forgets a question whose program never loaded, saying so if asked.

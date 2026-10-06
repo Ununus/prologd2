@@ -44,7 +44,15 @@ using Json = nlohmann::json;
 ///    (`?цель.`) before its answer, the way `-q` does on the command line
 ///    (task_46: `questions` was split into *run* and *print*).
 // 12: `load`, `query` and `format` carry the naming mode (`vars`, task_67).
-constexpr int kProtocolVersion = 12;
+// 13: `load` and `query` take the `screen` the picture is drawn on (`width`
+//    and `height`), and `ready` carries the engine's own screen (task_73).
+constexpr int kProtocolVersion = 13;
+
+/// The screen a front-end may ask for: small enough to stay cheap both in memory
+/// and on the wire (a snapshot is `width × height × 4` bytes), large enough for a
+/// lesson's picture.
+constexpr int kMinScreen = 16;
+constexpr int kMaxScreen = 2048;
 
 [[nodiscard]] std::string graphicsOpName(GraphicsOp op) {
   switch (op) {
@@ -241,7 +249,12 @@ class Session {
     emit(Json{{"event", "ready"},
               {"protocol", kProtocolVersion},
               {"version", std::string(versionString())},
-              {"keywords", keywordList()}});
+              {"keywords", keywordList()},
+              // The screen the picture is drawn on (task_73): a front-end may show
+              // it before anything is drawn, and its own default has to agree with
+              // this number rather than assume the one the first version had.
+              {"screen", Json{{"width", graphics_->width()},
+                               {"height", graphics_->height()}}}});
 
     std::string line;
     while (std::getline(in_, line)) {
@@ -341,6 +354,27 @@ class Session {
       return;
     }
     engine_.options().variableMode = static_cast<prologd::VariableMode>(vars);
+    // The screen the picture is drawn on (task_73).  A front-end names the size it
+    // shows, and the buffer becomes that size — cleared, because a picture belongs
+    // to the run that drew it.  A request without `screen` keeps the engine's own
+    // default, and `ready` says which one that is.
+    if (request.contains("screen")) {
+      const Json& screen = request.at("screen");
+      if (!screen.is_object()) {
+        fail("protocol", command + ": screen должен быть объектом с width и height");
+        return;
+      }
+      const int width = screen.value("width", graphics_->width());
+      const int height = screen.value("height", graphics_->height());
+      if (width < kMinScreen || width > kMaxScreen || height < kMinScreen ||
+          height > kMaxScreen) {
+        fail(command, command + ": размер экрана должен быть от " +
+                                 std::to_string(kMinScreen) + " до " +
+                                 std::to_string(kMaxScreen) + " точек");
+        return;
+      }
+      graphics_->reset(width, height);
+    }
     const bool stepping = request.value("step", false);
     if (stepping) {
       armStepping();

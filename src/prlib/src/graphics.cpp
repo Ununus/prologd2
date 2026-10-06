@@ -79,10 +79,15 @@ void RecordingGraphicsBackend::horizontal(long long x1, long long x2, long long 
 
 BitmapGraphicsBackend::BitmapGraphicsBackend() : BitmapGraphicsBackend(kMaxGrX, kMaxGrY) {}
 
-BitmapGraphicsBackend::BitmapGraphicsBackend(int width, int height)
-    : width_(width > 0 ? width : kMaxGrX),
-      height_(height > 0 ? height : kMaxGrY),
-      pixels_(static_cast<std::size_t>(width_) * static_cast<std::size_t>(height_), 0) {}
+BitmapGraphicsBackend::BitmapGraphicsBackend(int width, int height) {
+  reset(width, height);
+}
+
+void BitmapGraphicsBackend::reset(int width, int height) {
+  width_ = width > 0 ? width : kMaxGrX;
+  height_ = height > 0 ? height : kMaxGrY;
+  pixels_.assign(static_cast<std::size_t>(width_) * static_cast<std::size_t>(height_), 0);
+}
 
 void BitmapGraphicsBackend::setSink(Sink sink) { sink_ = std::move(sink); }
 

@@ -184,6 +184,17 @@ INPUT_MODES = ("panel", "dialog")
 VARIABLE_MODE = "execution/variable_mode"
 VARIABLE_MODES = ("0", "1", "2")
 
+#: The screen the graphics predicates draw on (task_73).  The engine's own default
+#: is the same 600 × 600 (`kMaxGrX`/`kMaxGrY`): the whole buffer travels to the
+#: window in a snapshot and ЗАКРАСКА walks it cell by cell, so the picture is as
+#: big as it needs to be and no bigger.  A lesson that wants the old screen asks
+#: for 1024 × 768 in these two rows.
+SCREEN_WIDTH = "execution/screen_width"
+SCREEN_HEIGHT = "execution/screen_height"
+DEFAULT_SCREEN_SIZE = 600
+MINIMUM_SCREEN_SIZE = 16
+MAXIMUM_SCREEN_SIZE = 2048
+
 MINIMUM_FONT_SIZE = 6.0
 MAXIMUM_FONT_SIZE = 72.0
 
@@ -376,6 +387,14 @@ SETTINGS: tuple[Setting, ...] = (
     Setting(MAX_OUTPUT_EVENTS, "Предел вывода", "Выполнение", "int",
             DEFAULT_MAX_OUTPUT_EVENTS, 0, MAXIMUM_MAX_OUTPUT_EVENTS, suffix=" событий",
             hint="Сколько событий вывода (строк и примитивов рисунка) разрешено за один запуск; 0 — без предела.  При превышении прогон останавливается — от потока вывода окно не зависает"),
+    Setting(SCREEN_WIDTH, "Ширина графического экрана", "Выполнение", "int",
+            DEFAULT_SCREEN_SIZE, MINIMUM_SCREEN_SIZE, MAXIMUM_SCREEN_SIZE,
+            suffix=" точек",
+            hint="Размер буфера, в котором рисуют графические предикаты.  Он же уезжает в окно снимком, а закраска обходит его по клеткам: чем больше экран, тем дороже каждый кадр.  600 — умолчание, 1024 × 768 — как было в первой версии"),
+    Setting(SCREEN_HEIGHT, "Высота графического экрана", "Выполнение", "int",
+            DEFAULT_SCREEN_SIZE, MINIMUM_SCREEN_SIZE, MAXIMUM_SCREEN_SIZE,
+            suffix=" точек",
+            hint="Высота того же буфера; вместе с шириной задаёт экран (раздел 6.5).  Новый размер применяется со следующего запуска"),
     Setting(VARIABLE_MODE, "Имена переменных", "Выполнение", "choice",
             DEFAULT_VARIABLE_MODE,
             choices=(("0", "как в ISO: переменная с большой буквы"),
@@ -1198,6 +1217,26 @@ class Settings:
     @max_output_events.setter
     def max_output_events(self, value: int) -> None:
         self._write(MAX_OUTPUT_EVENTS, int(min(MAXIMUM_MAX_OUTPUT_EVENTS, max(0, value))))
+
+    @property
+    def screen_size(self) -> tuple[int, int]:
+        """The screen the graphics predicates draw on: `(width, height)` (task_73).
+
+        Sent with every run, so the buffer is the size the window shows; a request
+        that names no size keeps the engine's own default, which is the same
+        600 × 600.  Two rows rather than one so a hand-edited file cannot hold a
+        size the dialog would have to parse.
+        """
+        width = self._number(SCREEN_WIDTH, DEFAULT_SCREEN_SIZE, MINIMUM_SCREEN_SIZE,
+                             MAXIMUM_SCREEN_SIZE)
+        height = self._number(SCREEN_HEIGHT, DEFAULT_SCREEN_SIZE, MINIMUM_SCREEN_SIZE,
+                              MAXIMUM_SCREEN_SIZE)
+        return (int(width), int(height))
+
+    @screen_size.setter
+    def screen_size(self, size) -> None:
+        for key, value in zip((SCREEN_WIDTH, SCREEN_HEIGHT), size, strict=True):
+            self._write(key, int(min(MAXIMUM_SCREEN_SIZE, max(MINIMUM_SCREEN_SIZE, value))))
 
     def limits(self) -> dict:
         """The three caps, as the `limits` object of a `load` (protocol 9).

@@ -261,24 +261,30 @@ class PrologSession(QObject):
                   trace: bool = False, questions: bool = True,
                   print_questions: bool = False,
                   limits: dict | None = None,
-                  variable_mode: int = 0) -> None:
+                  variable_mode: int = 0,
+                  screen: tuple[int, int] | None = None) -> None:
         self._send(protocol.load_text(text, name, step=step, trace=trace,
                                       questions=questions,
                                       print_questions=print_questions,
                                       limits=limits,
-                                      variable_mode=variable_mode))
+                                      variable_mode=variable_mode,
+                                      screen=screen))
 
     def load_file(self, path: str, *, step: bool = False, trace: bool = False,
                   questions: bool = True, print_questions: bool = False,
-                  limits: dict | None = None, variable_mode: int = 0) -> None:
+                  limits: dict | None = None, variable_mode: int = 0,
+                  screen: tuple[int, int] | None = None) -> None:
         self._send(protocol.load_file(path, step=step, trace=trace, questions=questions,
                                       print_questions=print_questions,
                                       limits=limits,
-                                      variable_mode=variable_mode))
+                                      variable_mode=variable_mode,
+                                      screen=screen))
 
     def run_query(self, text: str, *, step: bool = False, trace: bool = False,
-                  variable_mode: int = 0) -> None:
-        self._send(protocol.query(text, step=step, trace=trace, variable_mode=variable_mode))
+                  variable_mode: int = 0,
+                  screen: tuple[int, int] | None = None) -> None:
+        self._send(protocol.query(text, step=step, trace=trace,
+                                  variable_mode=variable_mode, screen=screen))
 
     def answer_input(self, text: str) -> None:
         self._awaiting_input = False

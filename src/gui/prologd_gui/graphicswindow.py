@@ -164,7 +164,9 @@ class GraphicsWindow(QWidget):
         self._fit_action = self._toolbar.addAction("Вписать в окно")
         self._fit_action.setCheckable(True)
         self._fit_action.setChecked(True)
-        self._fit_action.setToolTip("Показывать весь экран 1024×768 целиком")
+        self._fit_action.setToolTip(
+            f"Показывать весь экран {canvas.width}×{canvas.height} целиком"
+        )
         self._fit_action.toggled.connect(self._set_fit)
         self._scale_action = self._toolbar.addAction("1 : 1")
         self._scale_action.setToolTip("Одна точка программы — один пиксель на экране")
@@ -211,6 +213,12 @@ class GraphicsWindow(QWidget):
         if not self._fit_action.isChecked():
             self._view.setMinimumSize(self._canvas.width, self._canvas.height)
             self._view.setMaximumSize(self._canvas.width, self._canvas.height)
+        # The screen is a setting now (task_73), so the entry that fits the whole
+        # picture names the picture it fits — otherwise it would keep naming the
+        # default it was built with.
+        self._fit_action.setToolTip(
+            f"Показывать весь экран {self._canvas.width}×{self._canvas.height} целиком"
+        )
         self._view.update()
 
     def clear_picture(self) -> None:

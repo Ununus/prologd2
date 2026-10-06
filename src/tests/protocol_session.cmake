@@ -37,7 +37,8 @@ execute_process(
 
 set(expected_events
   "{\"event\":\"ready\","
-  "\"protocol\":12"
+  "\"protocol\":13"
+  "\"screen\":{\"height\":600,\"width\":600}"
   "\"keywords\":"
   "{\"event\":\"result\",\"found\":true}"
   "{\"event\":\"loaded\"}"
@@ -501,11 +502,11 @@ string(FIND "${events}" "\"event\":\"bitmap\"" position)
 if(position EQUAL -1)
   message(FATAL_ERROR "The snapshot did not come back\n--- got ---\n${events}")
 endif()
-string(FIND "${events}" "\"width\":1024" position)
+string(FIND "${events}" "\"width\":600" position)
 if(position EQUAL -1)
   message(FATAL_ERROR "The snapshot must be the engine's screen\n--- got ---\n${events}")
 endif()
-string(FIND "${events}" "\"height\":768" position)
+string(FIND "${events}" "\"height\":600" position)
 if(position EQUAL -1)
   message(FATAL_ERROR "The snapshot must be the engine's screen\n--- got ---\n${events}")
 endif()

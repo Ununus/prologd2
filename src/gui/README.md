@@ -509,7 +509,8 @@ maximised window and a display that is no longer there).
 `graphicswindow.GraphicsWindow` is a window of its own (`Qt.Window`, *owned* by
 the main window — without that flag a `QWidget` with a parent is a child widget
 and the picture would be embedded in the editor).  Its toolbar has «Вписать в
-окно» (the whole 1024×768 screen in the window), «1 : 1» (one cell per screen
+окно» (the whole screen in the window — 600×600 by default since task_73), «1 : 1» (one
+cell per screen
 pixel, with the scroll area doing the moving), «Очистить» (the *window's* picture
 — the interpreter's screen belongs to the program, and a new run starts a fresh
 interpreter and clears the canvas with it) and «Сохранить как PNG…»; to the right
@@ -1018,7 +1019,7 @@ is found — draws a program, asks for the finished bitmap and replays the very
 events the same session reported, so the two rasterisers (C++ and Python) cannot
 drift apart quietly.
 
-## Protocol contract (version 12)
+## Protocol contract (version 13)
 
 One JSON object per line in both directions; the interpreter writes nothing else
 to stdout.  The C++ side lives in `src/cli/protocol.cpp`, the Python side in
@@ -1044,7 +1045,11 @@ version 12 adds `vars` to `load`, `query` and `format` — the naming mode (0, 1
 task_67), the window's half of `--vars`, which a file's own `:- ИМЕНА(N).` first
 line overrides for that file.  A `query` needs it because a single statement
 carries no first line of its own: without it a question clicked on a margin marker
-would read a mode-1 program's constants as variables.
+would read a mode-1 program's constants as variables.  Version 13 adds `screen` to
+`load` and `query` — the size of the picture the run draws on (`width` and `height`,
+16 … 2048; task_73) — and the same object to `ready`, which is how a front-end knows
+the screen before it asks for a snapshot; a request without it keeps the engine's
+own 600 × 600.
 Version 1 sessions are still understood by the Python client (the table is then
 empty and completion falls back to the document's own predicates).
 
@@ -1115,20 +1120,22 @@ A window that was not open while the program drew asks for the picture instead o
 starting blank:
 
 ```json
-{"event":"bitmap","width":1024,"height":768,"data":"AwAAAA…"}
+{"event":"bitmap","width":600,"height":600,"data":"AwAAAA…"}
 ```
 
 `data` is base64 of `width × height` **four-byte little-endian colour values** —
 the program's own numbers, not ARGB, so a replayed picture and a snapshot are
 comparable cell by cell (`protocol_smoke.py` compares them for a program that
 draws one of everything, and `test_graphics.py` does it for a whole drawing).
-The screen is 1024×768, it starts black, and a primitive outside it is clipped.
+The screen is 600×600 by default (the window's «Ширина/высота графического экрана»
+rows, task_73 — the old 1024×768 is two settings away), it starts black, and a
+primitive outside it is clipped.
 
 ### Events
 
 | Event | Meaning |
 |-------|---------|
-| `{"event":"ready","protocol":11,"version":"2.1.0","keywords":[…]} `| the session is up |
+| `{"event":"ready","protocol":13,"version":"2.1.0","screen":{"height":600,"width":600},"keywords":[…]} `| the session is up |
 | `{"event":"output","text":"…"}` | program output (`ВЫВОД`, query results) — **one event per written line** since task_49, so it arrives while the program is still running; text written without a line end goes out with the end of the request (and a prompt with the `input_request` that follows it) |
 | `{"event":"result","found":true}` | one query finished; `found` is false when nothing matched |
 | `{"event":"loaded"}` | a `load` request is over: its program and its own `?`-statements ran (a `query` request is answered by its `result` alone) |
@@ -1137,7 +1144,7 @@ The screen is 1024×768, it starts black, and a primitive outside it is clipped.
 | `{"event":"trace","text":"…"}` | one line of the `ТРАССА` trace |
 | `{"event":"formatted","text":"…","changed":true}` | the laid-out text of a `format` request; `changed` says whether it differs from what was sent |
 | `{"event":"graphics","op":"setPixel","x":1,"y":2,"color":3}` | one drawing primitive, as the program called it; `op` is one of the eight and the fields are the cell, the segment or the box it acts on |
-| `{"event":"bitmap","width":1024,"height":768,"data":"…"}` | the whole screen, base64 of four-byte little-endian colour values — the answer to a `graphics` request |
+| `{"event":"bitmap","width":600,"height":600,"data":"…"}` | the whole screen, base64 of four-byte little-endian colour values — the answer to a `graphics` request |
 | `{"event":"error","kind":"parse","severity":"warning","message":"…","file":"…","line":3,"column":5}` | diagnostic; `kind` is `parse`, `runtime` or `protocol`, `severity` is `error` or `warning` (a warning never ends the run), and the position is absent when there is none to report |
 | `{"event":"bye"}` | the session is over |
 

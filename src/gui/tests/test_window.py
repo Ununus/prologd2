@@ -4309,6 +4309,28 @@ def test_the_output_tab_offers_clear(executable: str) -> None:
         discard_changes(window)
 
 
+def test_the_screen_size_setting_reaches_the_picture(executable: str) -> None:
+    """«Ширина/высота графического экрана» decide the buffer a run draws on (task_73).
+
+    The pair travels with the load, the interpreter makes its buffer that size, and
+    the picture that comes back is that size as well: a cell inside it is drawn, and
+    what the program asked for outside it is cut — a smaller screen crops the
+    picture instead of moving it.
+    """
+    window = empty_window(executable)
+    try:
+        window._settings.screen_size = (40, 30)
+        window.editor().setPlainText("?ТОЧКА(35, 25, 4), ТОЧКА(45, 25, 9).\n")
+        window._actions["run"].trigger()
+        assert pump(window, lambda: window.canvas().pixel(35, 25) == 4), window.output_text()
+        canvas = window.canvas()
+        assert (canvas.width, canvas.height) == (40, 30), (canvas.width, canvas.height)
+        assert canvas.pixel(39, 29) == 0, "the screen is 40 × 30, and the rest is cut"
+        print("ok: the screen size setting decides the size of the picture")
+    finally:
+        discard_changes(window)
+
+
 def test_f12_opens_the_file_of_an_import_directive(executable: str, directory: pathlib.Path) -> None:
     """`F12` on an `ИМПОРТ` line opens the file it names, in a tab (task_69).
 
@@ -4479,6 +4501,7 @@ def main(argv: list[str]) -> int:
         test_a_question_of_a_mode_one_file_keeps_its_names(executable)
         test_the_tab_menu_shows_the_clicked_file(executable, files)
         test_the_output_tab_offers_clear(executable)
+        test_the_screen_size_setting_reaches_the_picture(executable)
         test_f12_opens_the_file_of_an_import_directive(executable, files)
     print("all window checks passed")
     del application

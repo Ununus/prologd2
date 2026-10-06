@@ -170,6 +170,7 @@ entries of the session log below and in `ai/task_*.md`.
 | task_70_variable_mode_row | done | the window's «Имена переменных» row lost «по первой строке файла» — it said exactly what «как в ISO» said (the marker beats the row in the engine *and* in the window, and mode 0 never travels on the wire); three items now with ISO as the default, and a settings file still holding the old `auto` reads as `0` |
 | task_71_output_tab_menu | done | a right click on the output panel's «Вывод» tab offers «Очистить вывод» — the shared `clear_output` `QAction` of the action table (the one `Ctrl+L` reaches), offered on that tab alone and without switching tabs, because the command acts on the pane and not on the tab in front (the titles carry a counter, so the tab is told apart by the pane it shows) |
 | task_72_pld_prose | done | the «это А, а не Б» construction is gone from twenty places in sixteen `.pld` files — statements only, the five exercise questions keep the contrast because it *is* the question; the teacher's own edits were finished (two more `%!` answers for the new students, a missing final newline, a typo), and `test_queries.py`'s `PINNED` was refreshed after being red since task_67 |
+| task_73_screen_size | done | the graphics screen is a setting with 600 × 600 as the default (the old 1024 × 768 is two rows away): `screen` travels on `load`/`query` and comes back in `ready` (protocol 13), `BitmapGraphicsBackend::reset` resizes *and clears*, and the window's canvas is made and resized the same way so it cannot clip the picture where the engine does not |
 
 ## Test suite
 
@@ -3576,3 +3577,32 @@ doc/gui.typ` без замечаний.
 
 *Verified.*  `ctest` 330/330 (в том числе сверка примеров с их `%!` и с выводом
 форматтера), `test_queries.py` — 405 вопросов в 42 примерах, как в таблице.
+
+### 104. Размер графического экрана — настройка, умолчание 600 × 600 (2026-10-06)
+
+Учитель: закраска идёт «с небольшим лагом», поэтому буфер уменьшить, а смену размера
+отдать настройке.  Так и сделано: экран по умолчанию 600 × 600 (`kMaxGrX`/`kMaxGrY`),
+а строки «Ширина/высота графического экрана» («Выполнение», 16…2048) называют размер
+запуска — прежний 1024 × 768 возвращают они же.
+
+* Протокол 13: `load` и `query` принимают `screen` (`width`, `height`), а `ready` его
+  отдаёт — фронтенд знает экран ещё до первого снимка.  У буфера появился
+  `reset(w, h)`: он же бросает прежнюю картинку, потому что рисунок принадлежит тому
+  прогону, который его нарисовал.
+* Окно: холст создаётся и пересоздаётся размером настройки, а не константой — иначе он
+  резал бы рисунок там, где ядро не резало.  Подпись «Вписать в окно» называет текущий
+  размер, а не тот, с которым её создали.
+* Новые проверки: `test_window.py::test_the_screen_size_setting_reaches_the_picture`
+  (40 × 30 доходят до картинки: клетка внутри нарисована, за краем — нет),
+  `test_graphics_backend.cpp` — `reset` и «нулевой размер оставляет умолчание»,
+  `protocol_session.cmake` — новое умолчание и `screen` в `ready`.
+
+*Ловушка.*  `ready` собирается из `nlohmann::json`, а он держит ключи по алфавиту — и
+не только в верхнем объекте: `screen` пишется как `{"height":600,"width":600}`.
+Ожидание в `protocol_session.cmake`, написанное в том порядке, в каком поля
+перечислены в коде, не совпало.
+
+*Verified.*  `ctest` 330/330; `protocol_smoke`, `test_graphics` (ядро и холст рисуют
+одну и ту же картинку), `test_formatter` (протокол 13), `test_settings` (44 строки),
+`test_window`, `test_icons`, `test_shortcuts` — зелёные; `help.typ`, `technical.typ`,
+`gui.typ` собираются без замечаний.

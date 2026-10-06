@@ -7,9 +7,14 @@
 
 namespace prologd {
 
-/// Default virtual screen size used by the original PrologD graphics.
-inline constexpr int kMaxGrX = 1024;
-inline constexpr int kMaxGrY = 768;
+/// Default virtual screen size — what a program draws on when nobody asks for
+/// another size.  The original PrologD used `1024 × 768`; the default is smaller
+/// now because the whole buffer travels to a front-end as a snapshot, and
+/// `ЗАКРАСКА` walks it cell by cell: a lesson's picture is drawn in a fraction of
+/// a second, while the old screen takes a visible moment (task_73).  A front-end
+/// that wants the old screen asks for it — see `BitmapGraphicsBackend::reset`.
+inline constexpr int kMaxGrX = 600;
+inline constexpr int kMaxGrY = 600;
 
 /// How far outside the screen a coordinate may be before it is pulled back.
 ///
@@ -168,6 +173,15 @@ class BitmapGraphicsBackend final : public GraphicsBackend {
 
   BitmapGraphicsBackend();
   BitmapGraphicsBackend(int width, int height);
+
+  /// Makes the screen another size, and clears it.
+  ///
+  /// A front-end names the screen it shows before a run (task_73), so the buffer
+  /// is made the size the window draws — a bigger picture costs memory here and
+  /// bytes on the wire.  The pixels are *thrown away*: a picture belongs to the
+  /// run that drew it, and a snapshot of the previous one would be a lie.  A
+  /// size of zero or less keeps the default, the way the constructor treats it.
+  void reset(int width, int height);
 
   void setSink(Sink sink);
 
