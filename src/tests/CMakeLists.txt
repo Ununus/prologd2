@@ -65,8 +65,13 @@ if(TARGET prologd)
   endforeach()
 
   add_test(NAME cli_version COMMAND prologd --version)
+  # The version has one source — `project(prologd VERSION x.y.z)` — and this test
+  # asks the binary for it instead of repeating the literal.  It used to be a
+  # literal with escaped dots (`2\\.1\\.0`), which a grep for the old number does
+  # not find: the escape sits between the digits (part 105).
+  string(REPLACE "." "\\." PROLOGD_VERSION_PATTERN "${PROJECT_VERSION}")
   set_tests_properties(cli_version PROPERTIES
-    PASS_REGULAR_EXPRESSION "2\\.1\\.0")
+    PASS_REGULAR_EXPRESSION "${PROLOGD_VERSION_PATTERN}")
 
   add_test(NAME cli_help COMMAND prologd --help)
   set_tests_properties(cli_help PROPERTIES

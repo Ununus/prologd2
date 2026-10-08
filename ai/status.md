@@ -21,7 +21,8 @@ one duplicated clearing body out, and the two tables set on one shared base (par
 goal field given its own switch while a run learned to show the hidden output panel
 (part 92), and that panel made a strip again after it had taken half of the editor column
 (part 93), and the version raised to **2.1.0** with a fresh portable package built for it
-(part 94).
+(part 94), and then to **2.2.0** — the screen size became a setting (part 104) and the
+package was built again (part 105).
 
 ## Overall
 
@@ -171,6 +172,7 @@ entries of the session log below and in `ai/task_*.md`.
 | task_71_output_tab_menu | done | a right click on the output panel's «Вывод» tab offers «Очистить вывод» — the shared `clear_output` `QAction` of the action table (the one `Ctrl+L` reaches), offered on that tab alone and without switching tabs, because the command acts on the pane and not on the tab in front (the titles carry a counter, so the tab is told apart by the pane it shows) |
 | task_72_pld_prose | done | the «это А, а не Б» construction is gone from twenty places in sixteen `.pld` files — statements only, the five exercise questions keep the contrast because it *is* the question; the teacher's own edits were finished (two more `%!` answers for the new students, a missing final newline, a typo), and `test_queries.py`'s `PINNED` was refreshed after being red since task_67 |
 | task_73_screen_size | done | the graphics screen is a setting with 600 × 600 as the default (the old 1024 × 768 is two rows away): `screen` travels on `load`/`query` and comes back in `ready` (protocol 13), `BitmapGraphicsBackend::reset` resizes *and clears*, and the window's canvas is made and resized the same way so it cannot clip the picture where the engine does not |
+| task_74_version_2_2_0 | done | the version raised to **2.2.0** — one source (`project(... VERSION 2.2.0)`), four live copies moved with it, and the `cli_version` test lost its literal: it held `"2\\.1\\.0"`, which a grep for the old number cannot find; the portable package was built again (`dist\prologd-2.2.0-win64`, 303 files, and its 37.9 MiB zip) |
 
 ## Test suite
 
@@ -3606,3 +3608,25 @@ doc/gui.typ` без замечаний.
 одну и ту же картинку), `test_formatter` (протокол 13), `test_settings` (44 строки),
 `test_window`, `test_icons`, `test_shortcuts` — зелёные; `help.typ`, `technical.typ`,
 `gui.typ` собираются без замечаний.
+
+### 105. Версия 2.2.0 и второй портативный пакет (2026-10-08)
+
+Задача 74.  Номер поднят в единственном источнике — `project(prologd VERSION 2.2.0)` ✓,
+а за ним пошли четыре живые копии: пример строки `ВЕРСИЯ` в уроке
+`appendix_debug.pld`, пример события `ready` в `src/gui/README.md`, путь пакета в
+`tools/check_dependencies.py` и тест `cli_version`.
+
+*Нашлось на этом же тесте.*  `cli_version` держал номер литералом с
+**экранированными точками** — `PASS_REGULAR_EXPRESSION "2\\.1\\.0"`: поиск по
+`2.1.0` такого не находит, потому что экранирование сидит между цифрами.  Сборка
+прошла, а `ctest` упал ровно на нём, и это была единственная жертва подъёма.
+Теперь литерала нет вовсе: образец собирается из `${PROJECT_VERSION}`, то есть
+из того же источника, что и всё остальное.
+
+Протокол 13 (размер экрана) вошёл именно в 2.2.0 — поправлено и в
+`ai/conventions.md`, где было написано «13 as of 2.1.0».
+
+*Verified.*  `ctest` 330/330 (включая `cli_version`), `prologd --version` → `2.2.0`,
+`?ВЕРСИЯ.` → `PrologD 2.2.0 (2026-10-06)`; портативный пакет собран заново:
+`dist\prologd-2.2.0-win64` (303 файла, внутри `--version` → `2.2.0`) и
+`prologd-2.2.0-win64.zip` — 39 786 345 байт (37,9 МиБ; у 2.1.0 было 39 753 766).

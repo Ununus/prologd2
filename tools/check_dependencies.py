@@ -186,7 +186,7 @@ def check(package: pathlib.Path) -> int:
 
 
 def main(argv: list[str]) -> int:
-    package = pathlib.Path(argv[1] if len(argv) > 1 else "dist/prologd-2.1.0-win64")
+    package = pathlib.Path(argv[1] if len(argv) > 1 else "dist/prologd-2.2.0-win64")
     if not package.is_dir():
         print(f"not a folder: {package}")
         return 2
