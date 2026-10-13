@@ -142,6 +142,20 @@ Tests are written **together with** the feature, never after.
   Python, and the settings row answers a stored `2` as `1` instead of falling back
   to ISO): the two were one dialect all along, because the original reads `число'`
   in a file that declares nothing.
+* The **original engine** (`Ununus/prologd`) is built as a *nested* CMake project by
+  `-DBUILD_WITH_PROLOGD=ON` (task_78) and written beside ours
+  (`src/cli/<config>/prologd.exe`).  It is deliberately not pulled into this graph: its
+  targets are named `prlib` and `prologd_json` — both names this tree already uses — it
+  is C++17 where this tree is C++23, and its sources are CP1251.  Three facts about it
+  cost real time to find, and a front-end or a script has to know all three:
+  * it answers **protocol 13 as a *subset* of ours** (its own `src/protocol.cpp` says
+    so), so the protocol number cannot tell the two engines apart — a capability table
+    per engine is the only honest way (task_79);
+  * its command line has neither `-s` nor `--version` (`--source=FILE` is its spelling),
+    and `--list-keywords` is the one command both engines answer;
+  * it maps every line it reads back to CP1251 (`run_line` in `src/prologdc.cpp`), so one
+    character CP1251 cannot carry — `—`, `«`, `»`, `…` — turns the whole line into
+    `Недопустимый символ`.  A file that must run on it stays ASCII plus Russian letters.
 * Bumping the program version means moving every *live* copy of the literal — grep for the
   old number rather than trusting memory:
   * the `cli_version` test in `src/tests/CMakeLists.txt` follows by itself now: its pattern

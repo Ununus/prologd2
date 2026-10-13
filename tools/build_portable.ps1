@@ -189,6 +189,17 @@ try {
     Write-Host "interpreter: $cli"
     Write-Host "version    : $Version  ->  $packageName"
 
+    # The original engine (task_78) is optional.  A build made with
+    # -DBUILD_WITH_PROLOGD=ON has it beside ours; a build without that option has no
+    # such file, and this script must not fail over an engine nobody asked for.
+    $legacy = Join-Path $build "src\cli\$Configuration\prologd.exe"
+    $withLegacy = Test-Path $legacy
+    if ($withLegacy) {
+        Write-Host "old engine : $legacy"
+    } else {
+        Write-Host 'old engine : not built (-DBUILD_WITH_PROLOGD=OFF)'
+    }
+
     Write-Step '3/8 Tests on the sources'
     if ($SkipTests) {
         Write-Host 'skipped (-SkipTests)'
@@ -240,6 +251,9 @@ try {
     # `prologu.exe` and `gui.ini` beside it (task_61, section 4).
     Copy-Item (Join-Path $guiDist '*') $package -Recurse -Force
     Copy-Item $cli $package -Force
+    # Both engines when the build has both: the window picks `prologu.exe` and the
+    # old dialect is run by `prologd.exe` (task_78).
+    if ($withLegacy) { Copy-Item $legacy $package -Force }
 
     # PyInstaller's own copy of the runtime in `_internal` serves Python; our C++
     # executable in the root needs the DLLs next to itself (task_61, section 2).
@@ -340,16 +354,18 @@ try {
     Write-Host "package    : $package"
 
     Write-Step '7/8 Checks on the package'
-    foreach ($needed in 'prologu.exe', 'prologd-gui.exe',
-                       'msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll',
-                       '_internal\base_library.zip',
-                       'doc\help.pdf', 'doc\builtins.json',
-                       'doc\prologd2.png', 'doc\csu.png',
-                       'examples\lib\library.pld', 'examples\lessons\lesson_01.pld',
-                       'examples\problems\knapsack.pld',
-                       'stdlib\lists.pld', 'stdlib\sets.pld', 'stdlib\sorts.pld',
-                       $memoName) {
-        if (-not (Test-Path (Join-Path $package $needed))) { Fail "the package is missing $needed" }
+    $needed = @('prologu.exe', 'prologd-gui.exe',
+                'msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll',
+                '_internal\base_library.zip',
+                'doc\help.pdf', 'doc\builtins.json',
+                'doc\prologd2.png', 'doc\csu.png',
+                'examples\lib\library.pld', 'examples\lessons\lesson_01.pld',
+                'examples\problems\knapsack.pld',
+                'stdlib\lists.pld', 'stdlib\sets.pld', 'stdlib\sorts.pld',
+                $memoName)
+    if ($withLegacy) { $needed += 'prologd.exe' }
+    foreach ($wanted in $needed) {
+        if (-not (Test-Path (Join-Path $package $wanted))) { Fail "the package is missing $wanted" }
     }
     foreach ($needed in 'Qt6Core.dll', 'Qt6Gui.dll', 'Qt6Widgets.dll', 'python314.dll',
                        'qwindows.dll', 'opengl32sw.dll') {
@@ -366,6 +382,18 @@ try {
     if ($theirs -ne $Version) { Fail "the packaged interpreter says '$theirs', expected '$Version'" }
     $keywords = (& $packagedExe --list-keywords | Measure-Object -Line).Lines
     if ($keywords -lt 100) { Fail "the packaged interpreter lists only $keywords keyword lines" }
+
+    if ($withLegacy) {
+        # The original speaks a command line of its own: `--source=FILE`, and it has
+        # neither `-s` nor `--version` (checked on the pinned commit), so the one
+        # command both engines answer is asked here — and only its line count is
+        # looked at, because a pipe hands its Cyrillic over as ANSI bytes.
+        $legacyNames = (& (Join-Path $package 'prologd.exe') --list-keywords | Measure-Object -Line).Lines
+        if ($legacyNames -lt 40) {
+            Fail "the packaged old engine lists only $legacyNames keyword lines"
+        }
+        Write-Host "old engine : $legacyNames keyword lines, starts and answers"
+    }
 
     # The programs of the package, run by the interpreter of the package, from the
     # folder the user will unpack.  Only the exit code is looked at: a PowerShell

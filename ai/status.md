@@ -25,7 +25,8 @@ goal field given its own switch while a run learned to show the hidden output pa
 package was built again (part 105), and the engine's own file renamed to `prologu.exe`
 for the two-engine branch that follows (part 106), and the version raised to **2.3.0**
 with the engine taught to call itself «Пролог-У» (part 107), and the two naming modes
-of the old dialect merged into one — `2` is a spelling of `1` (part 108).
+of the old dialect merged into one — `2` is a spelling of `1` (part 108), and the
+original engine from `Ununus/prologd` made buildable beside ours (part 109).
 
 ## Overall
 
@@ -179,7 +180,7 @@ entries of the session log below and in `ai/task_*.md`.
 | task_75_rename_interpreter | done | the engine's file is `prologu.exe` (the CMake target is `prologu`, the file it produces follows it) — only the *file* moved: the project, the `PROLOGD_*` names, the `prologd::` namespace, the `prologd_gui` package, `prologd-gui.exe` and the `prologd2` icons all kept their names; the six window checks that each held their own copy of the build paths now ask `paths.interpreter()`, and a stale `prologd.exe` had to be deleted from the build tree by hand |
 | task_76_version_banner | done | the version is **2.3.0** and the engine calls itself «Пролог-У»: `PROLOGD_PRODUCT_NAME` sits beside `project(... VERSION ...)` and is injected through the generated `version.cpp`, *not* a `-D` macro (a non-ASCII value on the compiler's command line travels through a response file in the ANSI code page); one function, `versionBanner()`, is what both `--version` and the built-in `ВЕРСИЯ` print, so the packing script now reads the number out of that sentence instead of comparing the line |
 | task_77_naming_modes_merge | done | the naming mode has **two** values now — `Iso` (0) and `Old` (1); `2` is a *spelling* of `1` in one place per side (`variableModeFromNumber` in C++, `tokens.MODE_NUMBERS` in Python), so the marker, `--vars`, the wire and a stored setting all keep working; the settings row translates a stored `2` in *both* directions, because `set_value` answers an unknown choice with the setting's default and would have moved that reader to ISO; the mode-1 diagnostic about the apostrophe went — it advised what is now true |
-| task_78_build_with_prologd | open | `-DBUILD_WITH_PROLOGD=ON` fetches `Ununus/prologd` at a pinned commit and builds a second `prologd.exe` beside ours; it already speaks the JSON session (`PROLOGD_BUILD_FOR_GUI`), so no adapter is needed, and an offline build stays possible |
+| task_78_build_with_prologd | done | `-DBUILD_WITH_PROLOGD=ON` builds a pinned commit of `Ununus/prologd` as a **nested** CMake project (`ExternalProject_Add`, not `FetchContent`: its targets `prlib` and `prologd_json` are names this tree already uses) and writes its `prologd.exe` beside ours — one command builds both. It is told to take the JSON header this tree already has, so nothing is downloaded twice; `-DPROLOGD_ENGINE_SOURCE=<a clone>` builds with no network at all |
 | task_79_engine_switch_button | open | a button at the end of the toolbar (icons `u.png`/`d.png`) switches the engine, stopping a run first; one table of capabilities per engine greys out what the other cannot do (format, step, step over, trace, graphics, engine limits, the naming row), and `--interpreter` stays as an override |
 | task_80_process_directory_picker | open | the `...` button of «Свой каталог процесса» opens at the interpreter's own directory instead of wherever it happened to start |
 | task_81_docs_two_languages | open | `help.typ` is retitled to Пролог-У (the language), `prologd-diff.typ` becomes the story of the two dialects, `gui.typ` says the shell hosts both engines, and the README carries the four readings of «У»; lessons and the standard library are left alone for now |
@@ -3795,3 +3796,52 @@ ISO.  Поэтому `2` переводится дважды: в сеттере 
 `test_highlighter`, `test_settings` (с новым случаем на устаревшую двойку),
 `test_window`, остальные оконные наборы и `protocol_smoke` — зелёные; шесть
 документов собираются.
+
+### 109. Второй движок: оригинальный `prologd` рядом с нашим (2026-10-13)
+
+Задача 78.  `-DBUILD_WITH_PROLOGD=ON` собирает пинованный коммит `Ununus/prologd`
+(`7b7f46f`) и кладёт его `prologd.exe` рядом с `prologu.exe` — в тот же
+`src/cli/<конфигурация>`, куда пишет наш таргет.
+
+*Почему вложенный проект, а не `FetchContent`.*  План называл `FetchContent`, но он
+добавляет чужое дерево в наш граф, а у чужого две цели называются так же, как у нас:
+`prlib` и `prologd_json`.  В одном графе `target_link_libraries` мог бы молча взять не
+тот `prlib`, а разница между деревьями ещё и в стандарте языка (C++17 против наших
+C++23) и в кодировке исходников (CP1251 против UTF-8).  `ExternalProject_Add` держит
+их врозь: у него свой кэш, свои опции, свои цели, а результат — один файл на диске.
+Цена — вложенный `cmake --build` в каждом билде: 2 секунды, когда ничего не изменилось.
+
+*Без второй загрузки.*  Оригинал при конфигурации качает `json.hpp` сам; ему
+передаётся `PROLOGD_THIRDPARTY_DIR=<наш src/3rdparty>`, где `json-3.11.3` лежит ровно в
+том виде, в каком он его ищет, — так что загрузки не происходит.  Сеть нужна один раз,
+на клон; `-DPROLOGD_ENGINE_SOURCE=<клон>` убирает и её (проверено на отдельном дереве:
+`prologd.exe` собрался из клона, ничего не качая).  Опция выключена по умолчанию, и с
+ней выключенной сборка не тянет ничего нового.
+
+*Что выяснилось про оригинал* (записано в `ai/task_79_*.md`, для таблицы
+возможностей):
+
+* его `ready` отвечает `"protocol":13` — и в его же `src/protocol.cpp` написано, что
+  это **подмножество** нашего 13; значит, по номеру протокола движки не различить;
+* он терпим к нашим запросам: `load` с `vars`, `screen` и `questions` отвечает
+  `loaded`, лишние поля игнорируются — адаптер не нужен;
+* своего `--version` нет, `-s` он не понимает (`--source=ФАЙЛ`), и `--list-keywords` —
+  единственная команда, которую понимают оба;
+* **строку со символом, который не влезает в CP1251, он отбрасывает целиком**
+  (`run_line` в `prologdc.cpp`): `—`, `«», »» или `…` — это `Недопустимый символ`, и
+  поэтому `examples/lessons/_old/*.pld` у него не грузятся, пока тире не заменено;
+* ответы на старых уроках совпадают не везде — `_old/lesson_5.pld` у него отвечает
+  `НЕТ`, `НЕТ`, а у нас печатает список из двенадцати троек.  Это языковые различия,
+  и разбираться с ними там же (task_79 и task_81).
+
+*Пакет.*  `tools/build_portable.ps1` теперь берёт второй движок, **если он собран**
+(иначе пишет «not built» и не падает), кладёт его в пакет, требует его там и один раз
+запускает (`--list-keywords`); `check_dependencies.py` видит его импорты и подтверждает
+«every non-system import is a file of the package».
+
+*Verified.*  Чистое дерево с `-DBUILD_WITH_PROLOGD=ON`: собирается одним
+`cmake --build`, оба файла рядом, `ctest` **334/334**; отдельное дерево с
+`-DPROLOGD_ENGINE_SOURCE` собирает второго из клона без сети; пакет
+`dist\prologd-2.3.0-win64` — **306 файлов**, 96,6 МиБ (`prologu.exe` 977 KiB,
+`prologd.exe` 455 KiB, `prologd-gui.exe` 2,4 МиБ), zip — 39 998 952 байта (38,1 МиБ),
+внутри 66 строк имён у второго движка и 130 у нашего.

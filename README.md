@@ -55,6 +55,31 @@ ctest --preset windows-msvc
 
 The executable is `build\src\cli\Release\prologu.exe`.
 
+#### The original engine (optional)
+
+The old dialect is not a mode of this engine: it is an engine of its own, kept in
+[`Ununus/prologd`](https://github.com/Ununus/prologd), where a live service runs it.
+`-DBUILD_WITH_PROLOGD=ON` builds a pinned commit of it as a *nested* project and
+writes its `prologd.exe` beside `prologu.exe`:
+
+```powershell
+cmake -S . -B build -G "Visual Studio 18 2026" -A x64 -DBUILD_WITH_PROLOGD=ON
+cmake --build build --config Release
+```
+
+Nothing of ours is linked against it — its targets are named `prlib` and
+`prologd_json`, which this tree already uses — and it is told to take the JSON header
+this tree already has, so no second copy is downloaded.  The network is needed once,
+for the clone; `-DPROLOGD_ENGINE_SOURCE=<an existing clone>` skips even that.  The
+option is off by default, and with it off a build downloads nothing new.
+
+What the two engines share and where they part is written down in
+`doc/prologd-diff.pdf`; in short, the original answers protocol 13 as a documented
+*subset* of ours (no stepping, tracing, formatting or graphics), it has no `-s` and no
+`--version` on the command line (`--source=FILE` is its spelling), and it reads a file
+only if everything in it fits CP1251 — a line with `—`, `«»` or `…` in it stops with
+`Недопустимый символ`.
+
 The portable package — interpreter, window, the five documents, the lessons and
 the standard library — is built by one script:
 
