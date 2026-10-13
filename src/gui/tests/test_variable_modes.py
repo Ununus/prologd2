@@ -1,4 +1,4 @@
-"""Checks of the naming modes of a file (task_67, Qt-free).
+"""Checks of the naming modes of a file (task_67, merged in task_77, Qt-free).
 
     python src/gui/tests/test_variable_modes.py [path-to-prologu]
 
@@ -8,7 +8,7 @@ ask the interpreter on every keystroke.  That makes this module a second
 implementation of `readVariableMarker` in `src/prlib/src/lexer.cpp`, and this file
 is what keeps the two together: the rule is checked on its own, and then against
 the *interpreter's* own reading of the same texts, asked by behaviour
-(`?РАВНО(д, 1).` answers differently in the three modes).
+(`?РАВНО(д, 1).` answers differently in the two modes).
 """
 
 from __future__ import annotations
@@ -26,8 +26,8 @@ from prologd_gui.tokens import (  # noqa: E402
     ATOM,
     KEYWORD,
     MODE_ISO,
-    MODE_SINGLE_LETTER,
-    MODE_SINGLE_LETTER_APOSTROPHE,
+    MODE_NUMBERS,
+    MODE_OLD,
     PUNCTUATION,
     QUOTED_ATOM,
     STRING,
@@ -43,8 +43,8 @@ def kinds(line: str, mode: int = MODE_ISO) -> list[tuple[str, str]]:
     return [(token.kind, token.text) for token in tokenize(line, TABLE, mode)]
 
 
-def test_mode_one_reads_the_old_dialect() -> None:
-    assert kinds("голова(д)", MODE_SINGLE_LETTER) == [
+def test_the_old_mode_reads_the_old_dialect() -> None:
+    assert kinds("голова(д)", MODE_OLD) == [
         (ATOM, "голова"),
         (PUNCTUATION, "("),
         (VARIABLE, "д"),
@@ -52,43 +52,39 @@ def test_mode_one_reads_the_old_dialect() -> None:
     ]
     # A variable is one letter, either case, with at most one `_` after it.
     for name in ("д", "Б", "A", "A_", "x_"):
-        assert kinds(f"голова({name})", MODE_SINGLE_LETTER)[2] == (VARIABLE, name)
+        assert kinds(f"голова({name})", MODE_OLD)[2] == (VARIABLE, name)
     # A bare capitalised name is a string constant; a lowercase one stays an atom.
-    assert kinds("голова(Молоко)", MODE_SINGLE_LETTER)[2] == (STRING, "Молоко")
-    assert kinds("голова(молоко)", MODE_SINGLE_LETTER)[2] == (ATOM, "молоко")
-    assert kinds("голова(_д)", MODE_SINGLE_LETTER)[2] == (VARIABLE, "_д")
+    assert kinds("голова(Молоко)", MODE_OLD)[2] == (STRING, "Молоко")
+    assert kinds("голова(молоко)", MODE_OLD)[2] == (ATOM, "молоко")
+    assert kinds("голова(_д)", MODE_OLD)[2] == (VARIABLE, "_д")
     # The reserved table wins over the mode, exactly as it does in the lexer.
-    assert kinds("ВЫВОД(д)", MODE_SINGLE_LETTER)[0] == (KEYWORD, "ВЫВОД")
+    assert kinds("ВЫВОД(д)", MODE_OLD)[0] == (KEYWORD, "ВЫВОД")
     # Mode 0 is untouched by all of this.
     assert kinds("голова(д)", MODE_ISO)[2] == (ATOM, "д")
     assert kinds("голова(Молоко)", MODE_ISO)[2] == (VARIABLE, "Молоко")
 
 
-def test_mode_two_adds_the_apostrophe_names() -> None:
-    assert kinds("голова(Сумма')", MODE_SINGLE_LETTER_APOSTROPHE)[2] == (
-        VARIABLE,
-        "Сумма'",
-    )
-    # In mode 1 that name is the error the interpreter explains; here the name keeps
-    # the mode-1 reading and the apostrophe stays a quote — a malformed literal is
-    # coloured as the text it looks like (see the tokenizer's docstring).
-    assert kinds("голова(Сумма')", MODE_SINGLE_LETTER)[2] == (STRING, "Сумма")
+def test_the_old_mode_reads_apostrophe_names() -> None:
+    assert kinds("голова(Сумма')", MODE_OLD)[2] == (VARIABLE, "Сумма'")
     # At the start of a token the apostrophe is still the quote of an atom.
-    assert kinds("голова('Сумма')", MODE_SINGLE_LETTER_APOSTROPHE)[2] == (
-        QUOTED_ATOM,
-        "'Сумма'",
-    )
+    assert kinds("голова('Сумма')", MODE_OLD)[2] == (QUOTED_ATOM, "'Сумма'")
+    # task_77: the two numbers name one mode, and `2` is answered as `1` — a caller
+    # never sees the spelling.  In mode 0 the apostrophe stays where it is: the name
+    # keeps the ISO reading and a malformed literal is coloured as what it looks like.
+    assert MODE_NUMBERS[2] == MODE_NUMBERS[1] == MODE_OLD
+    assert kinds("голова(Сумма')", MODE_ISO)[2] == (VARIABLE, "Сумма")
 
 
 def test_the_first_line_names_the_mode() -> None:
     assert mode_from_first_line(":- ИМЕНА(0).\nдлинное:-истина.\n") == MODE_ISO
-    assert mode_from_first_line(":- ИМЕНА(1).\n") == MODE_SINGLE_LETTER
-    assert mode_from_first_line(":-ИМЕНА( 2 ).") == MODE_SINGLE_LETTER_APOSTROPHE
+    assert mode_from_first_line(":- ИМЕНА(1).\n") == MODE_OLD
+    # `2` is a spelling of `1`, so the answer is the mode and not the number.
+    assert mode_from_first_line(":-ИМЕНА( 2 ).") == MODE_OLD
     assert (
         mode_from_first_line(":- ИМЕНА(1). % так писали в старом курсе\n")
-        == MODE_SINGLE_LETTER
+        == MODE_OLD
     )
-    assert mode_from_first_line(":- ИМЕНА(1).\r\n") == MODE_SINGLE_LETTER
+    assert mode_from_first_line(":- ИМЕНА(1).\r\n") == MODE_OLD
     # Not the first line, so not the marker: the file keeps the mode of the run.
     assert mode_from_first_line("% комментарий\n:- ИМЕНА(1).\n") is None
     assert mode_from_first_line("\n:- ИМЕНА(1).\n") is None
@@ -135,9 +131,26 @@ def test_a_question_of_a_mode_one_file_keeps_its_names(executable: str) -> None:
     the user found in the window (task_67).
     """
     program = ":- ИМЕНА(1).\nстудент(Вова).\nстудент(Данил).\n"
-    assert ask(executable, program, "?студент(Вова).", MODE_SINGLE_LETTER) == ["ДА"]
+    assert ask(executable, program, "?студент(Вова).", MODE_OLD) == ["ДА"]
     misread = ask(executable, program, "?студент(Вова).", None)
     assert misread and misread[0].startswith("Вова="), misread
+
+
+def test_the_old_mode_travels_through_the_wire(executable: str) -> None:
+    """`vars` is the mode of a statement outside its file (task_67, task_77).
+
+    A question asked on its own — the margin marker, the goal line — arrives
+    without the file's first line, and the apostrophe name is the sharpest test of
+    it: `Значение'` is one variable in the old dialect and a broken quote in mode 0.
+    `2`, which an older window sends for the same dialect, has to read it too.
+    """
+    program = "факт(7).\n"
+    question = "?факт(Значение'),РАВНО(Значение', 7)."
+    # The binding comes back, which is the proof: `Значение'` was read as one
+    # variable and unified with 7.
+    assert ask(executable, program, question, MODE_OLD) == ["Значение'=7"]
+    assert ask(executable, program, question, 2) == ["Значение'=7"], "`2` is the old dialect"
+    assert ask(executable, program, question, None) != ["Значение'=7"], "no mode is ISO"
 
 
 def check_default_executable() -> str | None:
@@ -162,20 +175,15 @@ def run_probe(executable: str, text: str, workdir: pathlib.Path):
 def interpreter_mode(executable: str, text: str, workdir: pathlib.Path) -> int:
     """The mode the interpreter reads `text` in, asked by behaviour.
 
-    Two questions, one per run, because a file that stops at a lexer error prints
-    nothing at all: `д` is a variable in modes 1 and 2 (the answer is `д=1`) and an
-    atom in mode 0 (`НЕТ`), and `Сумма'` is a variable in mode 2 alone — mode 1
-    explains the apostrophe, mode 0 reads it as the opening quote of an atom that
-    never closes.  A marker that is not on the first line never becomes a mode: the
-    load stops with the built-in's own message instead.
+    `д` is a variable in the old dialect, whatever spelling the file used for it —
+    the answer is `д=1` — and an atom in mode 0, where the same question answers
+    `НЕТ`.  A marker that is not on the first line never becomes a mode: the load
+    stops with the built-in's own message, and that counts as mode 0 as well.
     """
     out, err = run_probe(executable, text + "?РАВНО(д, 1).\n", workdir)
     if "режим имён" in err or "д=1" not in out:
         return MODE_ISO
-    apostrophe, _ = run_probe(executable, text + "?РАВНО(Сумма', 5).\n", workdir)
-    return (
-        MODE_SINGLE_LETTER_APOSTROPHE if "Сумма'" in apostrophe else MODE_SINGLE_LETTER
-    )
+    return MODE_OLD
 
 
 def test_the_python_rule_matches_the_interpreter(executable: str) -> None:
@@ -198,8 +206,8 @@ def test_the_python_rule_matches_the_interpreter(executable: str) -> None:
 
 def main() -> int:
     executable = sys.argv[1] if len(sys.argv) > 1 else check_default_executable()
-    test_mode_one_reads_the_old_dialect()
-    test_mode_two_adds_the_apostrophe_names()
+    test_the_old_mode_reads_the_old_dialect()
+    test_the_old_mode_reads_apostrophe_names()
     test_the_first_line_names_the_mode()
     print("ok: the naming modes of a file")
     if executable is None:
@@ -208,6 +216,7 @@ def main() -> int:
     test_the_python_rule_matches_the_interpreter(executable)
     print("ok: the window's rule agrees with the interpreter")
     test_a_question_of_a_mode_one_file_keeps_its_names(executable)
+    test_the_old_mode_travels_through_the_wire(executable)
     print("ok: a question of its own carries the mode of the file")
     return 0
 

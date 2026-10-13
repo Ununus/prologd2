@@ -1041,8 +1041,9 @@ adds the drawing: `graphics` events, one per primitive, and the `graphics` reque
 with `snapshot`, answered with the whole `bitmap` (task_45); version 11 adds
 `printQuestions` to `load` — a run question echoes itself (`?цель.`) before its
 answer, the way `-q` does (task_46 split `questions` into *run* and *print*);
-version 12 adds `vars` to `load`, `query` and `format` — the naming mode (0, 1 or 2,
-task_67), the window's half of `--vars`, which a file's own `:- ИМЕНА(N).` first
+version 12 adds `vars` to `load`, `query` and `format` — the naming mode (0 or 1;
+`2` is the old spelling of `1`, task_67, merged in task_77), the window's half of
+`--vars`, which a file's own `:- ИМЕНА(N).` first
 line overrides for that file.  A `query` needs it because a single statement
 carries no first line of its own: without it a question clicked on a margin marker
 would read a mode-1 program's constants as variables.  Version 13 adds `screen` to

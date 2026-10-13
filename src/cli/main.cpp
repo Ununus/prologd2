@@ -92,8 +92,9 @@ int main(int argc, char** argv) {
   std::optional<std::size_t> maxDepth;
   std::optional<std::size_t> maxSteps;
   std::optional<std::size_t> maxFindAll;
-  // 0 = ISO (the default), 1 = the old dialect's single-letter variables, 2 = the
-  // same plus apostrophe names (task_67).
+  // 0 = ISO (the default), 1 = the old dialect: single-letter variables, a bare
+  // capitalised name as a string constant, and long names ending with an
+  // apostrophe.  `2` is the same mode under its former spelling (task_77).
   int variableMode = 0;
 
   app.add_option("-s,--source", sources, "Interpret the given source file (repeatable)");
@@ -112,8 +113,9 @@ int main(int argc, char** argv) {
   app.add_option("--max-findall", maxFindAll,
                  "Solution limit for one НАЙТИВСЕ (0 = unlimited; default: no limit)");
   app.add_option("--vars", variableMode,
-                 "How names are read: 0 ISO (default), 1 single-letter variables "
-                 "and unquoted string constants, 2 plus apostrophe names")
+                 "How names are read: 0 ISO (default), 1 the old dialect — "
+                 "single-letter variables, unquoted string constants, and "
+                 "apostrophe names (2 is a spelling of the same)")
       ->check(CLI::Range(0, 2));
   app.add_option("--protocol", protocol, "Front-end protocol: text (default) or json")
       ->check(CLI::IsMember({"text", "json"}));
@@ -139,6 +141,15 @@ int main(int argc, char** argv) {
 
   for (const std::string& file : positional) {
     sources.push_back(file);
+  }
+
+  // The one reading of `--vars` both branches below share, so that `2` is turned
+  // into the old dialect exactly once (task_77).
+  const std::optional<prologd::VariableMode> runMode =
+      prologd::variableModeFromNumber(variableMode);
+  if (!runMode.has_value()) {
+    std::cerr << "error: --vars expects 0, 1 or 2, not " << variableMode << '\n';
+    return 1;
   }
 
   // A query, not a run mode: answer and exit before anything is loaded.  One
@@ -178,7 +189,7 @@ int main(int argc, char** argv) {
       return 1;
     }
     // The mode of the run (task_67) — a file's own `:- ИМЕНА(N).` wins over it.
-    formatOptions.variables = static_cast<prologd::VariableMode>(variableMode);
+    formatOptions.variables = *runMode;
     formatOptions.width = formatWidth;
     formatOptions.indent_steps = formatIndent;
     formatOptions.indent_unit =
@@ -287,7 +298,7 @@ int main(int argc, char** argv) {
     limits.maxFindAllSolutions = *maxFindAll;
   }
   limits.applyTo(engine.options());
-  engine.options().variableMode = static_cast<prologd::VariableMode>(variableMode);
+  engine.options().variableMode = *runMode;
 
   std::vector<std::filesystem::path> includePaths;
   for (const std::string& directory : includeDirectories) {

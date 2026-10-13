@@ -42,16 +42,21 @@ QUERY = "query"  # `?`
 QUERY_COMMENT = "query_comment"  # a question parked in a comment: `% ?…`
 EXPRESSION = "expression"  # the `#` of `#… #`
 
-# -- naming modes (task_67) --------------------------------------------------
-#: The three ways a name is read, with the numbers the marker `:- ИМЕНА(N).` and
-#: `--vars` use.  Mode 0 is the port's own ISO reading; modes 1 and 2 are the old
-#: dialect, where a variable is one letter and a bare capitalised name is a string
-#: constant.  The mode belongs to a *file* — the interpreter reads it from the
-#: first line — and matters here only for colouring.
+# -- naming modes (task_67, merged in task_77) -------------------------------
+#: The two ways a name is read, with the numbers the marker `:- ИМЕНА(N).` and
+#: `--vars` use.  Mode 0 is the port's own ISO reading; mode 1 is the old dialect,
+#: where any single letter is a variable, a bare capitalised name is a string
+#: constant, and a long name ends with an apostrophe (`Сумма'`).
+#:
+#: `2` was a mode of its own until task_77 and is a *spelling* of `1` now: the
+#: original reads apostrophe names in a file that declares nothing, so the two
+#: were one dialect all along.  `MODE_NUMBERS` is the only place a spelling is
+#: turned into a mode, and a file that says `2` colours exactly as one that says
+#: `1` — the mirror of `variableModeFromNumber` in `src/prlib/src/lexer.cpp`.
 MODE_ISO = 0
-MODE_SINGLE_LETTER = 1
-MODE_SINGLE_LETTER_APOSTROPHE = 2
-MODES = (MODE_ISO, MODE_SINGLE_LETTER, MODE_SINGLE_LETTER_APOSTROPHE)
+MODE_OLD = 1
+MODES = (MODE_ISO, MODE_OLD)
+MODE_NUMBERS = {0: MODE_ISO, 1: MODE_OLD, 2: MODE_OLD}
 
 #: What `:- ИМЕНА(N).` looks like when it is written down.
 MARKER_NAME = "ИМЕНА"
@@ -160,9 +165,9 @@ def tokenize(line: str, keywords: Keywords | None = None, mode: int = MODE_ISO) 
     interpreter older than protocol 2 leaves us with: everything is then an atom
     or a variable, and the GUI cannot tell a built-in from a user name.
 
-    `mode` is how the file's names are read (task_67): 0 is the ISO reading, 1 and
-    2 are the old dialect's.  It is *one line's* rule and nothing more — the mode
-    itself comes from the file's first line (see `mode_from_first_line`).
+    `mode` is how the file's names are read (task_67): 0 is the ISO reading, 1 the
+    old dialect.  It is *one line's* rule and nothing more — the mode itself comes
+    from the file's first line (see `mode_from_first_line`).
     """
     tokens: list[Token] = []
     index = 0
@@ -213,12 +218,10 @@ def tokenize(line: str, keywords: Keywords | None = None, mode: int = MODE_ISO) 
             text = line[index:end]
             # The old dialect's long variable names: a name followed by an
             # apostrophe, and the apostrophe is a *suffix* — at the start of a token
-            # it is still the quote of `'атом'`.  Only mode 2 reads it as one name;
-            # in mode 1 the interpreter calls it an error and says which mode the
-            # author meant, and here the apostrophe is left where it is, the way any
-            # malformed literal is (see the module docstring).
-            if (mode == MODE_SINGLE_LETTER_APOSTROPHE and end < length
-                    and line[end] == "'"):
+            # it is still the quote of `'атом'`.  The one old mode reads it as one
+            # name (task_77); in mode 0 the apostrophe is left where it is, the way
+            # any malformed literal is (see the module docstring).
+            if mode == MODE_OLD and end < length and line[end] == "'":
                 end += 1
                 text = line[index:end]
                 tokens.append(Token(VARIABLE, text, index, end, alphabet_of(text)))
@@ -279,7 +282,9 @@ def mode_from_first_line(text: str, keywords: Keywords | None = None) -> int | N
     variable.
 
     `None` means «no marker», which is not the same as mode 0: a caller that has a
-    mode of its own (the window's row, `--vars`) uses it in that case.
+    mode of its own (the window's row, `--vars`) uses it in that case.  The answer
+    is always a *mode*: a marker of `2` comes back as `1`, its own spelling
+    (task_77), so no caller has to know about the two numbers.
     """
     first_line = plain_newlines(text).split("\n", 1)[0]
     parts = [token for token in tokenize(first_line, keywords)
@@ -294,8 +299,7 @@ def mode_from_first_line(text: str, keywords: Keywords | None = None) -> int | N
     digit = parts[3]
     if digit.kind != INTEGER or len(digit.text) != 1 or not digit.text.isdigit():
         return None
-    value = int(digit.text)
-    return value if value in MODES else None
+    return MODE_NUMBERS.get(int(digit.text))
 
 
 def _is_old_variable_name(text: str) -> bool:

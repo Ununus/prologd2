@@ -114,6 +114,24 @@ if(TARGET prologu)
   set_tests_properties(cli_list_keywords_variadic_writeln_english PROPERTIES
     PASS_REGULAR_EXPRESSION "writeln/\\+")
 
+  # task_77: `--vars 2` is the old spelling of `--vars 1`, and the file next to this
+  # test declares no naming mode of its own, so the flag is what decides.  The
+  # apostrophe name is what tells the readings apart — read as one variable, it
+  # answers `Значение'=7`; without `--vars` the same file does not even parse, which
+  # is what the third case says.
+  foreach(vars IN ITEMS 1 2)
+    add_test(NAME cli_vars_${vars}_reads_apostrophe_names
+      COMMAND prologu --vars ${vars}
+              -s "${CMAKE_CURRENT_SOURCE_DIR}/apostrophe_names.pld")
+    set_tests_properties(cli_vars_${vars}_reads_apostrophe_names PROPERTIES
+      PASS_REGULAR_EXPRESSION "Значение'=7")
+  endforeach()
+
+  add_test(NAME cli_no_vars_reads_iso
+    COMMAND prologu -s "${CMAKE_CURRENT_SOURCE_DIR}/apostrophe_names.pld")
+  set_tests_properties(cli_no_vars_reads_iso PROPERTIES
+    PASS_REGULAR_EXPRESSION "непарные скобки")
+
   # task_30: `--format` is checked by the bytes it writes — the formatted file
   # must still print what the original printed, and formatting it again must not
   # change it.  Both need the real executable, so a CMake script drives it.

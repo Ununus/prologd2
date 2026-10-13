@@ -194,14 +194,23 @@ TEST_CASE("a query and a directive keep their one line") {
 }
 
 TEST_CASE("the first line of a file decides how its names are read") {
-  // `Сумма'` is one variable in mode 2 and an unterminated quote in mode 0, so the
-  // very same clause parses only when the file says so (task_67).  The marker also
-  // has to *stay* the first line of the output: it is an ordinary statement.
+  // `Сумма'` is one variable in the old dialect and an unterminated quote in mode
+  // 0, so the very same clause parses only when the file says so (task_67).  The
+  // marker also has to *stay* the first line of the output: it is an ordinary
+  // statement.
   const std::string clause = "длинное:-РАВНО(Сумма',5).\n";
   const FormatResult declared = format(":- ИМЕНА(2).\n" + clause);
   REQUIRE(declared.ok());
   REQUIRE(declared.text.find("Сумма'") != std::string::npos);
   REQUIRE(declared.text.rfind(":- ИМЕНА(2).", 0) == 0);
+
+  // task_77: `2` is a spelling of `1` now, so the same file whose first line says
+  // `1` comes back the same way, marker and all.
+  const FormatResult spelled_one = format(":- ИМЕНА(1).\n" + clause);
+  REQUIRE(spelled_one.ok());
+  std::string expected = declared.text;
+  expected.replace(0, std::string(":- ИМЕНА(2).").size(), ":- ИМЕНА(1).");
+  REQUIRE(spelled_one.text == expected);
 
   const FormatResult bare = format(clause);
   REQUIRE_FALSE(bare.ok());
@@ -209,7 +218,7 @@ TEST_CASE("the first line of a file decides how its names are read") {
   // The option is the fallback for a text without a marker — the window's row and
   // the CLI's `--vars`.
   FormatOptions options;
-  options.variables = prologd::VariableMode::SingleLetterApostrophe;
+  options.variables = prologd::VariableMode::Old;
   REQUIRE(format(clause, options).ok());
 }
 

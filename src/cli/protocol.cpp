@@ -44,6 +44,9 @@ using Json = nlohmann::json;
 ///    (`?цель.`) before its answer, the way `-q` does on the command line
 ///    (task_46: `questions` was split into *run* and *print*).
 // 12: `load`, `query` and `format` carry the naming mode (`vars`, task_67).
+//     `vars: 1` and `vars: 2` became one mode in 2.3.0 (task_77) — the field,
+//     its range and this number are unchanged, so no bump: a client that sends
+//     2 gets exactly what it got before.
 // 13: `load` and `query` take the `screen` the picture is drawn on (`width`
 //    and `height`), and `ready` carries the engine's own screen (task_73).
 constexpr int kProtocolVersion = 13;
@@ -349,11 +352,12 @@ class Session {
     // every load, like the trace flag, or a mode asked for once would outlive the
     // request it was meant for.
     const int vars = request.value("vars", 0);
-    if (vars < 0 || vars > 2) {
+    const std::optional<VariableMode> mode = variableModeFromNumber(vars);
+    if (!mode.has_value()) {
       fail(command, command + ": режим имён должен быть 0, 1 или 2");
       return;
     }
-    engine_.options().variableMode = static_cast<prologd::VariableMode>(vars);
+    engine_.options().variableMode = *mode;
     // The screen the picture is drawn on (task_73).  A front-end names the size it
     // shows, and the buffer becomes that size — cleared, because a picture belongs
     // to the run that drew it.  A request without `screen` keeps the engine's own
@@ -509,14 +513,15 @@ class Session {
                               : IndentUnit::Tab;
     options.selection_only = request.value("selection", false);
     options.source_name = request.value("name", std::string("<format>"));
-    // The mode of the text being laid out (task_67); its own `:- ИМЕНА(N).` line
-    // wins over this one.
+    // The naming mode of the text being laid out (task_67); its own `:- ИМЕНА(N).`
+    // line wins over this one.  Not `mode`: that name is the *format* mode here.
     const int vars = request.value("vars", 0);
-    if (vars < 0 || vars > 2) {
+    const std::optional<VariableMode> naming = variableModeFromNumber(vars);
+    if (!naming.has_value()) {
       fail("format", "format: режим имён должен быть 0, 1 или 2");
       return;
     }
-    options.variables = static_cast<prologd::VariableMode>(vars);
+    options.variables = *naming;
     const FormatResult formatted =
         formatSource(request.at("text").get<std::string>(), options);
     if (!formatted.ok()) {

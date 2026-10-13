@@ -64,21 +64,33 @@ const std::unordered_set<std::string>& reservedBuiltinNames();
 /// then report with a suggestion).
 bool isReservedBuiltinName(std::string_view name);
 
-/// How a name is read (task_67): the three modes the teacher's review asked for.
+/// How a name is read (task_67, merged in task_77): two modes, and the file (or
+/// the run) says which one it wants.
 ///
 /// `Iso` is what the port ships: only a lowercase name is an atom, an upper-case
-/// one is a variable, and `'` quotes an atom.  `SingleLetter` is the old
-/// Пролог-Д: **any** single letter is a variable and a bare capitalised name is a
-/// string constant.  `SingleLetterApostrophe` adds the old dialect's long
-/// variable names, written with a trailing apostrophe (`Сумма'`).
+/// one is a variable, and `'` quotes an atom.  `Old` is the old Пролог-Д: **any**
+/// single letter is a variable, a bare capitalised name is a string constant, and
+/// a long variable name ends with an apostrophe (`Сумма'`).
+///
+/// The old dialect used to be *two* modes — `1` without apostrophe names, `2`
+/// with them — until task_77.  The original reads `число'` in a file that declares
+/// nothing, so `2` was never a dialect of its own: it was the honest half of `1`.
+/// The two are one mode now, and `2` stays a *spelling* of `1` wherever a number
+/// names a mode (the marker, `--vars`, the protocol's `vars`, a stored setting),
+/// so a file, a script or an ini that says it keeps working.
 ///
 /// A name is classified while the text is read, so the mode belongs to the *file*
 /// and to the run — never to a goal inside the program.
 enum class VariableMode : std::uint8_t {
   Iso = 0,
-  SingleLetter = 1,
-  SingleLetterApostrophe = 2,
+  Old = 1,
 };
+
+/// The mode a number names: `0`, `1`, and `2` as a spelling of `1` (task_77).
+/// `std::nullopt` for every other number; what to do about it is the caller's
+/// business — the CLI has already refused it, the protocol raises, and the marker
+/// means «the file says nothing».
+std::optional<VariableMode> variableModeFromNumber(int number);
 
 /// The `:- ИМЕНА(0|1|2).` marker of a file's first line (task_67), together with
 /// how many bytes of the source the marker line takes up — that is, everything up

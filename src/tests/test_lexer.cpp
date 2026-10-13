@@ -74,13 +74,13 @@ TEST_CASE("mode 0 is the dialect the corpus is written in") {
   REQUIRE(tokens[4].kind == TokenKind::QuotedAtom);  // 'Молоко'
 }
 
-TEST_CASE("mode 1 reads the old dialect's names") {
+TEST_CASE("the old dialect reads single-letter variables and capitalised names") {
   // Any single letter is a variable, and a bare capitalised name is a *string*
   // constant: the original kept strings and symbolic constants together, and old
   // programs call string predicates on such names (task_67).
   DiagnosticSink sink;
   const auto tokens =
-      lexWith("д Д Молоко молоко 'Молоко' ИМПОРТ В_ A_", VariableMode::SingleLetter, sink);
+      lexWith("д Д Молоко молоко 'Молоко' ИМПОРТ В_ A_", VariableMode::Old, sink);
   REQUIRE_FALSE(sink.hasErrors());
   REQUIRE(tokens[0].kind == TokenKind::Variable);
   REQUIRE(tokens[1].kind == TokenKind::Variable);
@@ -98,10 +98,9 @@ TEST_CASE("mode 1 reads the old dialect's names") {
   REQUIRE(tokens[7].text == "A_");
 }
 
-TEST_CASE("mode 2 adds the apostrophe names, and a leading apostrophe stays a quote") {
+TEST_CASE("the old dialect reads apostrophe names, and a leading apostrophe stays a quote") {
   DiagnosticSink sink;
-  const auto tokens =
-      lexWith("Сумма' X' a' 'Молоко'", VariableMode::SingleLetterApostrophe, sink);
+  const auto tokens = lexWith("Сумма' X' a' 'Молоко'", VariableMode::Old, sink);
   REQUIRE_FALSE(sink.hasErrors());
   REQUIRE(tokens[0].kind == TokenKind::Variable);
   REQUIRE(tokens[0].text == "Сумма'");
@@ -113,17 +112,22 @@ TEST_CASE("mode 2 adds the apostrophe names, and a leading apostrophe stays a qu
   REQUIRE(tokens[3].text == "Молоко");
 }
 
-TEST_CASE("mode 1 explains an apostrophe name instead of leaving a broken quote") {
-  // The one place 1 differs from 2, and the place a student meets it: say which
-  // mode was meant rather than reporting an unterminated string.
+TEST_CASE("`2` is a spelling of the old dialect, not a mode of its own") {
+  // task_77: the original reads `число'` in a file that declares nothing, so what
+  // the port shipped as modes 1 and 2 was one dialect all along.  `2` is still
+  // accepted — a file, a script or an ini that says it must keep working — and it
+  // means the old dialect, which is what the apostrophe name needed.
+  REQUIRE(variableModeFromNumber(0) == VariableMode::Iso);
+  REQUIRE(variableModeFromNumber(1) == VariableMode::Old);
+  REQUIRE(variableModeFromNumber(2) == VariableMode::Old);
+  REQUIRE_FALSE(variableModeFromNumber(3).has_value());
+  REQUIRE_FALSE(variableModeFromNumber(-1).has_value());
+
   DiagnosticSink sink;
-  const auto tokens = lexWith("X'", VariableMode::SingleLetter, sink);
-  REQUIRE(sink.hasErrors());
+  const auto tokens = lexWith("X'", VariableMode::Old, sink);
+  REQUIRE_FALSE(sink.hasErrors());
   REQUIRE(tokens[0].kind == TokenKind::Variable);
-  REQUIRE(tokens[0].text == "X");
-  const auto& diagnostics = sink.diagnostics();
-  REQUIRE_FALSE(diagnostics.empty());
-  REQUIRE(diagnostics.back().message.find("ИМЕНА(2)") != std::string::npos);
+  REQUIRE(tokens[0].text == "X'");
 }
 
 TEST_CASE("`\\+` is one token, and a lone backslash is an error") {

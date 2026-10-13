@@ -89,6 +89,30 @@ def test_setters_clamp(directory: pathlib.Path) -> None:
     print("ok: what is written is already inside the bounds")
 
 
+def test_the_retired_naming_mode_reads_as_the_old_dialect(
+    directory: pathlib.Path,
+) -> None:
+    """A stored or hand-written `2` is the old dialect, not the ISO default.
+
+    `2` was a naming mode of its own until task_77, when it became a spelling of `1`.
+    The row does not offer it any more, so without a deliberate answer `set_value`
+    would take it for an unknown choice and write the setting's *default* — moving a
+    reader who asked for the old dialect into ISO without a word.
+    """
+    path = directory / "legacy_mode.ini"
+    settings = Settings(path)
+    settings.variable_mode = "2"
+    assert settings.variable_mode == "1"
+    assert settings.variable_mode_number == 1
+
+    # And the same value found in a file somebody edited by hand.
+    path.write_text("[execution]\nvariable_mode=2\n", encoding="utf-8")
+    hand = Settings(path)
+    assert hand.variable_mode == "1"
+    assert hand.variable_mode_number == 1
+    print("ok: a retired `2` is read as the old dialect, not as the default")
+
+
 def test_unknown_keys_survive(directory: pathlib.Path) -> None:
     """A newer version's keys must not be dropped by an older one (task_29)."""
     path = directory / "gui.ini"
@@ -381,6 +405,7 @@ def main() -> int:
         test_broken_values_fall_back_instead_of_breaking_the_window(directory)
         test_setters_clamp(directory)
         test_unknown_keys_survive(directory)
+        test_the_retired_naming_mode_reads_as_the_old_dialect(directory)
         test_the_new_keys_have_the_documented_defaults(directory)
         test_the_interpreter_and_process_directory_round_trip(directory)
         test_syntax_overrides_round_trip_and_reach_the_palette(directory)

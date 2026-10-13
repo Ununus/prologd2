@@ -29,7 +29,7 @@ from prologd_gui.tokens import (  # noqa: E402
     ATOM,
     CYRILLIC,
     MODE_ISO,
-    MODE_SINGLE_LETTER,
+    MODE_OLD,
     STRING,
     VARIABLE,
 )
@@ -179,13 +179,13 @@ def test_the_naming_mode_changes_the_colours() -> None:
     assert coloured.colour("д") == THEME.color_for(ATOM, CYRILLIC)
     assert coloured.colour("Молоко") == THEME.color_for(VARIABLE, CYRILLIC)
 
-    coloured.highlighter.set_mode(MODE_SINGLE_LETTER)
+    coloured.highlighter.set_mode(MODE_OLD)
     assert coloured.colour("д") == THEME.color_for(VARIABLE, CYRILLIC)
     assert coloured.colour("Молоко") == THEME.color_for(STRING, CYRILLIC)
     # A mode that does not move the colours must not cost a re-highlight either:
     # the value is what a document keeps, and setting it again changes nothing.
-    coloured.highlighter.set_mode(MODE_SINGLE_LETTER)
-    assert coloured.highlighter.mode == MODE_SINGLE_LETTER
+    coloured.highlighter.set_mode(MODE_OLD)
+    assert coloured.highlighter.mode == MODE_OLD
     print("ok: the naming mode re-colours the old dialect's names")
 
 

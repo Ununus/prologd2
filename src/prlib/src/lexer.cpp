@@ -122,6 +122,18 @@ bool isReservedBuiltinName(std::string_view name) {
   return kReservedBuiltins.count(text) != 0 || kRetiredBuiltinNames.count(text) != 0;
 }
 
+std::optional<VariableMode> variableModeFromNumber(int number) {
+  switch (number) {
+    case 0:
+      return VariableMode::Iso;
+    case 1:
+    case 2:  // `2` is the old spelling of the old dialect (task_77)
+      return VariableMode::Old;
+    default:
+      return std::nullopt;
+  }
+}
+
 std::optional<std::pair<VariableMode, std::size_t>> readVariableMarker(
     std::string_view source) {
   const std::size_t newline = source.find('\n');
@@ -142,12 +154,11 @@ std::optional<std::pair<VariableMode, std::size_t>> readVariableMarker(
   if (!shape || tokens[3].text.size() != 1) {
     return std::nullopt;
   }
-  const int value = tokens[3].text[0] - '0';
-  if (value < 0 || value > 2) {
+  const std::optional<VariableMode> mode = variableModeFromNumber(tokens[3].text[0] - '0');
+  if (!mode.has_value()) {
     return std::nullopt;
   }
-  return std::pair{static_cast<VariableMode>(value),
-                   newline == std::string_view::npos ? source.size() : newline};
+  return std::pair{*mode, newline == std::string_view::npos ? source.size() : newline};
 }
 
 Lexer::Lexer(std::string_view source, std::string file_name, LexerOptions options)
@@ -234,24 +245,14 @@ Token Lexer::lexIdentifier(DiagnosticSink* sink) {
   // The old dialect's long variable names: a name followed by an apostrophe.  The
   // apostrophe is only a *suffix* — at the start of a token it is still the quote
   // of `'атом'` — which is why it is read here and not in `lexQuotedAtom`.
-  if (peek() == '\'') {
-    if (options_.variables == VariableMode::SingleLetterApostrophe) {
-      advanceByte(1);
-      text.push_back('\'');
-      return makeToken(TokenKind::Variable, std::move(text), start);
-    }
-    if (options_.variables == VariableMode::SingleLetter) {
-      // The one place mode 1 differs from mode 2, and the place a student meets
-      // it: say which mode they meant instead of leaving an unterminated quote.
-      reportInvalidSign(sink, start,
-                        "апостроф в конце имени — это режим 2 (`:- ИМЕНА(2).`); "
-                        "в режиме 1 переменная — одна буква");
-      advanceByte(1);
-    }
+  if (peek() == '\'' && options_.variables == VariableMode::Old) {
+    advanceByte(1);
+    text.push_back('\'');
+    return makeToken(TokenKind::Variable, std::move(text), start);
   }
   if (options_.variables != VariableMode::Iso) {
-    // Modes 1 and 2: the old dialect's variables are one letter, upper or lower,
-    // with at most one `_` after it (`д`, `Б`, `A_`) …
+    // The old dialect's variables are one letter, upper or lower, with at most one
+    // `_` after it (`д`, `Б`, `A_`) …
     if (isOldVariableName(first, text)) {
       return makeToken(TokenKind::Variable, std::move(text), start);
     }
@@ -262,8 +263,7 @@ Token Lexer::lexIdentifier(DiagnosticSink* sink) {
     }
     return makeToken(TokenKind::Identifier, std::move(text), start);
   }
-  const bool starts_upper = first.valid && isUpperCaseLetter(first.code_point);
-  if (starts_upper) {
+  const bool starts_upper = first.valid && isUpperCaseLetter(first.code_point);  if (starts_upper) {
     return makeToken(TokenKind::Variable, std::move(text), start);
   }
   return makeToken(TokenKind::Identifier, std::move(text), start);

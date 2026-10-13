@@ -24,7 +24,8 @@ goal field given its own switch while a run learned to show the hidden output pa
 (part 94), and then to **2.2.0** — the screen size became a setting (part 104) and the
 package was built again (part 105), and the engine's own file renamed to `prologu.exe`
 for the two-engine branch that follows (part 106), and the version raised to **2.3.0**
-with the engine taught to call itself «Пролог-У» (part 107).
+with the engine taught to call itself «Пролог-У» (part 107), and the two naming modes
+of the old dialect merged into one — `2` is a spelling of `1` (part 108).
 
 ## Overall
 
@@ -177,7 +178,7 @@ entries of the session log below and in `ai/task_*.md`.
 | task_74_version_2_2_0 | done | the version raised to **2.2.0** — one source (`project(... VERSION 2.2.0)`), four live copies moved with it, and the `cli_version` test lost its literal: it held `"2\\.1\\.0"`, which a grep for the old number cannot find; the portable package was built again (`dist\prologd-2.2.0-win64`, 303 files, and its 37.9 MiB zip) |
 | task_75_rename_interpreter | done | the engine's file is `prologu.exe` (the CMake target is `prologu`, the file it produces follows it) — only the *file* moved: the project, the `PROLOGD_*` names, the `prologd::` namespace, the `prologd_gui` package, `prologd-gui.exe` and the `prologd2` icons all kept their names; the six window checks that each held their own copy of the build paths now ask `paths.interpreter()`, and a stale `prologd.exe` had to be deleted from the build tree by hand |
 | task_76_version_banner | done | the version is **2.3.0** and the engine calls itself «Пролог-У»: `PROLOGD_PRODUCT_NAME` sits beside `project(... VERSION ...)` and is injected through the generated `version.cpp`, *not* a `-D` macro (a non-ASCII value on the compiler's command line travels through a response file in the ANSI code page); one function, `versionBanner()`, is what both `--version` and the built-in `ВЕРСИЯ` print, so the packing script now reads the number out of that sentence instead of comparing the line |
-| task_77_naming_modes_merge | open | modes 1 and 2 become one (`ИМЕНА(0\|1)`): the original reads apostrophe names but rejects `'Атом'`, so 2 is a superset of 1 — `2` stays accepted as a synonym, and what the old corpus may use is recorded |
+| task_77_naming_modes_merge | done | the naming mode has **two** values now — `Iso` (0) and `Old` (1); `2` is a *spelling* of `1` in one place per side (`variableModeFromNumber` in C++, `tokens.MODE_NUMBERS` in Python), so the marker, `--vars`, the wire and a stored setting all keep working; the settings row translates a stored `2` in *both* directions, because `set_value` answers an unknown choice with the setting's default and would have moved that reader to ISO; the mode-1 diagnostic about the apostrophe went — it advised what is now true |
 | task_78_build_with_prologd | open | `-DBUILD_WITH_PROLOGD=ON` fetches `Ununus/prologd` at a pinned commit and builds a second `prologd.exe` beside ours; it already speaks the JSON session (`PROLOGD_BUILD_FOR_GUI`), so no adapter is needed, and an offline build stays possible |
 | task_79_engine_switch_button | open | a button at the end of the toolbar (icons `u.png`/`d.png`) switches the engine, stopping a run first; one table of capabilities per engine greys out what the other cannot do (format, step, step over, trace, graphics, engine limits, the naming row), and `--interpreter` stays as an override |
 | task_80_process_directory_picker | open | the `...` button of «Свой каталог процесса» opens at the interpreter's own directory instead of wherever it happened to start |
@@ -3750,3 +3751,47 @@ interpreter», стало «Пролог-У: интерпретатор язык
 39 791 376 байт (37,9 МиБ; у 2.2.0 было 39 786 345 и 303 файла).  Внутри пакета
 прогнаны урок 1, `import_demo` и `stdlib_demo`, 130 строк имён, окно стартует и
 пишет `gui.ini` рядом с собой.
+
+### 108. Режимы имён: 1 и 2 — один диалект (2026-10-13)
+
+Задача 77.  `VariableMode` знает теперь два значения — `Iso` (0) и `Old` (1).
+Третьего нет: `2` оказался не вторым диалектом, а верной половиной первого —
+оригинальный `prologd` читает `число'` и в файле, который ничего не объявляет, так
+что режим 1, объявлявший апостроф ошибкой, был строже оригинала без причины.
+`2` остаётся **написанием** `1` везде, где число называет режим.
+
+*Одна точка перевода.*  `variableModeFromNumber` в C++ отвечает на `0` → `Iso`,
+`1` и `2` → `Old`, всё прочее → пусто, и через неё проходят: маркер
+`:- ИМЕНА(N).`, `--vars` (одно чтение на обе ветки — формат и запуск) и `vars` в
+`load` и `format`.  В окне то же самое делает таблица `tokens.MODE_NUMBERS`.
+Числа на проводе не менялись, и версия протокола стоит: клиент, который шлёт
+`vars: 2`, получает ровно то, что получал.
+
+*Ловушка, которая нашлась сразу.*  Строка настроек больше не предлагает `2` — и
+это сделало её опасной: `set_value` для «выбора» пишет **умолчание** для значения,
+которого среди пунктов нет, то есть сохранённая двойка молча уводила читателя в
+ISO.  Поэтому `2` переводится дважды: в сеттере (перед `set_value`) и в геттере
+(ини, которую правили руками).  Оба пути пинет `test_settings.py`.
+
+*Что ушло.*  Диагностика «апостроф в конце имени — это режим 2 (`:- ИМЕНА(2).`);
+в режиме 1 переменная — одна буква»: она советовала то, что теперь и так верно.
+На её месте — две проверки: `2` как написание (лексер) и два прогона одного файла
+(`test_builtins_control.cpp`).
+
+*Корпус.*  `old_lib_2.pld` оставлен с маркером `2` — нарочно, живым доказательством,
+что написание принимается, — и проза файла переписана: раньше она объясняла
+разницу двух режимов, которой больше нет.  Проза `use_old_names.pld` тоже.
+
+*Документы.*  `help.typ` (§3 и `--vars` в §15), `prologd-diff.typ` (раздел о
+режиме чтения имён с «Уточнением»), запись `ИМЕНА` в `doc/builtins.json`,
+`src/gui/README.md`, `ai/conventions.md`.
+
+*Новые проверки.*  Три случая в CTest: `--vars 1` и `--vars 2` читают апострофное
+имя из `src/tests/apostrophe_names.pld`, а без `--vars` тот же файл не разбирается
+вовсе.  На проводе то же самое пинет `test_variable_modes.py` — проба, в которой
+приходит связывание `Значение'=7`.
+
+*Verified.*  `ctest` **334/334** (331 плюс три новых); `test_variable_modes`,
+`test_highlighter`, `test_settings` (с новым случаем на устаревшую двойку),
+`test_window`, остальные оконные наборы и `protocol_smoke` — зелёные; шесть
+документов собираются.

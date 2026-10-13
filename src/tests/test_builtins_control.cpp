@@ -19,10 +19,16 @@ TEST_CASE("the first line of a file says how its names are read") {
   REQUIRE(result.output == "д=1\nХ=Молоко и\n");
 }
 
-TEST_CASE("the second mode adds the old apostrophe names") {
-  const auto result = runProgram(":- ИМЕНА(2).\n?РАВНО(Сумма', 5).\n");
-  REQUIRE(result.loaded);
-  REQUIRE(result.output == "Сумма'=5\n");
+TEST_CASE("the old dialect reads apostrophe names, and `2` says the same") {
+  // task_77: `2` was a mode of its own until the merge, and both numbers name the
+  // old dialect now — the apostrophe name is what says which reading a file got.
+  const auto one = runProgram(":- ИМЕНА(1).\n?РАВНО(Сумма', 5).\n");
+  REQUIRE(one.loaded);
+  REQUIRE(one.output == "Сумма'=5\n");
+
+  const auto two = runProgram(":- ИМЕНА(2).\n?РАВНО(Сумма', 5).\n");
+  REQUIRE(two.loaded);
+  REQUIRE(two.output == "Сумма'=5\n");
 }
 
 TEST_CASE("a marker off the first line says where it belongs") {

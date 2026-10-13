@@ -176,13 +176,20 @@ DEFAULT_INPUT_MODE = "panel"
 INPUT_MODES = ("panel", "dialog")
 
 #: How a file's names are read *when the file does not say* (task_67).  The old
-#: Пролог-Д wrote a variable as one letter and left a string constant unquoted,
-#: which mode 0 reads as a variable, so an old program means something else there.
-#: A file whose first line declares `:- ИМЕНА(N).` is read that way whatever this
-#: row says — the dialect belongs to the file — and an imported file is read in its
-#: own mode, too.  So this is a fallback, and the fallback is the modern reading.
+#: Пролог-Д wrote a variable as one letter, left a string constant unquoted and let
+#: a long variable name end with an apostrophe, which mode 0 reads as a variable, so
+#: an old program means something else there.  A file whose first line declares
+#: `:- ИМЕНА(N).` is read that way whatever this row says — the dialect belongs to
+#: the file — and an imported file is read in its own mode, too.  So this is a
+#: fallback, and the fallback is the modern reading.
 VARIABLE_MODE = "execution/variable_mode"
-VARIABLE_MODES = ("0", "1", "2")
+VARIABLE_MODES = ("0", "1")
+
+#: The number `2` the old dialect was asked for with until task_77.  It is a
+#: spelling of `1` now (the original reads apostrophe names anyway), and an ini that
+#: still says it has to keep meaning the old dialect — falling back to the default
+#: would move that reader to ISO without a word.
+VARIABLE_MODE_LEGACY = "2"
 
 #: The screen the graphics predicates draw on (task_73).  The engine's own default
 #: is the same 600 × 600 (`kMaxGrX`/`kMaxGrY`): the whole buffer travels to the
@@ -398,8 +405,7 @@ SETTINGS: tuple[Setting, ...] = (
     Setting(VARIABLE_MODE, "Имена переменных", "Выполнение", "choice",
             DEFAULT_VARIABLE_MODE,
             choices=(("0", "как в ISO: переменная с большой буквы"),
-                     ("1", "по-старому: одна буква — переменная"),
-                     ("2", "то же плюс имена с апострофом")),
+                     ("1", "по-старому: одна буква, имена с апострофом")),
             hint="Как читать имена в файле, который об этом молчит: 0 — имя с большой буквы — переменная; 1 и 2 — старый диалект, где переменная — одна буква, а имя с большой буквы без кавычек — строковая константа.  Строка «:- ИМЕНА(N).» первой строкой файла важнее этой настройки, и импортируемый файл читается в своём режиме.  Режим меняет подсветку и форматирование, а запуск всё равно читает маркер из файла"),
     Setting(IMPORT_PATHS, "Дополнительные каталоги ИМПОРТ", "Выполнение", "dirs", (),
             hint="Каталоги, в которых ИМПОРТ ищет файлы; передаются интерпретатору как -I, в этом порядке"),
@@ -1079,17 +1085,32 @@ class Settings:
 
     @property
     def variable_mode(self) -> str:
-        """How a file *without* a marker of its own is read: `0`, `1` or `2`.
+        """How a file *without* a marker of its own is read: `0` or `1`.
 
         The file's own `:- ИМЕНА(N).` first line beats this (task_67), so what is
         left is the window's half of `--vars`: the mode of a file that says
         nothing — `0`, unless the reader asks for the old dialect by name.
+
+        A stored `2` is answered as `1` rather than falling through `_choice` to the
+        default: the two were one mode before task_77, and a reader who asked for
+        the old dialect must not land in ISO because a number was renamed.
         """
+        key = _VARIABLE_MODE_SETTING.key
+        if self._text(key, DEFAULT_VARIABLE_MODE).strip() == VARIABLE_MODE_LEGACY:
+            return "1"
         return self._choice(_VARIABLE_MODE_SETTING)
 
     @variable_mode.setter
     def variable_mode(self, value: str) -> None:
-        self.set_value(_VARIABLE_MODE_SETTING, value)
+        """Sets the row, reading a `2` as the old dialect.
+
+        `2` is not one of the row's two choices any more (task_77), and `set_value`
+        answers a value it does not know with the setting's *default* — which would
+        move a caller who asked for the old dialect into ISO without a word.  So the
+        spelling is turned into the mode here, before the row sees it.
+        """
+        self.set_value(_VARIABLE_MODE_SETTING,
+                       "1" if str(value).strip() == VARIABLE_MODE_LEGACY else value)
 
     @property
     def variable_mode_number(self) -> int:

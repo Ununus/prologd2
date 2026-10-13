@@ -1,0 +1,6 @@
+% The old dialect's long variable names: `Значение'` is one variable, not a name
+% with a stray quote (task_77).  The file declares no naming mode of its own, so the
+% mode has to come from `--vars` — which is what the checks next to this file vary,
+% and both `1` and `2` have to read the name.
+факт(7).
+?факт(Значение'),ВЫВОД(Значение'),ПС.

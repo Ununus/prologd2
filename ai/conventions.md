@@ -135,7 +135,13 @@ Tests are written **together with** the feature, never after.
   `src/prlib/src/lexer.cpp`, used by the loader *and* the formatter); the window
   repeats it for colouring alone (`tokens.mode_from_first_line`) and
   `src/gui/tests/test_variable_modes.py` checks that repetition against the
-  interpreter's own reading of the same first lines.
+  interpreter's own reading of the same first lines.  There are **two** modes since
+  task_77: `0` ISO and `1` the old dialect — one-letter variables, unquoted string
+  constants and apostrophe names.  `2` is a *spelling* of `1`, accepted everywhere a
+  number names a mode (`variableModeFromNumber` in C++, `tokens.MODE_NUMBERS` in
+  Python, and the settings row answers a stored `2` as `1` instead of falling back
+  to ISO): the two were one dialect all along, because the original reads `число'`
+  in a file that declares nothing.
 * Bumping the program version means moving every *live* copy of the literal — grep for the
   old number rather than trusting memory:
   * the `cli_version` test in `src/tests/CMakeLists.txt` follows by itself now: its pattern

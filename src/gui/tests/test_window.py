@@ -4204,12 +4204,18 @@ def test_the_first_line_sets_the_naming_mode_of_the_highlighting(executable: str
 
         # The window's own row is what a file *without* a marker is read in, and a
         # marker still beats it — the same order `--vars` has on the command line.
-        window._settings.variable_mode = "2"
+        window._settings.variable_mode = "0"
         window.apply_settings()
-        assert buffer.highlighter.mode == 1
+        assert buffer.highlighter.mode == 1, "the marker beats the row"
         buffer.document.setPlainText("% без маркера\n")
         window.apply_settings()
-        assert buffer.highlighter.mode == 2
+        assert buffer.highlighter.mode == 0, "without a marker the row stands"
+        # `2` is a spelling of `1` (task_77): a stored 2 is the old dialect, not the
+        # default — falling back to ISO would move that reader without a word.
+        window._settings.variable_mode = "2"
+        window.apply_settings()
+        assert window._settings.variable_mode == "1", "a stored `2` is the old dialect"
+        assert buffer.highlighter.mode == 1
         print("ok: a file's first line sets the naming mode of its highlighting")
     finally:
         discard_changes(window)

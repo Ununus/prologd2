@@ -82,10 +82,10 @@ inline constexpr std::size_t kDefaultMaxNestedDepth = 10'000;
 struct EngineOptions {
   bool trace = false;
   /// How the names of a loaded program are read (task_67).  `Iso` is the dialect
-  /// the whole corpus is written in; the old dialect's single-letter variables
-  /// and unquoted string constants are a *mode of the file*, which is why the
-  /// value travels with the run — `--vars` on the command line, `:- ИМЕНА(1).` in
-  /// the first line of a file, a row of the settings dialog.
+  /// the whole corpus is written in; the old dialect's single-letter variables,
+  /// unquoted string constants and apostrophe names are a *mode of the file*,
+  /// which is why the value travels with the run — `--vars` on the command line,
+  /// `:- ИМЕНА(1).` in the first line of a file, a row of the settings dialog.
   VariableMode variableMode = VariableMode::Iso;
   std::size_t maxNestedDepth = kDefaultMaxNestedDepth;
   /// The guards of a run (task_46): a step cap, a recursion-depth cap and a
