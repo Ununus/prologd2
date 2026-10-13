@@ -368,7 +368,51 @@ bool Solver::resolveGoal(const Term& goal) {
                  goal.compound->args[1]);
     return true;
   }
+  if (name == "->" && arity == 2) {
+    // ISO's if-then without an else (task_85): commit to the first solution of
+    // the condition and run the consequence — `ПЕРВОЕ(Условие), Тогда`
+    // (task_51) written the ISO way.  The condition is solved in a machine of
+    // its own (`callOnce`), so a cut inside it stays there — ISO's opacity —
+    // while its bindings are the ones the consequence sees.
+    if (!engine_.callOnce(goal.compound->args[0])) {
+      return false;
+    }
+    const std::size_t barrier = env_->cp_barrier;
+    setEnv(advanceEnv(env_));
+    pushMeta(goal.compound->args[1], barrier);
+    return true;
+  }
   if (name == ";" && arity == 2) {
+    const Term& branch = goal.compound->args[0];
+    if (branch.kind == TermKind::Compound && branch.compound != nullptr &&
+        branch.compound->name == "->" && branch.compound->args.size() == 2) {
+      // `(Условие -> Тогда ; Иначе)` --- ISO's if-then-else, and not a
+      // disjunction of a committed pair: when the condition succeeds and the
+      // consequence fails, the else branch is *not* tried.  That is the one
+      // thing a `;` cannot express with a cut (the cut of `ПЕРВОЕ/2` is inside
+      // the branch), so the else branch is dropped the moment the condition has
+      // its first solution (task_85).  Once dropped, the condition itself is
+      // beyond backtracking as well --- `callOnce` gives only its first
+      // solution and keeps the bindings.
+      ChoicePoint cp;
+      cp.kind = ChoicePoint::Kind::Alternative;
+      cp.goal = goal;  // backtracking into it runs the else branch (`args[1]`)
+      cp.trail_mark = engine_.bindings().trailMark();
+      cp.barrier = cps_.size();
+      cp.env = env_;
+      cps_.push_back(std::move(cp));
+      const std::size_t alternatives = cps_.size() - 1;
+      if (!engine_.callOnce(branch.compound->args[0])) {
+        // The condition has no solution: fail, and the alternative already on
+        // the stack is exactly the else branch.
+        return false;
+      }
+      dropChoicePoints(alternatives);
+      const std::size_t barrier = env_->cp_barrier;
+      setEnv(advanceEnv(env_));
+      pushMeta(branch.compound->args[1], barrier);
+      return true;
+    }
     // A disjunction: the right operand becomes an alternative, and the left one
     // runs in a frame of its own.  That frame's cut barrier sits *above* the
     // alternative, so a cut inside a branch prunes what the branch itself

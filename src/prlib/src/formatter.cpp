@@ -350,7 +350,8 @@ class Formatter {
           } else if (kind == TokenKind::RParen || kind == TokenKind::RBracket) {
             body_depth = body_depth > 0 ? body_depth - 1 : 0;
           } else if (!body_hash && body_depth == 0 &&
-                     (kind == TokenKind::Comma || kind == TokenKind::Semicolon)) {
+                     (kind == TokenKind::Comma || kind == TokenKind::Semicolon ||
+                      kind == TokenKind::IfThen)) {
             statement.separators.push_back(j);
           }
         }
@@ -621,7 +622,8 @@ class Formatter {
       if (separator == kNone) {
         break;
       }
-      if ((*tokens_)[separator].kind == TokenKind::Semicolon) {
+      if ((*tokens_)[separator].kind == TokenKind::Semicolon ||
+          (*tokens_)[separator].kind == TokenKind::IfThen) {
         builder_.append(' ');
       }
       builder_.append(tokenText(separator));
@@ -801,7 +803,8 @@ FormatResult formatSource(std::string_view text, const FormatOptions& options) {
     } else if (kind == TokenKind::RParen || kind == TokenKind::RBracket) {
       depth = depth > 0 ? depth - 1 : 0;
     } else if (!in_hash && depth == 0 &&
-               (kind == TokenKind::Comma || kind == TokenKind::Semicolon)) {
+               (kind == TokenKind::Comma || kind == TokenKind::Semicolon ||
+                kind == TokenKind::IfThen)) {
       cuts.push_back(i);
     }
   }

@@ -141,6 +141,29 @@ TEST_CASE("a semicolon keeps the spaces the corpus gives it") {
           "выбор(Х):-РАВНО(Х, 1) ; РАВНО(Х, 2).\n?цена(Т, 40) ; цена(Т, 500).\n");
 }
 
+TEST_CASE("an arrow keeps the spaces the corpus gives it") {
+  // `->` is spaced like `;` (task_85): one space on either side, whatever the
+  // source had.  It is a break point of the hard shape as well, and a query
+  // stays on its own line either way.
+  const std::string source =
+      "выбор(Х):-дешёвый(Х)->надёжный(Х);отложить(Х).\n"
+      "?цена(Т, 40)->Т = дорого;Т = иначе.\n";
+  const FormatResult result = format(source);
+  REQUIRE(result.ok());
+  REQUIRE(result.text ==
+          "выбор(Х):-дешёвый(Х) -> надёжный(Х) ; отложить(Х).\n"
+          "?цена(Т, 40) -> Т = дорого ; Т = иначе.\n");
+
+  const FormatResult broken = format(source, hard());
+  REQUIRE(broken.ok());
+  REQUIRE(broken.text ==
+          "выбор(Х):-\n"
+          "\tдешёвый(Х) ->\n"
+          "\tнадёжный(Х) ;\n"
+          "\tотложить(Х).\n"
+          "?цена(Т, 40) -> Т = дорого ; Т = иначе.\n");
+}
+
 TEST_CASE("an arrow rule formats like a colon-dash rule") {
   const std::string source = "правило(Х)<-часть(Х),   ещё(Х).\n";
   const FormatResult result = format(source, hard());

@@ -231,7 +231,7 @@ void walkGoal(const Term& goal, const SourceLocation& location,
     walkGoal(args[1], location, visit);
     return;
   }
-  if (name == ";" && arity == 2) {
+  if ((name == ";" || name == "->") && arity == 2) {
     walkGoal(args[0], location, visit);
     walkGoal(args[1], location, visit);
     return;

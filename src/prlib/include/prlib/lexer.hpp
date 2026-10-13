@@ -28,6 +28,7 @@ enum class TokenKind : std::uint8_t {
   Question,
   ColonDash,
   Arrow,
+  IfThen,  ///< `->`, ISO's if-then (task_85)
   Bang,
   NotGoal,  ///< `\+`, ISO's spelling of `НЕ` (task_55)
   Hash,

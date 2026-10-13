@@ -232,7 +232,10 @@ def tokenize(line: str, keywords: Keywords | None = None, mode: int = MODE_ISO) 
             continue
 
         pair = line[index : index + 2]
-        if pair in (":-", "<-", "\\+"):
+        if pair in (":-", "<-", "->", "\\+"):
+            # `->` is a sign of its own since task_85 (ISO's if-then): without this
+            # line the tokenizer would read `-` and `>`, and every front-end rule
+            # built on the tokens would see two signs where the language has one.
             tokens.append(Token(PUNCTUATION, pair, index, index + 2))
             index += 2
             continue

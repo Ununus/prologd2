@@ -237,6 +237,17 @@ TEST_CASE("the original dialect's or-word loads, and its two arguments are goals
   REQUIRE(diagnostics.front().message.find("не найдено: члены/1") == 0);
 }
 
+TEST_CASE("an `->` with nothing after it says so") {
+  // task_85: the sign is an operator now, and a goal that was deleted leaves the
+  // arrow behind.  The message names the arrow instead of blaming the whole goal
+  // («Цель должна быть предикатом»), which points at the wrong end of the line.
+  const std::vector<PrologError> diagnostics = diagnosticsOf("?ЛОЖЬ -> .\n");
+  REQUIRE(diagnostics.size() == 1);
+  REQUIRE(diagnostics.front().code == ErrorCode::InvalidSentence);
+  REQUIRE(diagnostics.front().isParseError);
+  REQUIRE(diagnostics.front().message == "после «->» нужна цель");
+}
+
 TEST_CASE("an arity a user predicate does not have lists the ones it has") {
   const std::vector<PrologError> diagnostics = diagnosticsOf("дв(1, 2).\n?дв(1).\n");
   REQUIRE(diagnostics.size() == 1);

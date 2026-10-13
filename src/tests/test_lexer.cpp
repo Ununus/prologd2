@@ -244,10 +244,14 @@ TEST_CASE("the comparison signs are one token each") {
   // `<` followed by `=`.
   {
     DiagnosticSink sink;
-    const auto tokens = lex("<- :-", sink);
+    const auto tokens = lex("<- :- ->", sink);
     REQUIRE_FALSE(sink.hasErrors());
     REQUIRE(tokens[0].kind == TokenKind::Arrow);
     REQUIRE(tokens[1].kind == TokenKind::ColonDash);
+    // `->` is an operator of its own since task_85, not advice: it is read as
+    // one token, like `;`.
+    REQUIRE(tokens[2].kind == TokenKind::IfThen);
+    REQUIRE(tokens[2].text == "->");
   }
 }
 
@@ -264,7 +268,6 @@ TEST_CASE("an ISO operator the dialect lacks is explained") {
                {"X =\\= Y", "«не равно»"},
                {"X @< Y", "сравнение по стандартному порядку"},
                {"X @>= Y", "сравнение по стандартному порядку"},
-               {"X -> Y", "«если-то» — это «ПЕРВОЕ(Условие), Тогда»"},
                {"X <= Y", "«меньше или равно» записывают «=<»"}};
   for (const auto& item : cases) {
     INFO("source: " << item.source);

@@ -43,6 +43,11 @@ constexpr const char* kRetiredTerminator =
 constexpr const char* kInfixIsHint =
     "«is» — не оператор: выражение помечают «#…#», например «РАВНО(X, #2+3#)»";
 
+/// The wording of an `->` with nothing after it.  A bare sign is what a reader
+/// writes when they delete the goal that stood there, and the generic message
+/// («Цель должна быть предикатом») would point at the wrong end of the line.
+constexpr const char* kEmptyIfThen = "после «->» нужна цель";
+
 /// Tokens that can open a term, a fact, a rule or a query.  When one of them
 /// follows a *complete* statement, what is missing is the dot of that
 /// statement — saying so points at the end of the finished line instead of at
@@ -380,17 +385,11 @@ Term Parser::parsePrimary() {
     case TokenKind::LParen: {
       const Token open = advance();
       Term result = parseCommaGroup();
-      // `(A ; B)` is a disjunction: `,` binds tighter, as in ISO, so the
-      // operands of `;` are comma groups.  A parenthesised disjunction is how
-      // one reaches `ВЫП` and `НАЙТИВСЕ`, whose goals are arguments.
-      while (!failed_ && match(TokenKind::Semicolon)) {
-        const Token semicolon = previous();
-        if (check(TokenKind::Dot) || atEnd()) {
-          report(ErrorCode::InvalidSentence, semicolon.location, kRetiredTerminator);
-          break;
-        }
-        Term right = parseCommaGroup();
-        result = makeCompound(";", {std::move(result), std::move(right)});
+      // `(A ; B)` and `(A -> B)` are goals written as terms: a parenthesised
+      // disjunction or if-then is how one reaches `ВЫП` and `НАЙТИВСЕ`, whose
+      // goals are arguments.  `,` binds tightest, then `->`, then `;`.
+      if (!failed_ && (check(TokenKind::Semicolon) || check(TokenKind::IfThen))) {
+        result = parseGoalExpression(std::move(result));
       }
       if (!match(TokenKind::RParen)) {
         reportUnclosedBracket('(', open.location);
@@ -612,6 +611,51 @@ Term Parser::parseGoal() {
   return goal;
 }
 
+Term Parser::parseIfThen(Term first) {
+  // `A -> B` — ISO's if-then (task_85).  `,` binds tighter than `->`, so both
+  // sides are comma groups, and the operator is right-nested as in ISO: with a
+  // chain `A -> B -> C` the reader gets `A -> (B -> C)`.
+  std::vector<Term> goals;
+  goals.push_back(std::move(first));
+  while (!failed_ && check(TokenKind::IfThen)) {
+    const Token arrow = advance();
+    if (check(TokenKind::Dot) || check(TokenKind::RParen) || atEnd()) {
+      report(ErrorCode::InvalidSentence, arrow.location, kEmptyIfThen);
+      break;
+    }
+    goals.push_back(parseCommaGroup());
+  }
+  Term result = std::move(goals.back());
+  for (std::size_t i = goals.size() - 1; i > 0; --i) {
+    result = makeCompound("->", {std::move(goals[i - 1]), std::move(result)});
+  }
+  return result;
+}
+
+Term Parser::parseGoalExpression(Term first) {
+  // `;` is looser than `->`, and it is right-nested here as well — that is what
+  // the `else` of an if-then-else *is*: `A -> T ; B -> U ; E` reads as
+  // `(A -> T) ; ((B -> U) ; E)`, so the `else` of the first pair is the whole
+  // rest of the chain, exactly as in ISO.
+  std::vector<Term> branches;
+  branches.push_back(parseIfThen(std::move(first)));
+  while (!failed_ && check(TokenKind::Semicolon)) {
+    const Token semicolon = advance();
+    if (check(TokenKind::Dot) || atEnd()) {
+      // `;` where the statement ends: the terminator of the original dialect,
+      // retired in favour of a disjunction.
+      report(ErrorCode::InvalidSentence, semicolon.location, kRetiredTerminator);
+      break;
+    }
+    branches.push_back(parseIfThen(parseCommaGroup()));
+  }
+  Term result = std::move(branches.back());
+  for (std::size_t i = branches.size() - 1; i > 0; --i) {
+    result = makeCompound(";", {std::move(branches[i - 1]), std::move(result)});
+  }
+  return result;
+}
+
 std::vector<Term> Parser::parseGoalList(std::vector<SourceLocation>* locations) {
   std::vector<Term> goals;
   if (check(TokenKind::Dot) || check(TokenKind::Semicolon) || atEnd()) {
@@ -629,26 +673,11 @@ std::vector<Term> Parser::parseGoalList(std::vector<SourceLocation>* locations) 
     }
     goals.push_back(parseGoal());
   }
-  if (!failed_ && check(TokenKind::Semicolon)) {
-    // `,` binds tighter than `;`, so a disjunction swallows the conjunction
-    // collected so far: `A, B ; C, D` is `(A, B) ; (C, D)`.  The whole thing
-    // becomes one goal, and the per-goal positions collapse to the first.
-    Term left = commaGoal(goals);
-    while (!failed_ && check(TokenKind::Semicolon)) {
-      const Token semicolon = advance();
-      if (check(TokenKind::Dot) || atEnd()) {
-        // `;` where the statement ends: the terminator of the original dialect,
-        // retired in favour of a disjunction.
-        report(ErrorCode::InvalidSentence, semicolon.location, kRetiredTerminator);
-        break;
-      }
-      std::vector<Term> right_items;
-      right_items.push_back(parseGoal());
-      while (!failed_ && match(TokenKind::Comma)) {
-        right_items.push_back(parseGoal());
-      }
-      left = makeCompound(";", {std::move(left), commaGoal(right_items)});
-    }
+  if (!failed_ && (check(TokenKind::Semicolon) || check(TokenKind::IfThen))) {
+    // Not a plain conjunction after all: one goal comes out of `,`/`->`/`;`, and
+    // the per-goal positions collapse to the first.  `,` binds tightest, so the
+    // goals collected above are only the first comma group.
+    Term left = parseGoalExpression(commaGoal(goals));
     goals.clear();
     goals.push_back(std::move(left));
     if (locations != nullptr) {

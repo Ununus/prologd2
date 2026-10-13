@@ -32,7 +32,7 @@ a button for the naming mode (parts 110–112), a folder chooser that opens at t
 (part 113), the manual's comparison table put on a landscape page (part 114), and the
 original dialect's `ИЛИ/2` returned to the language without an English twin (part 115),
 and `sub_string/5` added as the ISO shape of `КОПИЯ` while `substring` left the
-language (part 116).
+language (part 116), and `->` added as ISO's if-then and if-then-else (part 117).
 
 ## Overall
 
@@ -199,10 +199,11 @@ entries of the session log below and in `ai/task_*.md`.
 | task_82_iso_compatibility | open | the policy (an ISO-compatible subset plus the teaching extras) and four stages: `stdlib/iso.pld`, the standard order of terms, the missing spellings (`is`, `=:=`, `=\=`, `->`, `\=`, `/* */`), and the documented refusals (`bagof`/`setof`, `catch`/`throw`, modules, dicts) — with a few book examples kept as checks |
 | task_83_ili_name | done | `ИЛИ/2` — the original dialect's word — is callable again, with the behaviour its library definition had (`ИЛИ(X, _) :- ВЫП(X), !.` and `ИЛИ(_, X) :- ВЫП(X).`), which is `ПЕРВОЕ` with two goals: one function, two names, and the arity stays 2.  It is the one built-in **without an English spelling** — `or` stays retired, `first` is the English name of `ПЕРВОЕ` — the exception `test_aliases.cpp` names.  It could not be a library clause: a name starting with a capital letter is a variable in mode 0 and a string constant in mode 1, so no `.pld` file can define it (`--list-keywords` 130 → 131) |
 | task_84_sub_string | done | `sub_string(Стр, До, Длина, После, Подстрока)` — the ISO shape of a substring: five arguments, positions and lengths **from zero**, the three counts summing to the length of the string, each given or computed from the other two — and it is **English only**, like `abs`.  `КОПИЯ/4` lost its English alias with it: `substring` is retired with a message, since the ISO predicate of the same family is a name of its own and not a spelling of `КОПИЯ` (which counts from one and takes four arguments).  Known difference from ISO: one answer, not a walk over every occurrence — a built-in cannot hand a choice point back to the solver |
+| task_85_if_then | done | `->` is a sign of the language: `(Условие -> Тогда)` takes the *first* solution of the condition and runs the consequence, and `(Условие -> Тогда ; Иначе)` treats the `;` after it as «иначе» — once the condition has a solution the else branch is dropped for good, *even when the consequence fails*.  That was the one thing neither `;` with a cut (a cut in a branch is local to it) nor `ПЕРВОЕ(C), T ; E` (which falls back to `E`) could say.  `,` binds tighter than `->`, `->` tighter than `;`, both right-nested; the condition is solved in a machine of its own (`callOnce`), so a cut inside it stays there.  The advice that used to answer the sign («не оператор: пишите `ПЕРВОЕ`», task_52) is gone |
 
 ## Test suite
 
-345 tests, about six seconds: 325 Catch2 cases plus 20 command-line and integration
+348 tests, about six seconds: 328 Catch2 cases plus 20 command-line and integration
 tests (seven option tests, five `--list-keywords` tests, the import-search report, the
 JSON protocol session, the formatter round-trip and the engine-limit and diagnostics
 cases).  Groups: BigInt, lexer, keywords, parser, unification, engine, every built-in
@@ -4152,4 +4153,37 @@ tests passed»: шаг обнаружения читает вывод в код�
 `?sub_string("hello", 6, 0, _Д, _П).` → `НЕТ`;
 `?sub_string("hello", -1, 1, _Д, _П).` → ошибка «sub_string: До меньше нуля (-1)»;
 `?substring("аб", 1, 1, _).` → ошибка со снятым именем.
+
+### 117. `->` — если-то и если-то-иначе (2026-10-13)
+
+Задача 85.  Просьба владельца: «Добавим `->`.»  Знак, которому диалект до сих пор
+отвечал подсказкой «не оператор, пишите `ПЕРВОЕ`», стал знаком языка.
+
+* Разбор: три уровня целей вместо двух — `,` крепче `->`, `->` крепче `;`, оба знака
+  правоассоциативны (`A -> T ; B -> U ; E` читается как `(A -> T) ; ((B -> U) ; E)`).
+  Тот же вход у скобочной цели, поэтому `ВЫП((A -> B ; C))` и `НАЙТИВСЕ(X, (A -> B), L)`
+  работают без отдельной работы.  Пустой знак (`?A -> .`) получает своё сообщение.
+* Решатель: `(C -> T)` — это `callOnce(C)`, то есть первое решение условия; пара
+  `(C -> T ; E)` узнаётся в `;(->(C,T), E)` до общей дизъюнкции, ветвь «иначе» ложится
+  точкой выбора *до* решения условия, и условие, у которого нашлось решение, снимает
+  эту точку.  Отсюда главное правило ISO: если условие решилось, а следствие нет,
+  «иначе» **не** берётся (замерено: `?(цена(Т, Ц) -> Ц > 100 ; Т = иначе).` → `НЕТ`).  Ни
+  `;` с отсечением, ни `ПЕРВОЕ` этого не выражают: отсечение ветви локально ей самой, а
+  `ПЕРВОЕ(C), T ; E` при нерешившемся `T` возьмёт «иначе».
+* Проверки: `walkGoal` раскрывает обе стороны знака, поэтому имена внутри условия и
+  следствия проверяются; форматтер размечен как у `;` (пробелы и переносы жёсткой
+  формы — оба замера в проверке); окно читает `->` одним знаком — без этого
+  `tokens.py` видел `-` и `>`.
+* Документы: `help.typ` §4.5 и §4.6 (знак стал основным, `ПЕРВОЕ` — «то же словами»),
+  строка таблицы сравнения, `prologd-diff.typ` (строка сводной таблицы и раздел
+  «если-то и если-то-иначе») и `technical.typ` §5.4 — как это устроено в решателе.
+
+*Ловушки.*  Проба с целью-переменной (`?Р -> …`) дала «Цель не может быть
+переменной»: знак тут ни при чём, но лишний раз про заглавную букву.  И правка
+абзаца в `technical.typ` сначала склеила два абзаца — замена захватила пустую строку
+рядом, и заметить это можно только чтением.
+
+*Verified.*  `ctest` 348/348 (345 плюс три случая: поведение, разбор и форматтер),
+25 оконных сюит и `protocol_smoke.py` зелёные, шесть документов собираются без
+замечаний.  Руками — таблица ответов и замеры форматтера в `ai/task_85_if_then.md`.
 

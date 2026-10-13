@@ -184,6 +184,38 @@ TEST_CASE("the choice form takes any number of goals") {
   REQUIRE(bad.error.find("Цель должна быть предикатом") != std::string::npos);
 }
 
+TEST_CASE("if-then commits to the condition, and if-then-else keeps the else") {
+  // task_85: `->` is ISO's if-then, and a `;` after it is «иначе».  The one
+  // thing `ПЕРВОЕ(Условие), Тогда ; Иначе` cannot say is here: once the condition
+  // has a solution the else branch is gone — even when the consequence fails.
+  const auto result = runProgram(
+      "цена(хлеб, 40).\n"
+      "цена(молоко, 20).\n"
+      "п(1).\n"
+      "п(2).\n"
+      "?цена(Т, Ц) -> Ц < 50.\n"                            // Т=хлеб, Ц=40
+      // The condition is committed: `Ц < 30` fails on хлеб, and the condition is
+      // not re-entered to find молоко — that is what the brackets are for.
+      "?цена(Т, Ц) -> Ц < 30.\n"                            // НЕТ
+      "?(цена(Т, Ц), Ц < 30) -> РАВНО(1, 1).\n"             // Т=молоко, Ц=20
+      // The else is out of reach once the condition succeeded…
+      "?цена(Т, Ц) -> Ц > 100 ; РАВНО(Т, нет).\n"           // НЕТ
+      // …while a condition that has no solution takes it:
+      "?(цена(Т, Ц), Ц > 100) -> РАВНО(Т, дорого) ; РАВНО(Т, нет).\n"  // Т=нет
+      "?(ЛОЖЬ -> РАВНО(X, 1) ; РАВНО(X, 2)).\n"             // X=2
+      "?п(X) -> РАВНО(1, 1) ; РАВНО(X, 2).\n"               // X=1
+      // The plain disjunction is unchanged, and `=` binds tighter than `->`:
+      "?цена(Т, 40) ; цена(Т, 20).\n"                       // Т=хлеб, Т=молоко
+      "?X = 1 -> РАВНО(X, 1) ; РАВНО(X, 9).\n"              // X=1
+      // A chain: the first condition succeeds, its consequence fails, and the
+      // second pair is the *else* of the first — so it is not tried either.
+      "?цена(Т, Ц) -> ЛОЖЬ ; цена(Т, Ц) -> ЛОЖЬ ; РАВНО(Т, нет).\n");  // НЕТ
+  REQUIRE(result.loaded);
+  REQUIRE_FALSE(result.runtimeError);
+  REQUIRE(result.output == "Т=хлеб\nЦ=40\nНЕТ\nТ=молоко\nЦ=20\nНЕТ\nТ=нет\nЦ=_1\n"
+                            "X=2\nX=1\nТ=хлеб\nТ=молоко\nX=1\nНЕТ\n");
+}
+
 TEST_CASE("`=` is the unification predicate") {
   // task_52: the sign is sugar — the solver sees `РАВНО/2`, so it binds,
   // reverses and fails exactly like the long form, and `;` stays the

@@ -97,9 +97,6 @@ constexpr ForeignOperator kForeignOperators[] = {
     {"@>=", "«@>=» "},
     {"@<", "«@<» "},
     {"@>", "«@>» "},
-    {"->",
-     "«->» — не оператор: «если-то» — это «ПЕРВОЕ(Условие), Тогда», а «;» после «->» "
-     "— не дизъюнкция, а «иначе»"},
     {"<=", "«<=» — не оператор: «меньше или равно» записывают «=<»"},
 };
 
@@ -465,10 +462,14 @@ std::vector<Token> Lexer::tokenizeImpl(DiagnosticSink* sink) {
       case '#': advanceByte(1); tokens.push_back(makeToken(TokenKind::Hash, "#", start)); break;
       case '+': advanceByte(1); tokens.push_back(makeToken(TokenKind::Plus, "+", start)); break;
       case '-':
-        // `->` is the if-then of other Prologs; the advice says what to write
-        // instead (task_52).  A lone `-` is the sign it always was.
-        if (const ForeignOperator* foreign = foreignOperatorAt(source_, offset_);
-            foreign != nullptr) {
+        // `->` is ISO's if-then (task_85).  It is an operator now, so it is read
+        // here, before the table of foreign spellings — which used to answer it
+        // with advice.  A lone `-` is the sign it always was.
+        if (peek(1) == '>') {
+          advanceByte(2);
+          tokens.push_back(makeToken(TokenKind::IfThen, "->", start));
+        } else if (const ForeignOperator* foreign = foreignOperatorAt(source_, offset_);
+                   foreign != nullptr) {
           advanceByte(foreign->text.size());
           reportInvalidSign(sink, start, foreignOperatorHint(*foreign));
           tokens.push_back(makeToken(TokenKind::Unknown, std::string(foreign->text), start));

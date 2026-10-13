@@ -2,7 +2,7 @@
 #import "style.typ": apply, logos
 #show: apply
 
-#set document(title: "Пролог-Д 2.0: курс уроков", author: "Проект PrologD")
+#set document(title: "Пролог-У: курс уроков", author: "Проект PrologD")
 #set page(
   paper: "a5",
   numbering: "1",
@@ -18,7 +18,7 @@
 #v(6cm)
 
 #align(center)[
-  #text(size: 20pt, weight: "bold")[Пролог-Д 2.0]
+  #text(size: 20pt, weight: "bold")[Пролог-У]
   #v(0.2em)
   #text(size: 13pt)[Курс уроков]
 ]

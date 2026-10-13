@@ -105,6 +105,12 @@ class Parser {
   /// `a, b, c` as the compound `,`/2 (left-nested); used inside parentheses,
   /// where a conjunction can be a goal argument (НАЙТИВСЕ, ВЫП).
   Term parseCommaGroup();
+  /// A whole goal out of `first` and what follows it: `,` binds tightest, then
+  /// `->`, then `;` — as in ISO.  Both operators are right-nested there, and for
+  /// `->` that is visible (`A -> T ; B -> U ; E`).
+  Term parseGoalExpression(Term first);
+  /// `A -> B` over comma groups, right-nested.
+  Term parseIfThen(Term first);
 
   // Terms.
   Term parseTerm();

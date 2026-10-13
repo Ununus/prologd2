@@ -212,6 +212,16 @@ def test_expression_query_and_arrows() -> None:
     ]
     assert kinds("A<-B") == [(VARIABLE, "A"), (PUNCTUATION, "<-"), (VARIABLE, "B")]
     assert kinds("A:-B") == [(VARIABLE, "A"), (PUNCTUATION, ":-"), (VARIABLE, "B")]
+    # `->` is one sign, not `-` and `>` (task_85): the front-end rules that read
+    # the tokens (the query line, the margin) must see what the engine sees.
+    assert kinds("A->B") == [(VARIABLE, "A"), (PUNCTUATION, "->"), (VARIABLE, "B")]
+    assert kinds("a->b;c") == [
+        (ATOM, "a"),
+        (PUNCTUATION, "->"),
+        (ATOM, "b"),
+        (PUNCTUATION, ";"),
+        (ATOM, "c"),
+    ]
     print("ok: #…#, ? and the two rule arrows")
 
 

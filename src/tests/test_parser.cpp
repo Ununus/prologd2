@@ -91,7 +91,33 @@ TEST_CASE("a disjunction is one goal and `,` binds tighter") {
     DiagnosticSink sink;
     const auto program = parse("p :- a ; b, c ; d.", sink);
     REQUIRE_FALSE(sink.hasErrors());
-    REQUIRE(bodyOf(program) == ";(;(a,,(b,c)),d)");
+    // `;` is right-nested, as in ISO (task_85).  For a chain of plain
+    // disjunctions the shape changes nothing, but with an if-then in a branch it
+    // is the `else` of the pair above that names the whole rest of the chain.
+    REQUIRE(bodyOf(program) == ";(a,;(,(b,c),d))");
+  }
+  {
+    // `->` binds looser than `,` and tighter than `;` (task_85): the condition of
+    // `a, b -> c` is the conjunction, and the `else` of `a -> b ; c` is `c`.
+    DiagnosticSink sink;
+    const auto program = parse("p :- a, b -> c ; d.", sink);
+    REQUIRE_FALSE(sink.hasErrors());
+    REQUIRE(bodyOf(program) == ";(->(,(a,b),c),d)");
+  }
+  {
+    // Both operators are right-nested, so the `else` of the first pair is the
+    // whole rest of the chain — `a -> b ; c -> d ; e`:
+    DiagnosticSink sink;
+    const auto program = parse("p :- a -> b ; c -> d ; e.", sink);
+    REQUIRE_FALSE(sink.hasErrors());
+    REQUIRE(bodyOf(program) == ";(->(a,b),;(->(c,d),e))");
+  }
+  {
+    // A parenthesised if-then is a goal, the way a parenthesised disjunction is:
+    DiagnosticSink sink;
+    const auto program = parse("p :- ВЫП((a -> b)).", sink);
+    REQUIRE_FALSE(sink.hasErrors());
+    REQUIRE(bodyOf(program) == "ВЫП(->(a,b))");
   }
   {
     // A parenthesised disjunction followed by a comma stays a flat conjunction:
