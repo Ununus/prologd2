@@ -138,6 +138,83 @@ TEST_CASE("string length: a non-string source and a non-number length are errors
   checkBadArguments("ДЛИНА(\"аб\", \"б\")", "ДЛИНА");
 }
 
+TEST_CASE("sub_string: ISO's five arguments, positions from zero") {
+  // task_84.  `sub_string(Стр, До, Длина, После, Подстрока)` is the ISO shape of
+  // `КОПИЯ/4` (§7.4 of the manual): «before, length, after» count from **zero**,
+  // each of them is either given or follows from the other two, and the piece is
+  // a string.  `_` is «anything», so the free arguments are the ones computed.
+  const auto result = runProgram(
+      "?sub_string(\"hello\", 1, 3, A, S).\n"      // A=1, S=ell
+      "?sub_string(\"hello\", 1, L, 1, S).\n"      // L=3, S=ell
+      "?sub_string(\"hello\", 0, 5, 0, \"hello\").\n"  // ДА: everything given
+      "?sub_string(\"hello\", B, L, A, S).\n"      // B=0, L=0, A=5, S=
+      "?sub_string(\"hello\", B, 3, A, S).\n"      // B=0, A=2, S=hel
+      "?sub_string(\"hello\", B, L, 1, S).\n"      // B=0, L=4, S=hell
+      "?sub_string(\"hello\", 1, L, A, S).\n"      // L=0, A=4, S=
+      "?sub_string(\"hello\", B, 2, 2, S).\n"      // B=1, S=el
+      "?sub_string(\"hello\", 5, 0, A, S).\n"      // A=0, S=
+  );
+  REQUIRE(result.loaded);
+  REQUIRE_FALSE(result.runtimeError);
+  REQUIRE(result.output == "A=1\nS=ell\nL=3\nS=ell\nДА\nB=0\nL=0\nA=5\nS=\n"
+                            "B=0\nA=2\nS=hel\nB=0\nL=4\nS=hell\nL=0\nA=4\nS=\n"
+                            "B=1\nS=el\nA=0\nS=\n");
+}
+
+TEST_CASE("sub_string: a known piece says where it is, and which one") {
+  // The third and the fifth of the six shapes: the piece is given, the counts
+  // are not.  The one answer is the *first* solution of ISO's order — the
+  // earliest position — the one difference from SWI's `sub_string/5`, which
+  // walks over every occurrence on backtracking.
+  const auto result = runProgram(
+      "?sub_string(\"hello\", B, L, A, \"ell\").\n"                     // B=1, L=3, A=1
+      // SWI's own example: the two halves of `<name>=<value>`…
+      "?sub_string(\"alpha bravo charlie\", B, L, A, \"bravo\").\n"     // B=6, L=5, A=8
+      // …and the same piece twice: the first occurrence is the answer.
+      "?sub_string(\"alpha bravo charlie bravo delta\", B, L, A, \"bravo\").\n"  // B=6, L=5, A=20
+      "?sub_string(\"hello\", B, L, A, \"\").\n"                        // B=0, L=0, A=5
+      "?sub_string(\"hello\", 1, 3, 1, \"ell\").\n"                    // ДА
+      // Positions are code points, like everywhere else in this dialect.
+      "?sub_string(\"ёжик\", 1, 1, A, S).\n"                          // A=2, S=ж
+      // A piece that is not there, and a piece of the wrong length.
+      "?sub_string(\"hello\", B, L, A, \"micron\").\n"                 // НЕТ
+      "?sub_string(\"hello\", B, 2, A, \"l\").\n"                      // НЕТ
+  );
+  REQUIRE(result.loaded);
+  REQUIRE_FALSE(result.runtimeError);
+  REQUIRE(result.output == "B=1\nL=3\nA=1\nB=6\nL=5\nA=8\nB=6\nL=5\nA=20\n"
+                            "B=0\nL=0\nA=5\nДА\nA=2\nS=ж\nНЕТ\nНЕТ\n");
+}
+
+TEST_CASE("sub_string: outside the string is a failure, not an error") {
+  const auto result = runProgram(
+      "?sub_string(\"hello\", 6, 0, _B, _S).\n"     // НЕТ: one past the end
+      "?sub_string(\"hello\", 1, 5, _B, _S).\n"     // НЕТ: longer than what is left
+      "?sub_string(\"hello\", 1, 3, 0, _S).\n"      // НЕТ: the three do not add to 5
+      "?sub_string(\"\", 0, 0, 0, S).\n"           // S= (empty)
+      "?sub_string(\"\", 1, 0, _B, _S).\n"         // НЕТ
+  );
+  REQUIRE(result.loaded);
+  REQUIRE_FALSE(result.runtimeError);
+  REQUIRE(result.output == "НЕТ\nНЕТ\nНЕТ\nS=\nНЕТ\n");
+}
+
+TEST_CASE("sub_string: the wrong kind of argument is an error") {
+  checkBadArguments("sub_string(1, 0, 1, _B, _S)", "sub_string");
+  checkBadArguments("sub_string(\"аб\", \"б\", 1, _B, _S)", "sub_string");
+  checkBadArguments("sub_string(\"аб\", 0, 1, _B, 5)", "sub_string");
+}
+
+TEST_CASE("sub_string: a negative count is a domain error, not a failure") {
+  // ISO's `domain_error(not_less_than_zero, _)`: the number is nonsense, so the
+  // goal is not «not satisfied».  It is raised with the count named, the way an
+  // out-of-range colour is (task_83).
+  const auto result = runProgram("?sub_string(\"hello\", -1, 1, _B, _S).\n");
+  REQUIRE(result.loaded);
+  REQUIRE(result.runtimeError);
+  REQUIRE(result.error.find("sub_string: До меньше нуля (-1)") != std::string::npos);
+}
+
 TEST_CASE("letter and digit: the first one, or the one at a position") {
   // Free position: the first character of that kind, which is how a program walks
   // a string looking for a letter or a digit.  Bound position: a check.

@@ -211,6 +211,19 @@ TEST_CASE("a retired name says what to write instead") {
   REQUIRE(error.location.column == 2);  // the goal, not the `?`
   REQUIRE(error.message ==
           "«or» переименовано: теперь это «first(Ц1, Ц2)», а дизъюнкция — «A ; B»");
+
+  // The English spelling `КОПИЯ` used to answer to went in task_84, and its
+  // message has to name both what it was and what the ISO predicate of the same
+  // family is — the two differ in the count of arguments and in where positions
+  // start, so «переименовано» would be the wrong word.
+  const std::vector<PrologError> gone =
+      diagnosticsOf("?substring(\"аб\", 1, 1, _).\n");
+  REQUIRE(gone.size() == 1);
+  REQUIRE(gone.front().code == ErrorCode::UnknownPredicate);
+  REQUIRE(gone.front().severity == Severity::Error);
+  REQUIRE(gone.front().isParseError);
+  REQUIRE(gone.front().message.find("«substring» снято") == 0);
+  REQUIRE(gone.front().message.find("sub_string") != std::string::npos);
 }
 
 TEST_CASE("the original dialect's or-word loads, and its two arguments are goals") {

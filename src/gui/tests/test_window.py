@@ -3036,7 +3036,7 @@ def test_f1_shows_the_record_of_the_word_under_the_caret(executable: str) -> Non
         window._actions["reference"].trigger()
 
         text = window.reference_text()
-        assert text.startswith("КОПИЯ (substring) — Подстрока и поиск"), ascii(text)
+        assert text.startswith("КОПИЯ — Подстрока и поиск"), ascii(text)
         assert "раздел руководства: 7.4" in text, ascii(text)
         assert "английское имя" not in text, ascii(text)
         for mode in ("Ц1, Ц2, Пер", "Ц1, Ц2, Стр4", "Пер, Ц2, Стр4", "Пер, Ц, Стр4", "Ц1, Пер, Стр4"):

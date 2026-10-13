@@ -186,10 +186,13 @@ def test_the_loader_serves_names_aliases_and_degrades() -> None:
     reference = Reference.load()
     assert len(reference) > 50, len(reference)
     assert reference.summary("КОПИЯ").startswith("Подстрока и поиск")
-    # An alias answers the record of its own predicate, not a copy of it.
-    assert reference.record("substring") is reference.record("КОПИЯ")
-    assert len(reference.variants("substring")) == 5
-    assert reference.section("substring") == "7.4"
+    # A record with no alias answers to its own name only (task_84): `КОПИЯ` lost
+    # `substring`, and the ISO predicate of the same family is a record of its own.
+    assert len(reference.variants("КОПИЯ")) == 5
+    assert reference.section("КОПИЯ") == "7.4"
+    assert reference.record("substring") is None
+    assert reference.section("sub_string") == "7.4"
+    assert reference.summary("sub_string").startswith("Форма ISO")
     assert reference.summary("неизвестное") == ""
     # A missing or unreadable file is not an error: no descriptions, and the
     # window still works (it has to run in a checkout without `doc/`).

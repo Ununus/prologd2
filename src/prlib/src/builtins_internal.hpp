@@ -49,7 +49,6 @@ BuiltinResult builtinQuiet(Engine&, std::span<const Term>);
 BuiltinResult builtinVersion(Engine&, std::span<const Term>);
 BuiltinResult builtinNot(Engine&, std::span<const Term>);
 BuiltinResult builtinForall(Engine&, std::span<const Term>);
-BuiltinResult builtinOr(Engine&, std::span<const Term>);
 BuiltinResult builtinEqual(Engine&, std::span<const Term>);
 BuiltinResult builtinNewline(Engine&, std::span<const Term>);
 BuiltinResult builtinWait(Engine&, std::span<const Term>);
@@ -93,6 +92,7 @@ BuiltinResult builtinIsLetter(Engine&, std::span<const Term>);
 BuiltinResult builtinIsDigit(Engine&, std::span<const Term>);
 BuiltinResult builtinConcat(Engine&, std::span<const Term>);
 BuiltinResult builtinCopy(Engine&, std::span<const Term>);
+BuiltinResult builtinSubString(Engine&, std::span<const Term>);
 BuiltinResult builtinStringLength(Engine&, std::span<const Term>);
 
 // ---- input/output ----

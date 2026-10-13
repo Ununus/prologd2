@@ -349,7 +349,11 @@ constexpr std::pair<std::string_view, std::string_view> kEnglishNames[] = {
     {"СТРЦЕЛ", "str_to_int"},    {"СТРВЕЩ", "str_to_float"},
     {"СТРСПИС", "str_to_list"},   {"БУКВА", "is_letter"},
     {"ЦИФРА", "is_digit"},      {"СЦЕП", "concat"},
-    {"КОПИЯ", "substring"},     {"ДЛИНА", "strlen"},
+    // `КОПИЯ` has no English spelling any more (task_84): the ISO predicate for
+    // the same work is `sub_string/5`, whose positions count from zero, so it is
+    // a name of its own and not an alias.  `substring/4` is retired with a
+    // message, and `test_aliases.cpp` allows the exception by name.
+    {"ДЛИНА", "strlen"},
     {"ВЫВОД", "write"},         {"ВЫВОДПС", "writeln"},
     {"ВВКОД", "put_code"},      {"ВВОДЦЕЛ", "read_int"},
     {"ВВОДВЕЩ", "read_float"},  {"ВВОДСИМВ", "read_char"},
@@ -481,6 +485,10 @@ const BuiltinTable& builtinTable() {
     add("ЦИФРА", 2, builtinIsDigit);
     add("СЦЕП", 3, builtinConcat);
     add("КОПИЯ", 4, builtinCopy);
+    // The ISO predicate of the same family (task_84): five arguments, positions
+    // and lengths from zero, and no Russian name — it is English by design, like
+    // `abs` or `is_whole`.
+    add("sub_string", 5, builtinSubString);
     add("ДЛИНА", 2, builtinStringLength);
 
     // Input/output.

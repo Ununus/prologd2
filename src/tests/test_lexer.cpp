@@ -151,17 +151,19 @@ TEST_CASE("`\\+` is one token, and a lone backslash is an error") {
 }
 
 TEST_CASE("a retired spelling is still a predicate name, not a variable") {
-  // `НАЙТИВСЁ` (with ё) left the language (task_44); the lexer keeps it
-  // reserved so a call reaches the checks and gets a hint instead of failing as
-  // an upper-case variable.
-  const std::string spelling = "НАЙТИВСЁ";
-  DiagnosticSink sink;
-  const auto tokens = lex(spelling, sink);
-  REQUIRE_FALSE(sink.hasErrors());
-  REQUIRE(tokens[0].kind == TokenKind::Identifier);
-  REQUIRE(isReservedBuiltinName(spelling));
-  // ... but it is not among the names the keyword table is built from.
-  REQUIRE(reservedBuiltinNames().count(spelling) == 0);
+  // `НАЙТИВСЁ` (with ё) left the language in task_44 and `substring` in task_84;
+  // the lexer keeps both reserved so a call reaches the checks and is told what
+  // happened, instead of failing as an upper-case variable.
+  for (const std::string& spelling : {"НАЙТИВСЁ", "substring"}) {
+    INFO("spelling: " << spelling);
+    DiagnosticSink sink;
+    const auto tokens = lex(spelling, sink);
+    REQUIRE_FALSE(sink.hasErrors());
+    REQUIRE(tokens[0].kind == TokenKind::Identifier);
+    REQUIRE(isReservedBuiltinName(spelling));
+    // ... but they are not among the names the keyword table is built from.
+    REQUIRE(reservedBuiltinNames().count(spelling) == 0);
+  }
 }
 
 TEST_CASE("the original dialect's or-word is reserved like any other built-in") {
@@ -175,6 +177,16 @@ TEST_CASE("the original dialect's or-word is reserved like any other built-in") 
   REQUIRE(tokens[0].kind == TokenKind::Identifier);
   REQUIRE(isReservedBuiltinName("ИЛИ"));
   REQUIRE(reservedBuiltinNames().count("ИЛИ") == 1);
+}
+
+TEST_CASE("`sub_string` is reserved like any other built-in") {
+  // task_84: the ISO name is English only, and it is offered — the two tests
+  // above are about names the language stopped offering.
+  DiagnosticSink sink;
+  const auto tokens = lex("sub_string", sink);
+  REQUIRE_FALSE(sink.hasErrors());
+  REQUIRE(tokens[0].kind == TokenKind::Identifier);
+  REQUIRE(reservedBuiltinNames().count("sub_string") == 1);
 }
 
 TEST_CASE("lexer handles numbers") {

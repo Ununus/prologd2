@@ -177,4 +177,14 @@ TEST_CASE("a retired name is not offered, its replacement is") {
   REQUIRE(ili->kind == prologd::KeywordKind::Predicate);
   REQUIRE(ili->arities == std::vector<std::size_t>{2});
   REQUIRE_FALSE(ili->variadic);
+
+  // `substring/4` was the English spelling of `КОПИЯ` and is retired (task_84):
+  // the ISO predicate of the same family takes five arguments and counts from
+  // zero, so it is offered under its own name.
+  REQUIRE(findKeyword(keywords, "substring") == nullptr);
+  REQUIRE(prologd::isReservedBuiltinName("substring"));
+  const prologd::KeywordInfo* sub_string = findKeyword(keywords, "sub_string");
+  REQUIRE(sub_string != nullptr);
+  REQUIRE(sub_string->kind == prologd::KeywordKind::Predicate);
+  REQUIRE(sub_string->arities == std::vector<std::size_t>{5});
 }

@@ -82,7 +82,7 @@ Russian original and completeness is structural rather than a matter of remember
 | `БУКВА` | 2 | `is_letter` | |
 | `ЦИФРА` | 2 | `is_digit` | |
 | `СЦЕП` | 3 | `concat` | ISO `atom_concat/3` |
-| `КОПИЯ` | 4 | `substring` | **not** `copy`: five argument modes, §7.4 |
+| `КОПИЯ` | 4 | `substring` | **not** `copy`: five argument modes, §7.4 — the English name was **removed** in task_84, when the ISO predicate `sub_string/5` (positions from zero) became a name of its own |
 | `ДЛИНА` | 2 | `strlen` | decision 2 |
 | `ВЫВОД` | 1+ | `write` | variadic |
 | `ВВКОД` | 1 | `put_code` | writes one code point |

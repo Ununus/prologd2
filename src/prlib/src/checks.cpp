@@ -162,6 +162,12 @@ constexpr RetiredName kRetiredNames[] = {
     // the English name for this behaviour is `first`.
     {"or", 2,
      "«or» переименовано: теперь это «first(Ц1, Ц2)», а дизъюнкция — «A ; B»"},
+    // The English spelling `КОПИЯ` used to answer to (task_84).  The ISO name of
+    // the same work is `sub_string/5`, and its positions count from zero — hence
+    // a name of its own rather than an alias.
+    {"substring", 4,
+     "«substring» снято: «КОПИЯ(Стр, Ц1, Ц2, Стр4)» считает позиции с 1, а "
+     "форма ISO — «sub_string(Стр, До, Длина, После, Подстрока)» с позиций с 0"},
 };
 
 const char* retiredNameMessage(std::string_view name, std::size_t arity) {

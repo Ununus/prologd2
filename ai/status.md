@@ -30,7 +30,9 @@ original engine from `Ununus/prologd` made buildable beside ours (part 109), and
 window made a host of **two engines** — a switch at the end of the toolbar, and beside it
 a button for the naming mode (parts 110–112), a folder chooser that opens at the engine
 (part 113), the manual's comparison table put on a landscape page (part 114), and the
-original dialect's `ИЛИ/2` returned to the language without an English twin (part 115).
+original dialect's `ИЛИ/2` returned to the language without an English twin (part 115),
+and `sub_string/5` added as the ISO shape of `КОПИЯ` while `substring` left the
+language (part 116).
 
 ## Overall
 
@@ -196,10 +198,11 @@ entries of the session log below and in `ai/task_*.md`.
 | task_81_docs_two_languages | open | `help.typ` is retitled to Пролог-У (the language), `prologd-diff.typ` becomes the story of the two dialects, `gui.typ` says the shell hosts both engines, and the README carries the four readings of «У»; lessons and the standard library are left alone for now |
 | task_82_iso_compatibility | open | the policy (an ISO-compatible subset plus the teaching extras) and four stages: `stdlib/iso.pld`, the standard order of terms, the missing spellings (`is`, `=:=`, `=\=`, `->`, `\=`, `/* */`), and the documented refusals (`bagof`/`setof`, `catch`/`throw`, modules, dicts) — with a few book examples kept as checks |
 | task_83_ili_name | done | `ИЛИ/2` — the original dialect's word — is callable again, with the behaviour its library definition had (`ИЛИ(X, _) :- ВЫП(X), !.` and `ИЛИ(_, X) :- ВЫП(X).`), which is `ПЕРВОЕ` with two goals: one function, two names, and the arity stays 2.  It is the one built-in **without an English spelling** — `or` stays retired, `first` is the English name of `ПЕРВОЕ` — the exception `test_aliases.cpp` names.  It could not be a library clause: a name starting with a capital letter is a variable in mode 0 and a string constant in mode 1, so no `.pld` file can define it (`--list-keywords` 130 → 131) |
+| task_84_sub_string | done | `sub_string(Стр, До, Длина, После, Подстрока)` — the ISO shape of a substring: five arguments, positions and lengths **from zero**, the three counts summing to the length of the string, each given or computed from the other two — and it is **English only**, like `abs`.  `КОПИЯ/4` lost its English alias with it: `substring` is retired with a message, since the ISO predicate of the same family is a name of its own and not a spelling of `КОПИЯ` (which counts from one and takes four arguments).  Known difference from ISO: one answer, not a walk over every occurrence — a built-in cannot hand a choice point back to the solver |
 
 ## Test suite
 
-338 tests, about six seconds: 318 Catch2 cases plus 20 command-line and integration
+345 tests, about six seconds: 325 Catch2 cases plus 20 command-line and integration
 tests (seven option tests, five `--list-keywords` tests, the import-search report, the
 JSON protocol session, the formatter round-trip and the engine-limit and diagnostics
 cases).  Groups: BigInt, lexer, keywords, parser, unification, engine, every built-in
@@ -4103,4 +4106,50 @@ tests passed»: шаг обнаружения читает вывод в код�
 (второй цели не достаётся); `?ИЛИ(п(X), ЛОЖЬ).` с `п(1). п(2).` → `X=1`;
 `?ИЛИ(ЛОЖЬ, ЛОЖЬ).` → `НЕТ`; `--list-keywords` — 131 строка, в ней `ИЛИ/2`,
 `ПЕРВОЕ/+`, `first/+` и нет `or`.
+
+### 116. `sub_string/5` — форма ISO для подстроки (2026-10-13)
+
+Задача 84.  У `КОПИЯ/4` было английское имя `substring`, и оно снято: форма ISO для
+подстроки устроена иначе — пять аргументов и счёт с нуля, — поэтому это не второе
+имя, а отдельный предикат.
+
+* `sub_string(Стр, До, Длина, После, Подстрока)` повторяет `sub_string/5` в SWI и
+  `sub_atom/5` в ISO: три числа в сумме дают длину строки, каждое либо задано,
+  либо находится из двух других; задана подстрока — ищется её вхождение;
+  свободные числа возвращаются связанными, свободная подстрока — строкой.
+  Прежний ответ SWI сходится дословно: `?sub_string("alpha bravo charlie", B, L,
+  A, "bravo").` → `B=6`, `L=5`, `A=8`.
+* Русского имени у него нет вовсе — имя английское и только английское, как у
+  `abs` или `is_whole`; у `КОПИЯ` наоборот, английского имени больше нет.  Это
+  второе исключение из правила «у каждого русского имени есть английское», и оно
+  названо в `test_aliases.cpp` рядом с `ИЛИ` и двумя именами, которые отвечает не
+  таблица (`ВЫП`, `ИМПОРТ`).
+* `substring/4` осталось зарезервированным и получает сообщение с обеими заменами:
+  «КОПИЯ» с позиций с 1 и `sub_string` с позиций с 0.  Таблица снятых имён в
+  `checks.cpp` — теперь про `or` и про него.
+* Границы как у `КОПИЯ`: за строкой — неудача (ноль символов разрешён ровно на
+  конце), отрицательное число — ошибка с именем счёта (ISO зовёт это
+  `domain_error(not_less_than_zero)`), не тот тип — обычная ошибка типа.
+* Список имён (`--list-keywords`) не изменился в числе строк: `substring/4` ушло,
+  `sub_string/5` пришло.
+
+*Отличие от ISO, записанное в §7.4.*  Перебора всех вхождений при возврате нет:
+встроенный предикат отвечает один раз (`BuiltinResult` — один исход, и отдать
+решателю точку выбора встроенный предикат не умеет), поэтому известная подстрока
+даёт *первое* вхождение — как `КОПИЯ` со свободными позицией и длиной.  Перебор
+остаётся отдельной работой, о ней и сказано в документах.
+
+*Ловушки.*  Случай Catch2 с русским именем опять не пережил шаг обнаружения (это
+уже записано в «Known gaps» §3): назвал случай по-русски — и получил четыре
+«упавших» теста при зелёном двоичном файле.  Полужирный в Typst — `*одинарные*`
+звёздочки, а `**двойные**` дают предупреждение «no text within stars».  И ожидание,
+написанное по памяти, ошиблось: свободные `После` и подстрока — это успех, а не
+неудача; неудачу даёт только *связанное* третье число.
+
+*Verified.*  `ctest` 345/345 (338 плюс семь новых случаев); 25 оконных сюит и
+`protocol_smoke.py` зелёные; пять документов собираются без замечаний.  Руками:
+`?sub_string("hello", 1, 3, A, S).` → `A=1`, `S=ell`;
+`?sub_string("hello", 6, 0, _Д, _П).` → `НЕТ`;
+`?sub_string("hello", -1, 1, _Д, _П).` → ошибка «sub_string: До меньше нуля (-1)»;
+`?substring("аб", 1, 1, _).` → ошибка со снятым именем.
 

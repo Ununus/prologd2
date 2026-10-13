@@ -3,7 +3,7 @@
     from prologd_gui.reference import Reference
     reference = Reference.load()      # a missing file is an empty reference
     reference.summary("КОПИЯ")        # 'Подстрока и поиск: ...'
-    reference.variants("substring")   # the five argument modes of §7.4
+    reference.variants("КОПИЯ")   # the five argument modes of §7.4
 
 Qt-free on purpose, like `keywords.py` and `protocol.py`: the window, the
 completion popup and the tests all read the same object, and nothing here needs a

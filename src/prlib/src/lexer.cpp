@@ -34,7 +34,11 @@ const std::unordered_set<std::string> kReservedBuiltins = {
     "read_string", "write", "writeln", "wait",
     // Strings
     "БУКВА", "ЦИФРА", "СЦЕП", "КОПИЯ", "ДЛИНА",
-    "is_letter", "is_digit", "concat", "substring", "strlen",
+    "is_letter", "is_digit", "concat", "strlen",
+    // `sub_string/5` is English on purpose (task_84): it is the ISO spelling of
+    // what `КОПИЯ/4` does, and ISO has no Russian word for it.  Its old English
+    // alias `substring` is retired below.
+    "sub_string",
     // Type tests and conversions
     "ПЕР", "ЦЕЛ", "ВЕЩ", "СИМВ", "СПИСОК", "ПОЛНЫЙ", "СТРСПИС", "СТРЦЕЛ",
     "СТРВЕЩ", "ЦЕЛВЕЩ",
@@ -60,6 +64,10 @@ const std::unordered_set<std::string> kRetiredBuiltinNames = {
     // The ported help spelled findall with ё for a while; the original manual
     // and the task spelled it without.
     "НАЙТИВСЁ",
+    // The English spelling `КОПИЯ` used to answer to (task_84).  It is not the
+    // ISO name of anything: the ISO predicate is `sub_string/5`, with positions
+    // from zero, so a call to `substring/4` reaches the checks and is told so.
+    "substring",
 };
 
 /// Operator spellings borrowed from other Prologs that this dialect does not

@@ -22,11 +22,18 @@ bool isAnsweredOutsideTheTable(std::string_view name) {
   return name == "ВЫП" || name == "ИМПОРТ";
 }
 
-/// The one built-in that has no English spelling *on purpose* (task_83): `ИЛИ`
-/// is the original dialect's word for «the first of two».  The English
-/// vocabulary for that behaviour is `ПЕРВОЕ`/`first`, and the old English twin
-/// `or` was retired in task_44 and stays retired.
-bool isDialectOnlyName(std::string_view name) { return name == "ИЛИ"; }
+/// The Russian names that have no English spelling, each for a reason of its own
+/// (task_83, task_84):
+///
+/// * `ИЛИ/2` is the word of the original dialect, kept so that programs written
+///   for it load.  The English way to say the same thing is `first`, the alias of
+///   `ПЕРВОЕ`, and the old English twin `or` stays retired.
+/// * `КОПИЯ/4` lost `substring` because the ISO predicate for the same work is
+///   `sub_string/5` — positions from zero, three counts — so that English name is
+///   a predicate of its own rather than an alias.
+bool hasNoEnglishSpelling(std::string_view name) {
+  return name == "ИЛИ" || name == "КОПИЯ";
+}
 
 std::string_view englishOf(std::string_view russian) {
   for (const prologd::BuiltinAlias& alias : prologd::builtinAliases()) {
@@ -80,8 +87,8 @@ TEST_CASE("every Russian built-in has an English spelling") {
     if (!isRussianName(name)) {
       continue;
     }
-    if (isAnsweredOutsideTheTable(name) || isDialectOnlyName(name)) {
-      continue;  // `ВЫП` -> `call`, `ИМПОРТ` -> `import`; `ИЛИ` has none by design
+    if (isAnsweredOutsideTheTable(name) || hasNoEnglishSpelling(name)) {
+      continue;  // `ВЫП` -> `call`, `ИМПОРТ` -> `import`; two names by design
     }
     INFO("built-in without an English spelling: " << name);
     REQUIRE_FALSE(englishOf(name).empty());
@@ -102,6 +109,17 @@ TEST_CASE("the original dialect's or-word is the two-goal spelling of the choice
   REQUIRE(prologd::findBuiltin("ИЛИ", 3) == nullptr);
 }
 
+TEST_CASE("the copy predicate answers to no English name, sub_string is its own") {
+  // task_84: `substring` was the English spelling of `КОПИЯ/4`, and it is gone —
+  // the ISO predicate of the same family takes five arguments and counts from
+  // zero, so it is registered as a name in its own right (`sub_string/5`).
+  REQUIRE(englishOf("КОПИЯ").empty());
+  REQUIRE(prologd::findBuiltin("substring", 4) == nullptr);
+  REQUIRE(prologd::findBuiltin("sub_string", 5) != nullptr);
+  REQUIRE(prologd::builtinArities("sub_string").arities == std::vector<std::size_t>{5});
+  REQUIRE(prologd::findBuiltin("sub_string", 4) == nullptr);
+}
+
 TEST_CASE("the English surface works from a program") {
   const auto result = prologd::test::runProgram(
       "parent(ann, bob).\n"
@@ -120,7 +138,8 @@ TEST_CASE("the English surface works from a program") {
       "?equal(5, 5).\n"
       "?is_list([1]).\n"
       "?is_text(текст).\n"
-      "?concat(\"а\", \"б\", Пара).\n");
+      "?concat(\"а\", \"б\", Пара).\n"
+      "?sub_string(\"абв\", 0, 1, _, Первая).\n");
   REQUIRE(result.loaded);
   REQUIRE_FALSE(result.runtimeError);
   REQUIRE(result.error.empty());
@@ -131,5 +150,5 @@ TEST_CASE("the English surface works from a program") {
           "Who=bob\n"
           "ok\n"
           "ДА\nДА\nНЕТ\nДА\nДА\nN=4\n"
-          "ДА\nДА\nДА\nДА\nДА\nПара=аб\n");
+          "ДА\nДА\nДА\nДА\nДА\nПара=аб\nПервая=а\n");
 }
