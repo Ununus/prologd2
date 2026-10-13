@@ -124,6 +124,8 @@ PINNED: dict[str, int] = {
     "problems/knapsack.pld": 2,
     "problems/monk.pld": 2,
     "problems/monkd.pld": 1,
+    "prologu/if_then_demo.pld": 8,
+    "prologu/sub_string_demo.pld": 7,
     "sort_demo.pld": 6,
     "stdlib_demo.pld": 63,
     "use_old_names.pld": 3,
@@ -168,10 +170,24 @@ def interpreter_keywords() -> Keywords:
     return Keywords(find(events, "ready")["keywords"])
 
 
+def example_files() -> list[pathlib.Path]:
+    """Every example program of *this* dialect, sorted.
+
+    `examples/prologd` is the original dialect's own shelf (task_86): those
+    programs are kept exactly as they were written there, so neither the question
+    rule nor the count of markers has anything to say about them.
+    """
+    root = pathlib.Path(__file__).resolve().parents[3] / "examples"
+    files = sorted(
+        path for path in root.rglob("*.pld") if path.relative_to(root).parts[0] != "prologd"
+    )
+    assert files, f"no example programs under {root}"
+    return files
+
+
 def example_counts() -> dict[str, int]:
     root = pathlib.Path(__file__).resolve().parents[3] / "examples"
-    files = sorted(root.rglob("*.pld"))
-    assert files, f"no example programs under {root}"
+    files = example_files()
     keywords = interpreter_keywords()
     return {
         path.relative_to(root).as_posix(): len(
@@ -215,7 +231,7 @@ def test_no_live_question_is_left_without_a_marker() -> None:
     root = pathlib.Path(__file__).resolve().parents[3] / "examples"
     keywords = interpreter_keywords()
     refused = []
-    for path in sorted(root.rglob("*.pld")):
+    for path in example_files():
         text = path.read_text(encoding="utf-8")
         accepted = {line for line, _statement in find_statements(text, keywords)}
         for number, line in enumerate(text.splitlines(), start=1):

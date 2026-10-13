@@ -32,7 +32,9 @@ a button for the naming mode (parts 110–112), a folder chooser that opens at t
 (part 113), the manual's comparison table put on a landscape page (part 114), and the
 original dialect's `ИЛИ/2` returned to the language without an English twin (part 115),
 and `sub_string/5` added as the ISO shape of `КОПИЯ` while `substring` left the
-language (part 116), and `->` added as ISO's if-then and if-then-else (part 117).
+language (part 116), and `->` added as ISO's if-then and if-then-else (part 117),
+and `examples/` given two shelves beside the current programs — the original
+dialect's own programs and two examples of the ISO additions (part 118).
 
 ## Overall
 
@@ -99,7 +101,12 @@ language (part 116), and `->` added as ISO's if-then and if-then-else (part 117)
   `examples/lessons` is a program per lesson whose own `%!` lines are its expected
   output, the five demos beside it (`first_demo`, `sort_demo`, `ground_demo`,
   `forall_demo`, `stdlib_demo`) are checked the same way, and the tasks are in
-  `examples/problems` (`factorial`, the Hanoi tower, `knapsack`).  `examples/README.md`
+  `examples/problems` (`factorial`, the Hanoi tower, `knapsack`).  Two shelves sit
+  beside them (task_86): `examples/prologd/` — the original PrologD's own example
+  programs, copied as they were written and skipped by the checks — and
+  `examples/prologu/`, the two examples of what this dialect added
+  (`sub_string_demo.pld`, `if_then_demo.pld`), which are checked like the demos.
+  `examples/README.md`
   is the map of the folder.  The standard library the dialect ships is `stdlib/` —
   beside the executable, imported with `-I stdlib` — and `stdlib_demo.pld` is its
   checked tour.
@@ -200,6 +207,7 @@ entries of the session log below and in `ai/task_*.md`.
 | task_83_ili_name | done | `ИЛИ/2` — the original dialect's word — is callable again, with the behaviour its library definition had (`ИЛИ(X, _) :- ВЫП(X), !.` and `ИЛИ(_, X) :- ВЫП(X).`), which is `ПЕРВОЕ` with two goals: one function, two names, and the arity stays 2.  It is the one built-in **without an English spelling** — `or` stays retired, `first` is the English name of `ПЕРВОЕ` — the exception `test_aliases.cpp` names.  It could not be a library clause: a name starting with a capital letter is a variable in mode 0 and a string constant in mode 1, so no `.pld` file can define it (`--list-keywords` 130 → 131) |
 | task_84_sub_string | done | `sub_string(Стр, До, Длина, После, Подстрока)` — the ISO shape of a substring: five arguments, positions and lengths **from zero**, the three counts summing to the length of the string, each given or computed from the other two — and it is **English only**, like `abs`.  `КОПИЯ/4` lost its English alias with it: `substring` is retired with a message, since the ISO predicate of the same family is a name of its own and not a spelling of `КОПИЯ` (which counts from one and takes four arguments).  Known difference from ISO: one answer, not a walk over every occurrence — a built-in cannot hand a choice point back to the solver |
 | task_85_if_then | done | `->` is a sign of the language: `(Условие -> Тогда)` takes the *first* solution of the condition and runs the consequence, and `(Условие -> Тогда ; Иначе)` treats the `;` after it as «иначе» — once the condition has a solution the else branch is dropped for good, *even when the consequence fails*.  That was the one thing neither `;` with a cut (a cut in a branch is local to it) nor `ПЕРВОЕ(C), T ; E` (which falls back to `E`) could say.  `,` binds tighter than `->`, `->` tighter than `;`, both right-nested; the condition is solved in a machine of its own (`callOnce`), so a cut inside it stays there.  The advice that used to answer the sign («не оператор: пишите `ПЕРВОЕ`», task_52) is gone |
+| task_86_examples_shelves | done | `examples/` gained two shelves beside the current programs: `examples/prologd/` — the original PrologD's own example programs (14 files, byte for byte, from the pinned clone `7b7f46f…`), to be run by `prologd.exe` and compared with the port — and `examples/prologu/`, the two examples of the ISO additions (`sub_string_demo.pld`, `if_then_demo.pld`), formatted and checked like the other demos.  The original shelf is **skipped** by the formatter walk and the question sweep, the way `lessons/_old` is: that dialect is not ours to police — and the skip compares the *first path component*, so a future `prologd2` cannot slip under it |
 
 ## Test suite
 
@@ -4186,4 +4194,36 @@ tests passed»: шаг обнаружения читает вывод в код�
 *Verified.*  `ctest` 348/348 (345 плюс три случая: поведение, разбор и форматтер),
 25 оконных сюит и `protocol_smoke.py` зелёные, шесть документов собираются без
 замечаний.  Руками — таблица ответов и замеры форматтера в `ai/task_85_if_then.md`.
+
+### 118. Две полки примеров: оригинал и дополнения (2026-10-13)
+
+Задача 86.  Владелец попросил разложить `examples` на полки: программы
+первоначального Пролог-Д, текущие и примеры дополнений.  Текущие остались на месте
+(«можно наверное оставить так») — это его же уточнение, — поэтому новых двух полок
+две: `examples/prologd/` и `examples/prologu/`.
+
+* `examples/prologd/` — 14 файлов из `src/examples` закреплённого клона
+  `Ununus/prologd` (`7b7f46f…`, тот же коммит, что у `PROLOGD_ENGINE_COMMIT`),
+  байт в байт и с именами как в оригинале (в именах уроков — пробелы).  Рядом
+  `README.md`: откуда копия, чем запускать (тем движком!) и почему наши проверки
+  её не трогают.
+* `examples/prologu/` — два наших примера: `sub_string_demo.pld` (форма ISO для
+  подстроки) и `if_then_demo.pld` (`->`).  Оба в стандартной форме, с
+  `%!`-обещаниями, и проверяются как остальные демонстрации: `checkedExamples()` и
+  `PINNED` (8 и 7 вопросов).
+* Полка оригинала — не наш корпус: другой конец предложения, другие имена, часть не
+  разбирается.  Поэтому её пропускают **обе** прогулки форматтера и обе сверки
+  вопросов в `test_queries.py`; имя полки сравнивается по первому компоненту пути,
+  чтобы будущая полка `prologd2` не попала под пропуск случайно.
+* Документы: `examples/README.md` (карта полок), `examples/prologd/README.md`,
+  раздел про examples в корневом `README.md`.
+
+*Ловушки.*  Полка сломала обе прогулки форматтера — вторая («каждый поставляемый
+файл уже в стандартной форме») пропускала только `_old` и споткнулась о первый же
+файл оригинала.  И `create_file` пишет CRLF, а форматтер сверяет байты: оба новых
+файла после создания переведены в LF.
+
+*Verified.*  `ctest` 348/348 (корпус вырос, случаев не прибавилось: `%!` двух новых
+примеров проверяются существующими случаями); счётчики вопросов сверены с `PINNED`
+через `--print`; 25 оконных сюит и `protocol_smoke.py` зелёные.
 

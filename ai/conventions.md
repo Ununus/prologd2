@@ -208,7 +208,11 @@ Tests are written **together with** the feature, never after.
   not enough: `src/gui/tests/test_queries.py` counts the statements of every
   example file (refresh the table with `--print` when a lesson changed on purpose)
   and `test_lessons.cpp` runs them.  A lesson edit has already left that script
-  red for a whole round.
+  red for a whole round.  Two folders are outside the corpus on purpose — the
+  checks walk past them: `examples/lessons/_old` (the ported originals, task_47)
+  and `examples/prologd` (the original dialect's own programs, task_86).  Both are
+  skipped by their *first path component*, so a folder whose name merely begins
+  with `prologd` is not caught by the skip.
 * Inserting one section into `help.typ` renumbers every section after it, and those
   numbers are quoted outside the manual: `section` in `doc/builtins.json`, prose in
   `prologd-diff.typ` («таблица кодов, раздел 6.4»), the `%`-comments of the

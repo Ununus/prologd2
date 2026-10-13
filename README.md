@@ -132,6 +132,13 @@ Start with `examples/lessons/README.md` (the index) or `doc/lessons.typ`; two
 lessons need a little more than a plain run, and the index says which.  The
 superseded originals are kept in `examples/lessons/_old/`.
 
+Beside the course `examples/` carries two shelves: `examples/prologd/` — the
+original PrologD's own example programs, copied from
+[`Ununus/prologd`](https://github.com/Ununus/prologd) as they were written, to be
+run by `prologd.exe` and compared with the port — and `examples/prologu/`, the two
+examples of what this dialect added: `sub_string_demo.pld` (the ISO substring form)
+and `if_then_demo.pld` (`->`).
+
 ## Standard library
 
 `stdlib/` holds the library the dialect ships — the list predicates

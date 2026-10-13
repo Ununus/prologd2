@@ -83,7 +83,8 @@ const std::vector<std::string>& checkedLessons() {
 /// Examples beside the lessons whose `%!` lines are checked the same way.  They
 /// are the showcase for the predicates the dialect added on top of the port
 /// (`ПЕРВОЕ`, `СОРТИРОВКА`, `ПОЛНЫЙ`, `ДЛЯВСЕХ`), the two problems whose output
-/// is the same on every machine and the tour of the standard library;
+/// is the same on every machine, the tour of the standard library and the two
+/// examples of the ISO additions (task_84, task_85) in `examples/prologu`;
 /// `problems/monk.pld` draws and `problems/monkd.pld` reads input, so those two
 /// are only parsed (see the test below).
 const std::vector<std::string>& checkedExamples() {
@@ -96,6 +97,8 @@ const std::vector<std::string>& checkedExamples() {
       "use_old_names.pld",
       "problems/factorial.pld",
       "problems/knapsack.pld",
+      "prologu/sub_string_demo.pld",
+      "prologu/if_then_demo.pld",
   };
   return names;
 }

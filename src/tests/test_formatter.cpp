@@ -295,12 +295,21 @@ TEST_CASE("formatting is idempotent for every example program") {
   // `1.` for 1.0 — task_52) and a few of them no longer parse.  The formatter
   // refuses a source it cannot parse, so they are not its business.
   const fs::path archived = root / "lessons" / "_old";
+  // `examples/prologd` is that same story for a whole shelf: the original
+  // dialect's own programs (task_86), copied as they were written.  The shelf is
+  // compared by its *first path component*, not by a prefix of the whole path, so
+  // a name that merely begins with `prologd` cannot slip into the skip.
+  const fs::path original("prologd");
   std::vector<fs::path> files;
   for (const auto& entry : fs::recursive_directory_iterator(root)) {
     if (!entry.is_regular_file() || entry.path().extension() != ".pld") {
       continue;
     }
     if (entry.path().string().find(archived.string()) != std::string::npos) {
+      continue;
+    }
+    const fs::path relative = entry.path().lexically_relative(root);
+    if (!relative.empty() && *relative.begin() == original) {
       continue;
     }
     files.push_back(entry.path());
@@ -349,6 +358,11 @@ TEST_CASE("every shipped program is already in the standard shape") {
   namespace fs = std::filesystem;
   const std::vector<fs::path> roots = {fs::path(PROLOGD_TEST_DATA_DIR),
                                        fs::path(PROLOGD_STDLIB_DIR)};
+  // The original dialect's own shelf is left alone here for the same reason as
+  // `_old` above: those programs are kept exactly as they were written (task_86),
+  // and their spelling is what the port changed.
+  const fs::path top(PROLOGD_TEST_DATA_DIR);
+  const fs::path original("prologd");
   std::size_t checked = 0;
   for (const fs::path& root : roots) {
     for (const auto& entry : fs::recursive_directory_iterator(root)) {
@@ -356,6 +370,10 @@ TEST_CASE("every shipped program is already in the standard shape") {
         continue;
       }
       if (entry.path().parent_path().filename() == "_old") {
+        continue;
+      }
+      const fs::path relative = entry.path().lexically_relative(top);
+      if (!relative.empty() && *relative.begin() == original) {
         continue;
       }
       const std::string source = readFile(entry.path());
