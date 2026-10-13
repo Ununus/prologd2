@@ -1,6 +1,6 @@
 """Offscreen checks of the window's file handling (needs PySide6 and a build).
 
-    python src/gui/tests/test_window.py [path-to-prologd]
+    python src/gui/tests/test_window.py [path-to-prologu]
 
 The defect this pins down: **Открыть** used to push the file into the running
 interpreter, so opening it a second time — or running the buffer and then opening
@@ -136,7 +136,7 @@ def discard_changes(window) -> None:
     every test closes through here, where the answer is `DISCARD`.
 
     The interpreter is stopped too: a test window that only closed its buffers
-    left a live `prologd` behind, and a suite of them (one per test) slowed the
+    left a live `prologu` behind, and a suite of them (one per test) slowed the
     machine down and made the run before a failure look like a hang.
     """
     from prologd_gui import window as window_module
@@ -2872,7 +2872,13 @@ def test_a_question_parked_in_a_comment_runs_from_the_margin(executable: str) ->
         view.queryRequested.emit("?ВЕРСИЯ.")
         wait_for_result(window)
         printed = printed_lines(window)
-        assert any(line.startswith("PrologD ") for line in printed), ascii(window.output_text())
+        # The answer is the engine's own banner (task_76) — a product name, a version and
+        # the build date.  The version in it is compared with the one the session
+        # announced in `ready`: the product name belongs to the engine, and a second copy
+        # of it here would only go stale at the next rename.
+        assert printed, ascii(window.output_text())
+        assert f" {window._version} " in printed[0], ascii(printed[0])
+        assert printed[0].endswith(")"), ascii(printed[0])
         # task_58: the quiet load says so in «Система», like `F5` does.  The line
         # used to be swallowed by the early return that waits for the answer.
         assert "--- база знаний загружена (" in window.system_text(), ascii(window.system_text())
@@ -4060,7 +4066,7 @@ def test_the_interpreter_row_picks_the_binary_and_names_it(
     executable: str, directory: pathlib.Path
 ) -> None:
     """task_46: the «Интерпретатор» row replaces `--exe`, and the window says so."""
-    other = directory / "другой" / "prologd.exe"
+    other = directory / "другой" / "prologu.exe"
     other.parent.mkdir()
     shutil.copy2(executable, other)
 
@@ -4069,7 +4075,7 @@ def test_the_interpreter_row_picks_the_binary_and_names_it(
         window._settings.interpreter = str(other)
         window.apply_settings()
         assert window.session.executable() == str(other), "the row did not reach the session"
-        assert f"prologd: {other}" in window._details.text(), window._details.text()
+        assert f"prologu: {other}" in window._details.text(), window._details.text()
 
         window.editor().setPlainText('?ВЫВОД("ок"),ПС.\n')
         window.run_program()
@@ -4084,7 +4090,7 @@ def test_a_missing_interpreter_is_reported_not_half_started(
     executable: str, directory: pathlib.Path
 ) -> None:
     """task_46: a row that points at nothing fails loudly, not half-open."""
-    missing = directory / "нет" / "prologd.exe"
+    missing = directory / "нет" / "prologu.exe"
 
     window = make_window(executable, ready=False)
     try:
@@ -4380,7 +4386,7 @@ def main(argv: list[str]) -> int:
         return 0
     executable = find_executable(argv)
     if executable is None:
-        print("skipped: no prologd build found, pass its path to check the window")
+        print("skipped: no prologu build found, pass its path to check the window")
         return 0
 
     application = QApplication(sys.argv[:1])

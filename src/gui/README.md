@@ -1,12 +1,12 @@
 # PrologD GUI (PySide6)
 
 The graphical front-end is a **Python/PySide6** application that drives the
-`prologd` executable through a line-delimited JSON protocol.  It never links
+`prologu` executable through a line-delimited JSON protocol.  It never links
 against `prlib`:
 
 ```
   ┌──────────────────┐   requests (JSON lines, stdin)   ┌───────────────┐
-  │  PySide6 GUI     │ ───────────────────────────────▶ │  prologd      │
+  │  PySide6 GUI     │ ───────────────────────────────▶ │  prologu      │
   │  prologd_gui/    │ ◀─────────────────────────────── │  --protocol   │
   └──────────────────┘   events (JSON lines, stdout)    │  json         │
                                                         └───────────────┘
@@ -36,7 +36,7 @@ package).  The «Интерпретатор» row of the settings dialog
 starts, and the status bar names a build that is not the one the window was
 started with.
 
-A **packaged** build (task_61) finds all of that beside itself — `prologd.exe` next
+A **packaged** build (task_61) finds all of that beside itself — `prologu.exe` next
 to the window, the icons inside its folder, `doc/` and `examples/` next to the
 executable — and the settings file as well (`gui.ini`, below).  It adds **nothing** to
 the `ИМПОРТ` search list: an earlier version put its own `examples/lib` there, and a
@@ -117,7 +117,7 @@ version does not know are left alone (task_29 adds the dialog).
 cannot be Qt's own: Qt inserts a *line separator* (`U+2028`), which the widget draws as
 a new line while `blockCount()` does not count it, so the line numbers and the question
 markers of the margin stood on the wrong lines.  Measured against the editor and against
-`prologd` (`tokens.LINE_SEPARATORS`): `\n` is one line to both, `\v`/`\f` are spaces to
+`prologu` (`tokens.LINE_SEPARATORS`): `\n` is one line to both, `\v`/`\f` are spaces to
 the interpreter but not line breaks either, `U+2028` is a line the editor draws and does
 not count, `U+2029` is counted by the widget and *rejected* by the lexer.  Both are
 folded into `\n` wherever they could enter — `CodeEditor.keyPressEvent` never lets one
@@ -840,7 +840,7 @@ again, but every name, number, `#expr#` body, quote and comment is copied byte
 for byte, so formatting cannot damage a program.  The formatter itself lives in
 prlib, next to the grammar it has to understand — a second parser in Python would
 drift — so the window sends the buffer with a `format` request (protocol 6) and
-puts the answer back.  The grammar's copy of that request is `prologd --format`;
+puts the answer back.  The grammar's copy of that request is `prologu --format`;
 the protocol contract has the details, and `src/gui/tests/test_formatter.py`
 drives the wire headlessly.
 
@@ -1135,7 +1135,7 @@ primitive outside it is clipped.
 
 | Event | Meaning |
 |-------|---------|
-| `{"event":"ready","protocol":13,"version":"2.2.0","screen":{"height":600,"width":600},"keywords":[…]} `| the session is up |
+| `{"event":"ready","protocol":13,"version":"2.3.0","screen":{"height":600,"width":600},"keywords":[…]} `| the session is up |
 | `{"event":"output","text":"…"}` | program output (`ВЫВОД`, query results) — **one event per written line** since task_49, so it arrives while the program is still running; text written without a line end goes out with the end of the request (and a prompt with the `input_request` that follows it) |
 | `{"event":"result","found":true}` | one query finished; `found` is false when nothing matched |
 | `{"event":"loaded"}` | a `load` request is over: its program and its own `?`-statements ran (a `query` request is answered by its `result` alone) |
@@ -1184,7 +1184,7 @@ failure (for example an interrupted query).
   (`predicate`, `operator`, `directive`) and its arities — `[]` for operators,
   directives and the variadic `ВЫВОД` and `ПЕРВОЕ`, which are marked with
   `"variadic":true`.
-  The same table is printed by `prologd --list-keywords`, one `name/arity` per
+  The same table is printed by `prologu --list-keywords`, one `name/arity` per
   line (`ВЫВОД/+` for the variadic ones), so a front-end never keeps its own copy
   of the built-in list — and one that needs the names *before* a session is up
   (completion at startup) can have them from that listing alone:

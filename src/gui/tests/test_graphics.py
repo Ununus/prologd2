@@ -222,16 +222,11 @@ def test_an_unknown_primitive_is_refused() -> None:
 # The two rasterisers are pinned to each other (needs a build)
 # ---------------------------------------------------------------------------
 def find_executable() -> str | None:
-    root = pathlib.Path(__file__).resolve().parents[3]
-    for candidate in (
-        root / "build" / "windows-msvc" / "src" / "cli" / "Release" / "prologd.exe",
-        root / "build" / "linux-release" / "src" / "cli" / "prologd",
-        root / "build" / "src" / "cli" / "Release" / "prologd.exe",
-        root / "build" / "src" / "cli" / "prologd",
-    ):
-        if candidate.exists():
-            return str(candidate)
-    return None
+    """The engine the window itself would run (`prologd_gui.paths`, task_75)."""
+    from prologd_gui import paths
+
+    executable = paths.interpreter()
+    return executable if pathlib.Path(executable).is_file() else None
 
 
 #: A program that draws one of everything: a whole-screen fill to start from, a
@@ -309,7 +304,7 @@ def main(argv: list[str]) -> int:
     test_an_unknown_primitive_is_refused()
     executable = argv[1] if len(argv) > 1 else find_executable()
     if executable is None:
-        print("skipped: no prologd build found, pass its path to pin the two rasterisers")
+        print("skipped: no prologu build found, pass its path to pin the two rasterisers")
     else:
         test_the_two_rasterisers_agree(executable)
     print("all graphics checks passed")

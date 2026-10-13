@@ -324,12 +324,12 @@ def test_the_new_keys_have_the_documented_defaults(directory: pathlib.Path) -> N
 def test_the_interpreter_and_process_directory_round_trip(directory: pathlib.Path) -> None:
     path = directory / "interp.ini"
     settings = Settings(path)
-    settings.interpreter = "C:/проlogd/prologd.exe"
+    settings.interpreter = "C:/проlogu/prologu.exe"
     settings.process_directory = "custom"
     settings.process_directory_path = "C:/курс"
 
     reopened = Settings(path)
-    assert reopened.interpreter == "C:/проlogd/prologd.exe"
+    assert reopened.interpreter == "C:/проlogu/prologu.exe"
     assert reopened.process_directory == "custom"
     assert reopened.process_directory_path == "C:/курс"
 

@@ -1,6 +1,6 @@
 """Checks of the naming modes of a file (task_67, Qt-free).
 
-    python src/gui/tests/test_variable_modes.py [path-to-prologd]
+    python src/gui/tests/test_variable_modes.py [path-to-prologu]
 
 The window works out the mode of a document itself — the file's own
 `:- ИМЕНА(N).` first line, or its own settings row — because the highlighter cannot
@@ -141,16 +141,11 @@ def test_a_question_of_a_mode_one_file_keeps_its_names(executable: str) -> None:
 
 
 def check_default_executable() -> str | None:
-    root = pathlib.Path(__file__).resolve().parents[3]
-    for candidate in (
-        root / "build" / "windows-msvc" / "src" / "cli" / "Release" / "prologd.exe",
-        root / "build" / "linux-release" / "src" / "cli" / "prologd",
-        root / "build" / "src" / "cli" / "Release" / "prologd.exe",
-        root / "build" / "src" / "cli" / "prologd",
-    ):
-        if candidate.exists():
-            return str(candidate)
-    return None
+    """The engine the window itself would run (`prologd_gui.paths`, task_75)."""
+    from prologd_gui import paths
+
+    executable = paths.interpreter()
+    return executable if pathlib.Path(executable).is_file() else None
 
 
 def run_probe(executable: str, text: str, workdir: pathlib.Path):
@@ -208,7 +203,7 @@ def main() -> int:
     test_the_first_line_names_the_mode()
     print("ok: the naming modes of a file")
     if executable is None:
-        print("skipped: no prologd build found, the cross-check did not run")
+        print("skipped: no prologu build found, the cross-check did not run")
         return 0
     test_the_python_rule_matches_the_interpreter(executable)
     print("ok: the window's rule agrees with the interpreter")

@@ -1,6 +1,6 @@
 """Headless smoke test for the interpreter protocol (no Qt needed).
 
-    python src/gui/tests/protocol_smoke.py [path-to-prologd]
+    python src/gui/tests/protocol_smoke.py [path-to-prologu]
 
 Exercises exactly what `prologd_gui.session` does — spawn the interpreter with
 `--protocol json`, feed requests, read events — so the wire format can be checked
@@ -48,16 +48,13 @@ def find(events, name: str, **fields):
 
 
 def check_default_executable() -> str:
-    root = pathlib.Path(__file__).resolve().parents[3]
-    for candidate in (
-        root / "build" / "windows-msvc" / "src" / "cli" / "Release" / "prologd.exe",
-        root / "build" / "linux-release" / "src" / "cli" / "prologd",
-        root / "build" / "src" / "cli" / "Release" / "prologd.exe",
-        root / "build" / "src" / "cli" / "prologd",
-    ):
-        if candidate.exists():
-            return str(candidate)
-    raise SystemExit("build prologd first, or pass its path as an argument")
+    """The engine the window itself would run (`prologd_gui.paths`, task_75)."""
+    from prologd_gui import paths
+
+    executable = paths.interpreter()
+    if not pathlib.Path(executable).is_file():
+        raise SystemExit("build prologu first, or pass its path as an argument")
+    return executable
 
 
 def main(argv: list[str]) -> int:

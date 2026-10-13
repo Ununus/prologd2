@@ -8,7 +8,7 @@ told to add ends up under `sys._MEIPASS` - so the two questions a front-end asks
 must be answered by the *layout*, not by where this file happens to lie:
 
 * `data_root()` - the folder the user sees: beside `prologd-gui.exe` in a package,
-  the repository root in a checkout.  The interpreter (`prologd.exe`), the settings
+  the repository root in a checkout.  The interpreter (`prologu.exe`), the settings
   file (`gui.ini`), `doc/` and `examples/` all live there;
 * `resource(name)` - read-only data the package carries (today only `assets`):
   under `sys._MEIPASS` in a package, `src/gui/<name>` in a checkout.
@@ -42,8 +42,8 @@ def reveal(path: str) -> None:
     subprocess.Popen(reveal_command(path))
 
 
-#: The interpreter inside a `data_root()`.
-EXECUTABLE_NAME = "prologd.exe" if os.name == "nt" else "prologd"
+#: The interpreter inside a `data_root()`: our own engine, «Пролог-У» (task_75).
+EXECUTABLE_NAME = "prologu.exe" if os.name == "nt" else "prologu"
 
 #: The settings file of a packaged build: beside the window, so the folder stays
 #: portable (task_61).  A checkout keeps its settings in AppData, as before.
@@ -89,16 +89,27 @@ def interpreter() -> str:
 
     A package carries one beside the window and that is the whole point: the
     machine it is copied to has no `build/` directory.  A checkout keeps exactly
-    the search it always had, so working from the sources is unchanged.
+    the search it always had, so working from the sources is unchanged; the file is
+    `prologu.exe`, our own engine (task_75).
+
+    Only one name is searched, deliberately.  The original engine will be built
+    beside this one as `prologd.exe` (task_78), and taking *that* as a fallback
+    would be a trap: an older build of it lies in every tree that was built before
+    the rename, so the window would run the wrong engine without saying so.  Which
+    engine to start becomes a choice the user makes under task_79.
     """
-    candidates = [data_root() / EXECUTABLE_NAME]
-    if not frozen():
-        candidates += [
-            source_root() / "build" / "windows-msvc" / "src" / "cli" / "Release" / "prologd.exe",
-            source_root() / "build" / "linux-release" / "src" / "cli" / "prologd",
-            source_root() / "build" / "src" / "cli" / "Release" / "prologd.exe",
-            source_root() / "build" / "src" / "cli" / "prologd",
+    if frozen():
+        places = [data_root()]
+    else:
+        root = source_root()
+        places = [
+            data_root(),
+            root / "build" / "windows-msvc" / "src" / "cli" / "Release",
+            root / "build" / "linux-release" / "src" / "cli",
+            root / "build" / "src" / "cli" / "Release",
+            root / "build" / "src" / "cli",
         ]
+    candidates = [place / EXECUTABLE_NAME for place in places]
     for candidate in candidates:
         if candidate.is_file():
             return str(candidate)
@@ -155,7 +166,7 @@ def resolve_import(name: str, *, source_dir: pathlib.Path | None,
 
     The engine's own order (ADR-026): an absolute name is itself; otherwise the
     folder of the *importing* file first, then every `-I` directory, then `stdlib`
-    beside the interpreter — `prologd` finds its own library last, and the window
+    beside the interpreter — the engine finds its own library last, and the window
     has to agree with it, or `F12` would open a different file than the one the run
     actually loads.  `None` means nothing of that name exists in any of them.
     """

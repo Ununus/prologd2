@@ -1,6 +1,6 @@
 """Qt bridge to the interpreter process.
 
-One `PrologSession` owns one `prologd --protocol json` child and translates its
+One `PrologSession` owns one `prologu --protocol json` child and translates its
 event stream into signals.  Keeping the interpreter in a separate process is what
 makes Ctrl+C, a crash in a user program and an interpreter restart cheap: the GUI
 never shares memory or a call stack with it.
@@ -41,7 +41,7 @@ FLOOD_EVENTS = 20_000
 
 
 def read_keywords(executable: str, timeout_ms: int = 4000) -> Keywords:
-    """The reserved names without a session: one `prologd --list-keywords` run.
+    """The reserved names without a session: one `prologu --list-keywords` run.
 
     The window needs the table for completion, colouring and the shortcut sheet
     *before* anything is run, and a window that has only been *opened* must not

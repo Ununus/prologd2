@@ -276,9 +276,9 @@ def test_the_interpreter_and_process_directory_rows(directory: pathlib.Path) -> 
 
     # The interpreter is a *file* row: its «…» asks for one file, not a folder.
     field = dialog._widgets[keys["execution/interpreter"].key]
-    dialog._ask_file = lambda: "C:/проlogd/prologd.exe"
+    dialog._ask_file = lambda: "C:/проlogu/prologu.exe"
     dialog._browse(keys["execution/interpreter"].key)
-    assert field.text() == "C:/проlogd/prologd.exe"
+    assert field.text() == "C:/проlogu/prologu.exe"
 
     # The process directory is a choice of three, and the default is `file`.
     combo = dialog._widgets[keys["execution/process_directory"].key]

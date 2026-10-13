@@ -22,7 +22,9 @@ goal field given its own switch while a run learned to show the hidden output pa
 (part 92), and that panel made a strip again after it had taken half of the editor column
 (part 93), and the version raised to **2.1.0** with a fresh portable package built for it
 (part 94), and then to **2.2.0** — the screen size became a setting (part 104) and the
-package was built again (part 105).
+package was built again (part 105), and the engine's own file renamed to `prologu.exe`
+for the two-engine branch that follows (part 106), and the version raised to **2.3.0**
+with the engine taught to call itself «Пролог-У» (part 107).
 
 ## Overall
 
@@ -173,6 +175,14 @@ entries of the session log below and in `ai/task_*.md`.
 | task_72_pld_prose | done | the «это А, а не Б» construction is gone from twenty places in sixteen `.pld` files — statements only, the five exercise questions keep the contrast because it *is* the question; the teacher's own edits were finished (two more `%!` answers for the new students, a missing final newline, a typo), and `test_queries.py`'s `PINNED` was refreshed after being red since task_67 |
 | task_73_screen_size | done | the graphics screen is a setting with 600 × 600 as the default (the old 1024 × 768 is two rows away): `screen` travels on `load`/`query` and comes back in `ready` (protocol 13), `BitmapGraphicsBackend::reset` resizes *and clears*, and the window's canvas is made and resized the same way so it cannot clip the picture where the engine does not |
 | task_74_version_2_2_0 | done | the version raised to **2.2.0** — one source (`project(... VERSION 2.2.0)`), four live copies moved with it, and the `cli_version` test lost its literal: it held `"2\\.1\\.0"`, which a grep for the old number cannot find; the portable package was built again (`dist\prologd-2.2.0-win64`, 303 files, and its 37.9 MiB zip) |
+| task_75_rename_interpreter | done | the engine's file is `prologu.exe` (the CMake target is `prologu`, the file it produces follows it) — only the *file* moved: the project, the `PROLOGD_*` names, the `prologd::` namespace, the `prologd_gui` package, `prologd-gui.exe` and the `prologd2` icons all kept their names; the six window checks that each held their own copy of the build paths now ask `paths.interpreter()`, and a stale `prologd.exe` had to be deleted from the build tree by hand |
+| task_76_version_banner | done | the version is **2.3.0** and the engine calls itself «Пролог-У»: `PROLOGD_PRODUCT_NAME` sits beside `project(... VERSION ...)` and is injected through the generated `version.cpp`, *not* a `-D` macro (a non-ASCII value on the compiler's command line travels through a response file in the ANSI code page); one function, `versionBanner()`, is what both `--version` and the built-in `ВЕРСИЯ` print, so the packing script now reads the number out of that sentence instead of comparing the line |
+| task_77_naming_modes_merge | open | modes 1 and 2 become one (`ИМЕНА(0\|1)`): the original reads apostrophe names but rejects `'Атом'`, so 2 is a superset of 1 — `2` stays accepted as a synonym, and what the old corpus may use is recorded |
+| task_78_build_with_prologd | open | `-DBUILD_WITH_PROLOGD=ON` fetches `Ununus/prologd` at a pinned commit and builds a second `prologd.exe` beside ours; it already speaks the JSON session (`PROLOGD_BUILD_FOR_GUI`), so no adapter is needed, and an offline build stays possible |
+| task_79_engine_switch_button | open | a button at the end of the toolbar (icons `u.png`/`d.png`) switches the engine, stopping a run first; one table of capabilities per engine greys out what the other cannot do (format, step, step over, trace, graphics, engine limits, the naming row), and `--interpreter` stays as an override |
+| task_80_process_directory_picker | open | the `...` button of «Свой каталог процесса» opens at the interpreter's own directory instead of wherever it happened to start |
+| task_81_docs_two_languages | open | `help.typ` is retitled to Пролог-У (the language), `prologd-diff.typ` becomes the story of the two dialects, `gui.typ` says the shell hosts both engines, and the README carries the four readings of «У»; lessons and the standard library are left alone for now |
+| task_82_iso_compatibility | open | the policy (an ISO-compatible subset plus the teaching extras) and four stages: `stdlib/iso.pld`, the standard order of terms, the missing spellings (`is`, `=:=`, `=\=`, `->`, `\=`, `/* */`), and the documented refusals (`bagof`/`setof`, `catch`/`throw`, modules, dicts) — with a few book examples kept as checks |
 
 ## Test suite
 
@@ -3630,3 +3640,113 @@ doc/gui.typ` без замечаний.
 `?ВЕРСИЯ.` → `PrologD 2.2.0 (2026-10-06)`; портативный пакет собран заново:
 `dist\prologd-2.2.0-win64` (303 файла, внутри `--version` → `2.2.0`) и
 `prologd-2.2.0-win64.zip` — 39 786 345 байт (37,9 МиБ; у 2.1.0 было 39 753 766).
+
+### 106. Исполняемый файл движка — `prologu.exe` (2026-10-13)
+
+Задача 75.  Ветка становится ISO-совместимым движком «Пролог-У», а оригинальный
+диалект приедет отдельным файлом из `Ununus/prologd` (задача 78) — двум движкам
+рядом нельзя называться одинаково.  Отсюда переименование:
+`add_executable(prologd …)` стал `add_executable(prologu …)`, и сборка кладёт
+`src\cli\Release\prologu.exe`.
+
+*Что не переименовано.*  Инвентаризация дала 254 файла и 1281 упоминание, но за
+ними стоят три разные вещи, и менялась одна.  Остались нетронутыми: `project(prologd
+VERSION …)`, опции `PROLOGD_BUILD_*`, переменные `PROLOGD_TEST_DATA_DIR`,
+`PROLOGD_STDLIB_DIR`, `PROLOGD_BUILD_DATE`, цели `prologd_warnings`/`prologd_json`/
+`prologd_utf8`, таргет документов `prologd_docs`, пространство имён `prologd::` в
+C++ и всё окно — пакет `prologd_gui`, `prologd-gui.exe`, значки `prologd2.png`/`.ico`.
+Имя репозитория — не имя файла.
+
+*Одним проходом.*  Переименование в два приёма оставило бы дерево, в котором
+проверки зовут файл, которого нет, — поэтому правки шли пакетом: цель и
+`install(TARGETS …)` в `src/cli/CMakeLists.txt`, семнадцать CLI-тестов и четыре
+`$<TARGET_FILE:…>` в `src/tests/CMakeLists.txt`, `tools/build_portable.ps1` (имя,
+которое копируется в пакет, и три проверки по нему), `tools/bench_engine.py`,
+`paths.EXECUTABLE_NAME` и поиск движка в окне, сообщение `main.py` о неполной
+сборке, примеры командной строки в пяти `.typ` и пяти README, шапки «Запуск:» в
+двадцати `.pld` и `tools/portable-readme.txt`.
+
+*Сбойник, который тут же нашёлся.*  CMake не удаляет файл прежней цели: рядом с
+`prologu.exe` в дереве сборки остался `prologd.exe` от 08.10.  Окно и проверки
+ищут **ровно одно** имя, и это нарочно: `paths.interpreter()` не берёт `prologd.exe`
+«на второе», потому что старый движок лежит в любом дереве, собранном до
+переименования, и окно молча запустило бы не тот.  Явный выбор движка — задача 79,
+а старый файл (`prologd.exe` и его `.pdb`) из дерева сборки удалён.
+
+*Одна точка поиска.*  Шесть оконных проверок держали каждая свой список каталогов
+сборки с именем файла внутри; теперь все они спрашивают `paths.interpreter()` —
+то есть смотрят ровно туда, куда смотрит окно.  Путь, переданный `argv[1]`,
+по-прежнему главнее списка.
+
+*Пример перестал спорить с движком.*  В `examples/lib/old_lib_2.pld` факт
+`студент('Вася').` написан без кавычек — в режиме имён 2 переменная кончается
+апострофом, а атома в кавычках оригинальный Пролог-Д не знает, тогда как файл
+должен читаться и там.  Ответы соседнего `use_old_names.pld` не изменились.
+
+*Новый счёт тестов.*  `ctest` — **331/331**, и число впервые проверено сложением:
+314 случаев Catch2 в `src/tests/*.cpp` плюс 17 CLI-тестов в
+`src/tests/CMakeLists.txt`.  В записях частей 103–105 стояло 330, то есть на один
+меньше, чем дают сами источники; похоже, список обнаруженных случаев отставал до
+переконфигурации проекта, а её вызвало как раз переименование цели.
+
+*Verified.*  `ctest` 331/331; `prologu.exe --version` → `2.2.0`;
+`examples\use_old_names.pld` → `Дважды=42`, `Четырежды=84`, `Кто=Боря`, `Кто=Вова`,
+`Кто=Вася`, `Кто=Гоша` — ровно ответы, записанные в самом файле; шесть документов
+собираются; `test_window` и двенадцать других оконных проверок зелёные.
+Портативный пакет пересобирается в задаче 76, вместе со сменой надписи версии:
+имя пакета `prologd-<версия>-win64` и `prologd-gui.exe` пока остались прежними.
+
+### 107. Версия 2.3.0 и баннер «Пролог-У» (2026-10-13)
+
+Задача 76.  Номер поднят в единственном источнике — `project(prologd VERSION 2.3.0)`,
+а у движка появилось имя: `set(PROLOGD_PRODUCT_NAME "Пролог-У")` рядом с номером.
+`--version` и встроенный `ВЕРСИЯ/0` печатают теперь одно и то же:
+
+```
+Пролог-У 2.3.0 (2026-10-13)
+```
+
+*Почему через сгенерированный файл, а не `-D`.*  Первая мысль была отдать имя
+макросом — номер так и живёт (`PROLOGD_VERSION`).  Нельзя: не-ASCII значение `-D`
+едет на командную строку компилятора через файл ответов, а MSVC читает его в
+ANSI-кодировке машины, и «Пролог-У» вернулся бы мохнатым.  Имя уходит в тот же
+`src/prlib/src/version.cpp`, который `configure_file` пишет UTF-8-байтами, а `prlib`
+собирается с `/utf-8`.
+
+*Одна функция на двух печатающих.*  `versionBanner()` в том же сгенерированном файле
+собирает строку.  Раньше она собиралась дважды: в `builtins.cpp` («PrologD », номер,
+дата) и отдельно — как значение флага `--version`.  Теперь склеивать нечего, и подъём
+номера не может отстать в одном из двух мест.
+
+*Следствие для скриптов.*  `--version` стало **предложением**, а не номером:
+`tools/build_portable.ps1` берёт из него первое `\d+\.\d+\.\d+` — и для имени папки,
+и для проверки двигателя внутри пакета, где сравнивать целую строку теперь нельзя (у
+пакета своя дата сборки).  Это записано и в `ai/conventions.md`, где заодно поправлен
+другой пункт: тест `cli_version` больше не держит литерала (task_74), и в списке
+«живых копий номера» его быть не должно.
+
+*Проверку окна пришлось поправить.*  `test_window.py` ждал от ответа `?ВЕРСИЯ.`
+начала `"PrologD "`.  Теперь он сверяет номер **внутри** баннера с тем, что сессия
+объявила в `ready`, а имя продукта не повторяет: второе место, где оно записано,
+устареет на следующем переименовании.
+
+*Заодно.*  Описание движка в `--help` было «PrologD logic programming language
+interpreter», стало «Пролог-У: интерпретатор языка логического программирования».
+Ту же строку показывают урок `appendix_debug.pld`, `help.typ` §13, `prologd-diff.typ`
+и запись `ВЕРСИЯ` в `doc/builtins.json`.
+
+*Что не тронуто.*  Имя самой оболочки: заголовок окна, `ORGANIZATION` в
+`settings.py`, путь `%LOCALAPPDATA%\PrologD\gui\gui.ini` и статусная строка
+«PrologD <номер> готов».  Это уже не про движок, а смена `ORGANIZATION` — переезд
+настроек у читателя; именами займутся задачи 79 и 81.  Папка распространения тоже
+осталась `prologd-2.3.0-win64`: решено 2026-10-13 не переименовывать — имя семейства
+у пакета, а `prologu.exe` живёт внутри.
+
+*Verified.*  `ctest` 331/331 (в том числе `cli_version` — он ищет номер в баннере);
+`prologu.exe --version` и `?ВЕРСИЯ.` → `Пролог-У 2.3.0 (2026-10-13)`; шесть
+документов собираются; `test_window` и девять других оконных проверок зелёные;
+портативный пакет собран заново — `dist\prologd-2.3.0-win64` (305 файлов, 96,1 МиБ,
+внутри `--version` → `Пролог-У 2.3.0 (2026-10-13)`) и `prologd-2.3.0-win64.zip` —
+39 791 376 байт (37,9 МиБ; у 2.2.0 было 39 786 345 и 303 файла).  Внутри пакета
+прогнаны урок 1, `import_demo` и `stdlib_demo`, 130 строк имён, окно стартует и
+пишет `gui.ini` рядом с собой.

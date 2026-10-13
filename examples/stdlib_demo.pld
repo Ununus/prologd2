@@ -1,8 +1,8 @@
 % Стандартная библиотека: что в ней есть. Запуск:
-%   prologd -I stdlib -s examples/stdlib_demo.pld
+%   prologu -I stdlib -s examples/stdlib_demo.pld
 % Ключ -I нужен потому, что в дереве исходников папки stdlib рядом с интерпретатором
 % нет, а в пакете интерпретатор находит её сам, и там запуск —
-%   prologd -i examples/stdlib_demo.input.txt -s examples/stdlib_demo.pld
+%   prologu -i examples/stdlib_demo.input.txt -s examples/stdlib_demo.pld
 % В окне папку stdlib (если она не рядом с интерпретатором) добавляют один раз:
 % «Правка → Настройки… → Выполнение → Дополнительные каталоги ИМПОРТ»; то, что
 % читают read_words и read_numbers, там вводят на вкладке «Ввод» (в командной

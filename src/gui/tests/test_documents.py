@@ -76,7 +76,7 @@ def test_a_line_separator_becomes_a_plain_newline(directory: pathlib.Path) -> No
 
     The editor draws `U+2028` as a new line while `blockCount()` does not count it,
     so the line numbers and the question markers of the margin stand on the wrong
-    lines; `prologd` rejects the character instead of breaking the line.  A file that
+    lines; `prologu` rejects the character instead of breaking the line.  A file that
     carries one is therefore read as if it had a plain newline — and written back
     with one, in the shape the editor showed.
     """

@@ -33,7 +33,7 @@ def report_missing_interpreter(executable: str) -> int:
     does (task_61 §7.1).
     """
     if not paths.frozen():
-        print(f"prologd not found: {executable}", file=sys.stderr)
+        print(f"{paths.EXECUTABLE_NAME} not found: {executable}", file=sys.stderr)
         print(
             "build it first (cmake --preset windows-msvc && cmake --build build/windows-msvc --config Release)",
             file=sys.stderr,
@@ -43,17 +43,17 @@ def report_missing_interpreter(executable: str) -> int:
     QMessageBox.critical(
         None,
         "Пролог-Д 2.0",
-        "Рядом с окном нет интерпретатора prologd.exe.\n\n"
+        f"Рядом с окном нет интерпретатора {paths.EXECUTABLE_NAME}.\n\n"
         f"Искали здесь: {executable}\n"
         f"Папка сборки: {paths.data_root()}\n\n"
-        "Сборка неполная: файл prologd.exe должен лежать рядом с prologd-gui.exe.",
+        f"Сборка неполная: файл {paths.EXECUTABLE_NAME} должен лежать рядом с prologd-gui.exe.",
     )
     return 1
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="PrologD graphical front-end")
-    parser.add_argument("--exe", default=paths.interpreter(), help="path to the prologd executable")
+    parser.add_argument("--exe", default=paths.interpreter(), help="path to the interpreter (prologu.exe)")
     parser.add_argument("--include", action="append", default=[], help="import search directory (repeatable)")
     parser.add_argument(
         "--theme",

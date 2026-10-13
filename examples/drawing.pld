@@ -1,5 +1,5 @@
 % Рисунок: лицо.  Запуск в дереве исходников:
-%   prologd -I stdlib -s examples/drawing.pld
+%   prologu -I stdlib -s examples/drawing.pld
 % Цвета - имена из библиотеки stdlib/graphics.pld; ниже видно, как имя связывается
 % с числом и передаётся дальше как обычный аргумент.
 

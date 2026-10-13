@@ -45,13 +45,13 @@
 Из командной строки то же самое выглядит так:
 
 ```sh
-prologd -s examples/lessons/lesson_01.pld
+prologu -s examples/lessons/lesson_01.pld
 
 # урок 7 читает данные из файла
-prologd -s examples/lessons/lesson_07.pld < examples/lessons/lesson_07.input.txt
+prologu -s examples/lessons/lesson_07.pld < examples/lessons/lesson_07.input.txt
 
 # урок 11 подключает библиотеку, поэтому ему нужен каталог поиска модулей
-prologd -I examples/lib -s examples/lessons/lesson_11.pld
+prologu -I examples/lib -s examples/lessons/lesson_11.pld
 ```
 
 = 2. Порядок уроков

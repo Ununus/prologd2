@@ -119,6 +119,13 @@ Tests are written **together with** the feature, never after.
   in the status bar, and keeps no copy of its own) and the built-in `ВЕРСИЯ/0`, which prints
   the version with `PROLOGD_BUILD_DATE` — a `string(TIMESTAMP … UTC)` taken when CMake
   configures, so a bump is a reconfigure (the build does that by itself).
+* The **product name** sits beside the number — `set(PROLOGD_PRODUCT_NAME "Пролог-У")` —
+  and is injected the same way, through the generated source and *not* a `-D` macro: a
+  non-ASCII value on the compiler's command line travels through a response file in the
+  machine's ANSI code page.  One function, `versionBanner()` (`Пролог-У 2.3.0
+  (2026-10-13)`), is what both `--version` and `ВЕРСИЯ/0` print, so the two cannot drift
+  (task_76).  Consequence for scripts: `--version` is a *sentence*, so the number has to
+  be read out of it (`tools/build_portable.ps1` matches `\d+\.\d+\.\d+`).
 * The **protocol version is a counter of its own** (`PROTOCOL_VERSION` in
   `src/gui/prologd_gui/protocol.py`, 13 as of 2.2.0, pinned by `protocol_smoke.py` and
   `test_formatter.py`): it moves when the protocol moves, not when the program does.
@@ -131,9 +138,11 @@ Tests are written **together with** the feature, never after.
   interpreter's own reading of the same first lines.
 * Bumping the program version means moving every *live* copy of the literal — grep for the
   old number rather than trusting memory:
-  * `src/tests/CMakeLists.txt` — the `cli_version` test matches `--version` against the
-    literal, and the suite fails without it;
-  * `examples/lessons/appendix_debug.pld` — the example line of the lesson about `ВЕРСИЯ`;
+  * the `cli_version` test in `src/tests/CMakeLists.txt` follows by itself now: its pattern
+    is built from `${PROJECT_VERSION}` (before task_74 it held the literal, with escaped
+    dots, and a grep for the number could not find it);
+  * `examples/lessons/appendix_debug.pld` — the example line of the lesson about `ВЕРСИЯ`,
+    which is the whole banner, product name and date included;
   * `src/gui/README.md` — the `ready` example, with the protocol number beside it (10 was
     left stale there for two protocol versions);
   * `tools/check_dependencies.py` — the default package path.

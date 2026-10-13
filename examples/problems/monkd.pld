@@ -5,7 +5,7 @@
 % «Нельзя!». Это та же задача, что в monk.pld, но решает её не программа,
 % а читатель.
 %
-% Запуск:  prologd -s examples/problems/monkd.pld
+% Запуск:  prologu -s examples/problems/monkd.pld
 
 monk(N):-begin(N,A,B,C), move(A,B,C).
 begin(N,A,[],[]):-БОЛЬШЕ(N,0), МЕНЬШЕ(N,11), list(N,B), rev(B,A), pyr(A).

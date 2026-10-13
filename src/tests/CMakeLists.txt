@@ -52,19 +52,19 @@ catch_discover_tests(prlib_tests)
 # ---------------------------------------------------------------------------
 # Command-line integration tests
 # ---------------------------------------------------------------------------
-if(TARGET prologd)
+if(TARGET prologu)
   set(PROLOGD_DEMO "${CMAKE_SOURCE_DIR}/examples/findall_demo.pld")
 
-  add_test(NAME cli_source_short COMMAND prologd -s "${PROLOGD_DEMO}")
-  add_test(NAME cli_source_long COMMAND prologd --source "${PROLOGD_DEMO}")
-  add_test(NAME cli_source_equals COMMAND prologd "--source=${PROLOGD_DEMO}")
-  add_test(NAME cli_positional COMMAND prologd "${PROLOGD_DEMO}")
+  add_test(NAME cli_source_short COMMAND prologu -s "${PROLOGD_DEMO}")
+  add_test(NAME cli_source_long COMMAND prologu --source "${PROLOGD_DEMO}")
+  add_test(NAME cli_source_equals COMMAND prologu "--source=${PROLOGD_DEMO}")
+  add_test(NAME cli_positional COMMAND prologu "${PROLOGD_DEMO}")
   foreach(test IN ITEMS cli_source_short cli_source_long cli_source_equals cli_positional)
     set_tests_properties(${test} PROPERTIES
       PASS_REGULAR_EXPRESSION "А=\\[\\[вова,корчагин\\]")
   endforeach()
 
-  add_test(NAME cli_version COMMAND prologd --version)
+  add_test(NAME cli_version COMMAND prologu --version)
   # The version has one source — `project(prologd VERSION x.y.z)` — and this test
   # asks the binary for it instead of repeating the literal.  It used to be a
   # literal with escaped dots (`2\\.1\\.0`), which a grep for the old number does
@@ -73,12 +73,12 @@ if(TARGET prologd)
   set_tests_properties(cli_version PROPERTIES
     PASS_REGULAR_EXPRESSION "${PROLOGD_VERSION_PATTERN}")
 
-  add_test(NAME cli_help COMMAND prologd --help)
+  add_test(NAME cli_help COMMAND prologu --help)
   set_tests_properties(cli_help PROPERTIES
     PASS_REGULAR_EXPRESSION "--source")
 
   add_test(NAME cli_include
-    COMMAND prologd -I "${CMAKE_SOURCE_DIR}/examples/lib"
+    COMMAND prologu -I "${CMAKE_SOURCE_DIR}/examples/lib"
             -s "${CMAKE_SOURCE_DIR}/examples/import_demo.pld")
   set_tests_properties(cli_include PROPERTIES
     PASS_REGULAR_EXPRESSION "Дважды=42")
@@ -86,7 +86,7 @@ if(TARGET prologd)
   # task_32: an import that cannot be resolved must name the directories that
   # were searched, so a working-folder mistake is visible in the front-end.
   add_test(NAME cli_import_search_report
-    COMMAND prologd -s "${CMAKE_CURRENT_SOURCE_DIR}/missing_import.pld")
+    COMMAND prologu -s "${CMAKE_CURRENT_SOURCE_DIR}/missing_import.pld")
   set_tests_properties(cli_import_search_report PROPERTIES
     PASS_REGULAR_EXPRESSION "Искался в:")
 
@@ -94,23 +94,23 @@ if(TARGET prologd)
   # loading anything.  The Catch2 test covers the content; these cover the CLI
   # shape — `/3` for a predicate, `/+` for a variadic name (ВЫВОД, ВЫВОДПС,
   # ПЕРВОЕ).
-  add_test(NAME cli_list_keywords COMMAND prologd --list-keywords)
+  add_test(NAME cli_list_keywords COMMAND prologu --list-keywords)
   set_tests_properties(cli_list_keywords PROPERTIES
     PASS_REGULAR_EXPRESSION "НАЙТИВСЕ/3")
 
-  add_test(NAME cli_list_keywords_variadic COMMAND prologd --list-keywords)
+  add_test(NAME cli_list_keywords_variadic COMMAND prologu --list-keywords)
   set_tests_properties(cli_list_keywords_variadic PROPERTIES
     PASS_REGULAR_EXPRESSION "ВЫВОД/\\+")
 
-  add_test(NAME cli_list_keywords_variadic_first COMMAND prologd --list-keywords)
+  add_test(NAME cli_list_keywords_variadic_first COMMAND prologu --list-keywords)
   set_tests_properties(cli_list_keywords_variadic_first PROPERTIES
     PASS_REGULAR_EXPRESSION "ПЕРВОЕ/\\+")
 
-  add_test(NAME cli_list_keywords_variadic_writeln COMMAND prologd --list-keywords)
+  add_test(NAME cli_list_keywords_variadic_writeln COMMAND prologu --list-keywords)
   set_tests_properties(cli_list_keywords_variadic_writeln PROPERTIES
     PASS_REGULAR_EXPRESSION "ВЫВОДПС/\\+")
 
-  add_test(NAME cli_list_keywords_variadic_writeln_english COMMAND prologd --list-keywords)
+  add_test(NAME cli_list_keywords_variadic_writeln_english COMMAND prologu --list-keywords)
   set_tests_properties(cli_list_keywords_variadic_writeln_english PROPERTIES
     PASS_REGULAR_EXPRESSION "writeln/\\+")
 
@@ -119,7 +119,7 @@ if(TARGET prologd)
   # change it.  Both need the real executable, so a CMake script drives it.
   add_test(NAME cli_format
     COMMAND ${CMAKE_COMMAND}
-            "-DPROLOGD_EXE=$<TARGET_FILE:prologd>"
+            "-DPROLOGD_EXE=$<TARGET_FILE:prologu>"
             "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}"
             "-DSOURCE_DIR=${CMAKE_SOURCE_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/cli_format.cmake")
@@ -128,7 +128,7 @@ if(TARGET prologd)
   # instead of the usual PASS_REGULAR_EXPRESSION form.
   add_test(NAME cli_json_protocol
     COMMAND ${CMAKE_COMMAND}
-            "-DPROLOGD_EXE=$<TARGET_FILE:prologd>"
+            "-DPROLOGD_EXE=$<TARGET_FILE:prologu>"
             "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/protocol_session.cmake")
 
@@ -137,7 +137,7 @@ if(TARGET prologd)
   # instead of inside the test binary.
   add_test(NAME cli_engine_limits
     COMMAND ${CMAKE_COMMAND}
-            "-DPROLOGD_EXE=$<TARGET_FILE:prologd>"
+            "-DPROLOGD_EXE=$<TARGET_FILE:prologu>"
             "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/engine_limits.cmake")
 
@@ -146,7 +146,7 @@ if(TARGET prologd)
   # which `PASS_REGULAR_EXPRESSION` cannot see, so a CMake script drives it.
   add_test(NAME cli_diagnostics
     COMMAND ${CMAKE_COMMAND}
-            "-DPROLOGD_EXE=$<TARGET_FILE:prologd>"
+            "-DPROLOGD_EXE=$<TARGET_FILE:prologu>"
             "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/cli_diagnostics.cmake")
 endif()

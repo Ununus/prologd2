@@ -303,7 +303,7 @@ TEST_CASE("the comparison signs survive formatting") {
 }
 
 TEST_CASE("every shipped program is already in the standard shape") {
-  // `prologd --format` is the layout the repository keeps its own programs in,
+  // `prologu --format` is the layout the repository keeps its own programs in,
   // and the lessons are the widest corpus of real text there is (task_47): the
   // moment one of them drifts, this check says which.  `examples/lessons/_old`
   // holds the ported originals for comparison with the port, so it keeps their

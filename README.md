@@ -19,14 +19,14 @@ cmake --build build
 ctest --test-dir build
 ```
 
-The console interpreter is `build/src/cli/prologd`.
+The console interpreter is `build/src/cli/prologu`.
 
 ```sh
 # Run a program file
-./build/src/cli/prologd -s examples/findall_demo.pld
+./build/src/cli/prologu -s examples/findall_demo.pld
 
 # Or read the program from stdin
-./build/src/cli/prologd < examples/findall_demo.pld
+./build/src/cli/prologu < examples/findall_demo.pld
 ```
 
 ### Windows
@@ -53,7 +53,7 @@ cmake --build --preset windows-msvc
 ctest --preset windows-msvc
 ```
 
-The executable is `build\src\cli\Release\prologd.exe`.
+The executable is `build\src\cli\Release\prologu.exe`.
 
 The portable package — interpreter, window, the five documents, the lessons and
 the standard library — is built by one script:
@@ -124,9 +124,9 @@ flag:
 ```
 
 ```sh
-prologd -s examples/stdlib_demo.pld
+prologu -s examples/stdlib_demo.pld
 # from a source tree, where nothing sits beside the interpreter:
-prologd -I stdlib -s examples/stdlib_demo.pld
+prologu -I stdlib -s examples/stdlib_demo.pld
 ```
 
 `examples/stdlib_demo.pld` is a runnable tour of every predicate, with its own
@@ -139,7 +139,7 @@ The built-in `СОРТИРОВКА` already sorts and de-duplicates; the sorts i
 ## Command line
 
 ```
-Usage: prologd [options] [files...]
+Usage: prologu [options] [files...]
 
 -s, --source FILE     interpret a source file (repeatable)
 -I, --include DIR     add a module search directory
@@ -165,8 +165,8 @@ Usage: prologd [options] [files...]
 Source files can also be given as positional arguments:
 
 ```sh
-prologd examples/findall_demo.pld
-prologd --source examples/findall_demo.pld
+prologu examples/findall_demo.pld
+prologu --source examples/findall_demo.pld
 ```
 
 Diagnostics use the usual compiler format:
@@ -177,13 +177,13 @@ Exit codes: `0` success, `1` usage error, `2` a source file could not be loaded
 
 ### Front-end protocol
 
-`prologd --protocol json` replaces the human-readable console with a session
+`prologu --protocol json` replaces the human-readable console with a session
 for front-ends: requests are JSON objects on stdin, events are JSON objects on
 stdout, one per line. `-i`/`-o`/`-e` are refused in this mode — the protocol
 owns both streams. The Python/PySide6 GUI in `src/gui` is built on it; see
 `src/gui/README.md` for the full contract. Protocol version 2 adds the reserved
 names and their arities to the `ready` event, so a front-end never keeps its own
-copy of the built-in list (`prologd --list-keywords` prints the same table).
+copy of the built-in list (`prologu --list-keywords` prints the same table).
 
 ## Project layout
 

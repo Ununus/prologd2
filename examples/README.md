@@ -3,7 +3,7 @@
 Готовые программы на Пролог-Д — их можно запускать как есть:
 
 ```sh
-prologd -s examples/first_demo.pld
+prologu -s examples/first_demo.pld
 ```
 
 ## Что где

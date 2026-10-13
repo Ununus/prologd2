@@ -131,11 +131,7 @@ BuiltinResult builtinQuiet(Engine& engine, std::span<const Term>) {
 }
 
 BuiltinResult builtinVersion(Engine& engine, std::span<const Term>) {
-  std::string text = "PrologD ";
-  text += versionString();
-  text += " (";
-  text += buildDateString();
-  text += ')';
+  const std::string text(versionBanner());
   engine.io().write(text);
   engine.io().newline();
   return BuiltinResult::Continue;

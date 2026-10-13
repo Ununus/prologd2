@@ -1,6 +1,6 @@
 """Offscreen checks of the interpreter session (needs PySide6 and a build).
 
-    python src/gui/tests/test_session.py [path-to-prologd]
+    python src/gui/tests/test_session.py [path-to-prologu]
 
 Two things are worth a test rather than a comment:
 
@@ -35,18 +35,13 @@ TWICE = "X=1\nX=2\nX=1\nX=2\n"
 
 
 def find_executable(argv: list[str]) -> str | None:
+    """The engine the window itself would run (`prologd_gui.paths`, task_75)."""
     if len(argv) > 1:
         return argv[1]
-    root = pathlib.Path(__file__).resolve().parents[3]
-    for candidate in (
-        root / "build" / "windows-msvc" / "src" / "cli" / "Release" / "prologd.exe",
-        root / "build" / "linux-release" / "src" / "cli" / "prologd",
-        root / "build" / "src" / "cli" / "Release" / "prologd.exe",
-        root / "build" / "src" / "cli" / "prologd",
-    ):
-        if candidate.exists():
-            return str(candidate)
-    return None
+    from prologd_gui import paths
+
+    executable = paths.interpreter()
+    return executable if pathlib.Path(executable).is_file() else None
 
 
 def pump(session, predicate, timeout: float = 15.0) -> bool:
@@ -162,7 +157,7 @@ def main(argv: list[str]) -> int:
         return 0
     executable = find_executable(argv)
     if executable is None:
-        print("skipped: no prologd build found, pass its path to check the session")
+        print("skipped: no prologu build found, pass its path to check the session")
         return 0
 
     application = QCoreApplication(sys.argv[:1])

@@ -6,9 +6,9 @@
 
 Запуск
   prologd-gui.exe   окно: редактор, запуск программы по F5, ответы в панели внизу.
-  prologd.exe       интерпретатор в командной строке:
-                      prologd.exe -s examples\lessons\lesson_01.pld
-                      prologd.exe --help
+  prologu.exe       интерпретатор в командной строке:
+                      prologu.exe -s examples\lessons\lesson_01.pld
+                      prologu.exe --help
   Окно берёт интерпретатор из своей же папки, настраивать ничего не надо.
 
 Уроки и примеры — в папке examples: уроки в examples\lessons, задачи (факториал,
@@ -19,7 +19,7 @@
 сортировки, строки и целые числа.  Интерпретатор ищет её сам, поэтому достаточно
 директивы в программе:
     :- ИМПОРТ("lists.pld").
-Отдельный ключ нужен только в дереве исходников: prologd.exe -I stdlib -s z.pld.
+Отдельный ключ нужен только в дереве исходников: prologu.exe -I stdlib -s z.pld.
 Разбор — в library.pdf (и в stdlib\README.md), готовый пример —
 examples\stdlib_demo.pld.
 

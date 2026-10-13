@@ -67,8 +67,8 @@ bool consumeInterrupt() {
 int main(int argc, char** argv) {
   enableUtf8Console();
 
-  CLI::App app{"PrologD logic programming language interpreter"};
-  app.set_version_flag("--version", std::string(prologd::versionString()));
+  CLI::App app{"Пролог-У: интерпретатор языка логического программирования"};
+  app.set_version_flag("--version", prologd::versionBanner());
 
   std::vector<std::string> sources;
   std::vector<std::string> includeDirectories;
@@ -294,7 +294,7 @@ int main(int argc, char** argv) {
     includePaths.push_back(prologd::fromUtf8Path(directory));
   }
   // The standard library travels beside the interpreter (part 84): a `stdlib`
-  // folder next to `prologd.exe` is searched *last*, after every `-I` directory, so
+  // folder next to `prologu.exe` is searched *last*, after every `-I` directory, so
   // a program of the same name beside the user's own file wins, and no flag is
   // needed for `:- ИМПОРТ("lists.pld").` in the portable package.  A build tree has
   // nothing beside the executable, which is where `-I stdlib` stays useful.

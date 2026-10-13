@@ -145,7 +145,7 @@ TIMEOUT_MILLISECONDS = "execution/timeout_milliseconds"
 #: printed — and the answer to a flood is the same escalation: the request, then
 #: the process.
 MAX_OUTPUT_EVENTS = "execution/max_output_events"
-#: Which `prologd` the window runs (task_46).  Empty means «the one the window
+#: Which `prologu` the window runs (task_46).  Empty means «the one the window
 #: was started with» — `--exe`, itself auto-detected when left out.  A row that
 #: names another build takes effect at the next session start, and the status
 #: bar says which one is in use.
@@ -404,7 +404,7 @@ SETTINGS: tuple[Setting, ...] = (
     Setting(IMPORT_PATHS, "Дополнительные каталоги ИМПОРТ", "Выполнение", "dirs", (),
             hint="Каталоги, в которых ИМПОРТ ищет файлы; передаются интерпретатору как -I, в этом порядке"),
     Setting(INTERPRETER, "Интерпретатор", "Выполнение", "file", "",
-            hint="Путь к prologd; пусто — тот, с которым окно запущено.  Смена действует со следующего запуска"),
+            hint="Путь к prologu; пусто — тот, с которым окно запущено.  Смена действует со следующего запуска"),
     Setting(PROCESS_DIRECTORY, "Рабочий каталог процесса", "Выполнение", "choice",
             DEFAULT_PROCESS_DIRECTORY,
             choices=(("file", "каталог файла программы"),
@@ -1265,7 +1265,7 @@ class Settings:
     # -- the interpreter and its process directory (task_46) ------------------
     @property
     def interpreter(self) -> str:
-        """The `prologd` path the rows name; `""` means «the window's own»."""
+        """The `prologu` path the rows name; `""` means «the window's own»."""
         return self._text(INTERPRETER, "")
 
     @interpreter.setter

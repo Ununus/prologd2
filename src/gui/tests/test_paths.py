@@ -192,7 +192,7 @@ def test_the_import_name_is_resolved_the_way_the_interpreter_resolves_it() -> No
         (folder / "near" / "lib.pld").write_text("факт(1).\n", encoding="utf-8")
         (folder / "shared" / "other.pld").write_text("факт(2).\n", encoding="utf-8")
         (folder / "stdlib" / "lists.pld").write_text("факт(3).\n", encoding="utf-8")
-        side = str(folder / "prologd.exe")
+        side = str(folder / paths.EXECUTABLE_NAME)
 
         found = paths.resolve_import("lib.pld", source_dir=folder / "near",
                                     directories=[str(folder / "shared")],

@@ -6,7 +6,7 @@
 % глазах. Рисунок видно в окне (кнопка «Запустить»); в консоли графика молчит, и
 % остаётся только время пауз.
 %
-% Запуск:  prologd -s examples/problems/monk.pld
+% Запуск:  prologu -s examples/problems/monk.pld
 
 monk(N):-begin(N,A,B,C), move(N,1,2,3,A,B,C,_,_,_).
 move(1,X,Y,_,A,B,C,D,E,F):-make(X,Y,A,B,C,D,E,F).

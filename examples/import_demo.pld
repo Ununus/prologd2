@@ -1,5 +1,5 @@
 % Пример импорта модуля.  Запуск:
-%   prologd -I examples/lib -s examples/import_demo.pld
+%   prologu -I examples/lib -s examples/import_demo.pld
 % Ромбовидный импорт (два пути к одному общему модулю) - в examples/diamond/.
 
 :- ИМПОРТ("library.pld").

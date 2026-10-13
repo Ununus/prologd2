@@ -1,6 +1,6 @@
 """Headless check of the formatter over the protocol (no Qt needed).
 
-    python src/gui/tests/test_formatter.py [path-to-prologd]
+    python src/gui/tests/test_formatter.py [path-to-prologu]
 
 What the window's **Форматировать** will do is done here without a window: the
 text goes out as a `format` request and the laid-out text comes back in a
@@ -50,16 +50,13 @@ def find(events, name: str, **fields):
 
 
 def check_default_executable() -> str:
-    root = pathlib.Path(__file__).resolve().parents[3]
-    for candidate in (
-        root / "build" / "windows-msvc" / "src" / "cli" / "Release" / "prologd.exe",
-        root / "build" / "linux-release" / "src" / "cli" / "prologd",
-        root / "build" / "src" / "cli" / "Release" / "prologd.exe",
-        root / "build" / "src" / "cli" / "prologd",
-    ):
-        if candidate.exists():
-            return str(candidate)
-    raise SystemExit("build prologd first, or pass its path as an argument")
+    """The engine the window itself would run (`prologd_gui.paths`, task_75)."""
+    from prologd_gui import paths
+
+    executable = paths.interpreter()
+    if not pathlib.Path(executable).is_file():
+        raise SystemExit("build prologu first, or pass its path as an argument")
+    return executable
 
 
 EXAMPLE = "правило(а,б,с):-функция1(а,б,с), функция2(а,б,с), функция3(а,б,с),\nфункция4(а,б,с), функция5(а,б,с), функция6(а,б,с).\n"

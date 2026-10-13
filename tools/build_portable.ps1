@@ -8,7 +8,7 @@
     -> zip.
 
     What the package is: `prologd-gui.exe` with its `_internal` folder beside
-    `prologd.exe`, the three Visual C++ DLLs our C++ needs, `doc` (six PDFs, their
+    `prologu.exe`, the three Visual C++ DLLs our C++ needs, `doc` (six PDFs, their
     `.typ` sources and `builtins.json`), `examples` (lessons, tasks, `lib`),
     `stdlib` (the standard library, which the interpreter searches beside itself) and the
     memo `tools\portable-readme.txt`, copied under its Russian name (`$memoName`
@@ -33,7 +33,7 @@
     is used.
 
 .PARAMETER Version
-    Version for the folder name.  By default it is read from `prologd.exe --version`.
+    Version for the folder name.  By default it is read from `prologu.exe --version`.
 
 .PARAMETER SkipTests
     Skip `ctest` (for a quick repack; the checks on the built tree are then missing).
@@ -171,12 +171,19 @@ try {
     & cmake --build $build --config $Configuration
     Assert-Exit 'cmake --build'
 
-    $cli = Join-Path $build "src\cli\$Configuration\prologd.exe"
+    $cli = Join-Path $build "src\cli\$Configuration\prologu.exe"
     if (-not (Test-Path $cli)) { Fail "the interpreter was not built: $cli" }
     if (-not $Version) {
-        $Version = (& $cli --version | Select-Object -First 1)
-        if ($Version) { $Version = $Version.Trim() }
-        if (-not $Version) { Fail 'prologd.exe --version printed nothing' }
+        # `--version` prints the whole banner -- product name, number, build date
+        # (task_76) -- while the folder name wants the number alone, so the first
+        # `d.d.d` of the line is taken out of it.  Only the number is ever shown: the
+        # banner's Cyrillic half reaches a pipe as ANSI bytes.
+        $banner = (& $cli --version | Select-Object -First 1)
+        if ($banner) { $banner = $banner.Trim() }
+        if (-not $banner) { Fail 'prologu.exe --version printed nothing' }
+        $number = [regex]::Match($banner, '\d+\.\d+\.\d+')
+        if (-not $number.Success) { Fail "--version printed no version number: $banner" }
+        $Version = $number.Value
     }
     $packageName = "prologd-$Version-win64"
     Write-Host "interpreter: $cli"
@@ -230,7 +237,7 @@ try {
 
     # The frozen window goes to the *root* of the package, not into a folder of its
     # own: that is what makes `paths.data_root()` be the folder the user sees, with
-    # `prologd.exe` and `gui.ini` beside it (task_61, section 4).
+    # `prologu.exe` and `gui.ini` beside it (task_61, section 4).
     Copy-Item (Join-Path $guiDist '*') $package -Recurse -Force
     Copy-Item $cli $package -Force
 
@@ -333,7 +340,7 @@ try {
     Write-Host "package    : $package"
 
     Write-Step '7/8 Checks on the package'
-    foreach ($needed in 'prologd.exe', 'prologd-gui.exe',
+    foreach ($needed in 'prologu.exe', 'prologd-gui.exe',
                        'msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll',
                        '_internal\base_library.zip',
                        'doc\help.pdf', 'doc\builtins.json',
@@ -351,8 +358,11 @@ try {
         }
     }
 
-    $packagedExe = Join-Path $package 'prologd.exe'
-    $theirs = (& $packagedExe --version | Select-Object -First 1).Trim()
+    $packagedExe = Join-Path $package 'prologu.exe'
+    # The banner again, read the same way: the number inside it must be the one the
+    # folder is named after.  The date may differ if the package was built on another
+    # day, so the whole line is not compared.
+    $theirs = [regex]::Match((& $packagedExe --version | Select-Object -First 1), '\d+\.\d+\.\d+').Value
     if ($theirs -ne $Version) { Fail "the packaged interpreter says '$theirs', expected '$Version'" }
     $keywords = (& $packagedExe --list-keywords | Measure-Object -Line).Lines
     if ($keywords -lt 100) { Fail "the packaged interpreter lists only $keywords keyword lines" }

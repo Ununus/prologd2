@@ -1035,7 +1035,8 @@ ISO-Прологу и работает с текстом в кодировке U
 - `НЕТ_ТРАССЫ` (`no_trace`) --- выключает его;
 - `ТИХО` (`quiet`) --- подавляет печать ответа «ДА»/«НЕТ» и значений переменных для
   текущего вопроса;
-- `ВЕРСИЯ` (`version`) --- печатает версию интерпретатора и дату сборки.
+- `ВЕРСИЯ` (`version`) --- печатает имя интерпретатора, версию и дату сборки,
+  например `Пролог-У 2.3.0 (2026-10-13)`.
 
 = 14. Графика
 
@@ -1087,7 +1088,7 @@ ISO-Прологу и работает с текстом в кодировке U
 = 15. Командная строка
 
 ```
-prologd [параметры] [файлы...]
+prologu [параметры] [файлы...]
 ```
 
 - `-s, --source ФАЙЛ` --- интерпретировать файл (можно указывать несколько раз);
@@ -1124,8 +1125,8 @@ prologd [параметры] [файлы...]
 Исходные файлы можно указывать и как позиционные аргументы:
 
 ```sh
-prologd examples/findall_demo.pld
-prologd --source examples/findall_demo.pld
+prologu examples/findall_demo.pld
+prologu --source examples/findall_demo.pld
 ```
 
 Если файлы не указаны, программа читается со стандартного ввода.
@@ -1158,8 +1159,8 @@ prologd --source examples/findall_demo.pld
 Например:
 
 ```sh
-prologd --format=hard -s examples/problems/monk.pld
-prologd --format --format-width 100 -s program.pld > neat.pld
+prologu --format=hard -s examples/problems/monk.pld
+prologu --format --format-width 100 -s program.pld > neat.pld
 ```
 
 Диагностика печатается в обычном для компиляторов виде:
@@ -1263,7 +1264,7 @@ prologd --format --format-width 100 -s program.pld > neat.pld
 (5.6), `is_whole`, `is_number` (5.7) и операторы `mod`, `div` (3.3) — у них
 русского имени нет вовсе, и в таблицу пар они не попадают.  Оператор `\+`
 (4.4) --- вторая запись `НЕ`: в таблице пар его тоже нет.  Всё это видно и в
-`prologd --list-keywords`, и в автодополнении графической оболочки.
+`prologu --list-keywords`, и в автодополнении графической оболочки.
 
 Из чего складываются имена.  Без приставки --- только те, у которых смысл
 совпадает со стандартом ISO: `var`, `integer`, `float`.  `is_` --- 

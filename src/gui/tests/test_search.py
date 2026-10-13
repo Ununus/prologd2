@@ -158,13 +158,13 @@ def test_a_caret_inside_a_word_finds_that_word() -> None:
 # -- the bar in a window (PySide6, offscreen, no interpreter) ----------------
 #
 # The window opens with a buffer and nothing running: searching is an editor
-# feature, and needing a built `prologd.exe` for it would have made these checks
+# feature, and needing a built `prologu.exe` for it would have made these checks
 # part of the interpreter suite for no reason.
 
 
 def search_window():
     """A window of its own, with the find bar and a throw-away settings file."""
-    return make_window("prologd", ready=False)
+    return make_window("prologu", ready=False)
 
 
 def typed(window, text: str) -> None:

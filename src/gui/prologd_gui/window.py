@@ -564,7 +564,7 @@ class MainWindow(QMainWindow):
 
     # -- the interpreter and its working directory (task_46) ---------------
     def _interpreter_path(self) -> str:
-        """The `prologd` a run starts: the row, or the one the window was given."""
+        """The `prologu` a run starts: the row, or the one the window was given."""
         row = self._settings.interpreter.strip()
         return row or self._default_executable
 
@@ -965,10 +965,10 @@ class MainWindow(QMainWindow):
         parts = [state]
         # The interpreter a run will actually start, when the rows named a
         # different build (task_46): what the command line chose is invisible, so
-        # a window that runs another `prologd` has to say so.
+        # a window that runs another `prologu` has to say so.
         row = self._settings.interpreter.strip()
         if row:
-            parts.append(f"prologd: {row}")
+            parts.append(f"prologu: {row}")
         buffer = self.current_buffer()
         if buffer is not None:
             view = self.view_for(buffer)

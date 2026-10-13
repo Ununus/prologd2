@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.24)
 
 project(prologd
-  VERSION 2.2.0
+  VERSION 2.3.0
   DESCRIPTION "PrologD logic programming language interpreter"
   LANGUAGES CXX)
 
@@ -14,6 +14,13 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 string(TIMESTAMP PROLOGD_BUILD_DATE "%Y-%m-%d" UTC)
+
+# The product the *engine* calls itself (task_76).  It reaches the generated
+# `src/prlib/src/version.cpp` through `configure_file`, not through a `-D` macro: a
+# non-ASCII value on the compiler's command line travels through a response file in the
+# machine's ANSI code page, while the generated source is written as UTF-8 bytes and
+# compiled with `/utf-8` like every other file of `prlib`.
+set(PROLOGD_PRODUCT_NAME "Пролог-У")
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)

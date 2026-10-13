@@ -1,6 +1,6 @@
 """Headless checks of stepping over the protocol (no Qt needed).
 
-    python src/gui/tests/test_stepping.py [path-to-prologd]
+    python src/gui/tests/test_stepping.py [path-to-prologu]
 
 The window drives stepping through `prologd_gui.session`, which is a thin layer
 over these events, so the wire format is worth checking on its own — and on a

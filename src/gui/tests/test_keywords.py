@@ -1,6 +1,6 @@
 """Headless checks of the keyword table (the `ready` event and `--list-keywords`).
 
-    python src/gui/tests/test_keywords.py [path-to-prologd]
+    python src/gui/tests/test_keywords.py [path-to-prologu]
 
 Qt-free and framework-free, like the other front-end tests.  Without an
 interpreter argument the script looks for the newest build and, if there is
@@ -101,25 +101,22 @@ def test_junk_entries_are_ignored() -> None:
     print("ok: malformed entries are ignored")
 
 
-# The three candidates in `main.py`, `protocol_smoke.py` and here are the same
-# list in three copies; task_26 moves it into one Qt-free module.
 def find_executable(argv: list[str]) -> str | None:
+    """The engine the window itself would run (`prologd_gui.paths`, task_75).
+
+    The list of build directories used to be a copy per check; it now lives in the
+    module the window uses, so a check cannot look anywhere the window would not.
+    """
     if len(argv) > 1:
         return argv[1]
-    root = pathlib.Path(__file__).resolve().parents[3]
-    for candidate in (
-        root / "build" / "windows-msvc" / "src" / "cli" / "Release" / "prologd.exe",
-        root / "build" / "linux-release" / "src" / "cli" / "prologd",
-        root / "build" / "src" / "cli" / "Release" / "prologd.exe",
-        root / "build" / "src" / "cli" / "prologd",
-    ):
-        if candidate.exists():
-            return str(candidate)
-    return None
+    from prologd_gui import paths
+
+    executable = paths.interpreter()
+    return executable if pathlib.Path(executable).is_file() else None
 
 
 def test_list_lines_build_the_same_table() -> None:
-    """`prologd --list-keywords` is what the window fetches at startup."""
+    """`prologu --list-keywords` is what the window fetches at startup."""
     table = Keywords.from_event(
         {
             "keywords": [
@@ -179,7 +176,7 @@ def main(argv: list[str]) -> int:
 
     executable = find_executable(argv)
     if executable is None:
-        print("skipped: no prologd build found, pass its path to check the interpreter")
+        print("skipped: no prologu build found, pass its path to check the interpreter")
         return 0
     print(f"interpreter: {executable}")
     test_against_the_interpreter(executable)
