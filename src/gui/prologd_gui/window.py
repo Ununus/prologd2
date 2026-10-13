@@ -798,13 +798,15 @@ class MainWindow(QMainWindow):
                 self._toolbar.addWidget(self._build_format_button())
             elif key == actions.ENGINE:
                 self._toolbar.addWidget(self._build_engine_button())
+            elif key == actions.NAMING:
+                self._toolbar.addWidget(self._build_naming_button())
             else:
                 self._toolbar.addAction(self._actions[key])
         self._toolbar.setVisible(self._settings.toolbar_visible)
         self.addToolBar(self._toolbar)
 
     def _build_engine_button(self) -> QToolButton:
-        """The engine switch, at the right end of the toolbar (task_79).
+        """The engine switch, the last control of the toolbar (task_79).
 
         A `QToolButton` and not a `QAction`, like the format mode control: it is
         not a command of the program but a property of the whole window — *which*
@@ -868,8 +870,14 @@ class MainWindow(QMainWindow):
                 hint = f"{hint} — {self._engine.title} этого не умеет"
             action.setToolTip(hint)
             action.setStatusTip(hint)
-        # A hidden widget takes no room in the layout, so this leaves no hole.
+        # The two controls that stand for a *capability* of the engine go with it.  The
+        # format mode control is *hidden*: it belongs to a command that does not exist
+        # on that engine (a hidden widget takes no room, so no hole is left), and the
+        # command itself is greyed out beside it.  The naming control stays **visible
+        # but disabled** — the row it duplicates is disabled in the dialog as well, and
+        # a control that says why is worth more than one that vanishes.
         self._format_button.setVisible(self._engine.has(engines.FORMAT))
+        self._sync_naming_button()
         # `run`, `stop`, the two steps and the traced run are computed with the
         # state of the session as well, and that formula lives in one place.
         self._sync_run_actions()
@@ -947,6 +955,107 @@ class MainWindow(QMainWindow):
     def _set_format_selection(self, flag: bool) -> None:
         self._settings.format_selection = bool(flag)
         self._sync_format_menu()
+
+    def _build_naming_button(self) -> QToolButton:
+        """The naming mode, at the right end of the toolbar, before the switch (task_79).
+
+        The second state control, in front of the engine switch: a `QToolButton` whose
+        menu carries the two dialects the «Имена переменных» row of the dialog edits.
+        It stands on the toolbar for the reason the format mode control does — the
+        dialect is chosen *while looking at the program*, and walking into a dialog
+        for it is two levels too far — and it duplicates that row rather than owning
+        a preference of its own.  The picture is `n.png` («имена»), the tooltip names
+        the mode in force, and everything else follows from the engine
+        (`_sync_naming_button`).
+        """
+        button = QToolButton(self)
+        button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        found = assets.icon(actions.NAMING_ICON)
+        if found is not None:
+            button.setIcon(found)
+        button.setMenu(self._build_naming_menu())
+        self._naming_button = button
+        return button
+
+    def _build_naming_menu(self) -> QMenu:
+        """The two dialects, word for word as the row of the dialog names them.
+
+        The labels are read from the `Setting` record itself, so a row that is renamed
+        renames the menu with it: the menu *is* the row, and a second copy of those
+        words is exactly what would drift apart.
+        """
+        menu = QMenu("Имена переменных", self)
+        self._naming_menu = menu
+        group = QActionGroup(self)
+        group.setExclusive(True)
+        self._naming_actions: dict[str, QAction] = {}
+        for value, entry_title in settings.BY_KEY[settings.VARIABLE_MODE].choices:
+            entry = menu.addAction(entry_title)
+            entry.setCheckable(True)
+            entry.setActionGroup(group)
+            entry.triggered.connect(
+                lambda _checked=False, mode=value: self._set_variable_mode(mode)
+            )
+            self._naming_actions[value] = entry
+        self._sync_naming_menu()
+        return menu
+
+    def _sync_naming_menu(self) -> None:
+        """Shows the stored mode without answering for it.
+
+        The stored `2` arrives as `1` (`Settings.variable_mode` spells it that way),
+        so the check lands on the entry the row would show as well.
+        """
+        if not hasattr(self, "_naming_menu"):
+            return
+        mode = self._settings.variable_mode
+        for value, entry in self._naming_actions.items():
+            entry.blockSignals(True)
+            entry.setChecked(value == mode)
+            entry.blockSignals(False)
+
+    def _set_variable_mode(self, mode: str) -> None:
+        """The menu writes the row's own key, and the open buffers follow at once.
+
+        One key, one write: the dialog reads the same `execution/variable_mode`, and
+        the fallback of every buffer that declares no dialect is handed out again
+        (`_apply_dialect`) — a mode chosen here is in force as soon as it is clicked.
+        """
+        self._settings.variable_mode = mode
+        self._sync_naming_menu()
+        self._apply_dialect()
+        self._status.setText(f"имена переменных: {self._naming_label()}")
+
+    def _naming_label(self) -> str:
+        """The mode in force as the row names it: its label up to the colon.
+
+        «ISO: переменная с большой буквы» is read as `ISO` — the two dialects have
+        short names, and they are the row's own words; a label that grows no colon is
+        used whole, so a renamed row cannot make this empty.
+        """
+        for value, entry_title in settings.BY_KEY[settings.VARIABLE_MODE].choices:
+            if value == self._settings.variable_mode:
+                return entry_title.split(":", 1)[0].strip() or entry_title
+        return self._settings.variable_mode
+
+    def _sync_naming_button(self) -> None:
+        """The naming control: on with its capability, and its tooltip says what.
+
+        An engine that reads names its own way has no modes to choose — the original
+        *is* the old dialect — so the menu would be a choice between one thing and
+        nothing.  The control is disabled there, exactly as the row it duplicates is
+        in the dialog, and the tooltip says who decides instead.
+        """
+        if not self._engine.has(engines.NAMING):
+            self._naming_button.setEnabled(False)
+            self._naming_button.setToolTip(
+                f"Имена переменных: {self._engine.title} читает имена по-старому — "
+                f"выбирать нечего"
+            )
+        else:
+            self._naming_button.setEnabled(True)
+            self._naming_button.setToolTip(f"Имена переменных: {self._naming_label()}")
+        self._sync_naming_menu()
 
     def _build_theme_menu(self, title: str) -> QMenu:
         """The appearance: light, dark or the platform's own (task_29).

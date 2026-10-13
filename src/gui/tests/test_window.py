@@ -1918,6 +1918,8 @@ def test_the_goal_line_does_not_reload_a_loaded_base(executable: str) -> None:
 
 
 def test_the_toolbar_reuses_the_actions(executable: str) -> None:
+    from PySide6.QtWidgets import QWidgetAction
+
     from prologd_gui import actions
 
     window = empty_window(executable)
@@ -1929,20 +1931,23 @@ def test_the_toolbar_reuses_the_actions(executable: str) -> None:
             assert actions.BY_KEY[key].title in shown, (key, shown)
         # task_58: «Очистить вывод» left the toolbar for the «Выполнение» menu, and
         # the size control left it too (see `test_two_font_sizes_and_one_wheel`).
-        # task_79: the last control of all is the engine switch, so the last
-        # *labelled* entry is «Настройки…» and the two empty-text entries are the
-        # formatter's mode control and the switch.
+        # task_79: the right end carries two controls that stand for *states* of the
+        # window — the naming mode and, last of all, the engine switch — so the last
+        # *labelled* entry is «Настройки…» and the three empty-text entries are those
+        # two and the formatter's mode control.
         labels = [entry.text() for entry in toolbar.actions() if not entry.isSeparator()]
         assert actions.BY_KEY["help_doc"].title not in labels, labels
         assert actions.BY_KEY["clear_output"].title not in labels, labels
-        assert labels[-1] == "", labels
-        assert labels[-2] == actions.BY_KEY["settings"].title, labels
+        assert labels[-1] == "" and labels[-2] == "", labels
+        assert labels[-3] == actions.BY_KEY["settings"].title, labels
         widgets = [index for index, label in enumerate(labels) if not label]
-        assert len(widgets) == 2, labels
+        assert len(widgets) == 3, labels
         assert widgets[0] == labels.index(actions.BY_KEY["format"].title) + 1, labels
-        assert widgets[1] == len(labels) - 1, labels
-        # The switch is a control, not a command: its picture is the engine a press
-        # will start, and its tooltip names both sides (task_79).
+        trailing = [entry.defaultWidget() for entry in toolbar.actions()
+                    if isinstance(entry, QWidgetAction)][-2:]
+        assert trailing == [window._naming_button, window._engine_button], trailing
+        # The switch is a control, not a command: its picture is the engine that is
+        # running, and its tooltip names both sides (task_79).
         assert window._engine_button.isEnabled() is True
         assert window._engine_button.toolTip().startswith("Движок: сейчас"), (
             window._engine_button.toolTip()
@@ -4389,6 +4394,51 @@ def test_the_welcome_program_runs_on_both_engines(
     print("ok: the welcome program answers the same on both engines")
 
 
+def test_the_naming_button_duplicates_the_row(
+    executable: str, directory: pathlib.Path
+) -> None:
+    """task_79: the naming mode from the toolbar — the row's own key, and its words.
+
+    It duplicates the «Имена переменных» row rather than owning a preference: one
+    key, the labels read from the `Setting` record, so a renamed row renames the menu
+    with it.  A mode chosen here is in force at once (the buffers that declare no
+    dialect follow), and on an engine that reads names its own way the control is off.
+    """
+    from prologd_gui import engines, tokens
+    from prologd_gui import settings as settings_module
+
+    row = settings_module.BY_KEY[settings_module.VARIABLE_MODE]
+    folder = both_engines(directory, executable)
+    window = make_window(str(folder / engines.OURS.file_name), ready=False)
+    try:
+        window.editor().setPlainText("шапка(Сумма).\n")
+        buffer = window.current_buffer()
+        assert window._settings.variable_mode == "0"
+        assert buffer.variable_mode() == tokens.MODE_ISO
+        assert window._naming_button.isEnabled() is True
+        assert [entry.text() for entry in window._naming_menu.actions()] == [
+            title for _value, title in row.choices
+        ], [entry.text() for entry in window._naming_menu.actions()]
+        assert window._naming_actions["0"].isChecked() is True
+        assert window._naming_label() == "ISO"
+        assert "ISO" in window._naming_button.toolTip(), window._naming_button.toolTip()
+
+        window._naming_actions["1"].trigger()
+        assert window._settings.variable_mode == "1", "the menu must write the row's key"
+        assert window._naming_actions["1"].isChecked() is True
+        assert window._naming_actions["0"].isChecked() is False, "the entries are exclusive"
+        assert buffer.variable_mode() == tokens.MODE_OLD, "the buffer follows at once"
+        assert "имена переменных" in window.status_text(), window.status_text()
+
+        # An engine that reads names its own way: the control is off, and says so.
+        window.switch_engine()
+        assert window._naming_button.isEnabled() is False
+        assert "по-старому" in window._naming_button.toolTip(), window._naming_button.toolTip()
+        print("ok: the naming button duplicates the row, and goes off with the engine")
+    finally:
+        discard_changes(window)
+
+
 def test_the_settings_dialog_follows_the_engine_that_runs(
     executable: str, directory: pathlib.Path
 ) -> None:
@@ -4819,6 +4869,7 @@ def main(argv: list[str]) -> int:
         test_the_other_engine_gets_only_what_it_answers(executable, files)
         test_the_other_engine_reads_names_its_own_way(executable, files)
         test_the_welcome_program_runs_on_both_engines(executable, files)
+        test_the_naming_button_duplicates_the_row(executable, files)
         test_the_settings_dialog_follows_the_engine_that_runs(executable, files)
         test_the_process_directory_is_where_files_go(executable, files)
         test_autosave_writes_named_buffers_and_skips_the_rest(executable, files)

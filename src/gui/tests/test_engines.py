@@ -123,17 +123,24 @@ def test_a_gated_row_is_a_row_and_really_is_missing() -> None:
     print("ok: every gated key is a real row, and the engine that gates it lacks it")
 
 
-def test_the_switch_is_the_last_thing_on_the_toolbar() -> None:
-    """A control of the whole window, not a command of the program (task_79)."""
-    assert actions.TOOLBAR[-1] == actions.ENGINE
+def test_the_state_controls_are_the_last_thing_on_the_toolbar() -> None:
+    """Two controls of the whole window, not commands of the program (task_79).
+
+    The naming mode and, as the very last control, the engine switch: both are
+    *states* of the window — in which dialect a file that declares none is read, and
+    which program runs — so they stand apart at the right edge, after a separator,
+    with the wider question last.
+    """
+    assert actions.TOOLBAR[-2:] == (actions.NAMING, actions.ENGINE), actions.TOOLBAR
     assert actions.SEPARATOR in actions.TOOLBAR, actions.TOOLBAR
-    markers = (actions.SEPARATOR, actions.FORMAT_MODE, actions.ENGINE)
-    assert actions.ENGINE not in actions.BY_KEY, "it is a control, not a command"
+    markers = (actions.SEPARATOR, actions.FORMAT_MODE, actions.ENGINE, actions.NAMING)
+    assert actions.ENGINE not in actions.BY_KEY, "the switch is a control, not a command"
+    assert actions.NAMING not in actions.BY_KEY, "and so is the naming mode"
     for key in actions.TOOLBAR:
         if key in markers:
             continue
         assert key in actions.BY_KEY, key
-    print(f"ok: the toolbar ends with the engine switch ({len(actions.TOOLBAR)} entries)")
+    print(f"ok: the toolbar ends with the two state controls ({len(actions.TOOLBAR)} entries)")
 
 
 def main() -> int:
@@ -143,7 +150,7 @@ def main() -> int:
     test_a_launch_answers_the_engine_and_the_folder()
     test_every_capability_of_the_table_is_asked_about()
     test_a_gated_row_is_a_row_and_really_is_missing()
-    test_the_switch_is_the_last_thing_on_the_toolbar()
+    test_the_state_controls_are_the_last_thing_on_the_toolbar()
     print("all engine checks passed")
     return 0
 

@@ -44,6 +44,12 @@ REPLACE_ICON = "edit-find-replace"
 #: to a control rather than to a command.
 FORMAT_ICON = "edit-format-set"
 
+#: The picture of the *naming mode* control (task_79): `n` — «имена» — for the second
+#: state control of the toolbar, whose menu carries the two dialects the «Имена
+#: переменных» row edits.  Like the format mode control it is a control and not a
+#: command, so it is named here for the audit.
+NAMING_ICON = "n"
+
 #: Names that belong to no action: the tab picture of a buffer (never saved,
 #: saved, modified) and the application icon.  They live here because
 #: `ICON_NAMES` is the list `test_icons.py` holds the code to.
@@ -91,6 +97,14 @@ FORMAT_MODE = "#format-mode"
 #: The window builds it (`window._build_engine_button`) and finds the engines
 #: table in `engines`.
 ENGINE = "#engine"
+
+#: The naming-mode control (task_79): the third control of that kind, right before the
+#: engine switch — it is not a command either but the dialect the *running* engine
+#: reads a file in, and its menu carries the same two values as the «Имена
+#: переменных» row of the dialog (read from that row's own description, so the two
+#: cannot drift apart).  On an engine that has no modes the control is disabled, as
+#: the row is.
+NAMING = "#naming"
 
 #: The appearance (task_29's dark theme): a submenu of «Вид», because a *set* of
 #: three themes is not something one checkable entry can say.  It used to be a
@@ -277,8 +291,8 @@ BY_KEY: dict[str, Action] = {action.key: action for action in ACTIONS}
 #: files in `assets/` and against the documented `MISSING` list.
 ICON_NAMES: frozenset[str] = frozenset(
     [action.icon for action in ACTIONS if action.icon]
-    + [RECENT_ICON, FIND_ICON, REPLACE_ICON, FORMAT_ICON, FILE_ICON, SAVED_ICON,
-       MODIFIED_ICON, APPLICATION_ICON, THEME_ICON, ADD_ICON, REMOVE_ICON]
+    + [RECENT_ICON, FIND_ICON, REPLACE_ICON, FORMAT_ICON, NAMING_ICON, FILE_ICON,
+       SAVED_ICON, MODIFIED_ICON, APPLICATION_ICON, THEME_ICON, ADD_ICON, REMOVE_ICON]
     + list(ENGINE_ICONS)
 )
 
@@ -384,10 +398,13 @@ MENUS: tuple[tuple[str, tuple[str, ...]], ...] = (
 #: tab belongs in «Файл», and the toolbar keeps the three file buttons that act on
 #: the tab in front of the user (task_48).
 #:
-#: The engine switch (task_79) is the last control of all: it is not a command of
-#: the program but the choice of *which* program — the thing the toolbar's other
-#: buttons are about — so it stands apart, after a separator, and the eye finds it
-#: at the right edge where nothing follows it.
+#: The naming control (task_79) and the engine switch after it are the last two
+#: controls of all: they are not commands of the program but the dialect it reads
+#: names in and the choice of *which* program runs — the two things the toolbar's
+#: buttons above them are about — so they stand apart, after a separator, in the
+#: order the questions are asked in (how is the file read, and by what), with the
+#: engine last: it is the wider question, and the right edge is where the eye looks
+#: for it.
 TOOLBAR: tuple[str, ...] = (
     "new",
     "open",
@@ -406,6 +423,7 @@ TOOLBAR: tuple[str, ...] = (
     SEPARATOR,
     "settings",
     SEPARATOR,
+    NAMING,
     ENGINE,
 )
 

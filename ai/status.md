@@ -187,7 +187,7 @@ entries of the session log below and in `ai/task_*.md`.
 | task_76_version_banner | done | the version is **2.3.0** and the engine calls itself «Пролог-У»: `PROLOGD_PRODUCT_NAME` sits beside `project(... VERSION ...)` and is injected through the generated `version.cpp`, *not* a `-D` macro (a non-ASCII value on the compiler's command line travels through a response file in the ANSI code page); one function, `versionBanner()`, is what both `--version` and the built-in `ВЕРСИЯ` print, so the packing script now reads the number out of that sentence instead of comparing the line |
 | task_77_naming_modes_merge | done | the naming mode has **two** values now — `Iso` (0) and `Old` (1); `2` is a *spelling* of `1` in one place per side (`variableModeFromNumber` in C++, `tokens.MODE_NUMBERS` in Python), so the marker, `--vars`, the wire and a stored setting all keep working; the settings row translates a stored `2` in *both* directions, because `set_value` answers an unknown choice with the setting's default and would have moved that reader to ISO; the mode-1 diagnostic about the apostrophe went — it advised what is now true |
 | task_78_build_with_prologd | done | `-DBUILD_WITH_PROLOGD=ON` builds a pinned commit of `Ununus/prologd` as a **nested** CMake project (`ExternalProject_Add`, not `FetchContent`: its targets `prlib` and `prologd_json` are names this tree already uses) and writes its `prologd.exe` beside ours — one command builds both. It is told to take the JSON header this tree already has, so nothing is downloaded twice; `-DPROLOGD_ENGINE_SOURCE=<a clone>` builds with no network at all |
-| task_79_engine_switch_button | done | the window is a host of two engines: a `QToolButton` at the right end of the toolbar switches between «Пролог-У» (`prologu.exe`, ours) and «Пролог-Д» (`prologd.exe`, the original) — its picture is the engine that is *running* — and the choice is `view/engine`; what a command needs of an engine is a *capability* declared once (`Action.needs`, `settings.GATED_ROWS`) and asked in one place, so the original gets no format button, no step, no trace, no graphics, no engine limits and no naming row — those are disabled with a reason, not clickable-into-nothing, and a marker-less file is read and coloured the old way under it.  A press **stops the session** first (a live process belongs to the engine being left) and re-reads `--list-keywords` (66 names against our 130); `--exe` — and the value of the removed «Интерпретатор» row, which is still read — names the folder both engines are built in, and its file name picks the engine; the first tab holds a welcome program written in the intersection of the two dialects (unquoted lower-case atoms, single-letter variables), so it answers on either engine — checked by running it twice (part 111) |
+| task_79_engine_switch_button | done | the window is a host of two engines: a `QToolButton` at the right end of the toolbar switches between «Пролог-У» (`prologu.exe`, ours) and «Пролог-Д» (`prologd.exe`, the original) — its picture is the engine that is *running* — and the choice is `view/engine`; what a command needs of an engine is a *capability* declared once (`Action.needs`, `settings.GATED_ROWS`) and asked in one place, so the original gets no format button, no step, no trace, no graphics, no engine limits and no naming row — those are disabled with a reason, not clickable-into-nothing, and a marker-less file is read and coloured the old way under it.  A press **stops the session** first (a live process belongs to the engine being left) and re-reads `--list-keywords` (66 names against our 130); `--exe` — and the value of the removed «Интерпретатор» row, which is still read — names the folder both engines are built in, and its file name picks the engine; the first tab holds a welcome program written in the intersection of the two dialects (unquoted lower-case atoms, single-letter variables), so it answers on either engine — checked by running it twice (part 111); a second control at that end (`n.png`) carries the two naming modes with the dialog row's own labels and is disabled under the original engine (part 112) |
 | task_80_process_directory_picker | open | the `...` button of «Свой каталог процесса» opens at the interpreter's own directory instead of wherever it happened to start |
 | task_81_docs_two_languages | open | `help.typ` is retitled to Пролог-У (the language), `prologd-diff.typ` becomes the story of the two dialects, `gui.typ` says the shell hosts both engines, and the README carries the four readings of «У»; lessons and the standard library are left alone for now |
 | task_82_iso_compatibility | open | the policy (an ISO-compatible subset plus the teaching extras) and four stages: `stdlib/iso.pld`, the standard order of terms, the missing spellings (`is`, `=:=`, `=\=`, `->`, `\=`, `/* */`), and the documented refusals (`bagof`/`setof`, `catch`/`throw`, modules, dicts) — with a few book examples kept as checks |
@@ -3962,4 +3962,39 @@ C++23) и в кодировке исходников (CP1251 против UTF-8)
 *Verified.*  `test_window.py` — новая проверка зелёная рядом с остальными
 (`all window checks passed`); `doc/gui.typ` (§2 цитирует приветствие и объясняет,
 почему оно так написано) собирается без замечаний.
+
+### 112. Кнопка «Имена переменных» на панели инструментов (2026-10-13)
+
+Учитель попросил вынести диалект на панель: кнопка `n.png` в конце панели с меню из
+тех же двух значений, что и строка «Имена переменных», и выключающаяся под Пролог-Д,
+как остальное.
+
+*Одно место — одна настройка.*  Меню строится **из записи** строки
+(`settings.BY_KEY[VARIABLE_MODE].choices`): тот же ключ `execution/variable_mode`, те
+же два значения и *те же слова*.  Второй список слов рядом разошёлся бы с первым при
+первом же переименовании — а переименование случилось в тот же день: значения
+называются теперь «ISO: переменная с большой буквы» и «PLD: одна буква, имена с
+апострофом».  Кнопка ничего своего не хранит: `_set_variable_mode` пишет тот же ключ,
+что и диалог, зовёт `_apply_dialect()` (файлы без маркера следуют сразу) и говорит в
+строке состояния, что выбрано.  Стоит она **перед** кнопкой движка: вопросы идут от
+узкого к широкому — как читается файл, и чем он потом будет прочитан, — а правый
+край остаётся за движком.
+
+*Выключить или спрятать.*  Кнопка режима форматирования на движке без форматирования
+**прячется**: она принадлежит команде, которой там нет (и команда рядом серая).  Кнопка
+имён **остаётся видимой, но выключенной** — как и строка в диалоге, — и подсказка
+говорит, кто решает вместо неё («Пролог-Д читает имена по-старому — выбирать нечего»).
+Исчезающая кнопка сказала бы меньше, чем кнопка, объясняющая себя.
+
+*Заодно в документах.*  §6.3 руководства всё ещё описывал *три* значения строки с
+прежними словами — это осталось от task_77 и никем не было замечено; теперь там два
+значения, слова взяты из записи, и названа кнопка на панели.  Владелец заодно сократил
+подсказки строк в `settings.py` (короче, по строкам через `\n`).
+
+*Verified.*  `test_window.py`: проверка панели сравнивает последние два *виджета* по
+их `QWidgetAction.defaultWidget()`, а не по пустой надписи (их стало три); новая
+проверка `test_the_naming_button_duplicates_the_row` сверяет надписи меню с записью
+строки, переключает режим и убеждается, что буфер и настройка следуют, а под Пролог-Д
+кнопка выключена и говорит почему; `test_icons.py` требует файл `n.png` (он есть).
+Все 25 сюит зелёные, `doc/gui.typ` собирается без замечаний.
 
