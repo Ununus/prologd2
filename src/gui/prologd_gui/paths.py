@@ -18,11 +18,12 @@ Nothing here imports Qt, so a check of this module needs no display and no PySid
 
 from __future__ import annotations
 
-import os
 import pathlib
 import subprocess
 import sys
 from collections.abc import Iterable
+
+from . import engines
 
 def reveal_command(path: str) -> list[str]:
     """The command that shows a file where it lives (task_68).
@@ -42,8 +43,11 @@ def reveal(path: str) -> None:
     subprocess.Popen(reveal_command(path))
 
 
-#: The interpreter inside a `data_root()`: our own engine, «Пролог-У» (task_75).
-EXECUTABLE_NAME = "prologu.exe" if os.name == "nt" else "prologu"
+#: The engine of this repository inside a `data_root()`: «Пролог-У» (task_75).
+#: The two names, their titles and their pictures live in `engines`, which is
+#: where the *choice* between them is described (task_79); this is only where a
+#: file is looked for.
+EXECUTABLE_NAME = engines.OURS.file_name
 
 #: The settings file of a packaged build: beside the window, so the folder stays
 #: portable (task_61).  A checkout keeps its settings in AppData, as before.
@@ -84,19 +88,19 @@ def settings_path() -> pathlib.Path | None:
     return data_root() / SETTINGS_NAME if frozen() else None
 
 
-def interpreter() -> str:
-    """The interpreter to run, as the string `--exe` wants.
+def interpreter(file_name: str = EXECUTABLE_NAME) -> str:
+    """The file `file_name` to run, as the string `--exe` wants.
 
-    A package carries one beside the window and that is the whole point: the
-    machine it is copied to has no `build/` directory.  A checkout keeps exactly
-    the search it always had, so working from the sources is unchanged; the file is
-    `prologu.exe`, our own engine (task_75).
+    A package carries the engines beside the window and that is the whole point:
+    the machine it is copied to has no `build/` directory.  A checkout keeps
+    exactly the search it always had, so working from the sources is unchanged.
 
-    Only one name is searched, deliberately.  The original engine will be built
-    beside this one as `prologd.exe` (task_78), and taking *that* as a fallback
-    would be a trap: an older build of it lies in every tree that was built before
-    the rename, so the window would run the wrong engine without saying so.  Which
-    engine to start becomes a choice the user makes under task_79.
+    The search is by **one** file name at a time, deliberately.  Until task_78
+    the original engine was a tempting fallback — a tree built before task_75 has
+    a `prologd.exe` in every one of these folders, so falling back to it would run
+    the wrong engine without saying so.  Which engine to start is the user's
+    choice now (`view/engine`, and the button on the toolbar), and
+    `engine_executable` resolves the file of *that* engine.
     """
     if frozen():
         places = [data_root()]
@@ -109,11 +113,26 @@ def interpreter() -> str:
             root / "build" / "src" / "cli" / "Release",
             root / "build" / "src" / "cli",
         ]
-    candidates = [place / EXECUTABLE_NAME for place in places]
+    candidates = [place / file_name for place in places]
     for candidate in candidates:
         if candidate.is_file():
             return str(candidate)
     return str(candidates[0])
+
+
+def engine_executable(engine: engines.Engine, *, folder: str = "") -> str:
+    """The file of `engine` the next run starts (task_79).
+
+    Two answers, and the difference matters.  `folder` is the folder `--exe` (or
+    task_46's removed «Интерпретатор» row) named — «here are my builds»: the
+    engines were built together, so the chosen one is looked for **there and
+    nowhere else**, and a file that is missing is reported in the pane by
+    `window._start_session` rather than quietly answered by another build tree.
+    Without a folder, `interpreter` searches the usual places for that engine.
+    """
+    if folder:
+        return str(pathlib.Path(folder) / engine.file_name)
+    return interpreter(engine.file_name)
 
 
 def example_library() -> pathlib.Path:

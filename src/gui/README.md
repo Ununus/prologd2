@@ -27,14 +27,18 @@ python -m venv .venv
 .venv\Scripts\python.exe src/gui/main.py --include examples/lib
 ```
 
-`--exe` overrides the interpreter path (by default the newest build under
-`build/` is used), `--include` adds an `ИМПОРТ` search directory and may be
-repeated, and `--icons DIR` points the icon loader at another directory (the
-default is `src/gui/assets` in a checkout, the copy inside its own folder in a
-package).  The «Интерпретатор» row of the settings dialog
-(`execution/interpreter`) beats `--exe`: when it is not empty, *it* is what a run
-starts, and the status bar names a build that is not the one the window was
-started with.
+`--exe` names the engine of this launch: the folder it lies in is where **both**
+engines are looked for — `prologu.exe` of this repository and `prologd.exe`, the
+original one task_78 builds beside it — and a file name that *is* one of the two
+picks that engine.  Which engine a run starts is otherwise a preference
+(`view/engine`), written by the button at the **right end of the toolbar**, whose
+picture is the engine that is *running* (`u.png` / `d.png`).  A value an older file
+still holds under `execution/interpreter` is read as the same kind of launch pin,
+and the first press of that button clears it (task_79).  `--include` adds an
+`ИМПОРТ` search directory and may be repeated, and `--icons DIR` points the icon
+loader at another directory (the default is `src/gui/assets` in a checkout, the copy
+inside its own folder in a package).  The status bar names the engine a run will
+start, and the file as well when the build folder was named by hand.
 
 A **packaged** build (task_61) finds all of that beside itself — `prologu.exe` next
 to the window, the icons inside its folder, `doc/` and `examples/` next to the
@@ -341,7 +345,9 @@ The toolbar is grouped as
 the reference front-end had it: file | run/stop/step | editing (comment,
 uncomment, format and, right beside it, the formatter's **mode control** — a
 `QToolButton` with the three modes and «только выделенное», where a mode is
-switched while looking at the code) | tools (graphics, settings);
+switched while looking at the code) | tools (graphics, settings) | the **engine
+switch** — the last control of all, whose picture is the engine that is *running*
+(task_79, `actions.ENGINE` and the module `prologd_gui/engines.py`);
 `QToolBar.setIconSize(QSize(24, 24))` is set explicitly so the layout does not
 depend on the style.  The right end lost three buttons in task_58.  «Руководство
 пользователя» went first: a button that opens a PDF takes room in the middle of the
@@ -350,6 +356,14 @@ next to «Графическое окно» — both are about what is on the sc
 the run.  And the font-size box went with them: `Ctrl`+wheel and the three zoom
 commands cover the everyday change, and an exact value is the «Размер шрифта» row of
 the settings dialog.
+
+The engine switch belongs to no action: it is not a command of the program but the
+choice of *which* program, so it is a `QToolButton` added by the window
+(`_build_engine_button`) at the very end of `actions.TOOLBAR`, and everything
+about it — the picture, the tooltip, whether it is usable at all — follows from
+the engine a run would start (`Action.needs` is where a *command* declares what it
+needs of an engine, and `settings.GATED_ROWS` does the same for a row of the
+dialog).
 
 Two commands left the toolbar in this round.  «Сохранить все» acts on *every*
 tab, so it lives in «Файл» where the rest of them are: the toolbar keeps the
@@ -899,7 +913,7 @@ table).
 | Редактор | font family and size, line numbers, the current-line band, word wrap, tabs or spaces and the width, auto-indent, completion (on/off, after how many letters, `Учитывать регистр`) |
 | Вид | theme (light, dark or system), toolbar, the output panel (shown; right or bottom, the bottom being the default since task_50), the goal field, where a program's input question is asked (console or dialog), the output's font size, its line limit and whether it follows the end |
 | Формат | the formatter's mode, width, indent and unit, «только выделенное» |
-| Выполнение | whether a run answers the program's own `?`-questions, save before run, the four limits (steps, depth, НАЙТИВСЕ solutions, milliseconds), **the interpreter path** (empty = the one the window was started with), **the process directory** (the running file's folder, the window's folder, or a fixed one — `ЗАПИСЬ_В`/`ЧТЕНИЕ_ИЗ` open relative to it), the `ИМПОРТ` search folders |
+| Выполнение | whether a run answers the program's own `?`-questions, save before run, the four limits (steps, depth, НАЙТИВСЕ solutions, milliseconds), the naming mode (the fallback for a file that declares none — under the original engine it *is* the old dialect, and the row is disabled), **the process directory** (the running file's folder, the window's folder, or a fixed one — `ЗАПИСЬ_В`/`ЧТЕНИЕ_ИЗ` open relative to it), the `ИМПОРТ` search folders |
 | Файлы | autosave in minutes (0 = off), how many recent files to remember, restoring the open tabs at start-up |
 | Подсветка | the syntax colours, one swatch per highlighted role («Комментарий», «Строка», «Атом латиницей» …) for the light and the dark theme side by side; a click on a swatch asks for a new colour and the hex is stored per theme (`syntax/light`, `syntax/dark`) and applied at once, «Вернуть встроенные цвета» drops every override |
 | Вставки | the live `Ctrl`+key table (task_31), the settings file path, «Вернуть встроенную таблицу» |
@@ -1225,11 +1239,14 @@ One piece of work is planned in a task file of its own (`ai/task_*.md`):
   them plus «Предел времени, мс» and «Предел вывода» (the window's own guards,
   not the engine's), and a run names the rows it goes with before it
   starts.  The interpreter path and the process directory are done too (2026-10-02):
-  `execution/interpreter` picks the binary (empty = `--exe`, which stays the
+  `execution/interpreter` picked the binary (empty = `--exe`, which stays the
   fallback), `execution/process_directory` picks where the child starts, «Применить»
   restarts a live session on either change, and a missing path is reported in the
   pane.  A text-mode `--timeout-ms` was dropped by decision.  Still open: named
-  profiles.
+  profiles.  The **path row itself left the dialog** in task_79 (2026-10-13): the
+  window hosts two engines now, the engine is chosen by the button on the toolbar
+  (`view/engine`), a particular build by `--exe`, and a value the old row left in a
+  file is still read (`Settings.legacy_interpreter`) until that button is pressed.
 * **Three defects found by using the window** — `ai/task_49_gui_defects.md`:
   `Шаг → Стоп → Запуск` answering «нет шага, который ждёт ответа», a second
   unnamed tab coming back modified after a restore, «Запустить с трассировкой»

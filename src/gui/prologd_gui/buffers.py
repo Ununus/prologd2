@@ -58,6 +58,12 @@ class Buffer(QObject):
         # instead of a re-tokenisation of the buffer.
         self._first_line = ""
         self._variable_mode = 0
+        #: How a file that says nothing is read (task_67): the *window's* answer,
+        #: handed to every buffer as they appear (`set_fallback_variable_mode`) — a
+        #: row for our own engine, the old dialect for one that has no modes at all
+        #: (task_79).  The row is only the starting point: the window knows which
+        #: engine runs, this object does not.
+        self._fallback_mode = self._settings.variable_mode_number
         self.document.contentsChanged.connect(self._on_contents_changed)
         self.refresh_variable_mode()
 
@@ -139,15 +145,27 @@ class Buffer(QObject):
         """Works out how this document's names are read, and tells the highlighter.
 
         The file's own `:- ИМЕНА(N).` first line wins (task_67); a file that says
-        nothing is read in the window's own mode («Имена переменных»), the way
-        `--vars` covers the CLI.  This is colouring only: the interpreter reads the
-        same marker when it runs or formats the file.
+        nothing is read in the window's answer (`_fallback_mode`), the way `--vars`
+        covers the CLI.  This is colouring only: the interpreter reads the same
+        marker when it runs or formats the file.
         """
         declared = mode_from_first_line(self.text())
         self._variable_mode = (
-            self._settings.variable_mode_number if declared is None else declared
+            self._fallback_mode if declared is None else declared
         )
         self.highlighter.set_mode(self._variable_mode)
+
+    def set_fallback_variable_mode(self, mode: int) -> None:
+        """What a file that declares nothing about names is read in (task_79).
+
+        The window answers, not this object: only the window knows *which engine*
+        runs, and an engine with no modes of its own reads names the old way, so a
+        marker-less file is colouring-, completing- and sending-wise the old one
+        under it.  A file that declares `:- ИМЕНА(N).` is not touched — the dialect
+        belongs to the file — and the colouring follows at once.
+        """
+        self._fallback_mode = int(mode)
+        self.refresh_variable_mode()
 
     def variable_mode(self) -> int:
         """How this document's names are read (task_67) — see `refresh_variable_mode`.

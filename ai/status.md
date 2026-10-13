@@ -83,6 +83,12 @@ original engine from `Ununus/prologd` made buildable beside ours (part 109).
   failure that names the directories tried.
 * CLI11 front-end with UTF-8 console setup on Windows and diagnostics in the
   `file:line:column: error: message` form, with severities.
+* **Two engines**: this repository's «Пролог-У» (`prologu.exe`, version 2.3.0) and a
+  *pinned* original `Ununus/prologd` built beside it as `prologd.exe`
+  (`-DBUILD_WITH_PROLOGD=ON`, task_78).  The window is a host of both (task_79): the
+  button at the right end of the toolbar switches between them, and what the chosen
+  engine cannot answer — formatting, a step, a trace, graphics, its own limits, the
+  naming modes — is disabled with a reason instead of doing nothing.
 * Examples live in `examples/` and are covered by golden tests: the course in
   `examples/lessons` is a program per lesson whose own `%!` lines are its expected
   output, the five demos beside it (`first_demo`, `sort_demo`, `ground_demo`,
@@ -181,14 +187,14 @@ entries of the session log below and in `ai/task_*.md`.
 | task_76_version_banner | done | the version is **2.3.0** and the engine calls itself «Пролог-У»: `PROLOGD_PRODUCT_NAME` sits beside `project(... VERSION ...)` and is injected through the generated `version.cpp`, *not* a `-D` macro (a non-ASCII value on the compiler's command line travels through a response file in the ANSI code page); one function, `versionBanner()`, is what both `--version` and the built-in `ВЕРСИЯ` print, so the packing script now reads the number out of that sentence instead of comparing the line |
 | task_77_naming_modes_merge | done | the naming mode has **two** values now — `Iso` (0) and `Old` (1); `2` is a *spelling* of `1` in one place per side (`variableModeFromNumber` in C++, `tokens.MODE_NUMBERS` in Python), so the marker, `--vars`, the wire and a stored setting all keep working; the settings row translates a stored `2` in *both* directions, because `set_value` answers an unknown choice with the setting's default and would have moved that reader to ISO; the mode-1 diagnostic about the apostrophe went — it advised what is now true |
 | task_78_build_with_prologd | done | `-DBUILD_WITH_PROLOGD=ON` builds a pinned commit of `Ununus/prologd` as a **nested** CMake project (`ExternalProject_Add`, not `FetchContent`: its targets `prlib` and `prologd_json` are names this tree already uses) and writes its `prologd.exe` beside ours — one command builds both. It is told to take the JSON header this tree already has, so nothing is downloaded twice; `-DPROLOGD_ENGINE_SOURCE=<a clone>` builds with no network at all |
-| task_79_engine_switch_button | open | a button at the end of the toolbar (icons `u.png`/`d.png`) switches the engine, stopping a run first; one table of capabilities per engine greys out what the other cannot do (format, step, step over, trace, graphics, engine limits, the naming row), and `--interpreter` stays as an override |
+| task_79_engine_switch_button | done | the window is a host of two engines: a `QToolButton` at the right end of the toolbar switches between «Пролог-У» (`prologu.exe`, ours) and «Пролог-Д» (`prologd.exe`, the original) — its picture is the engine that is *running* — and the choice is `view/engine`; what a command needs of an engine is a *capability* declared once (`Action.needs`, `settings.GATED_ROWS`) and asked in one place, so the original gets no format button, no step, no trace, no graphics, no engine limits and no naming row — those are disabled with a reason, not clickable-into-nothing, and a marker-less file is read and coloured the old way under it.  A press **stops the session** first (a live process belongs to the engine being left) and re-reads `--list-keywords` (66 names against our 130); `--exe` — and the value of the removed «Интерпретатор» row, which is still read — names the folder both engines are built in, and its file name picks the engine; the first tab holds a welcome program written in the intersection of the two dialects (unquoted lower-case atoms, single-letter variables), so it answers on either engine — checked by running it twice (part 111) |
 | task_80_process_directory_picker | open | the `...` button of «Свой каталог процесса» opens at the interpreter's own directory instead of wherever it happened to start |
 | task_81_docs_two_languages | open | `help.typ` is retitled to Пролог-У (the language), `prologd-diff.typ` becomes the story of the two dialects, `gui.typ` says the shell hosts both engines, and the README carries the four readings of «У»; lessons and the standard library are left alone for now |
 | task_82_iso_compatibility | open | the policy (an ISO-compatible subset plus the teaching extras) and four stages: `stdlib/iso.pld`, the standard order of terms, the missing spellings (`is`, `=:=`, `=\=`, `->`, `\=`, `/* */`), and the documented refusals (`bagof`/`setof`, `catch`/`throw`, modules, dicts) — with a few book examples kept as checks |
 
 ## Test suite
 
-307 tests, about five seconds: 290 Catch2 cases plus 17 command-line and integration
+334 tests, about six seconds: 314 Catch2 cases plus 20 command-line and integration
 tests (seven option tests, five `--list-keywords` tests, the import-search report, the
 JSON protocol session, the formatter round-trip and the engine-limit and diagnostics
 cases).  Groups: BigInt, lexer, keywords, parser, unification, engine, every built-in
@@ -199,12 +205,13 @@ branch by branch — see `ai/task_34_builtin_branches.md`, which also lists what
 found.
 
 The front end has its own headless checks, run by hand (they need PySide6, so CI does not
-run them yet): 23 scripts in `src/gui/tests/` plus `protocol_smoke.py`.  They cover the
+run them yet): 25 scripts in `src/gui/tests/` plus `protocol_smoke.py`.  They cover the
 reserved names and the colouring rules (`test_keywords.py`, `test_tokens.py`,
 `test_highlighter.py`, `test_appearance.py`), the editor, its popup and its bars
 (`test_editor.py`, `test_completion.py`, `test_search.py`, `test_shortcuts.py`), files,
 settings and the paths of a packaged build (`test_documents.py`, `test_settings.py`,
-`test_settingsdialog.py`, `test_icons.py`, `test_paths.py`), the interpreter on the wire
+`test_settingsdialog.py`, `test_icons.py`, `test_paths.py`, `test_engines.py`), the
+interpreter on the wire
 (`test_session.py`, `test_formatter.py`), and the window itself (`test_window.py`,
 `test_queries.py`, `test_answers.py`, `test_output.py`, `test_stepping.py`,
 `test_graphics.py`, `test_reference.py`, `test_queryline.py`).
@@ -3826,7 +3833,9 @@ C++23) и в кодировке исходников (CP1251 против UTF-8)
 * он терпим к нашим запросам: `load` с `vars`, `screen` и `questions` отвечает
   `loaded`, лишние поля игнорируются — адаптер не нужен;
 * своего `--version` нет, `-s` он не понимает (`--source=ФАЙЛ`), и `--list-keywords` —
-  единственная команда, которую понимают оба;
+  единственная команда, которую понимают оба; (уточнено в части 110: короткий ключ
+  всё-таки есть — `-s=ФАЙЛ`, а вот `-s ФАЙЛ` и слитное `-sФАЙЛ` действительно
+  `Invalid argument`, как и голое имя файла);
 * **строку со символом, который не влезает в CP1251, он отбрасывает целиком**
   (`run_line` в `prologdc.cpp`): `—`, `«», »» или `…` — это `Недопустимый символ`, и
   поэтому `examples/lessons/_old/*.pld` у него не грузятся, пока тире не заменено;
@@ -3845,3 +3854,112 @@ C++23) и в кодировке исходников (CP1251 против UTF-8)
 `dist\prologd-2.3.0-win64` — **306 файлов**, 96,6 МиБ (`prologu.exe` 977 KiB,
 `prologd.exe` 455 KiB, `prologd-gui.exe` 2,4 МиБ), zip — 39 998 952 байта (38,1 МиБ),
 внутри 66 строк имён у второго движка и 130 у нашего.
+
+### 110. Кнопка смены движка (2026-10-13)
+
+Задача 79.  Окно стало **хостом двух движков**.  Наш движок («Пролог-У»,
+`prologu.exe`) и оригинальный («Пролог-Д», `prologd.exe`, собран задачей 78) — это
+разные программы с разными возможностями, и выбирать между ними нужно из одного окна,
+не открывая второго.
+
+*Возможности — таблицей, а не `if`-ами.*  Номер протокола движки не различает:
+оригинал отвечает `13`, и это подмножество нашего 13 (написано в его же
+`src/protocol.cpp`).  Поэтому разница записана один раз — в `prologd_gui/engines.py`:
+*способность* (форматирование, шаг, трасса, графика, `limits` в `load`, режим имён), а
+«кому это нужно» — там, где требование и возникает: `Action.needs` у команды,
+`settings.GATED_ROWS` у строки настроек.  Окно спрашивает таблицу в одном месте
+(`_apply_engine`): чего движок не умеет, то выключено, а подсказка говорит «Пролог-Д
+этого не умеет».  `test_engines.py` держит таблицу с двух сторон: требование, которого
+нет ни у одного движка, и способность, о которой никто не спрашивает, — обе ошибки.
+Общее у движков не тронуто: `Запустить`, `Остановить`, `НАЙТИВСЕ`, `ИМПОРТ`, а из
+пределов — «Предел времени» и «Предел вывода» (это счётчики окна, а не движка).
+
+*Нажатие останавливает — и не прогон, а сессию.*  Вежливая остановка (`interrupt`)
+оставила бы процесс живым и свободным: база знаний оригинального движка нашему не
+нужна, а события живой программы пришли бы в окно, которое уже говорит, что работает
+другой движок.  Поэтому кнопка зовёт `_stop_now` («--- движок изменён ---» в
+«Системе»), а потом меняет движок, перечитывает `--list-keywords` (66 имён против
+наших 130 — от них зависят подсветка, автодополнение и шпаргалка) и пересчитывает
+состояния пунктов.  Значком кнопка показывает, *какой движок работает сейчас*
+(`u.png` — наш, `d.png` — оригинальный): кнопка говорит, какой программе
+принадлежит панель под ней, — а подсказка называет оба сразу: «Движок: сейчас
+Пролог-У.  Нажмите, чтобы переключиться на Пролог-Д».  Если второго файла рядом
+нет, кнопка выключена и говорит, где его искали, — «нажимается впустую» она не
+бывает.  Выбор пишется в `view/engine` и переживает перезапуск окна.
+
+*Что задаёт движок.*  `engines.launch(pin, chosen)` — одно правило для `main.py`
+(который не пускает окно без файла) и для окна: `--exe` называет **папку** сборки
+(движки собираются рядом) и, если его имя — одно из двух, сам движок; иначе решает
+`view/engine`.  Строка «Выполнение → Интерпретатор» из задачи 46 **ушла** — её роль
+взяли кнопка и `--exe`, — но её значение читается и дальше
+(`Settings.legacy_interpreter`): файл, который называл другую сборку, обязан
+продолжать её называть, иначе окно молча запустило бы чужую.  Первое нажатие кнопки
+значение стирает: нажатие — ответ более новый, чем строка.
+
+*Строки настроек.*  Диалог строится из таблицы и теперь знает движок: строки, которые
+читает только наш движок (три предела, «Имена переменных», две строки экранного
+буфера), выключены, а подпись говорит, чьи они, — «Предел шагов (движок Пролог-У)».
+Подпись, а не подсказка: у выключенного виджета Qt подсказку не показывает.  Обещать
+их в строке «пределы: …» перед запуском тоже нельзя, и то, что движок не читает,
+печатается отдельной строкой: «--- Пролог-Д их не читает: «Предел шагов» 5000 — эти
+строки действуют только на Пролог-У ---».
+
+*Диалект имён — движка, а не строки.*  «Имена переменных» — это *умолчание* для
+файла, который молчит про свой диалект, и потому его ответ зависит ещё и от
+движка.  У оригинала режимов нет вовсе: он читает переменную как одну букву, а
+прописное имя без кавычек — как строковую константу, потому что это и *есть*
+старый диалект.  Значит, под ним файл без маркера надо читать, подсвечивать и
+спрашивать по-старому, иначе окно называло бы переменной имя, которое движок
+печатает строковой константой, а строка настроек была бы выключена зря.
+Умолчание живёт в буфере (`Buffer.set_fallback_variable_mode`, одно место —
+`window._default_variable_mode`), окно раздаёт его при `ready`, при смене движка
+и по «Применить» диалога; файл с маркером `:- ИМЕНА(N).` сохраняет свой режим на
+любом движке — диалект принадлежит файлу.
+
+*Про `-s` у оригинала.*  Запись 109 сказала, что короткого ключа у него нет.  Он есть,
+но требует `=`: `-s=ФАЙЛ` и `--source=ФАЙЛ` работают, а `-s ФАЙЛ`, слитное `-sФАЙЛ` и
+голое имя файла — `Invalid argument` (его `--help` печатает `-s, --source=FILE`, что
+читается как разрешение на раздельную форму).  Поправлено в `ai/conventions.md`.
+
+*Verified.*  Все сюиты `src/gui/tests` зелёные, включая новый `test_engines.py` и
+`test_window.py` (восемь новых проверок и две переписанные из задачи 46): движок
+меняется на живой программе — прогон, ожидающий ввода, останавливается первым
+нажатием; кнопка надевает значок того движка, который теперь работает; оба движка
+отвечают на один и тот же вопрос; `--exe …\prologd.exe` запускает оригинальный;
+файл без маркера читается диалектом движка, а файл с маркером сохраняет свой;
+строки диалога выключены и подписаны; выбор восстанавливается в следующем окне;
+`typst compile doc/gui.typ` без замечаний.  Сторона C++ не тронута.
+
+### 111. Приветственная программа — на любом движке (2026-10-13)
+
+Учитель заметил, что первая вкладка окна приветствует программой, которую
+оригинальный движок даже не разбирает, и предложил другую:
+
+```prolog
+% пример программы
+студент(вова, корчагин).
+студент(данил, ахмеров).
+
+?студент(И, Ф).
+```
+
+*Почему старая не годилась.*  Первая же её строка — `студент('Вова',
+'Корчагин').` — у Пролог-Д даёт `*** parse: Ошибка при разборе …` и
+`Недопустимый символ (1)`: **кавычек старый диалект не знает вовсе** (апостроф там
+приписывают к имени, чтобы получить переменную, — `Сумма'`), а `Имя` и `Фамилия`
+он прочитал бы *строковыми константами*, потому что переменная в нём — одна буква.
+Измерено: у нас старая программа отвечает `Имя=Вова`, у него — пусто и две
+диагностики.
+
+*Почему новая годится.*  Она написана в пересечении двух диалектов: атомы
+строчные и **без кавычек** (в ISO-чтении строчное имя — атом, в старом — тоже), а
+переменные **однобуквенные** (`И` и `Ф` — переменные в обоих; `Имя` было бы
+переменной только у нас).  Ответ у обоих движков один и тот же:
+`И=вова`, `Ф=корчагин`, `И=данил`, `Ф=ахмеров` — и это не на слово, а проверкой
+(`test_window.py`: программа запускается дважды, на каждом движке, и вывод
+сравнивается).
+
+*Verified.*  `test_window.py` — новая проверка зелёная рядом с остальными
+(`all window checks passed`); `doc/gui.typ` (§2 цитирует приветствие и объясняет,
+почему оно так написано) собирается без замечаний.
+

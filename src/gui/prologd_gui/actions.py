@@ -21,6 +21,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from . import engines
+
 #: The recent-files entry is a submenu, not a command: it is built by the window
 #: and named here so the icon audit sees it.
 RECENT_ICON = "file-recent"
@@ -61,6 +63,13 @@ THEME_ICON = "view-theme"
 ADD_ICON = "settings-add"
 REMOVE_ICON = "settings-remove"
 
+#: The two pictures of the engine switch (task_79): `u.png` while our own engine is
+#: the one that runs, `d.png` while the original is — the button says which program
+#: the toolbar belongs to.  Both belong to the audit: a missing file would leave the
+#: button text-only, and the one picture the user has for «which engine is this»
+#: would be gone.
+ENGINE_ICONS: tuple[str, ...] = tuple(engine.icon for engine in engines.ENGINES)
+
 #: A menu entry that is a separator or a submenu rather than an action.
 SEPARATOR = "-"
 RECENT = "recent"
@@ -75,6 +84,13 @@ RECENT = "recent"
 #: toolbar, so the marker went with it.  A size is changed by `Ctrl`+wheel and the
 #: three zoom commands, and an exact value is a row of the settings dialog.
 FORMAT_MODE = "#format-mode"
+
+#: The engine switch (task_79): a control at the *right end* of the toolbar, the
+#: counterpart of `FORMAT_MODE` — it is not a command of the program but a
+#: property of the whole window, and its picture is the engine that is running.
+#: The window builds it (`window._build_engine_button`) and finds the engines
+#: table in `engines`.
+ENGINE = "#engine"
 
 #: The appearance (task_29's dark theme): a submenu of «Вид», because a *set* of
 #: three themes is not something one checkable entry can say.  It used to be a
@@ -94,6 +110,11 @@ class Action:
     implemented: bool = True
     #: What a disabled entry waits for, verbatim in its tooltip.
     waiting_for: str = ""
+    #: The capability of the *engine* the command needs (`engines` constants,
+    #: task_79).  Empty means any engine answers it: the window disables the
+    #: entry while the current engine does not have it, and its tooltip says so
+    #: instead of letting the click go nowhere.
+    needs: str = ""
 
     def tooltip(self) -> str:
         """The whole tooltip: the title, its keys, and why it may be disabled."""
@@ -147,7 +168,8 @@ ACTIONS: tuple[Action, ...] = (
     # drawn and thrown away in task_58 — it read as something other than «clear the
     # output» — so the command went word-only until a glyph of its own arrived.
     Action("clear_output", "Очистить вывод", "execution-clear", ("Ctrl+L",)),
-    Action("format", "Форматировать", "edit-format", ("Ctrl+I",)),
+    Action("format", "Форматировать", "edit-format", ("Ctrl+I",),
+           needs=engines.FORMAT),
     # «Настройки…» was the last disabled entry that named a task file (task_29).
     # No key of its own: the menu is where it is looked for, and every `Ctrl`
     # chord on the main row belongs to the insert table of task_31.
@@ -204,9 +226,11 @@ ACTIONS: tuple[Action, ...] = (
     Action("full_screen", "Полный экран", "view-full-screen", ("F11",), checkable=True),
     # -- execution
     Action("run", "Запустить", "execution-execute", ("F5", "Ctrl+R")),
-    Action("run_trace", "Запустить с трассировкой", "execution-tracing"),
-    Action("step", "Шаг", "execution-step-into", ("F10",)),
-    Action("step_over", "Шаг с обходом", "execution-step-over", ("Shift+F10",)),
+    Action("run_trace", "Запустить с трассировкой", "execution-tracing",
+           needs=engines.TRACE),
+    Action("step", "Шаг", "execution-step-into", ("F10",), needs=engines.STEP),
+    Action("step_over", "Шаг с обходом", "execution-step-over", ("Shift+F10",),
+           needs=engines.STEP),
     Action("stop", "Остановить", "execution-abort", ("Shift+F5",)),
     Action("save_before_run", "Сохранять перед запуском", None, checkable=True),
     # The answer table (task_59): the answer of a *single* goal — a goal typed into
@@ -228,7 +252,8 @@ ACTIONS: tuple[Action, ...] = (
     # so the picture can go to a second screen and does not take space from the
     # code.  Checkable, like the output panel: its state is the window's
     # visibility, and both survive a restart (`view/graphics_visible`).
-    Action("graphics", "Графическое окно", "view-graphics", checkable=True),
+    Action("graphics", "Графическое окно", "view-graphics", checkable=True,
+           needs=engines.GRAPHICS),
     # -- help
     # The reference of a predicate (task_37): the same help picture, because it
     # is the same «справка» — only the answer comes from `doc/builtins.json`
@@ -254,6 +279,7 @@ ICON_NAMES: frozenset[str] = frozenset(
     [action.icon for action in ACTIONS if action.icon]
     + [RECENT_ICON, FIND_ICON, REPLACE_ICON, FORMAT_ICON, FILE_ICON, SAVED_ICON,
        MODIFIED_ICON, APPLICATION_ICON, THEME_ICON, ADD_ICON, REMOVE_ICON]
+    + list(ENGINE_ICONS)
 )
 
 #: The menu bar: (title, entries).  `-` is a separator, `recent` the submenu of
@@ -357,6 +383,11 @@ MENUS: tuple[tuple[str, tuple[str, ...]], ...] = (
 #: menu keeps it.  «Сохранить все» is not here either: a command that acts on every
 #: tab belongs in «Файл», and the toolbar keeps the three file buttons that act on
 #: the tab in front of the user (task_48).
+#:
+#: The engine switch (task_79) is the last control of all: it is not a command of
+#: the program but the choice of *which* program — the thing the toolbar's other
+#: buttons are about — so it stands apart, after a separator, and the eye finds it
+#: at the right edge where nothing follows it.
 TOOLBAR: tuple[str, ...] = (
     "new",
     "open",
@@ -374,6 +405,8 @@ TOOLBAR: tuple[str, ...] = (
     "graphics",
     SEPARATOR,
     "settings",
+    SEPARATOR,
+    ENGINE,
 )
 
 #: The context menu of an editor *tab* (task_68), built from the same table as

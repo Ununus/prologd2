@@ -269,16 +269,17 @@ def test_the_folder_rows_and_the_insert_page(directory: pathlib.Path) -> None:
     print("ok: the folder rows work, and the insert page lists and restores the table")
 
 
-def test_the_interpreter_and_process_directory_rows(directory: pathlib.Path) -> None:
-    """The two rows of task_46: a file chooser and a three-way choice."""
+def test_the_process_directory_rows(directory: pathlib.Path) -> None:
+    """The rows of task_46 that are left: a three-way choice each way round.
+
+    The «Интерпретатор» row that stood beside them is gone (task_79): the engine is
+    chosen by the button on the toolbar, and a *particular build* by `--exe`.  A
+    file that still holds the key is read — `Settings.legacy_interpreter` — which is
+    why the row's absence is asserted here by key and not by title.
+    """
     dialog = dialog_for(directory, "interp.ini")
     keys = {setting.key: setting for setting in settings_module.SETTINGS}
-
-    # The interpreter is a *file* row: its «…» asks for one file, not a folder.
-    field = dialog._widgets[keys["execution/interpreter"].key]
-    dialog._ask_file = lambda: "C:/проlogu/prologu.exe"
-    dialog._browse(keys["execution/interpreter"].key)
-    assert field.text() == "C:/проlogu/prologu.exe"
+    assert "execution/interpreter" not in keys, "the row is gone, not hidden"
 
     # The process directory is a choice of three, and the default is `file`.
     combo = dialog._widgets[keys["execution/process_directory"].key]
@@ -286,7 +287,39 @@ def test_the_interpreter_and_process_directory_rows(directory: pathlib.Path) -> 
     assert combo.currentData() == "file"
     values = [combo.itemData(row) for row in range(combo.count())]
     assert values == ["file", "window", "custom"], values
-    print("ok: the interpreter row asks for a file, the directory row is a three-way choice")
+    print("ok: the process directory row is a three-way choice, and the engine row is gone")
+
+
+def test_the_engine_rows_are_gated_by_the_engine(directory: pathlib.Path) -> None:
+    """Rows an engine does not read are disabled and say whose they are (task_79).
+
+    Both halves matter: a row that is editable and does nothing is a promise that
+    is not kept, and a *disabled* widget is not shown a tooltip at all — so the
+    reason has to be in the label, where it is read without hovering.
+    """
+    from prologd_gui import engines
+    from prologd_gui.settingsdialog import SettingsDialog
+
+    settings = Settings(directory / "engine.ini")
+    settings.engine = engines.ORIGINAL.key
+    dialog = SettingsDialog(settings)
+    assert dialog.windowTitle().endswith(engines.ORIGINAL.title), dialog.windowTitle()
+    for capability, keys in settings_module.GATED_ROWS.items():
+        assert not engines.ORIGINAL.has(capability), capability
+        for key in keys:
+            label = dialog._row_labels[key].text()
+            assert dialog._widgets[key].isEnabled() is False, key
+            assert label.startswith(settings_module.BY_KEY[key].label), (key, label)
+            assert engines.OURS.title in label, (key, label)
+
+    # Under our own engine every row is editable, and its label is plain again.
+    ours = SettingsDialog(Settings(directory / "ours.ini"))
+    assert ours.windowTitle().endswith(engines.OURS.title), ours.windowTitle()
+    for keys in settings_module.GATED_ROWS.values():
+        for key in keys:
+            assert ours._widgets[key].isEnabled() is True, key
+            assert ours._row_labels[key].text() == f"{settings_module.BY_KEY[key].label}:", key
+    print("ok: the engine gates its rows, and the labels say whose they are")
 
 
 def test_the_process_directory_path_follows_its_choice(directory: pathlib.Path) -> None:
@@ -382,7 +415,8 @@ def main(argv: list[str]) -> int:
         test_import_stages_a_file_and_carries_unknown_keys(directory)
         test_export_writes_a_file_another_store_can_read(directory)
         test_the_folder_rows_and_the_insert_page(directory)
-        test_the_interpreter_and_process_directory_rows(directory)
+        test_the_process_directory_rows(directory)
+        test_the_engine_rows_are_gated_by_the_engine(directory)
         test_the_process_directory_path_follows_its_choice(directory)
         test_the_button_row_and_the_shared_label_column(directory)
         test_applying_announces_itself(directory)

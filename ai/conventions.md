@@ -151,11 +151,31 @@ Tests are written **together with** the feature, never after.
   * it answers **protocol 13 as a *subset* of ours** (its own `src/protocol.cpp` says
     so), so the protocol number cannot tell the two engines apart — a capability table
     per engine is the only honest way (task_79);
-  * its command line has neither `-s` nor `--version` (`--source=FILE` is its spelling),
-    and `--list-keywords` is the one command both engines answer;
+  * its command line has no `--version`, and **every option needs the `=` form**: `--source=FILE`
+    and `-s=FILE` work, while `-s FILE`, `-sFILE` and a bare file name are all `Invalid argument`
+    (its `--help` prints `-s, --source=FILE`, which reads as if the separated form were fine — it
+    is not; measured 2026-10-13, after an earlier note got this wrong).  `--list-keywords` is the
+    one command both engines answer;
   * it maps every line it reads back to CP1251 (`run_line` in `src/prologdc.cpp`), so one
     character CP1251 cannot carry — `—`, `«`, `»`, `…` — turns the whole line into
     `Недопустимый символ`.  A file that must run on it stays ASCII plus Russian letters.
+* The **engine table** (`src/gui/prologd_gui/engines.py`, task_79) is the one place that says what an
+  engine can do, and the window asks it rather than guessing from the protocol number.  A capability
+  (`FORMAT`, `STEP`, `TRACE`, `GRAPHICS`, `LIMITS`, `NAMING`) is declared where the *demand* is —
+  `Action.needs` for a menu or toolbar entry, `settings.GATED_ROWS` for a row of the dialog — and
+  `src/gui/tests/test_engines.py` fails in both directions: a requirement no engine has, and a
+  capability no command or row asks about (prose dressed as a table).  Which engine a launch uses is
+  `engines.launch(pin, chosen)` — `--exe` (or the value task_46's removed «Интерпретатор» row still
+  holds) names the *folder* both engines are built in **and**, when its file name is one of them, the
+  engine; `view/engine` is the stored choice, written by the button at the right end of the toolbar.
+  A switch **stops the session** rather than asking the run to end: a live process belongs to the
+  engine being left, and its events would land in the output of a window that says it runs the other
+  one.  The button's picture is the engine that is *running* (`u.png` / `d.png`), so the toolbar
+  says which program it belongs to; the tooltip names the other one.  A capability also decides
+  *reading*: «Имена переменных» is a fallback for a file that declares none, so under an engine
+  without `NAMING` a marker-less file is coloured, completed and sent as the old dialect
+  (`window._default_variable_mode`, one door: `_apply_dialect`).  A file with a `:- ИМЕНА(N).`
+  first line keeps its own mode on either engine — the dialect belongs to the file.
 * Bumping the program version means moving every *live* copy of the literal — grep for the
   old number rather than trusting memory:
   * the `cli_version` test in `src/tests/CMakeLists.txt` follows by itself now: its pattern
