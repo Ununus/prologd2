@@ -26,7 +26,11 @@ Built-in predicate names are Russian and must be written with UTF-8 in string
 literals. Never split a multi-byte character.  Every built-in with a Russian name
 also has an English spelling in lower case (`НАЙТИВСЕ`/`findall`), registered from
 the one table in `builtins.cpp`; `test_aliases.cpp` fails if a Russian name has no
-row there.  A built-in is described **in `doc/builtins.json`** (one record: summary,
+row there.  That test names the exceptions one by one, and there are two kinds:
+names the engine or the parser answers (`ВЫП`/`call`, `ИМПОРТ`/`import`), and
+`ИЛИ/2` (task_83) — the word of the original dialect, kept so that programs written
+for it load; the English way to say the same thing is `first`, the alias of
+`ПЕРВОЕ`, and the old English twin `or` stays retired.  A built-in is described **in `doc/builtins.json`** (one record: summary,
 argument modes, the `help.typ` section, the English spelling) — so a new built-in is
 added to `builtins.cpp`, to the lexer's reserved set *and* to `doc/builtins.json`,
 and `src/gui/tests/test_reference.py` fails when the three disagree.  The

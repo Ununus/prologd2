@@ -126,6 +126,35 @@ TEST_CASE("the choice form commits to the first solution of its first goal") {
   REQUIRE(generator.output == "X=1\n");
 }
 
+TEST_CASE("the original dialect's or-word is the two-goal choice form") {
+  // task_83: `ИЛИ/2` is back — the word the original dialect used for «the first
+  // of two» — and it is the same behaviour, so it is worth saying what that is
+  // in the language itself.  The library definition the port inherited (and the
+  // manual prints) is `ИЛИ(X, _) :- ВЫП(X), !.` / `ИЛИ(_, X) :- ВЫП(X).`: the
+  // first goal is tried, and if it has a solution the second is never reached.
+  const auto result = runProgram(
+      "п(1).\n"
+      "п(2).\n"
+      "?ИЛИ(ЛОЖЬ, РАВНО(X, 2)).\n"
+      "?ИЛИ(РАВНО(X, 1), РАВНО(X, 2)).\n"
+      "?ИЛИ(п(X), ЛОЖЬ).\n"
+      "?ИЛИ(ЛОЖЬ, ЛОЖЬ).\n");
+  REQUIRE(result.loaded);
+  REQUIRE_FALSE(result.runtimeError);
+  REQUIRE(result.output == "X=2\nX=1\nX=1\nНЕТ\n");
+
+  // Two goals, and only two: the arity is the one the old definition had, unlike
+  // variadic `ПЕРВОЕ` — so `ИЛИ/1` and `ИЛИ/3` are load errors, not a silent
+  // failure or a different meaning.
+  const auto one = runProgram("?ИЛИ(ЛОЖЬ).\n");
+  REQUIRE_FALSE(one.loaded);
+  REQUIRE(one.error.find("ИЛИ не имеет арности 1") != std::string::npos);
+
+  const auto three = runProgram("?ИЛИ(ЛОЖЬ, ЛОЖЬ, ЛОЖЬ).\n");
+  REQUIRE_FALSE(three.loaded);
+  REQUIRE(three.error.find("ИЛИ не имеет арности 3") != std::string::npos);
+}
+
 TEST_CASE("the choice form takes any number of goals") {
   // task_51: `ПЕРВОЕ` is variadic like `ВЫВОД` — goals are tried in order, and
   // the first one that succeeds is committed to.  One goal is `ВЫП(Ц)`.

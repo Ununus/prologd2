@@ -4229,7 +4229,7 @@ def test_the_engine_button_switches_and_remembers(
         )
         # The reserved names are the engine's, and they were re-read: colouring,
         # completion and the cheat sheet are all built from them (task_78 measured
-        # the two tables — 66 names against our 130 — so an empty one is a bug).
+        # the two tables — 66 names against our 131 — so an empty one is a bug).
         now = set(window.session.keywords.all_labels())
         assert now and now != ours_names, (len(now), len(ours_names))
 

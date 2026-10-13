@@ -26,7 +26,11 @@ package was built again (part 105), and the engine's own file renamed to `prolog
 for the two-engine branch that follows (part 106), and the version raised to **2.3.0**
 with the engine taught to call itself «Пролог-У» (part 107), and the two naming modes
 of the old dialect merged into one — `2` is a spelling of `1` (part 108), and the
-original engine from `Ununus/prologd` made buildable beside ours (part 109).
+original engine from `Ununus/prologd` made buildable beside ours (part 109), and the
+window made a host of **two engines** — a switch at the end of the toolbar, and beside it
+a button for the naming mode (parts 110–112), a folder chooser that opens at the engine
+(part 113), the manual's comparison table put on a landscape page (part 114), and the
+original dialect's `ИЛИ/2` returned to the language without an English twin (part 115).
 
 ## Overall
 
@@ -187,14 +191,15 @@ entries of the session log below and in `ai/task_*.md`.
 | task_76_version_banner | done | the version is **2.3.0** and the engine calls itself «Пролог-У»: `PROLOGD_PRODUCT_NAME` sits beside `project(... VERSION ...)` and is injected through the generated `version.cpp`, *not* a `-D` macro (a non-ASCII value on the compiler's command line travels through a response file in the ANSI code page); one function, `versionBanner()`, is what both `--version` and the built-in `ВЕРСИЯ` print, so the packing script now reads the number out of that sentence instead of comparing the line |
 | task_77_naming_modes_merge | done | the naming mode has **two** values now — `Iso` (0) and `Old` (1); `2` is a *spelling* of `1` in one place per side (`variableModeFromNumber` in C++, `tokens.MODE_NUMBERS` in Python), so the marker, `--vars`, the wire and a stored setting all keep working; the settings row translates a stored `2` in *both* directions, because `set_value` answers an unknown choice with the setting's default and would have moved that reader to ISO; the mode-1 diagnostic about the apostrophe went — it advised what is now true |
 | task_78_build_with_prologd | done | `-DBUILD_WITH_PROLOGD=ON` builds a pinned commit of `Ununus/prologd` as a **nested** CMake project (`ExternalProject_Add`, not `FetchContent`: its targets `prlib` and `prologd_json` are names this tree already uses) and writes its `prologd.exe` beside ours — one command builds both. It is told to take the JSON header this tree already has, so nothing is downloaded twice; `-DPROLOGD_ENGINE_SOURCE=<a clone>` builds with no network at all |
-| task_79_engine_switch_button | done | the window is a host of two engines: a `QToolButton` at the right end of the toolbar switches between «Пролог-У» (`prologu.exe`, ours) and «Пролог-Д» (`prologd.exe`, the original) — its picture is the engine that is *running* — and the choice is `view/engine`; what a command needs of an engine is a *capability* declared once (`Action.needs`, `settings.GATED_ROWS`) and asked in one place, so the original gets no format button, no step, no trace, no graphics, no engine limits and no naming row — those are disabled with a reason, not clickable-into-nothing, and a marker-less file is read and coloured the old way under it.  A press **stops the session** first (a live process belongs to the engine being left) and re-reads `--list-keywords` (66 names against our 130); `--exe` — and the value of the removed «Интерпретатор» row, which is still read — names the folder both engines are built in, and its file name picks the engine; the first tab holds a welcome program written in the intersection of the two dialects (unquoted lower-case atoms, single-letter variables), so it answers on either engine — checked by running it twice (part 111); a second control at that end (`n.png`) carries the two naming modes with the dialog row's own labels and is disabled under the original engine (part 112) |
+| task_79_engine_switch_button | done | the window is a host of two engines: a `QToolButton` at the right end of the toolbar switches between «Пролог-У» (`prologu.exe`, ours) and «Пролог-Д» (`prologd.exe`, the original) — its picture is the engine that is *running* — and the choice is `view/engine`; what a command needs of an engine is a *capability* declared once (`Action.needs`, `settings.GATED_ROWS`) and asked in one place, so the original gets no format button, no step, no trace, no graphics, no engine limits and no naming row — those are disabled with a reason, not clickable-into-nothing, and a marker-less file is read and coloured the old way under it.  A press **stops the session** first (a live process belongs to the engine being left) and re-reads `--list-keywords` (66 names against our 131); `--exe` — and the value of the removed «Интерпретатор» row, which is still read — names the folder both engines are built in, and its file name picks the engine; the first tab holds a welcome program written in the intersection of the two dialects (unquoted lower-case atoms, single-letter variables), so it answers on either engine — checked by running it twice (part 111); a second control at that end (`n.png`) carries the two naming modes with the dialog row's own labels and is disabled under the original engine (part 112) |
 | task_80_process_directory_picker | done | the «…» of «Свой каталог процесса» opens at the folder of the *engine* (`stdlib`, `examples` and a course's files are there) or on the row's own value when it is filled; the window hands its own folder in, so a launch pinned by `--exe` opens at that tree, and the modal is now titled after the row that asked instead of «Каталог для ИМПОРТ»; the import list's «Добавить…» opens there too |
 | task_81_docs_two_languages | open | `help.typ` is retitled to Пролог-У (the language), `prologd-diff.typ` becomes the story of the two dialects, `gui.typ` says the shell hosts both engines, and the README carries the four readings of «У»; lessons and the standard library are left alone for now |
 | task_82_iso_compatibility | open | the policy (an ISO-compatible subset plus the teaching extras) and four stages: `stdlib/iso.pld`, the standard order of terms, the missing spellings (`is`, `=:=`, `=\=`, `->`, `\=`, `/* */`), and the documented refusals (`bagof`/`setof`, `catch`/`throw`, modules, dicts) — with a few book examples kept as checks |
+| task_83_ili_name | done | `ИЛИ/2` — the original dialect's word — is callable again, with the behaviour its library definition had (`ИЛИ(X, _) :- ВЫП(X), !.` and `ИЛИ(_, X) :- ВЫП(X).`), which is `ПЕРВОЕ` with two goals: one function, two names, and the arity stays 2.  It is the one built-in **without an English spelling** — `or` stays retired, `first` is the English name of `ПЕРВОЕ` — the exception `test_aliases.cpp` names.  It could not be a library clause: a name starting with a capital letter is a variable in mode 0 and a string constant in mode 1, so no `.pld` file can define it (`--list-keywords` 130 → 131) |
 
 ## Test suite
 
-334 tests, about six seconds: 314 Catch2 cases plus 20 command-line and integration
+338 tests, about six seconds: 318 Catch2 cases plus 20 command-line and integration
 tests (seven option tests, five `--list-keywords` tests, the import-search report, the
 JSON protocol session, the formatter round-trip and the engine-limit and diagnostics
 cases).  Groups: BigInt, lexer, keywords, parser, unification, engine, every built-in
@@ -4030,4 +4035,72 @@ C++23) и в кодировке исходников (CP1251 против UTF-8)
   движка и свой заголовок, а диалог с переданной папкой берёт именно её;
   `test_window.py` — диалог окна, пришпиленного к другому дереву, получает **его** папку.
   Все 25 сюит зелёные, `doc/gui.typ` собирается без замечаний.
+
+### 114. Таблица сравнения — на горизонтальной странице (2026-10-13)
+
+Просьба из чтения руководства: таблица «Сравнение с SWI-Prolog и GNU Prolog» не
+влезала по ширине.  Виной уже знакомое свойство A5: сырой текст в узкой ячейке не
+переносится, поэтому строка вроде «Операторы ISO: `=:=` `=\=`, …» распирала столбец
+за поле.
+
+* Разворачивается **одна страница, а не документ**: раздел обёрнут в
+  `#page(flipped: true)[ … ]`.  `page` задаёт свойства только той странице, которую
+  создаёт, поэтому дальше лист снова книжный — это проверено рендером, а не выведено
+  из документации: на странице 3 таблица поперёк, на странице 4 (`= 1. Основы`) уже
+  обычная.  Прежний заголовок раздела и так начинался с `pagebreak(weak: true)`, так
+  что разворот начинается ровно с заголовка.
+* Таблица обязана уместиться на этой странице **целиком**: разъехавшись на две, вторая
+  половина попала бы на книжный лист — получалось хуже, чем было.  Кегль документа
+  (10 pt) не годится: измерено, не хватает последних трёх строк, даже с плотными
+  полями.  Внутри блока стоят `set text(size: 9pt)` и `set par(leading: 0.6em)`, а
+  вертикальные поля ячеек сжаты до `inset: (x: 4pt, y: 1.5pt)`.  Полей по горизонтали
+  это не касается: теснота столбцов читается хуже, чем теснота строк.
+* Объём документа не изменился: **76 страниц** до и после (`git show HEAD:doc/help.typ`
+  собран отдельно для сравнения) — разворот забрал ширину, а не высоту.
+
+*Verified.*  `typst compile doc/help.typ` без замечаний; страницы 3 и 4 отрендерены
+(`--format png --ppi 105`) и просмотрены: таблица целиком на альбомном листе, номер
+страницы на месте, следующая страница книжная и начинается с `= 1. Основы`.
+
+### 115. Старое `ИЛИ` возвращается — без английского имени (2026-10-13)
+
+Задача 83.  `ИЛИ/2` — слово первоначального Пролог-Д, снятое в task_44, — снова
+работает, с поведением своего старого библиотечного определения.
+
+* Работа у него та же, что у `ПЕРВОЕ/2`, и это видно прямо в таблице:
+  `add("ИЛИ", 2, builtinFirst)` ведёт к той же функции.  Поведение, записанное в
+  языке, — `ИЛИ(X, _) :- ВЫП(X), !.` и `ИЛИ(_, X) :- ВЫП(X).`: первая цель даёт
+  своё первое решение, и только если решений у неё нет, берётся вторая цель.
+* Арность у старого имени осталась старой — ровно 2.  `ПЕРВОЕ` тем и отличается,
+  что принимает любое число целей (task_51), поэтому `ИЛИ/3` — не «то же самое,
+  только подольше», а ошибка загрузки: `ИЛИ не имеет арности 3 (есть 2)`.
+* Английского имени у `ИЛИ` нет — это и была просьба.  `or/2` остаётся снятым и
+  по-прежнему объясняет себя при вызове; английская запись этой формы — `first`,
+  второе имя `ПЕРВОЕ`.  В `test_aliases.cpp` исключение названо по имени — рядом с
+  двумя именами, которые отвечает не таблица диспетчеризации (`ВЫП`, `ИМПОРТ`), —
+  потому что правило «у каждого русского имени есть английское» до сих пор
+  исключений не знало.
+* Имя зарезервировано лексером (иначе в режиме 0 оно переменная, а в режиме 1
+  константа) и убрано из снятых, поэтому `--list-keywords` печатает 131 строку
+  вместо 130, а окно — дополнение, подсветка, шпаргалка — получает новое имя само:
+  имена оно берёт у движка.  Счёт «66 против наших 130» поправлен в двух
+  комментариях окна и в проверке переключения движка.
+* Библиотечным предложением это определение быть не может: имя с заглавной буквы
+  не функтор ни в одном режиме имён, поэтому два предложения из просьбы цитируются
+  в комментарии у `builtinFirst`, в руководстве (§4.6), в справочнике и в §5.4
+  технического описания — но работу выполняет таблица.
+
+*Ловушка.*  Первая редакция назвала новые случаи Catch2 по-русски, и `ctest`
+объявил все четыре упавшими, хотя сам двоичный файл с тем же фильтром отвечал «All
+tests passed»: шаг обнаружения читает вывод в кодовой странице OEM и пишет мусор в
+`prlib_tests_tests.cmake`.  Это уже записано в «Known gaps» §3 — и всё равно
+стоило времени.  Названия случаев — латиница, русские имена живут в строках.
+
+*Verified.*  `ctest` 338/338 (334 плюс четыре новых случая); 25 оконных сюит и
+`protocol_smoke.py` зелёные; `doc/help.typ`, `doc/prologd-diff.typ` и
+`doc/technical.typ` собираются без замечаний.  Руками на собранном движке:
+`?ИЛИ(ЛОЖЬ, РАВНО(X, 2)).` → `X=2`; `?ИЛИ(РАВНО(X, 1), РАВНО(X, 2)).` → `X=1`
+(второй цели не достаётся); `?ИЛИ(п(X), ЛОЖЬ).` с `п(1). п(2).` → `X=1`;
+`?ИЛИ(ЛОЖЬ, ЛОЖЬ).` → `НЕТ`; `--list-keywords` — 131 строка, в ней `ИЛИ/2`,
+`ПЕРВОЕ/+`, `first/+` и нет `or`.
 

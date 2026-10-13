@@ -150,11 +150,19 @@ BuiltinResult builtinForall(Engine& engine, std::span<const Term> args) {
 }
 
 BuiltinResult builtinFirst(Engine& engine, std::span<const Term> args) {
-  // `ПЕРВОЕ` (renamed from "ИЛИ", task_44) commits to the first solution of the
-  // first goal that has one; the full disjunction is `A ; B` (task_41).  Any
-  // positive arity, like `ВЫВОД` (task_51): one goal is «the first solution of
-  // this goal» — committed, so unlike `ВЫП(Ц)` it does not backtrack into the
-  // rest of that goal's solutions.
+  // Commits to the first solution of the first goal that has one; the full
+  // disjunction is `A ; B` (task_41).  Any positive arity, like `ВЫВОД`
+  // (task_51): one goal is «the first solution of this goal» — committed, so
+  // unlike `ВЫП(Ц)` it does not backtrack into the rest of that goal's
+  // solutions.
+  //
+  // Two names reach this loop (task_83): `ПЕРВОЕ`, the descriptive one, at any
+  // arity from one, and `ИЛИ`, the word of the original dialect, at arity two
+  // — the library definition the port inherited and the manual prints,
+  // `ИЛИ(X, _) :- ВЫП(X), !.` and `ИЛИ(_, X) :- ВЫП(X).`, which is exactly what
+  // the loop does with two arguments.  `ИЛИ` cannot be written that way *in the
+  // language*: a name starting with a capital letter is a variable in mode 0 and
+  // a string constant in mode 1, so no library file can define it.
   for (const Term& goal : args) {
     if (engine.callOnce(goal)) {
       return BuiltinResult::Continue;
@@ -320,7 +328,10 @@ BuiltinResult builtinVariablesMarker(Engine& engine, std::span<const Term> args)
 /// (`ВЫП`/`call`, handled by the solver; `ИМПОРТ`/`import`, handled by the
 /// parser) — see `keywords.cpp` and `parser.cpp`.  `ПЕРВОЕ`/`first`,
 /// `ВЫВОД`/`write` and `ВЫВОДПС`/`writeln` are here for their English spelling,
-/// but they are registered by `kVariadicNames`, not by `add`.
+/// but they are registered by `kVariadicNames`, not by `add`.  `ИЛИ` is
+/// deliberately not here (task_83): the word belongs to the original dialect,
+/// and the English way to say the same thing is `first`, the alias of `ПЕРВОЕ`
+/// (`test_aliases.cpp` allows the exception by name).
 constexpr std::pair<std::string_view, std::string_view> kEnglishNames[] = {
     {"ЛОЖЬ", "fail"},         {"ТРАССА", "trace"},
     {"НЕТ_ТРАССЫ", "no_trace"}, {"ТИХО", "quiet"},
@@ -417,6 +428,10 @@ const BuiltinTable& builtinTable() {
     add("ВЕРСИЯ", 0, builtinVersion);
     add("НЕ", 1, builtinNot);
     add("ДЛЯВСЕХ", 2, builtinForall);
+    // `ПЕРВОЕ` is variadic and lives in `kVariadicNames`; `ИЛИ` is the same
+    // behaviour under the dialect's own name, and only for two goals — that is
+    // the shape the original had (task_83).
+    add("ИЛИ", 2, builtinFirst);
     add("РАВНО", 2, builtinEqual);
     add("ПС", 0, builtinNewline);
     add("ЖДИ", 1, builtinWait);

@@ -151,19 +151,30 @@ TEST_CASE("`\\+` is one token, and a lone backslash is an error") {
 }
 
 TEST_CASE("a retired spelling is still a predicate name, not a variable") {
-  // `НАЙТИВСЁ` (with ё) and `ИЛИ` left the language (task_44); the lexer keeps
-  // them reserved so a call reaches the checks and gets a message instead of
-  // failing as an upper-case variable.
-  for (const std::string& spelling : {"НАЙТИВСЁ", "ИЛИ"}) {
-    INFO("spelling: " << spelling);
-    DiagnosticSink sink;
-    const auto tokens = lex(spelling, sink);
-    REQUIRE_FALSE(sink.hasErrors());
-    REQUIRE(tokens[0].kind == TokenKind::Identifier);
-    REQUIRE(isReservedBuiltinName(spelling));
-    // ... but they are not among the names the keyword table is built from.
-    REQUIRE(reservedBuiltinNames().count(spelling) == 0);
-  }
+  // `НАЙТИВСЁ` (with ё) left the language (task_44); the lexer keeps it
+  // reserved so a call reaches the checks and gets a hint instead of failing as
+  // an upper-case variable.
+  const std::string spelling = "НАЙТИВСЁ";
+  DiagnosticSink sink;
+  const auto tokens = lex(spelling, sink);
+  REQUIRE_FALSE(sink.hasErrors());
+  REQUIRE(tokens[0].kind == TokenKind::Identifier);
+  REQUIRE(isReservedBuiltinName(spelling));
+  // ... but it is not among the names the keyword table is built from.
+  REQUIRE(reservedBuiltinNames().count(spelling) == 0);
+}
+
+TEST_CASE("the original dialect's or-word is reserved like any other built-in") {
+  // It came back in task_83, so this time it *is* offered by the keyword table:
+  // reserved, and among the names completion and colouring are built from.
+  // (The test's own name says «or-word» rather than the word itself because a
+  // non-ASCII test *name* does not survive CMake's discovery step.)
+  DiagnosticSink sink;
+  const auto tokens = lex("ИЛИ", sink);
+  REQUIRE_FALSE(sink.hasErrors());
+  REQUIRE(tokens[0].kind == TokenKind::Identifier);
+  REQUIRE(isReservedBuiltinName("ИЛИ"));
+  REQUIRE(reservedBuiltinNames().count("ИЛИ") == 1);
 }
 
 TEST_CASE("lexer handles numbers") {

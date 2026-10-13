@@ -22,6 +22,12 @@ bool isAnsweredOutsideTheTable(std::string_view name) {
   return name == "ВЫП" || name == "ИМПОРТ";
 }
 
+/// The one built-in that has no English spelling *on purpose* (task_83): `ИЛИ`
+/// is the original dialect's word for «the first of two».  The English
+/// vocabulary for that behaviour is `ПЕРВОЕ`/`first`, and the old English twin
+/// `or` was retired in task_44 and stays retired.
+bool isDialectOnlyName(std::string_view name) { return name == "ИЛИ"; }
+
 std::string_view englishOf(std::string_view russian) {
   for (const prologd::BuiltinAlias& alias : prologd::builtinAliases()) {
     if (alias.first == russian) {
@@ -74,12 +80,26 @@ TEST_CASE("every Russian built-in has an English spelling") {
     if (!isRussianName(name)) {
       continue;
     }
-    if (isAnsweredOutsideTheTable(name)) {
-      continue;  // `ВЫП` -> `call`, `ИМПОРТ` -> `import`; asserted below
+    if (isAnsweredOutsideTheTable(name) || isDialectOnlyName(name)) {
+      continue;  // `ВЫП` -> `call`, `ИМПОРТ` -> `import`; `ИЛИ` has none by design
     }
     INFO("built-in without an English spelling: " << name);
     REQUIRE_FALSE(englishOf(name).empty());
   }
+}
+
+TEST_CASE("the original dialect's or-word is the two-goal spelling of the choice form") {
+  // task_83: the name of the original dialect is callable again, and the English
+  // one stays out.  Only the shape is checked here; the behaviour is in
+  // `test_builtins_control.cpp`.
+  REQUIRE(prologd::isReservedBuiltinName("ИЛИ"));
+  REQUIRE(englishOf("ИЛИ").empty());
+  REQUIRE(prologd::findBuiltin("or", 2) == nullptr);
+  REQUIRE(prologd::builtinArities("ИЛИ").arities == std::vector<std::size_t>{2});
+  REQUIRE_FALSE(prologd::builtinArities("ИЛИ").variadic);
+  REQUIRE(prologd::findBuiltin("ИЛИ", 2) == prologd::findBuiltin("ПЕРВОЕ", 2));
+  REQUIRE(prologd::findBuiltin("ИЛИ", 1) == nullptr);
+  REQUIRE(prologd::findBuiltin("ИЛИ", 3) == nullptr);
 }
 
 TEST_CASE("the English surface works from a program") {

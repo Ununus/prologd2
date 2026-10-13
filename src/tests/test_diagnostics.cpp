@@ -197,11 +197,11 @@ TEST_CASE("the retired findall spelling suggests the current one") {
 }
 
 TEST_CASE("a retired name says what to write instead") {
-  // `ИЛИ` was renamed to `ПЕРВОЕ` (task_44): the name is gone, so the load
-  // fails with a message that names the replacement — the same kind of break as
-  // the `;` terminator (task_41), and for the same reason: the old spelling
-  // reads like something it never was.
-  const std::vector<PrologError> diagnostics = diagnosticsOf("?ИЛИ(ЛОЖЬ, ЛОЖЬ).\n");
+  // `or` was the English spelling of `ИЛИ` and left the language with it
+  // (task_44); the English vocabulary for the behaviour is `first`, the alias of
+  // `ПЕРВОЕ`.  Unlike a name that was never in the language, this one is an
+  // error with a message: the reader has nowhere else to learn what `or` meant.
+  const std::vector<PrologError> diagnostics = diagnosticsOf("?or(ЛОЖЬ, ЛОЖЬ).\n");
   REQUIRE(diagnostics.size() == 1);
   const PrologError& error = diagnostics.front();
   REQUIRE(error.code == ErrorCode::UnknownPredicate);
@@ -210,7 +210,18 @@ TEST_CASE("a retired name says what to write instead") {
   REQUIRE(error.location.line == 1);
   REQUIRE(error.location.column == 2);  // the goal, not the `?`
   REQUIRE(error.message ==
-          "«ИЛИ» переименовано: теперь это «ПЕРВОЕ(Ц1, Ц2)», а дизъюнкция — «A ; B»");
+          "«or» переименовано: теперь это «first(Ц1, Ц2)», а дизъюнкция — «A ; B»");
+}
+
+TEST_CASE("the original dialect's or-word loads, and its two arguments are goals") {
+  // task_83: the Russian word is callable again, so nothing is said about the
+  // call itself...
+  REQUIRE(diagnosticsOf("?ИЛИ(ЛОЖЬ, ЛОЖЬ).\n").empty());
+  // ...and both arguments are reached as goals, the way `ПЕРВОЕ`'s are: a name
+  // inside one of them is checked, not taken for an opaque term.
+  const std::vector<PrologError> diagnostics = diagnosticsOf("?ИЛИ(члены(Х), ЛОЖЬ).\n");
+  REQUIRE(diagnostics.size() == 1);
+  REQUIRE(diagnostics.front().message.find("не найдено: члены/1") == 0);
 }
 
 TEST_CASE("an arity a user predicate does not have lists the ones it has") {

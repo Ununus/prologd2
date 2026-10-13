@@ -625,7 +625,7 @@ class MainWindow(QMainWindow):
         touched — a build tree is where both of them lie — and the value task_46's
         removed row left in the file is dropped, because otherwise it would name
         the engine again on the next start and outlive the click.  The reserved names are re-read as well: the two engines answer
-        `--list-keywords` with different tables (66 names against our 130), and
+        `--list-keywords` with different tables (66 names against our 131), and
         completion, colouring and the cheat sheet are all built from them.
         """
         if self._session.is_running():
@@ -3691,7 +3691,7 @@ class MainWindow(QMainWindow):
         One door for the two places they change: the engine that answered `ready`
         (task_50), and the switch of task_79, where the same window starts talking
         to another engine — whose table is not the same one (66 names against our
-        130), so colouring, completion and the cheat sheet have to be rebuilt.
+        131), so colouring, completion and the cheat sheet have to be rebuilt.
 
         The dialect a marker-less file is read in travels with them: it is the
         engine's, not the row's, and it changes at the same moment.

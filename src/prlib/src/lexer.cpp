@@ -15,8 +15,12 @@ const std::unordered_set<std::string> kReservedBuiltins = {
     "ИМЕНА",
     "variables",
     // Control / logic, with the English spelling of each name (task_39).
-    "ЛОЖЬ", "ТРАССА", "НЕТ_ТРАССЫ", "ВЫП", "НЕ", "ДЛЯВСЕХ", "ПЕРВОЕ", "РАВНО",
-    "ТИХО", "ВЕРСИЯ", "ПС",
+    // `ИЛИ` is the one name here without an English twin: it is the word of the
+    // original dialect, kept for the programs written for it, and its English
+    // spelling `or` stays retired (task_44) — the English vocabulary is
+    // `ПЕРВОЕ`/`first` (task_83).
+    "ЛОЖЬ", "ТРАССА", "НЕТ_ТРАССЫ", "ВЫП", "НЕ", "ДЛЯВСЕХ", "ПЕРВОЕ", "ИЛИ",
+    "РАВНО", "ТИХО", "ВЕРСИЯ", "ПС",
     "fail", "trace", "no_trace", "call", "not", "forall", "first", "equal",
     "quiet", "version", "nl",
     // Arithmetic
@@ -56,9 +60,6 @@ const std::unordered_set<std::string> kRetiredBuiltinNames = {
     // The ported help spelled findall with ё for a while; the original manual
     // and the task spelled it without.
     "НАЙТИВСЁ",
-    // `ИЛИ` reads like a disjunction, which it never was: it commits to the
-    // first solution of its first goal.  Renamed to `ПЕРВОЕ` (task_44).
-    "ИЛИ",
 };
 
 /// Operator spellings borrowed from other Prologs that this dialect does not

@@ -157,8 +157,9 @@ struct RetiredName {
 };
 
 constexpr RetiredName kRetiredNames[] = {
-    {"ИЛИ", 2,
-     "«ИЛИ» переименовано: теперь это «ПЕРВОЕ(Ц1, Ц2)», а дизъюнкция — «A ; B»"},
+    // `ИЛИ` was retired here in task_44 and came back in task_83 as a built-in
+    // of arity two; the *English* spelling stays out of the language, because
+    // the English name for this behaviour is `first`.
     {"or", 2,
      "«or» переименовано: теперь это «first(Ц1, Ц2)», а дизъюнкция — «A ; B»"},
 };
@@ -259,7 +260,7 @@ void walkGoal(const Term& goal, const SourceLocation& location,
     visit(name, 2, location);
     return;
   }
-  if ((name == "ПЕРВОЕ" || name == "first") && arity == 2) {
+  if ((name == "ПЕРВОЕ" || name == "first" || name == "ИЛИ") && arity == 2) {
     walkGoal(args[0], location, visit);
     walkGoal(args[1], location, visit);
     visit(name, 2, location);

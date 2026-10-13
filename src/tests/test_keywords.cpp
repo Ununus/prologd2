@@ -164,9 +164,17 @@ TEST_CASE("a retired name is not offered, its replacement is") {
   // The spellings the language has retired stay reserved for the lexer (so an
   // old call gets a message instead of becoming a variable), but the keyword
   // table — completion, colouring, `--list-keywords` — must not show them.
-  REQUIRE(findKeyword(keywords, "ИЛИ") == nullptr);
   REQUIRE(findKeyword(keywords, "or") == nullptr);
   REQUIRE(findKeyword(keywords, "НАЙТИВСЁ") == nullptr);
-  REQUIRE(prologd::isReservedBuiltinName("ИЛИ"));
   REQUIRE(prologd::isReservedBuiltinName("НАЙТИВСЁ"));
+
+  // `ИЛИ` is not retired any more (task_83): the dialect's word works again and
+  // is offered — reserved, arity two, not variadic, the shape the old library
+  // definition had.  The one thing that did *not* come back is its English
+  // spelling, `or`.
+  const prologd::KeywordInfo* ili = findKeyword(keywords, "ИЛИ");
+  REQUIRE(ili != nullptr);
+  REQUIRE(ili->kind == prologd::KeywordKind::Predicate);
+  REQUIRE(ili->arities == std::vector<std::size_t>{2});
+  REQUIRE_FALSE(ili->variadic);
 }
