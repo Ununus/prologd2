@@ -228,14 +228,14 @@ def test_the_folder_rows_and_the_insert_page(directory: pathlib.Path) -> None:
     dialog = dialog_for(directory, "folders.ini")
     keys = {setting.key: setting for setting in settings_module.SETTINGS}
     editor = dialog._widgets[keys["execution/import_paths"].key]
-    dialog._ask_directory = lambda: "C:/курс"
+    dialog._ask_directory = lambda *_args: "C:/курс"
 
     add, remove = editor.buttons()
     assert add.icon().isNull() is False, "«Добавить…» lost its picture"
     assert remove.icon().isNull() is False, "«Убрать» lost its picture"
     add.click()
     add.click()  # the same folder twice: the list keeps one
-    dialog._ask_directory = lambda: None
+    dialog._ask_directory = lambda *_args: None
     add.click()
     assert editor.paths() == ["C:/курс"], editor.paths()
     # A long path is read from its *end* (part 88): the folder that was added is
@@ -252,7 +252,7 @@ def test_the_folder_rows_and_the_insert_page(directory: pathlib.Path) -> None:
 
     # The process folder is a plain field with a «…» button beside it.
     field = dialog._widgets[keys["execution/process_directory_path"].key]
-    dialog._ask_directory = lambda: "C:/общие"
+    dialog._ask_directory = lambda *_args: "C:/общие"
     dialog._browse(keys["execution/process_directory_path"].key)
     assert field.text() == "C:/общие"
 
@@ -369,6 +369,48 @@ def test_applying_announces_itself(directory: pathlib.Path) -> None:
     print("ok: «Применить», «ОК» and the built-in table announce themselves, «Отмена» does not")
 
 
+def test_the_folder_chooser_opens_at_the_engine(directory: pathlib.Path) -> None:
+    """task_80: «…» opens where the engine is, or on the row's own value.
+
+    The task's own shape of check: the button is not pressed at all — the *value* the
+    chooser is handed is what is asked about, and the modal itself is replaced (a real
+    `QFileDialog` would hang a headless run).
+    """
+    from prologd_gui import paths
+    from prologd_gui.settingsdialog import SettingsDialog
+
+    settings = Settings(directory / "picker.ini")
+    dialog = SettingsDialog(settings)
+    engine = str(pathlib.Path(paths.interpreter()).parent)
+    assert dialog._engine_directory == engine, dialog._engine_directory
+
+    seen: list[tuple[str, str]] = []
+    dialog._ask_directory = lambda start, title: seen.append((start, title)) or ""
+    key = settings_module.PROCESS_DIRECTORY_PATH
+    field = dialog._widgets[key]
+    dialog._browse(key)
+    assert seen == [(engine, settings_module.BY_KEY[key].label)], seen
+
+    # A filled row is the user's answer to «where»: the chooser opens on it, and the
+    # modal is titled after the row rather than after the first row that needed it.
+    field.setText("C:/курс")
+    dialog._browse(key)
+    assert seen[-1][0] == "C:/курс", seen
+
+    # The window hands its own folder: a launch may be pinned to another build tree.
+    pinned = str(directory / "сборка")
+    assert SettingsDialog(settings, None, None, pinned)._engine_directory == pinned
+
+    # The list of «Дополнительные каталоги ИМПОРТ» has no field to read a start from,
+    # and opens at the engine as well — `examples/lib` and `stdlib` are there.
+    editor = dialog._widgets[settings_module.IMPORT_PATHS]
+    add, _remove = editor.buttons()
+    seen.clear()
+    add.click()
+    assert seen == [(engine, "Каталог для ИМПОРТ")], seen
+    print("ok: the folder chooser opens at the engine, or on the filled row")
+
+
 def test_the_button_row_and_the_shared_label_column(directory: pathlib.Path) -> None:
     """Where the buttons sit, and that the fields line up on every page.
 
@@ -418,6 +460,7 @@ def main(argv: list[str]) -> int:
         test_the_process_directory_rows(directory)
         test_the_engine_rows_are_gated_by_the_engine(directory)
         test_the_process_directory_path_follows_its_choice(directory)
+        test_the_folder_chooser_opens_at_the_engine(directory)
         test_the_button_row_and_the_shared_label_column(directory)
         test_applying_announces_itself(directory)
     del application

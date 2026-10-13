@@ -4461,6 +4461,9 @@ def test_the_settings_dialog_follows_the_engine_that_runs(
             for keys in settings_module.GATED_ROWS.values():
                 for key in keys:
                     assert dialog._widgets[key].isEnabled() is False, key
+            # The choosers open where *this* window's engine is (task_80), which is
+            # the folder it was pinned to and not the one a plain search would find.
+            assert dialog._engine_directory == str(folder), dialog._engine_directory
             return False
 
         window._run_settings_dialog = drive

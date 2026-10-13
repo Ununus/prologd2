@@ -954,6 +954,16 @@ can be handed out to a class.
 packaged build reads `gui.ini` beside the window instead), and
 a value that cannot be read falls back to its default instead of taking the
 window down.
+* **The choosers open somewhere sensible** (task_80).  «Импорт…» and «Экспорт…» are
+about a file the user made, and they open at the remembered `last_directory` (or the
+home folder).  The *folder* choosers — the «…» of «Свой каталог процесса» and
+«Добавить…» of «Дополнительные каталоги ИМПОРТ» — are about where the *programs*
+are, and open at the folder of the engine: `stdlib`, `examples` and a course's own
+files live there.  A `directory` row that already names a folder opens on its own
+value, and the modal is titled after the row that asked (one chooser serves them all,
+and it used to say «Каталог для ИМПОРТ» for every one of them).  The window hands its
+own folder in (`SettingsDialog(..., engine_directory=…)`), because a launch can be
+pinned to another build tree by `--exe`.
 
 The split of the two font sizes is the one place where an old file behaves
 differently from a new one: `output/font_size` unset means «follow the editor»,

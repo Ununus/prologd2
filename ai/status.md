@@ -188,7 +188,7 @@ entries of the session log below and in `ai/task_*.md`.
 | task_77_naming_modes_merge | done | the naming mode has **two** values now — `Iso` (0) and `Old` (1); `2` is a *spelling* of `1` in one place per side (`variableModeFromNumber` in C++, `tokens.MODE_NUMBERS` in Python), so the marker, `--vars`, the wire and a stored setting all keep working; the settings row translates a stored `2` in *both* directions, because `set_value` answers an unknown choice with the setting's default and would have moved that reader to ISO; the mode-1 diagnostic about the apostrophe went — it advised what is now true |
 | task_78_build_with_prologd | done | `-DBUILD_WITH_PROLOGD=ON` builds a pinned commit of `Ununus/prologd` as a **nested** CMake project (`ExternalProject_Add`, not `FetchContent`: its targets `prlib` and `prologd_json` are names this tree already uses) and writes its `prologd.exe` beside ours — one command builds both. It is told to take the JSON header this tree already has, so nothing is downloaded twice; `-DPROLOGD_ENGINE_SOURCE=<a clone>` builds with no network at all |
 | task_79_engine_switch_button | done | the window is a host of two engines: a `QToolButton` at the right end of the toolbar switches between «Пролог-У» (`prologu.exe`, ours) and «Пролог-Д» (`prologd.exe`, the original) — its picture is the engine that is *running* — and the choice is `view/engine`; what a command needs of an engine is a *capability* declared once (`Action.needs`, `settings.GATED_ROWS`) and asked in one place, so the original gets no format button, no step, no trace, no graphics, no engine limits and no naming row — those are disabled with a reason, not clickable-into-nothing, and a marker-less file is read and coloured the old way under it.  A press **stops the session** first (a live process belongs to the engine being left) and re-reads `--list-keywords` (66 names against our 130); `--exe` — and the value of the removed «Интерпретатор» row, which is still read — names the folder both engines are built in, and its file name picks the engine; the first tab holds a welcome program written in the intersection of the two dialects (unquoted lower-case atoms, single-letter variables), so it answers on either engine — checked by running it twice (part 111); a second control at that end (`n.png`) carries the two naming modes with the dialog row's own labels and is disabled under the original engine (part 112) |
-| task_80_process_directory_picker | open | the `...` button of «Свой каталог процесса» opens at the interpreter's own directory instead of wherever it happened to start |
+| task_80_process_directory_picker | done | the «…» of «Свой каталог процесса» opens at the folder of the *engine* (`stdlib`, `examples` and a course's files are there) or on the row's own value when it is filled; the window hands its own folder in, so a launch pinned by `--exe` opens at that tree, and the modal is now titled after the row that asked instead of «Каталог для ИМПОРТ»; the import list's «Добавить…» opens there too |
 | task_81_docs_two_languages | open | `help.typ` is retitled to Пролог-У (the language), `prologd-diff.typ` becomes the story of the two dialects, `gui.typ` says the shell hosts both engines, and the README carries the four readings of «У»; lessons and the standard library are left alone for now |
 | task_82_iso_compatibility | open | the policy (an ISO-compatible subset plus the teaching extras) and four stages: `stdlib/iso.pld`, the standard order of terms, the missing spellings (`is`, `=:=`, `=\=`, `->`, `\=`, `/* */`), and the documented refusals (`bagof`/`setof`, `catch`/`throw`, modules, dicts) — with a few book examples kept as checks |
 
@@ -3997,4 +3997,37 @@ C++23) и в кодировке исходников (CP1251 против UTF-8)
 строки, переключает режим и убеждается, что буфер и настройка следуют, а под Пролог-Д
 кнопка выключена и говорит почему; `test_icons.py` требует файл `n.png` (он есть).
 Все 25 сюит зелёные, `doc/gui.typ` собирается без замечаний.
+
+### 113. «…» открывает выбор у движка (2026-10-13)
+
+Задача 80.  Диалог выбора каталога у строки «Свой каталог процесса» открывался там,
+где ему вздумается — на запомненном `last_directory`, а без него в домашнем каталоге, —
+а нужен там, где лежат программы: `stdlib`, `examples` и файлы курса рядом с движком.
+
+* Стартовый каталог считает `SettingsDialog._directory_start(key)`: **значение самой
+  строки**, если оно не пусто (это ответ пользователя на вопрос «где», и следующая
+  папка скорее всего рядом), иначе — папка движка.  Папку окно передаёт *свою*
+  (`SettingsDialog(..., engine_directory=…)`), потому что запуск может быть пришпилен к
+  другому дереву (`--exe`); диалог, построенный сам по себе, спрашивает
+  `paths.interpreter()` — тот же поиск, что и окно.
+* `last_directory` для папок нарочно больше не спрашивается: он принадлежит *файловым*
+  выборам («Импорт…» и «Экспорт…» настроек — они про файл, который сделал
+  пользователь, а не про то, где лежат программы).
+* Заодно у той же кнопки был неверный заголовок: одна заготовка `_ask_directory`
+  обслуживала и «Дополнительные каталоги ИМПОРТ», и «Свой каталог процесса», поэтому
+  выбор каталога процесса открывался с заголовком «Каталог для ИМПОРТ».  Теперь
+  заголовок — название строки, которая спросила, а у списка ИМПОРТ остались его
+  собственные слова.
+* Список «Дополнительные каталоги ИМПОРТ» («Добавить…») открывается там же: у него нет
+  своего поля, из которого можно взять старт, а `examples/lib` и `stdlib` лежат рядом с
+  движком — тот же случай, о котором задача и говорит.
+* Заготовки обоих выборов теперь принимают старт и заголовок, и тесты подменяют их,
+  *смотря на переданное значение* — саму модалку не открывают (модалка в headless-прогоне
+  висит, а не падает; это правило проекта).
+
+*Verified.*  `test_settingsdialog.py` — новая проверка `test_the_folder_chooser_opens_at_the_engine`:
+  «…» получает папку движка, заполненная строка — своё значение, список ИМПОРТ — папку
+  движка и свой заголовок, а диалог с переданной папкой берёт именно её;
+  `test_window.py` — диалог окна, пришпиленного к другому дереву, получает **его** папку.
+  Все 25 сюит зелёные, `doc/gui.typ` собирается без замечаний.
 

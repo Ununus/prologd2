@@ -59,6 +59,7 @@ from PySide6.QtWidgets import (
 
 from . import actions, assets
 from . import engines
+from . import paths
 from . import settings as settings_module
 from . import shortcuts
 from . import theme as theme_module
@@ -231,6 +232,7 @@ class SettingsDialog(QDialog):
         settings: settings_module.Settings,
         parent: QWidget | None = None,
         engine: engines.Engine | None = None,
+        engine_directory: str = "",
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Настройки")
@@ -241,6 +243,15 @@ class SettingsDialog(QDialog):
         #: differ from it for one launch (`--exe`, and the removed «Интерпретатор»
         #: row), and the rows must follow the engine that runs.
         self._engine = engine or engines.by_key(settings.engine)
+        #: Where a *folder* chooser opens when its row says nothing (task_80): the
+        #: folder of the engine — `stdlib`, the examples and a course's own files lie
+        #: there, and «свой каталог процесса» is a folder beside the interpreter in
+        #: nine cases out of ten.  The window passes its own, because a launch may be
+        #: pinned to another build tree (`--exe`); a dialog built on its own asks
+        #: `paths`, the same search the window makes.
+        self._engine_directory = str(engine_directory or "") or str(
+            pathlib.Path(paths.interpreter()).parent
+        )
         self._applied = False
         #: An imported file that has not been applied yet.  «Отмена» drops it.
         self._staged: dict[str, object] = {}
@@ -427,7 +438,16 @@ class SettingsDialog(QDialog):
             # dialog (`_ask_directory`), and a bound method captured here would
             # keep pointing at the real `QFileDialog` — which is modal, and a
             # modal box in a headless run hangs the test instead of failing it.
-            return PathListEditor(lambda: self._ask_directory(), self)
+            # A `dirs` row has no field to read a start from, so it opens at the
+            # folder of the engine (`_directory_start`), where a course's examples
+            # and `stdlib` live (task_80).
+            return PathListEditor(
+                lambda: self._ask_directory(
+                    self._directory_start(settings_module.IMPORT_PATHS),
+                    "Каталог для ИМПОРТ",
+                ),
+                self,
+            )
         return QLineEdit(self)
 
     def _with_browse(self, setting: settings_module.Setting, field: QWidget) -> QWidget:
@@ -855,19 +875,49 @@ class SettingsDialog(QDialog):
         )
         return path or None
 
-    def _ask_directory(self) -> str | None:
+    def _ask_directory(self, start: str = "", title: str = "Каталог") -> str | None:
+        """The folder chooser of a `directory`/`dirs` row (task_46, task_80).
+
+        `start` is where it opens and `title` names the row that asked: one chooser
+        serves several rows, and the modal for «Свой каталог процесса» used to be
+        titled «Каталог для ИМПОРТ» — the title of the first row that needed it.
+        """
         chosen = QFileDialog.getExistingDirectory(
-            self, "Каталог для ИМПОРТ", str(self._start_directory())
+            self, title, start or str(self._start_directory())
         )
         return chosen or None
 
-    def _ask_file(self) -> str | None:
-        """The chooser of the interpreter row (task_46): one executable."""
+    def _ask_file(self, start: str = "", title: str = "Файл") -> str | None:
+        """The chooser of a `file` row (task_46's interpreter row, since removed).
+
+        No record asks for a file any more (`execution/interpreter` left with
+        task_79), but the `kind` is still part of the table's vocabulary, and a seam
+        without a caller is cheaper than a kind that cannot be browsed.
+        """
         path, _ = QFileDialog.getOpenFileName(
-            self, "Интерпретатор", str(self._start_directory()),
+            self, title, start or str(self._start_directory()),
             "Исполняемый файл (*.exe);;Все файлы (*)",
         )
         return path or None
+
+    def _directory_start(self, key: str) -> str:
+        """Where the folder chooser opens for the row `key` (task_80).
+
+        The row's own value comes first: a filled row is the user's answer to «where»,
+        and it is also where the next folder is most likely to be.  Otherwise the
+        folder of the engine — opening at the home directory (what the *file*
+        choosers still do) made the user walk to the build tree by hand every time.
+
+        The remembered `last_directory` is deliberately not consulted here: it belongs
+        to importing and exporting settings, which are about a file the user made
+        rather than about where the programs are.
+        """
+        widget = self._widgets.get(key)
+        if isinstance(widget, QLineEdit):
+            typed = widget.text().strip()
+            if typed:
+                return typed
+        return self._engine_directory
 
     def _start_directory(self) -> pathlib.Path:
         remembered = self._settings.last_directory
@@ -876,8 +926,18 @@ class SettingsDialog(QDialog):
         return pathlib.Path.home()
 
     def _browse(self, key: str) -> None:
+        """The «…» button of a path row: ask, then put the answer in the field.
+
+        The chooser is handed the folder to open at (task_80) and the row's own name,
+        so the modal says what it is asking for.
+        """
         setting = settings_module.BY_KEY[key]
-        chosen = self._ask_file() if setting.kind == "file" else self._ask_directory()
+        start = self._directory_start(key)
+        chosen = (
+            self._ask_file(start, setting.label)
+            if setting.kind == "file"
+            else self._ask_directory(start, setting.label)
+        )
         widget = self._widgets.get(key)
         if chosen and isinstance(widget, QLineEdit):
             widget.setText(chosen)

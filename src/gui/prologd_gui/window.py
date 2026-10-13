@@ -3796,7 +3796,14 @@ class MainWindow(QMainWindow):
         replaceable method: a modal box hangs a headless test instead of failing
         it, and the settings are not worth breaking that rule for.
         """
-        dialog = settingsdialog.SettingsDialog(self._settings, self, self._engine)
+        dialog = settingsdialog.SettingsDialog(
+            self._settings,
+            self,
+            self._engine,
+            # The choosers of the dialog open where the engine is (task_80) — and the
+            # window is the one that knows *which* engine, folders and all.
+            engine_directory=str(pathlib.Path(self._interpreter_path()).parent),
+        )
         # «Применить» must be *visible*: the window behind a modal dialog still
         # paints, so the dialog says «written» and the window re-reads the store
         # right then, instead of waiting for the dialog to close.
