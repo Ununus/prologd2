@@ -714,13 +714,15 @@ Undo, redo, «Запустить» and «Остановить» follow the *stat
 interpreter is **two** things, not one: the process can be up and idle, and a
 computation can be in flight in it.  «Запустить» needs the second — a run in
 flight is not started twice, and the answer frees the button so that the next
-press restarts the whole file — while «Остановить» needs the first, because a live
-interpreter holds a knowledge base and unloading it is a stop of its own (the note
-says `--- база знаний выгружена ---`; a computation that was interrupted gets
-`--- остановлено ---`).  Stopping a *run* is polite first: the session is asked to
+press restarts the whole file — while «Остановить» is lit for the *run*: an idle
+interpreter with a base loaded leaves it dark (task_87 — a lit button reads as «the
+program is looping», and the next start loads the base again anyway, so there is
+nothing to stop in that state; the command `stop_program` still unloads an idle
+interpreter when a caller asks for it).  An interrupted run therefore gets its
+`--- остановлено ---` and leaves the interpreter idle *with* its base.  Stopping a
+*run* is polite first: the session is asked to
 end the query (`interrupt`), and the process is taken down only if the interpreter
-has not finished on its own within `STOP_GRACE_MS` (500 ms) — so an interrupted run
-leaves the interpreter idle *with* its base, and the next press unloads it.  A
+has not finished on its own within `STOP_GRACE_MS` (500 ms).  A
 window the user has only opened starts **no**
 interpreter: the session comes up with the first run or with a goal typed into the
 query line, which is also what makes «Остановить» dead until then.  A goal typed

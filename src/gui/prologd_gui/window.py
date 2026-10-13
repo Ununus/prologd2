@@ -1173,8 +1173,12 @@ class MainWindow(QMainWindow):
 
         `Запустить` is for a computation that is not in flight — it restarts the
         whole file, whether the interpreter is idle with a base loaded or gone
-        altogether.  `Остановить` is for a live process: stopping an idle one is
-        how the knowledge base is unloaded, which is what its message says.
+        altogether.  `Остановить` is for a run in flight and for nothing else
+        (task_87): an idle interpreter with a base loaded used to keep it lit, and
+        a lit stop button reads as «the program is looping».  The next start loads
+        the base again, so that state has nothing to stop — the command itself
+        still knows the other meaning (`stop_program`), it is only the button that
+        no longer offers it.
 
         The deadline of a run (task_46) is dropped here as well: every path that
         ends a run comes through this method, and a timer that outlived its run
@@ -1191,7 +1195,8 @@ class MainWindow(QMainWindow):
         # flag, which the flag ordering of `run_program` then fixed.)
         free = not self._busy or self._session.paused()
         self._actions["run"].setEnabled(free)
-        self._actions["stop"].setEnabled(self._session.is_running())
+        # A run in flight, and nothing else: see the docstring above.
+        self._actions["stop"].setEnabled(self._busy)
         # A step and a traced run need a second thing beyond a program that may be
         # started: an engine that answers the request (task_79).  «Запустить» above
         # is deliberately not gated — running a program is what both engines do.
@@ -2780,7 +2785,10 @@ class MainWindow(QMainWindow):
         it always did.
 
         An idle interpreter with a base loaded is the other meaning: stopping
-        *it* unloads the base, and that is the one case that is immediate.
+        *it* unloads the base, and that is the one case that is immediate.  The
+        two-state button no longer reaches this branch (task_87 — it is dark while
+        no run is in flight, and the next start loads the base again); the command
+        keeps it for a caller that does want to unload.
         """
         if not self._session.is_running():
             self._status.setText("интерпретатор уже остановлен")

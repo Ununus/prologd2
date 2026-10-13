@@ -1006,11 +1006,13 @@ def test_the_run_state_drives_the_buttons(executable: str) -> None:
     """Two states, not one: the process can be *up and idle*, and a run can be
     *in flight*.
 
-    `Запустить` needs the second (there is nothing to start while a computation is
-    running, and it is what restarts the whole file), `Остановить` the first — a
-    live interpreter holds a knowledge base, and unloading it is a stop of its own.
-    A window the user has only opened has nothing running at all, which is what the
-    startup state wrongly said it had.
+    `Запустить` needs a computation that is not in flight (there is nothing to
+    start while one is running, and it is what restarts the whole file), while
+    `Остановить` is lit for the run itself and dark for an idle interpreter with a
+    base loaded (task_87): a lit button reads as «the program is looping», and the
+    base is loaded again by the next start, so there is nothing to stop.  A window
+    the user has only opened has nothing running at all, which is what the startup
+    state wrongly said it had.
     """
     window = make_window(executable, ready=False)
     try:
@@ -1026,24 +1028,21 @@ def test_the_run_state_drives_the_buttons(executable: str) -> None:
         assert window._actions["stop"].isEnabled() is True
         assert pump(window, lambda: "решение" in window.status_text()), window.status_text()
 
-        # The answer frees `Запустить`; the process is up and the base is loaded.
+        # The answer frees `Запустить` and *darkens* `Остановить`: the process is up
+        # with its base, but a run is not what is going on.
         assert window._actions["run"].isEnabled() is True, "the answer frees the button"
-        assert window._actions["stop"].isEnabled() is True, "the process is still up"
+        assert window._actions["stop"].isEnabled() is False, "the run is over"
         assert "база знаний загружена" in window._details.text(), window._details.text()
 
-        # Stopping an *idle* interpreter unloads the knowledge base ...
-        window._actions["stop"].trigger()
-        assert window.session.is_running() is False
-        assert window._actions["run"].isEnabled() is True
-        assert window._actions["stop"].isEnabled() is False
-        assert "--- база знаний выгружена ---" in window.system_text(), window.system_text()
-
-        # ... while stopping a computation in flight is asked politely first and
-        # ends on the deadline when nobody is reading (a load runs to its end
-        # before the request can be read — see the window test below for the case
-        # where the request *is* read: a read waiting for input).
+        # The base is still there and the next start loads it again — which is why
+        # leaving that button dark costs nothing.
         window._actions["run"].trigger()
-        assert window._actions["stop"].isEnabled() is True
+        assert window._actions["stop"].isEnabled() is True, "a new run lights it again"
+
+        # Stopping a computation in flight is asked politely first and ends on the
+        # deadline when nobody is reading (a load runs to its end before the request
+        # can be read — see the window test below for the case where the request *is*
+        # read: a read waiting for input).
         window._actions["stop"].trigger()
         assert pump(window, lambda: "--- остановлено ---" in window.system_text()), (
             window.system_text()
@@ -1059,8 +1058,8 @@ def test_stopping_a_query_asks_first_and_keeps_the_base(executable: str) -> None
     The solver reads the interrupt at every step of its loop, so a query that
     *waits* — for input, the clearest case — ends on the request: the pane says
     `--- остановлено ---`, and the interpreter is left idle with its knowledge
-    base.  Stopping that idle session is a different act and unloads it; the
-    deadline (`STOP_GRACE_MS`) covers the one state a request cannot reach.
+    base.  That state leaves the button dark (task_87): there is no run left to
+    stop, and the base is loaded again by the next start.
     """
     window = empty_window(executable)
     try:
@@ -1077,13 +1076,12 @@ def test_stopping_a_query_asks_first_and_keeps_the_base(executable: str) -> None
         assert "база знаний загружена" in window._details.text(), window._details.text()
         assert window._input_console.waiting() is False, "the pending request is dismissed"
 
-        # The idle interpreter with its base is unloaded by the same command.
-        window._actions["stop"].trigger()
-        assert "--- база знаний выгружена ---" in window.system_text(), window.system_text()
-        assert window.session.is_running() is False
+        # The run is over, so the button is dark again (task_87): the interpreter is
+        # idle with its base, and nothing there needs stopping.
+        assert window._actions["stop"].isEnabled() is False, "the run is over"
     finally:
         discard_changes(window)
-    print("ok: «Остановить» asks first, keeps the base, and unloads it on the next press")
+    print("ok: «Остановить» asks first and leaves the base loaded")
 
 
 def test_the_wrap_switch_reaches_every_editor(executable: str) -> None:

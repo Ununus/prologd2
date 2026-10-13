@@ -89,10 +89,11 @@ Done in the third round (2026-09-29): the run state was split in two — the pro
 being *up* and a computation being *in flight* — and the window no longer starts an
 interpreter just by opening: it comes up with the first run or with a query typed
 into the query line.  `Запустить` is enabled while nothing is computing (the answer
-frees it, and the next press restarts the whole file), `Остановить` while the
-process is alive, and the stop says which of the two it interrupted:
-`--- остановлено ---` for a computation, `--- база знаний выгружена ---` for an idle
-interpreter.  The load note became `--- загрузка базы знаний ---`, the status bar
+frees it, and the next press restarts the whole file), `Остановить` while a run is
+in flight, and the stop says what it interrupted: `--- остановлено ---` for a
+computation, and `--- база знаний выгружена ---` for an idle interpreter — the second
+of those belongs to a caller that asks for the command directly; the *button* went
+dark while no run is in flight in task_87.  The load note became `--- загрузка базы знаний ---`, the status bar
 says `выполняется` / `база знаний загружена` / `интерпретатор остановлен`, and
 `test_window.py` checks the whole walk: nothing running → run → answer → stop (idle)
 → run → stop (in flight).

@@ -34,7 +34,8 @@ original dialect's `ИЛИ/2` returned to the language without an English twin (
 and `sub_string/5` added as the ISO shape of `КОПИЯ` while `substring` left the
 language (part 116), and `->` added as ISO's if-then and if-then-else (part 117),
 and `examples/` given two shelves beside the current programs — the original
-dialect's own programs and two examples of the ISO additions (part 118).
+dialect's own programs and two examples of the ISO additions (part 118), and the
+stop button lit only while a run is in flight (part 119).
 
 ## Overall
 
@@ -208,6 +209,7 @@ entries of the session log below and in `ai/task_*.md`.
 | task_84_sub_string | done | `sub_string(Стр, До, Длина, После, Подстрока)` — the ISO shape of a substring: five arguments, positions and lengths **from zero**, the three counts summing to the length of the string, each given or computed from the other two — and it is **English only**, like `abs`.  `КОПИЯ/4` lost its English alias with it: `substring` is retired with a message, since the ISO predicate of the same family is a name of its own and not a spelling of `КОПИЯ` (which counts from one and takes four arguments).  Known difference from ISO: one answer, not a walk over every occurrence — a built-in cannot hand a choice point back to the solver |
 | task_85_if_then | done | `->` is a sign of the language: `(Условие -> Тогда)` takes the *first* solution of the condition and runs the consequence, and `(Условие -> Тогда ; Иначе)` treats the `;` after it as «иначе» — once the condition has a solution the else branch is dropped for good, *even when the consequence fails*.  That was the one thing neither `;` with a cut (a cut in a branch is local to it) nor `ПЕРВОЕ(C), T ; E` (which falls back to `E`) could say.  `,` binds tighter than `->`, `->` tighter than `;`, both right-nested; the condition is solved in a machine of its own (`callOnce`), so a cut inside it stays there.  The advice that used to answer the sign («не оператор: пишите `ПЕРВОЕ`», task_52) is gone |
 | task_86_examples_shelves | done | `examples/` gained two shelves beside the current programs: `examples/prologd/` — the original PrologD's own example programs (14 files, byte for byte, from the pinned clone `7b7f46f…`), to be run by `prologd.exe` and compared with the port — and `examples/prologu/`, the two examples of the ISO additions (`sub_string_demo.pld`, `if_then_demo.pld`), formatted and checked like the other demos.  The original shelf is **skipped** by the formatter walk and the question sweep, the way `lessons/_old` is: that dialect is not ours to police — and the skip compares the *first path component*, so a future `prologd2` cannot slip under it |
+| task_87_stop_button_idle | done | «Остановить» is lit for a run in flight and dark for an idle interpreter with a base loaded: a lit stop button reads as «the program is looping» (the user's report), and the base is loaded again by the next start, so that state has nothing to stop.  `_sync_run_actions` uses `self._busy` — a paused step and a wait for input count as a run, and keep the button usable.  Only the *button* changed: `stop_program` still unloads an idle interpreter for a caller that asks directly (the engine switch and a margin click stop the session through `_stop_now`) |
 
 ## Test suite
 
@@ -4226,4 +4228,39 @@ tests passed»: шаг обнаружения читает вывод в код�
 *Verified.*  `ctest` 348/348 (корпус вырос, случаев не прибавилось: `%!` двух новых
 примеров проверяются существующими случаями); счётчики вопросов сверены с `PINNED`
 через `--print`; 25 оконных сюит и `protocol_smoke.py` зелёные.
+
+Портативный пакет собран заново (`tools/build_portable.ps1`, все восемь стадий, в том
+числе `ctest` и шесть документов): `dist\prologd-2.3.0-win64` — 324 файла, 96,7 МиБ,
+архив `prologd-2.3.0-win64.zip` — 38,2 МиБ (40 068 240 байт; у 2.2.0 было
+39 786 345).  Обе полки в пакете на месте, и обе проверены запуском **из пакета**:
+`prologu.exe` отвечает на `examples\prologu\if_then_demo.pld` и
+`examples\prologu\sub_string_demo.pld`, а `prologd.exe` считает
+`examples\prologd\factorial.pld` (`ф=720`) и грузит `examples\prologd\lessons\lesson 1.pld`
+(имя с пробелом).
+
+### 119. Кнопка «Остановить» горит только во время счёта (2026-10-13)
+
+Задача 87.  Замечание владельца: горящая кнопка стоп похожа на «программа
+зациклилась» — пусть после загрузки базы знаний она гаснет (база всё равно грузится
+заново при следующем запуске).
+
+* Кнопка была привязана к «процесс жив» (task_27): интерпретатор с загруженной базой
+  держал её зажжённой.  Теперь `_sync_run_actions` включает её по `self._busy` — то
+  есть только пока идёт счёт.  Пауза на шаге и ожидание ввода — тоже `_busy`, так что
+  выход из них кнопкой по-прежнему доступен; свободный интерпретатор с базой кнопку
+  не зажигает.
+* Команда не изменилась: `stop_program` умеет выгрузить базу у свободного
+  интерпретатора, и эта ветвь оставлена — но кнопка её больше не предлагает (в
+  докстроке команды сказано прямо, чтобы ветвь не выглядела случайно мёртвой).
+  Переключение движка и клик по маркеру останавливают сеанс через `_stop_now` и не
+  затронуты.
+* Проверки окна переписаны под новое правило: ответ снимает `Запустить` и гасит
+  `Остановить`; новый запуск зажигает её снова; после вежливой остановки ожидающего
+  запроса кнопка гаснет, а сеанс с базой остаётся жив.
+* Документы: таблица `Shift+F5` и §5 в `doc/gui.typ`, абзац в `src/gui/README.md`,
+  заметка в `ai/task_27_gui_panels.md` (кнопка изменилась, команда — нет).
+
+*Verified.*  `ctest` 348/348 (C++ не трогали); 25 оконных сюит и `protocol_smoke.py`
+зелёные; `test_window.py` прогнан отдельно три раза подряд; `doc/gui.typ` собирается
+без замечаний.
 
