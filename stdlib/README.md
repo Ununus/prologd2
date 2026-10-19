@@ -25,12 +25,12 @@ prologu -I stdlib -s задача.pld
 
 | Файл | О чём |
 |---|---|
-| `lists.pld` | списки: поиск, длина, края, построение, разбор, работа целью |
+| `lists.pld` | списки: края, номер, построение, разбор, работа целью; подключает `iso.pld` |
 | `sets.pld` | множества на списках; подключает `lists.pld` |
-| `sorts.pld` | приёмы сортировки; подключает `lists.pld` |
 | `strings.pld` | строки: пробелы, слова, замена, разбор чисел; подключает `lists.pld` |
-| `math.pld` | целые числа: делители, степени, простые |
+| `math.pld` | целые числа: делители, степени, простые; подключает `iso.pld` |
 | `graphics.pld` | цвета графики: `rgb/4` и имена цветов |
+| `iso.pld` | имена стандарта: списки, целые, сортировка плюс тесты типов, `once/1`, `ignore/1`, `succ/2`, `nth1/3`; никого не подключает |
 
 Полный список предикатов с аргументами — в документе «Стандартная библиотека»
 (`doc/library.typ`, он же PDF в сборке); короткое описание каждого предиката стоит
@@ -73,7 +73,7 @@ prologu -I stdlib -s задача.pld
 | `set/2` | `set/2`, но через `СОРТИРОВКА`: без повторов по возрастанию |
 | `delrepeat/2` | `unique/2`: без повторов, порядок первых вхождений сохраняется |
 | `subset/2`, `equalset/2`, `unionset/3`, `intersect/3`, `difset/3` | те же имена; `intersect` и `difset` собирают ответ через `НАЙТИВСЕ` |
-| `selectsort/2`, `insertsort/2`, `bubblesort/2`, `quicksort/2`, `mergesort/2`, `treesort/2` | те же имена в `sorts.pld` |
+| `selectsort/2`, `insertsort/2`, `bubblesort/2`, `quicksort/2`, `mergesort/2`, `treesort/2` | те же имена, но в примерах: `examples/sorts.pld` — учебные приёмы, а не библиотека |
 | `ins/3` | `insert/3` |
 | `change/2`, `merge/3`, `halves/3` (было `splitting/3`) | те же имена |
 | `maketree/2,3`, `addtree/3`, `treelist/2` | `make_tree/2,3`, `add_node/3`, `tree_list/2` |

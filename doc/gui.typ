@@ -18,7 +18,7 @@
 #v(6cm)
 
 #align(center)[
-  #text(size: 20pt, weight: "bold")[Пролог-Д 2.0]
+  #text(size: 20pt, weight: "bold")[Пролог-Д 2.x]
   #v(0.2em)
   #text(size: 13pt)[Графический интерфейс]
 ]

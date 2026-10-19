@@ -143,8 +143,7 @@ and `if_then_demo.pld` (`->`).
 
 `stdlib/` holds the library the dialect ships — the list predicates
 (`member`, `length`, `min_list`, `append`, `reverse`, `flatten`, `permutation`,
-…), the set predicates built on lists (`set`, `subset`, `intersect`, …), the
-sorting techniques (`msort`, `quicksort`, `mergesort`, `treesort`, …), the string
+…), the set predicates built on lists (`set`, `subset`, `intersect`, …), the string
 helpers (`words`, `join`, `trim`, `replace`, `to_numbers`) and the integer
 predicates (`between`, `gcd`, `lcm`, `power`, `factorial`, `is_prime`, `primes`).
 The interpreter searches `stdlib` beside itself, last — after the importing file's
@@ -165,8 +164,13 @@ prologu -I stdlib -s examples/stdlib_demo.pld
 expected output in `%!` lines; `doc/library.typ` is the reference (`test_stdlib.cpp`
 fails if a predicate has no line there) and `stdlib/README.md` is the map plus the
 table `old name -> new name` for programs written against the first PrologD library.
-The built-in `СОРТИРОВКА` already sorts and de-duplicates; the sorts in
-`sorts.pld` are the study versions, kept because they show the techniques.
+The built-in `СОРТИРОВКА` already sorts and de-duplicates, and `msort/2` does the same
+but keeps repeats; the six study sorts (`selectsort`, `quicksort`, `mergesort`,
+`treesort`, …) are an example rather than a library and live in `examples/sorts.pld`.
+`iso.pld` is the base of the library and the door for examples from books: it
+defines `member/2`, `append/3`, `length/2`, `last/2`, `between/3` and `msort/2`
+under the names ISO uses, and adds the type tests, `once/1`, `ignore/1`, `succ/2`,
+`nth1/3` and `memberchk/2`; `lists.pld` and `math.pld` import it.
 
 ## Command line
 

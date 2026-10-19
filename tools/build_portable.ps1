@@ -360,8 +360,9 @@ try {
                 'doc\help.pdf', 'doc\builtins.json',
                 'doc\prologd2.png', 'doc\csu.png',
                 'examples\lib\library.pld', 'examples\lessons\lesson_01.pld',
-                'examples\problems\knapsack.pld',
-                'stdlib\lists.pld', 'stdlib\sets.pld', 'stdlib\sorts.pld',
+                'examples\problems\knapsack.pld', 'examples\sorts.pld',
+                'stdlib\lists.pld', 'stdlib\sets.pld', 'stdlib\iso.pld',
+                'stdlib\iso.pld',
                 $memoName)
     if ($withLegacy) { $needed += 'prologd.exe' }
     foreach ($wanted in $needed) {

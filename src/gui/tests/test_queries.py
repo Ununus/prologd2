@@ -127,7 +127,8 @@ PINNED: dict[str, int] = {
     "prologu/if_then_demo.pld": 8,
     "prologu/sub_string_demo.pld": 7,
     "sort_demo.pld": 6,
-    "stdlib_demo.pld": 63,
+    "sorts.pld": 8,
+    "stdlib_demo.pld": 73,
     "use_old_names.pld": 3,
 }
 
