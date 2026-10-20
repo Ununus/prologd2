@@ -238,6 +238,31 @@ TEST_CASE("the arithmetic signs take expressions written without hash marks") {
   }
 }
 
+TEST_CASE("an ISO module directive is refused before it can confuse") {
+  // `:- module(м, [факт/1]).` — the export list is not parseable here (`факт/1`
+  // needs `/` as an operator of terms), and the ordinary path answered
+  // «непарные скобки» about brackets that are perfectly matched.  Stage 4 of
+  // task_82: one message, and it names the construct.
+  DiagnosticSink sink;
+  parse(":- module(м, [факт/1]).\n", sink);
+  REQUIRE(sink.hasErrors());
+  REQUIRE(sink.diagnostics().size() == 1);
+  REQUIRE(sink.diagnostics().front().message.find("«:- module(…)» в Пролог-Д нет") !=
+          std::string::npos);
+}
+
+TEST_CASE("ISO rationals are not read as a lost dot") {
+  // `1 rdiv 3` stops right before `rdiv`, because `rdiv` is an ordinary name to
+  // this grammar: the statement looks complete one token early.  The message
+  // has to name the rationals, not a missing dot.
+  DiagnosticSink sink;
+  parse("?X = 1 rdiv 3.\n", sink);
+  REQUIRE(sink.hasErrors());
+  REQUIRE(sink.diagnostics().size() == 1);
+  REQUIRE(sink.diagnostics().front().message.find("рациональных чисел") !=
+          std::string::npos);
+}
+
 TEST_CASE("a `;` where the dialect used to accept one is an error") {
   SECTION("as a sentence terminator") {
     DiagnosticSink sink;

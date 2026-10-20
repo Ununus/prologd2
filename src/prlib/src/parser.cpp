@@ -41,6 +41,21 @@ constexpr const char* kRetiredTerminator =
 /// («Цель должна быть предикатом») would point at the wrong end of the line.
 constexpr const char* kEmptyIfThen = "после «->» нужна цель";
 
+/// `:- module(Name, [pred/arity, …]).` — ISO's module system, which this
+/// dialect does not have (task_82, stage 4).  The refusal has to come before the
+/// goal list is read: the export list is not even parseable here, because
+/// `pred/arity` needs `/` as an operator of terms, and a reader would otherwise
+/// get «непарные скобки» about a bracket that is perfectly matched.
+constexpr const char* kModuleRefused =
+    "«:- module(…)» в Пролог-Д нет: файл подключают директивой "
+    "«ИМПОРТ(\"файл.pld\")» (раздел 8)";
+
+/// `1 rdiv 3` — ISO's rationals.  `rdiv` is an ordinary name here, so the parse
+/// stops right before it with «предложение должно заканчиваться точкой»; that
+/// message points at a missing dot instead of the construct that is missing.
+constexpr const char* kRationalsRefused =
+    "рациональных чисел («1 rdiv 3») в Пролог-Д нет: числа — целые и вещественные";
+
 /// Tokens that can open a term, a fact, a rule or a query.  When one of them
 /// follows a *complete* statement, what is missing is the dot of that
 /// statement — saying so points at the end of the finished line instead of at
@@ -165,6 +180,13 @@ void Parser::reportUnclosedBracket(char open, const SourceLocation& location) {
 }
 
 void Parser::reportMissingDot() {
+  // `1 rdiv 3` stops here: `rdiv` is an ordinary name to this grammar, so the
+  // statement looks complete one token early.  Saying «нужна точка» would send
+  // the reader looking for a dot instead of for the rationals that are missing.
+  if (check(TokenKind::Identifier) && peek().text == "rdiv") {
+    report(ErrorCode::InvalidSentence, peek().location, kRationalsRefused);
+    return;
+  }
   // The dot belongs right after the last token of the statement, and that is
   // where a reader has to look.  The message says what the statement *needs*:
   // "предложение заканчивается точкой" read as a statement of fact, and
@@ -867,6 +889,15 @@ bool Parser::parseQueryOrDirective(ParsedProgram& out) {
     match(TokenKind::Minus);  // accept the standard `?-` form
   } else {
     match(TokenKind::ColonDash);
+    // `:- module(Name, [pred/arity]).` is ISO's module system.  Read here, before
+    // the goal list: the export list would fail on `/` and blamed a bracket.
+    if (check(TokenKind::Identifier) && peek().text == "module" &&
+        peek(1).kind == TokenKind::LParen) {
+      report(ErrorCode::InvalidSentence, peek().location, kModuleRefused);
+      recoverToStatementEnd();
+      out.ok = false;
+      return false;
+    }
   }
   beginScope();
   std::vector<SourceLocation> goal_locations;

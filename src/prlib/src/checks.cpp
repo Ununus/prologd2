@@ -179,10 +179,12 @@ const char* retiredNameMessage(std::string_view name, std::size_t arity) {
   return nullptr;
 }
 
-/// Spellings borrowed from other Prologs that mean something the dialect writes
-/// differently (task_55).  A call to one stays an ordinary unknown predicate —
-/// the name is not reserved, so a program may still define its own `is/2` — but
-/// the warning names the Пролог-Д spelling of the same thing.
+/// Names borrowed from other Prologs: either the dialect writes the same thing
+/// differently (task_55), or it has no such thing at all and the warning says
+/// so instead of leaving a bare «не найдено» (task_92, stage 4).  A call to one
+/// stays an ordinary unknown predicate — none of these names is reserved, so a
+/// program may still define its own — but the warning names the Пролог-Д
+/// spelling of the same thing, or says there is none.
 struct ForeignSpelling {
   std::string_view name;
   std::size_t arity;
@@ -190,7 +192,19 @@ struct ForeignSpelling {
 };
 
 constexpr ForeignSpelling kForeignSpellings[] = {
-    {"is", 2, "«is» — не предикат: в Пролог-Д это «РАВНО(X, #2+3#)»"},
+    {"is", 2, "«is» — знак, а не предикат: пишут «X is 2 + 3»"},
+    {"catch", 3, "исключений в Пролог-Д нет: ошибка останавливает программу"},
+    {"throw", 1,
+     "исключений в Пролог-Д нет: «не получилось» — это ЛОЖЬ, а объяснение печатает "
+     "ВЫВОД"},
+    {"bagof", 3,
+     "все решения собирает «НАЙТИВСЕ/3»; групп по свободным переменным пока нет"},
+    {"setof", 3,
+     "все решения собирает «НАЙТИВСЕ/3», порядок и повторы наводит «СОРТИРОВКА/2»"},
+    {"module", 1,
+     "модулей в Пролог-Д нет: файл подключают директивой «ИМПОРТ(\"файл.pld\")»"},
+    {"rational", 1,
+     "рациональных чисел в Пролог-Д нет: числа — целые и вещественные"},
 };
 
 const char* foreignSpellingHint(std::string_view name, std::size_t arity) {

@@ -210,7 +210,7 @@ entries of the session log below and in `ai/task_*.md`.
 | task_79_engine_switch_button | done | the window is a host of two engines: a `QToolButton` at the right end of the toolbar switches between «Пролог-У» (`prologu.exe`, ours) and «Пролог-Д» (`prologd.exe`, the original) — its picture is the engine that is *running* — and the choice is `view/engine`; what a command needs of an engine is a *capability* declared once (`Action.needs`, `settings.GATED_ROWS`) and asked in one place, so the original gets no format button, no step, no trace, no graphics, no engine limits and no naming row — those are disabled with a reason, not clickable-into-nothing, and a marker-less file is read and coloured the old way under it.  A press **stops the session** first (a live process belongs to the engine being left) and re-reads `--list-keywords` (66 names against our 131); `--exe` — and the value of the removed «Интерпретатор» row, which is still read — names the folder both engines are built in, and its file name picks the engine; the first tab holds a welcome program written in the intersection of the two dialects (unquoted lower-case atoms, single-letter variables), so it answers on either engine — checked by running it twice (part 111); a second control at that end (`n.png`) carries the two naming modes with the dialog row's own labels and is disabled under the original engine (part 112) |
 | task_80_process_directory_picker | done | the «…» of «Свой каталог процесса» opens at the folder of the *engine* (`stdlib`, `examples` and a course's files are there) or on the row's own value when it is filled; the window hands its own folder in, so a launch pinned by `--exe` opens at that tree, and the modal is now titled after the row that asked instead of «Каталог для ИМПОРТ»; the import list's «Добавить…» opens there too |
 | task_81_docs_two_languages | open | `help.typ` is retitled to Пролог-У (the language), `prologd-diff.typ` becomes the story of the two dialects, `gui.typ` says the shell hosts both engines, and the README carries the four readings of «У»; lessons and the standard library are left alone for now |
-| task_82_iso_compatibility | in progress | the policy (an ISO-compatible subset plus the teaching extras) and four stages: `stdlib/iso.pld` (**done**, task_88), the standard order of terms (**done**, task_90), the missing spellings `is`, `=:=`, `=\=`, `\=`, `/* */` (**done**, task_92 — `->` turned out to be a sign of its own, task_85) and the documented refusals (`bagof`/`setof` — now a task of its own, task_91 — `catch`/`throw`, modules, dicts) — with a few book examples kept as checks (`examples/iso/`, task_92) |
+| task_82_iso_compatibility | done | the policy (an ISO-compatible subset plus the teaching extras) and four stages, all done: `stdlib/iso.pld` (task_88), the standard order of terms (task_90), the missing spellings `is`, `=:=`, `=\=`, `\=`, `/* */` (task_92 — `->` turned out to be a sign of its own, task_85) and the documented refusals (parts 129–131: `catch`/`throw`, `:- module`, dicts, rationals — each with a message, and ADR-028; `bagof`/`setof` became a task of its own, task_91) — with six book examples kept as checks (`examples/iso/`, task_92) |
 | task_83_ili_name | done | `ИЛИ/2` — the original dialect's word — is callable again, with the behaviour its library definition had (`ИЛИ(X, _) :- ВЫП(X), !.` and `ИЛИ(_, X) :- ВЫП(X).`), which is `ПЕРВОЕ` with two goals: one function, two names, and the arity stays 2.  It is the one built-in **without an English spelling** — `or` stays retired, `first` is the English name of `ПЕРВОЕ` — the exception `test_aliases.cpp` names.  It could not be a library clause: a name starting with a capital letter is a variable in mode 0 and a string constant in mode 1, so no `.pld` file can define it (`--list-keywords` 130 → 131) |
 | task_84_sub_string | done | `sub_string(Стр, До, Длина, После, Подстрока)` — the ISO shape of a substring: five arguments, positions and lengths **from zero**, the three counts summing to the length of the string, each given or computed from the other two — and it is **English only**, like `abs`.  `КОПИЯ/4` lost its English alias with it: `substring` is retired with a message, since the ISO predicate of the same family is a name of its own and not a spelling of `КОПИЯ` (which counts from one and takes four arguments).  Known difference from ISO: one answer, not a walk over every occurrence — a built-in cannot hand a choice point back to the solver |
 | task_85_if_then | done | `->` is a sign of the language: `(Условие -> Тогда)` takes the *first* solution of the condition and runs the consequence, and `(Условие -> Тогда ; Иначе)` treats the `;` after it as «иначе» — once the condition has a solution the else branch is dropped for good, *even when the consequence fails*.  That was the one thing neither `;` with a cut (a cut in a branch is local to it) nor `ПЕРВОЕ(C), T ; E` (which falls back to `E`) could say.  `,` binds tighter than `->`, `->` tighter than `;`, both right-nested; the condition is solved in a machine of its own (`callOnce`), so a cut inside it stays there.  The advice that used to answer the sign («не оператор: пишите `ПЕРВОЕ`», task_52) is gone |
@@ -4604,3 +4604,78 @@ ISO до конца».
 
 *Verified.*  `ctest` 361/361; окна и `protocol_smoke.py` зелёные; документы
   собираются.
+
+### 129. Подсказки для `catch`/`throw` (2026-10-21)
+
+Вопрос владельца: «Подсказки для catch/throw?» — то есть этап 4 задачи 82: отказ
+должен быть объяснён, а не выдан как «не найдено».
+
+* **Подсказки.**  Таблица `kForeignSpellings` (`checks.cpp`) пополнилась двумя
+  строками, и предупреждение о неизвестном имени теперь говорит, что это не
+  опечатка:
+  `не найдено: catch/3; исключений в Пролог-Д нет: ошибка останавливает
+  программу`;
+  `не найдено: throw/1; исключений в Пролог-Д нет: «не получилось» — это ЛОЖЬ, а
+  объяснение печатает ВЫВОД`.
+  Имена не зарезервированы: своё `catch/3` программа определить может.
+* **`is/2`.**  Подсказка переписана под задачу 92: «`is` — знак, а не предикат:
+  пишут `X is 2 + 3`» (было «в Пролог-Д это `РАВНО(X, #2+3#)`»).
+* **Документы.**  `help.typ` §4.9 «Исключений нет: `catch` и `throw`» — почему нет,
+  что писать вместо (`->`, `НЕ`, `ПОЛНЫЙ`/`ЦЕЛ`/`ЧИСЛО` до опасного места,
+  `ВЫВОД`, `ДЛЯВСЕХ`); `prologd-diff.typ` — раздел «Исключений нет» и строка
+  «Исключения» в сводной таблице.  Решение записано ADR-028.
+* **Проверки.**  `test_diagnostics.cpp`: случай «an ISO exception is told there are
+  none» (оба сообщения дословно) и обновлённое ожидание для `is/2`.
+
+*Verified.*  `ctest` 362/362 (на один случай больше); окна и `protocol_smoke.py`
+  зелёные; документы собираются.
+
+### 130. Подсказки для `bagof`/`setof` (2026-10-21)
+
+Продолжение части 129, вопрос владельца: «bagof setof?»
+
+* **Подсказки.**  Две строки в `kForeignSpellings` (`checks.cpp`):
+  `не найдено: bagof/3; все решения собирает «НАЙТИВСЕ/3»; групп по свободным
+  переменным пока нет`;
+  `не найдено: setof/3; все решения собирает «НАЙТИВСЕ/3», порядок и повторы
+  наводит «СОРТИРОВКА/2»`.
+  Будущих имён (`ВСЕРЕШ`, `МНОРЕШ`) подсказка не называет: их пока нет, и совет,
+  ведущий к другому «не найдено», хуже молчания.
+* **Документы.**  `help.typ` §12: абзац о том, что `bagof`/`setof` нет, что для
+  цели без свободных переменных их заменяет `НАЙТИВСЕ` (а `setof` — ещё и
+  `СОРТИРОВКА`), и что группировку по свободным переменным строят руками.
+* **Проверки.**  `test_diagnostics.cpp`: случай «`bagof` and `setof` are pointed at
+  what collects today» — оба сообщения дословно.
+* **Записи.**  `ai/task_91_bagof_setof.md`: в «Что уже есть» добавлена подсказка
+  при вызове; в ADR-025 — строка о том, что отказ пока выговаривается подсказкой.
+
+*Verified.*  `ctest` 363/363; документы собираются.
+
+### 131. Этап 4 закрыт: `:- module`, словари, рациональные (2026-10-21)
+
+Владелец выбрал из трёх вариантов «task_82, этап 4» — отказы `catch`/`throw`,
+`:- module`, словари, рациональные с объяснением. `catch`/`throw` были сделаны в
+части 129; здесь — остальные три.
+
+* **`:- module(…)` — ошибка разбора.**  Список экспорта `[факт/1]` в этой
+  грамматике не разбирается: `/` — не знак терма, и обычный путь отвечал
+  «непарные скобки: `[` открыта в строке 1» про скобки, которые парные.
+  Отказ выдаётся до чтения списка целей (`parseQueryOrDirective`), текст:
+  ««:- module(…)» в Пролог-Д нет: файл подключают директивой «ИМПОРТ("файл.pld")»
+  (раздел 8)».  Вызов `module/1` обычной целью — подсказка в таблице чужих имён.
+* **Словари `_{…}` — подсказка в лексере.**  Раньше — «недопустимый символ» на
+  `{`, `:` и `}` подряд.  Теперь `{` говорит: «фигурных скобок в Пролог-Д нет:
+  словарей и «{Цель}» здесь не бывает, а блок целей берут в круглые скобки»;
+  `}` остаётся обычной ошибкой, чтобы не повторять ту же фразу.
+* **Рациональные `1 rdiv 3`.**  `rdiv` — обычное имя, поэтому разбор
+  останавливался перед ним и говорил «предложение должно заканчиваться точкой».
+  `reportMissingDot` теперь смотрит на следующий токен: если это `rdiv`, текст —
+  «рациональных чисел («1 rdiv 3») в Пролог-Д нет: числа — целые и вещественные».
+  Вызов `rational/1` — подсказка в той же таблице.
+* **Документы.**  `help.typ` §8: «Модулей ISO здесь нет» и два пункта про словари
+  и рациональные; `prologd-diff.typ`: раздел «Импорт модулей» и три новые строки
+  сводной таблицы; ADR-028 дополнен: этап 4 закрыт.
+* **Проверки.**  `test_parser.cpp` (модуль и `rdiv`), `test_lexer.cpp` (словарь),
+  `test_diagnostics.cpp` (`module/1`, `rational/1`).
+
+*Verified.*  `ctest` 367/367; документы собираются.

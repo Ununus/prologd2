@@ -333,6 +333,17 @@ TEST_CASE("an unclosed block comment is explained") {
           std::string::npos);
 }
 
+TEST_CASE("a dict is told there are no dicts") {
+  // `_{ключ: значение}` is ISO's dict, and `{Цель}` its shorthand for a call.
+  // The brace is the thing to explain, and only the opener carries the
+  // sentence — the closer would repeat it (task_82, stage 4).
+  DiagnosticSink sink;
+  lex("?X = _{a:1}.", sink);
+  REQUIRE(sink.hasErrors());
+  REQUIRE(sink.diagnostics().front().message.find("фигурных скобок") !=
+          std::string::npos);
+}
+
 TEST_CASE("lexer reports malformed numbers") {
   DiagnosticSink sink;
   const auto tokens = lex("12.123.123", sink);

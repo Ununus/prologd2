@@ -166,10 +166,10 @@ TEST_CASE("an undefined predicate is a warning with a suggestion") {
 }
 
 TEST_CASE("an ISO `is` is told what the dialect writes instead") {
-  // `is/2` is not a predicate of the dialect (task_55), so the call stays an
-  // ordinary unknown name — a program may define its own `is/2` — but the
-  // warning names the spelling that does the same thing, because a reader of
-  // ISO Prolog reaches for `is` first.
+  // `is/2` is not a predicate of the dialect: it is a *sign* (task_92), so the
+  // call stays an ordinary unknown name — a program may define its own `is/2` —
+  // but the warning names the spelling that does the same thing, because a
+  // reader of ISO Prolog reaches for `is` first.
   const std::vector<PrologError> diagnostics = diagnosticsOf("?is(X, #2+3#).\n");
   REQUIRE(diagnostics.size() == 1);
   const PrologError& warning = diagnostics.front();
@@ -178,7 +178,65 @@ TEST_CASE("an ISO `is` is told what the dialect writes instead") {
   REQUIRE(warning.location.line == 1);
   REQUIRE(warning.location.column == 2);
   REQUIRE(warning.message ==
-          "не найдено: is/2; «is» — не предикат: в Пролог-Д это «РАВНО(X, #2+3#)»");
+          "не найдено: is/2; «is» — знак, а не предикат: пишут «X is 2 + 3»");
+}
+
+TEST_CASE("an ISO exception is told there are none") {
+  // Stage 4 of task_82: `catch`/`throw` are refused, and the refusal is carried
+  // by the same table as `is/2` — two warnings that name the reason instead of
+  // a bare «не найдено».
+  const std::vector<PrologError> caught =
+      diagnosticsOf("?catch(Истина, _Ошибка, _Запас).\n");
+  REQUIRE(caught.size() == 1);
+  REQUIRE(caught.front().code == ErrorCode::UnknownPredicate);
+  REQUIRE(caught.front().message ==
+          "не найдено: catch/3; исключений в Пролог-Д нет: ошибка останавливает "
+          "программу");
+
+  const std::vector<PrologError> thrown = diagnosticsOf("?throw(беда).\n");
+  REQUIRE(thrown.size() == 1);
+  REQUIRE(thrown.front().code == ErrorCode::UnknownPredicate);
+  REQUIRE(thrown.front().message ==
+          "не найдено: throw/1; исключений в Пролог-Д нет: «не получилось» — это "
+          "ЛОЖЬ, а объяснение печатает ВЫВОД");
+}
+
+TEST_CASE("`bagof` and `setof` are pointed at what collects today") {  // The two are on the roadmap (task_91, under the names `ВСЕРЕШ` and
+  // `МНОРЕШ`), so the warning names no future predicate: it names the one that
+  // is there.  For `setof` that is `НАЙТИВСЕ` plus `СОРТИРОВКА`, which is the
+  // whole answer when the goal has no free variables but the template.
+  const std::vector<PrologError> bag = diagnosticsOf("?bagof(_Х, ЛОЖЬ, _С).\n");
+  REQUIRE(bag.size() == 1);
+  REQUIRE(bag.front().code == ErrorCode::UnknownPredicate);
+  REQUIRE(bag.front().message ==
+          "не найдено: bagof/3; все решения собирает «НАЙТИВСЕ/3»; групп по "
+          "свободным переменным пока нет");
+
+  const std::vector<PrologError> set = diagnosticsOf("?setof(_Х, ЛОЖЬ, _С).\n");
+  REQUIRE(set.size() == 1);
+  REQUIRE(set.front().code == ErrorCode::UnknownPredicate);
+  REQUIRE(set.front().message ==
+          "не найдено: setof/3; все решения собирает «НАЙТИВСЕ/3», порядок и "
+          "повторы наводит «СОРТИРОВКА/2»");
+}
+
+TEST_CASE("a module and a rational are told they do not exist") {
+  // The other two refusals of stage 4 (task_82).  `:- module(…)` is refused by
+  // the parser, where the export list would otherwise fail; a *call* to
+  // `module/1` or `rational/1` is an ordinary unknown name with a hint.
+  const std::vector<PrologError> module = diagnosticsOf("?module(м).\n");
+  REQUIRE(module.size() == 1);
+  REQUIRE(module.front().code == ErrorCode::UnknownPredicate);
+  REQUIRE(module.front().message ==
+          "не найдено: module/1; модулей в Пролог-Д нет: файл подключают "
+          "директивой «ИМПОРТ(\"файл.pld\")»");
+
+  const std::vector<PrologError> rational = diagnosticsOf("?rational(1).\n");
+  REQUIRE(rational.size() == 1);
+  REQUIRE(rational.front().code == ErrorCode::UnknownPredicate);
+  REQUIRE(rational.front().message ==
+          "не найдено: rational/1; рациональных чисел в Пролог-Д нет: числа — "
+          "целые и вещественные");
 }
 
 TEST_CASE("the retired findall spelling suggests the current one") {

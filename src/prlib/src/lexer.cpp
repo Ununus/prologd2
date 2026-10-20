@@ -489,6 +489,23 @@ std::vector<Token> Lexer::tokenizeImpl(DiagnosticSink* sink) {
       case '[': advanceByte(1); tokens.push_back(makeToken(TokenKind::LBracket, "[", start)); break;
       case ']': advanceByte(1); tokens.push_back(makeToken(TokenKind::RBracket, "]", start)); break;
       case '|': advanceByte(1); tokens.push_back(makeToken(TokenKind::Bar, "|", start)); break;
+      case '{':
+        // Curly braces are ISO's dicts (`_{ключ: значение}`) and its `{Цель}`
+        // shorthand for a call; the dialect has neither, and the bare
+        // «недопустимый символ» leaves the reader guessing (task_82, stage 4).
+        // Only the opener is explained: the closer would repeat the same
+        // sentence for the same construct.
+        advanceByte(1);
+        reportInvalidSign(sink, start,
+                          "фигурных скобок в Пролог-Д нет: словарей и «{Цель}» "
+                          "здесь не бывает, а блок целей берут в круглые скобки");
+        tokens.push_back(makeToken(TokenKind::Unknown, "{", start));
+        break;
+      case '}':
+        advanceByte(1);
+        reportInvalidSign(sink, start);
+        tokens.push_back(makeToken(TokenKind::Unknown, "}", start));
+        break;
       case ':':
         if (peek(1) == '-') {
           advanceByte(2);

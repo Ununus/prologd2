@@ -811,6 +811,11 @@ tests and the lesson material.
 решение «`bagof`/`setof` не заводить» переоткрыто задачей 91; из отказа этого ADR
 в силе остаются только `catch`/`throw`, модули, словари и рациональные.
 
+**Поправка 2026-10-21 (часть 130).**  Пока `bagof/3` и `setof/3` не написаны,
+вызов любого из них — это не молчание: у них есть подсказка в той же таблице, что
+у `is/2` и `catch/3` («все решения собирает `НАЙТИВСЕ/3`…»), а `help.typ` §12
+объясняет, чем их заменить сегодня.
+
 
 ## ADR-026: The standard library is a folder beside the interpreter, searched last
 
@@ -871,5 +876,49 @@ the standard's comment, non-nesting, an unclosed one is a lexical error — and 
 formatter returns any text containing `/*` untouched, because the layout rules were
 written for `%` and a multi-line comment inside a goal would be moved into another
 clause.  Losing a comment is worse than leaving the spacing alone.
+
+**Status.** Accepted.
+
+## ADR-028: Exceptions are refused, and the refusal is spoken aloud
+
+**Context.** Stage 4 of task_82 asked for the refusals to be settled — `catch`/`throw`,
+`:- module`, dicts, rationals — and part of it was already in the language as behaviour
+without a stated reason.  A program from a book that writes
+`catch(Цель, Ошибка, Восстановление)` used to get a bare «не найдено: catch/3»: true, but
+it reads as a typo, and a reader concludes the name is misspelled rather than missing.
+The dialect has no exceptions of any kind: a runtime error (division by zero, a wrong
+argument type, a free variable where a number is needed) is a `PrologRuntimeError` that
+the engine throws and the CLI prints before stopping the run.
+
+**Decision.** No exceptions.  `throw/1` and `catch/3` are not added, and the refusal is
+carried by the same mechanism that already answers foreign spellings (`is`, task_55):
+the names stay **unreserved** — a program may define its own `catch/3` and `throw/1`, and
+then the ordinary call rules apply — while a call to one produces the usual unknown-name
+warning *plus* a sentence saying there is nothing to reach for:
+
+```
+не найдено: catch/3; исключений в Пролог-Д нет: ошибка останавливает программу
+не найдено: throw/1; исключений в Пролог-Д нет: «не получилось» — это ЛОЖЬ,
+              а объяснение печатает ВЫВОД
+```
+
+The hint table (`kForeignSpellings`, `checks.cpp`) is the whole implementation: no
+machine change, no reserved name, no new dispatch entry.  `is/2`'s hint was rewritten at
+the same time — since task_92 it says «`is` — знак, а не предикат: пишут `X is 2 + 3`».
+
+**Consequences.** A reader who tries ISO exception handling is told what to do instead:
+failure as a signal (`(Условие -> Тогда ; Иначе)`, `НЕ`), checks *before* the risky
+operation (`ПОЛНЫЙ`, `ЦЕЛ`, `ЧИСЛО`), `ВЫВОД` for the explanation, `ДЛЯВСЕХ` for «for all
+X, if p(X) then q(X)».  A program that catches errors has to be rewritten; one that does
+not is unaffected.  The refusal is documented where a reader looks for it — `help.typ`
+§4.9 and the «Исключений нет» section of `prologd-diff.typ`, whose summary table gained an
+«Исключения» row.
+
+**Поправка 2026-10-21 (часть 131).**  Этап 4 закрыт: к подсказкам `catch`/`throw`
+добавлены `:- module(…)` (ошибка разбора до чтения списка экспорта — там
+`предикат/арность` требует `/` как знака терма, и человек получал «непарные
+скобки»), `_{…}` (лексер), `1 rdiv 3` (вместо «предложение должно заканчиваться
+точкой») и вызовы `module/1`, `rational/1` (таблица чужих имён).  Записи — в
+`help.typ` §8 и в разделе «Импорт модулей» файла `prologd-diff.typ`.
 
 **Status.** Accepted.
