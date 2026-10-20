@@ -45,7 +45,7 @@ boundary kept for the front-end (`task_20`).
 
 `НАЙТИВСЕ/3` (`findall/3`) is the one predicate that did not exist in the
 original; it was an explicit requirement of this rewrite (`task_13_findall.md`,
-`examples/findall_demo.pld`).
+`examples/findall.pld`).
 
 `_ref/` is a local, git-ignored copy of parts of that implementation, kept for
 reference while porting — today mainly the previous front-end

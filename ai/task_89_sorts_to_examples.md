@@ -52,3 +52,8 @@
   Руками: `prologu -I stdlib -s examples/sorts.pld` печатает ровно восемь строк
   `%!`; `stdlib_demo.pld` проходит со своим вводом и заканчивается на `ДА` из
   раздела ISO.
+**Поправка 2026-10-21 (часть 126).**  Файл называется теперь
+`examples/sorting.pld`: после снятия `_demo` у демонстраций рядом оказались
+`sort.pld` (встроенная `СОРТИРОВКА/2`) и `sorts.pld` (приёмы), имена отличались
+одной буквой.  Все ссылки — в `README.md`, `examples/README.md`, `stdlib/README.md`,
+`PINNED`, `checkedExamples()` и `tools/build_portable.ps1` — обновлены.

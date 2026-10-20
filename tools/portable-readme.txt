@@ -13,9 +13,10 @@
 
 Уроки и примеры — в папке examples: уроки в examples\lessons, задачи (факториал,
 Ханойская башня, рюкзак) — в examples\problems, библиотека для урока
-про ИМПОРТ — в examples\lib.  Рядом две полки: examples\prologu — примеры
-дополнений диалекта (sub_string_demo.pld и if_then_demo.pld), а examples\prologd —
-программы первоначального Пролог-Д: их запускает prologd.exe из этой же папки.
+про ИМПОРТ — в examples\lib.  Рядом две папки: examples\iso — программы,
+записанные именами и знаками ISO (arith, lists, family, order, if_then,
+sub_string), а examples\prologd — программы первоначального Пролог-Д: их
+запускает prologd.exe из этой же папки.
 Что где лежит, написано в examples\README.md.
 
 Стандартная библиотека — в папке stdlib: списки, множества на списках, приёмы
@@ -24,7 +25,7 @@
     :- ИМПОРТ("lists.pld").
 Отдельный ключ нужен только в дереве исходников: prologu.exe -I stdlib -s z.pld.
 Разбор — в library.pdf (и в stdlib\README.md), готовый пример —
-examples\stdlib_demo.pld.
+examples\stdlib.pld.
 
 Открыть урок в окне: «Файл → Открыть» (Ctrl+O),
 запустить — F5, ответы — в панели «Вывод» (и таблицей на вкладке «Таблица»).  Вопрос

@@ -5,7 +5,7 @@
 # formatted file prints exactly what the original printed.  Both modes, and a
 # plain example next to a lesson that is full of comments and `;`.
 
-set(example "${SOURCE_DIR}/examples/findall_demo.pld")
+set(example "${SOURCE_DIR}/examples/findall.pld")
 set(lesson "${SOURCE_DIR}/examples/lessons/lesson_04.pld")
 
 function(format_the_file source mode out)

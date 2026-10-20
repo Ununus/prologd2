@@ -61,6 +61,6 @@ python3 ai/tools/port_lessons.py "<checkout>/examples/lessons" examples/lessons
 python3 ai/tools/port_lessons.py "<checkout>/examples" examples
 ```
 
-`examples/findall_demo.pld` is already written in the new syntax and must not be
+`examples/findall.pld` is already written in the new syntax and must not be
 overwritten by the tool; restore it if necessary (it is the requirements
 example).

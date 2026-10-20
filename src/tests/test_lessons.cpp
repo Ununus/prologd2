@@ -84,20 +84,20 @@ const std::vector<std::string>& checkedLessons() {
 /// are the showcase for the predicates the dialect added on top of the port
 /// (`ПЕРВОЕ`, `СОРТИРОВКА`, `ПОЛНЫЙ`, `ДЛЯВСЕХ`), the two problems whose output
 /// is the same on every machine, the tour of the standard library, the study
-/// sorts that left the library for `examples/sorts.pld` (task_89), and the shelf
+/// sorts that left the library for `examples/sorting.pld` (task_89), and the folder
 /// `examples/iso` of programs written with ISO names and signs (task_92: the
 /// arithmetic signs, the library, a family tree, the standard order, `->` and
 /// `sub_string/5`); `problems/monk.pld` draws and `problems/monkd.pld` reads
 /// input, so those two are only parsed (see the test below).
 const std::vector<std::string>& checkedExamples() {
   static const std::vector<std::string> names = {
-      "first_demo.pld",
-      "sort_demo.pld",
-      "ground_demo.pld",
-      "forall_demo.pld",
-      "sorts.pld",
-      "stdlib_demo.pld",
-      "use_old_names.pld",
+      "first.pld",
+      "sort.pld",
+      "ground.pld",
+      "forall.pld",
+      "sorting.pld",
+      "stdlib.pld",
+      "names.pld",
       "problems/factorial.pld",
       "problems/knapsack.pld",
       "iso/arith.pld",
@@ -167,13 +167,13 @@ std::string withoutQueries(const std::string& source) {
 TEST_CASE("ported example programs parse cleanly") {
   const std::vector<std::string> files = {
       "problems/factorial.pld", "problems/monk.pld",     "problems/monkd.pld",
-      "file_io.pld",           "drawing.pld",           "findall_demo.pld",
-      "import_demo.pld",       "lib/library.pld",
+      "file_io.pld",           "drawing.pld",           "findall.pld",
+      "import.pld",       "lib/library.pld",
   };
   // `lib/old_lib*.pld` are not here: `withoutQueries` strips every `:` line, and
   // that takes the naming marker with it, so the file would be read in mode 0 and
   // its apostrophe names would not parse.  They are exercised through
-  // `use_old_names.pld`, which imports and calls both of them.
+  // `names.pld`, which imports and calls both of them.
   for (const std::string& file : files) {
     const auto result = runProgram(withoutQueries(readExample(file)));
     INFO("file: " << file);
@@ -198,9 +198,9 @@ TEST_CASE("every lesson prints exactly what its comments promise") {
 
 TEST_CASE("the example programs print what their comments promise") {
   for (const std::string& name : checkedExamples()) {
-    // `stdlib_demo.pld` imports the standard library, so the check looks where
+    // `stdlib.pld` imports the standard library, so the check looks where
     // the CLI looks with `-I stdlib`; it is also the only example that reads —
-    // the numbers come from `stdlib_demo.input.txt` beside it.  `use_old_names.pld`
+    // the numbers come from `stdlib.input.txt` beside it.  `names.pld`
     // imports the two old-format libraries by a path relative to the examples
     // folder, which is the data directory itself.
     const std::string stem = name.substr(0, name.rfind('.'));

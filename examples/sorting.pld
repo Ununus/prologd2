@@ -10,9 +10,9 @@
 % возрастанию, повторы оставляют на месте и сравнивают через встроенную БОЛЬШЕ —
 % тем же порядком, что и СОРТИРОВКА, поэтому список строк сортируется так же.
 %
-% Запуск:  prologu -s examples/sorts.pld
+% Запуск:  prologu -s examples/sorting.pld
 % В дереве исходников, где папки stdlib рядом с интерпретатором нет, — с ключом
-% -I:  prologu -I stdlib -s examples/sorts.pld
+% -I:  prologu -I stdlib -s examples/sorting.pld
 % Директива подключает lists.pld — сортировки на нём построены, — а вместе с ним
 % iso.pld, откуда приходят append/3, а с ним merge/3 и tree_list/2.
 

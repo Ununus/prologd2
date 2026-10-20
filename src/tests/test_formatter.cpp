@@ -295,8 +295,8 @@ TEST_CASE("formatting is idempotent for every example program") {
   // `1.` for 1.0 — task_52) and a few of them no longer parse.  The formatter
   // refuses a source it cannot parse, so they are not its business.
   const fs::path archived = root / "lessons" / "_old";
-  // `examples/prologd` is that same story for a whole shelf: the original
-  // dialect's own programs (task_86), copied as they were written.  The shelf is
+  // `examples/prologd` is that same story for a whole folder: the original
+  // dialect's own programs (task_86), copied as they were written.  The folder is
   // compared by its *first path component*, not by a prefix of the whole path, so
   // a name that merely begins with `prologd` cannot slip into the skip.
   const fs::path original("prologd");
@@ -386,7 +386,7 @@ TEST_CASE("every shipped program is already in the standard shape") {
   namespace fs = std::filesystem;
   const std::vector<fs::path> roots = {fs::path(PROLOGD_TEST_DATA_DIR),
                                        fs::path(PROLOGD_STDLIB_DIR)};
-  // The original dialect's own shelf is left alone here for the same reason as
+  // The original dialect's own folder is left alone here for the same reason as
   // `_old` above: those programs are kept exactly as they were written (task_86),
   // and their spelling is what the port changed.
   const fs::path top(PROLOGD_TEST_DATA_DIR);

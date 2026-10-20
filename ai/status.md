@@ -6,7 +6,7 @@ the C++ sources (nine more listings, the grammar brought in line with `parser.cp
 "привычный/обычный Prolog" wording replaced by ISO Prolog, the whole `ai/` folder translated
 into English, the last `$` taken out of the interpreter (part 81), three built-ins —
 `СОРТИРОВКА/2`, `ПОЛНЫЙ/1`, `ДЛЯВСЕХ/2` — added in place of `bagof`/`setof` (part 82,
-ADR-025), the examples folder given a map and a `problems/` shelf (part 83), the standard
+ADR-025), the examples folder given a map and a `problems/` folder (part 83), the standard
 library started as `stdlib/` with `lists.pld`, `sets.pld`, `sorts.pld` and a checked demo
 (part 84), that library grown to five files, documented in a sixth document and found by the
 interpreter beside itself without a flag (part 85, ADR-026), its own texts given a single
@@ -103,8 +103,8 @@ stop button lit only while a run is in flight (part 119).
   naming modes — is disabled with a reason instead of doing nothing.
 * Examples live in `examples/` and are covered by golden tests: the course in
   `examples/lessons` is a program per lesson whose own `%!` lines are its expected
-  output, the five demos beside it (`first_demo`, `sort_demo`, `ground_demo`,
-  `forall_demo`, `stdlib_demo`) are checked the same way, and the tasks are in
+  output, the nine demos beside it (`first`, `sort`, `sorting`, `ground`, `forall`,
+  `findall`, `import`, `names`, `stdlib`) are checked the same way, and the tasks are in
   `examples/problems` (`factorial`, the Hanoi tower, `knapsack`).  Two shelves sit
   beside them (task_86): `examples/prologd/` — the original PrologD's own example
   programs, copied as they were written and skipped by the checks — and
@@ -112,7 +112,7 @@ stop button lit only while a run is in flight (part 119).
   `family`, `order`, `if_then`, `sub_string`), which are checked like the demos.
   `examples/README.md`
   is the map of the folder.  The standard library the dialect ships is `stdlib/` —
-  beside the executable, imported with `-I stdlib` — and `stdlib_demo.pld` is its
+  beside the executable, imported with `-I stdlib` — and `stdlib.pld` is its
   checked tour; `stdlib/iso.pld` is the base of the library — it owns `member/2`,
   `append/3`, `length/2`, `last/2`, `between/3` and `msort/2`, and adds the type tests
   and `once/1`, `ignore/1`, `succ/2`, `nth1/3`, `memberchk/2` (task_88); `lists.pld`
@@ -214,13 +214,13 @@ entries of the session log below and in `ai/task_*.md`.
 | task_83_ili_name | done | `ИЛИ/2` — the original dialect's word — is callable again, with the behaviour its library definition had (`ИЛИ(X, _) :- ВЫП(X), !.` and `ИЛИ(_, X) :- ВЫП(X).`), which is `ПЕРВОЕ` with two goals: one function, two names, and the arity stays 2.  It is the one built-in **without an English spelling** — `or` stays retired, `first` is the English name of `ПЕРВОЕ` — the exception `test_aliases.cpp` names.  It could not be a library clause: a name starting with a capital letter is a variable in mode 0 and a string constant in mode 1, so no `.pld` file can define it (`--list-keywords` 130 → 131) |
 | task_84_sub_string | done | `sub_string(Стр, До, Длина, После, Подстрока)` — the ISO shape of a substring: five arguments, positions and lengths **from zero**, the three counts summing to the length of the string, each given or computed from the other two — and it is **English only**, like `abs`.  `КОПИЯ/4` lost its English alias with it: `substring` is retired with a message, since the ISO predicate of the same family is a name of its own and not a spelling of `КОПИЯ` (which counts from one and takes four arguments).  Known difference from ISO: one answer, not a walk over every occurrence — a built-in cannot hand a choice point back to the solver |
 | task_85_if_then | done | `->` is a sign of the language: `(Условие -> Тогда)` takes the *first* solution of the condition and runs the consequence, and `(Условие -> Тогда ; Иначе)` treats the `;` after it as «иначе» — once the condition has a solution the else branch is dropped for good, *even when the consequence fails*.  That was the one thing neither `;` with a cut (a cut in a branch is local to it) nor `ПЕРВОЕ(C), T ; E` (which falls back to `E`) could say.  `,` binds tighter than `->`, `->` tighter than `;`, both right-nested; the condition is solved in a machine of its own (`callOnce`), so a cut inside it stays there.  The advice that used to answer the sign («не оператор: пишите `ПЕРВОЕ`», task_52) is gone |
-| task_86_examples_shelves | done | `examples/` gained two shelves beside the current programs: `examples/prologd/` — the original PrologD's own example programs (14 files, byte for byte, from the pinned clone `7b7f46f…`), to be run by `prologd.exe` and compared with the port — and `examples/prologu/`, the two examples of the ISO additions (`sub_string_demo.pld`, `if_then_demo.pld`), formatted and checked like the other demos.  The original shelf is **skipped** by the formatter walk and the question sweep, the way `lessons/_old` is: that dialect is not ours to police — and the skip compares the *first path component*, so a future `prologd2` cannot slip under it |
+| task_86_examples_folders | done | `examples/` gained two folders beside the current programs: `examples/prologd/` — the original PrologD's own example programs (14 files, byte for byte, from the pinned clone `7b7f46f…`), to be run by `prologd.exe` and compared with the port — and `examples/prologu/`, the two examples of the ISO additions (`sub_string_demo.pld`, `if_then_demo.pld`), formatted and checked like the other demos.  The original folder is **skipped** by the formatter walk and the question sweep, the way `lessons/_old` is: that dialect is not ours to police — and the skip compares the *first path component*, so a future `prologd2` cannot slip under it |
 | task_87_stop_button_idle | done | «Остановить» is lit for a run in flight and dark for an idle interpreter with a base loaded: a lit stop button reads as «the program is looping» (the user's report), and the base is loaded again by the next start, so that state has nothing to stop.  `_sync_run_actions` uses `self._busy` — a paused step and a wait for input count as a run, and keep the button usable.  Only the *button* changed: `stop_program` still unloads an idle interpreter for a caller that asks directly (the engine switch and a margin click stop the session through `_stop_now`) |
 | task_88_iso_pld | done | `stdlib/iso.pld` — stage 1 of task_82: the ISO names of predicates that already existed (`member/2`, `append/3`, `length/2`, `last/2`, `between/3`, `msort/2` by import; `sort/2`, `forall/2`, `ground/1` are built-ins) plus the seven the library did not have — the type tests `nonvar/1`, `atom/1`, `number/1`, `atomic/1`, `compound/1`, `callable/1`, and `once/1`, `ignore/1`, `succ/2`, `nth1/3`, `memberchk/2`.  One recorded difference from ISO: text here is both an atom and a string, so `atom("молоко")` is true; `succ/2` answers once (the cut in the first clause) and `nth1/3` numbers from one with the index first.  `stdlib_demo.pld` grew an ISO section of 18 checked questions, and `doc/library.typ` a section 8.  Since 2026-10-19 (part 121) it is the **base** of the library: `member/2`, `append/3`, `length/2`, `last/2`, `between/3` and `msort/2` moved in from `lists`/`math` (and `msort/2` from the old `sorts`), which now import it — `msort/2` with its own merge and the two cuts that stop an empty list from dividing itself forever |
 | task_89_sorts_to_examples | done | `stdlib/sorts.pld` became `examples/sorts.pld` (the owner's suggestion): six study sorts of a job the library already answers with `СОРТИРОВКА` and `msort/2` were teaching material, not a library.  The file now carries the demonstration that used to sit in the library tour — eight `%!` questions, so it is checked like the other examples — and `stdlib_demo.pld` dropped the six sorts (81 → 73 questions) with a line pointing at the example.  `doc/library.typ` §4 became «Сортировка и учебные приёмы» (a table of what the example shows), §1 lost the file row, and the examples map, the README and the packaging script name the new home |
 | task_90_standard_order | done | stage 2 of task_82 and the cure for the book program that raised «СОРТИРОВКА: Недопустимый тип аргументов» on a list of pairs: `compareStandardOrder` (`prlib/order.cpp`) orders variables < numbers < text < compounds, compounds by arity, name and arguments, with a path guard for terms that contain themselves; `compare/3` binds `<`, `=` or `>` (or tests a given one) and the four `@` signs are sugar over it (`@=<` and `@>=` under `НЕ`, like `=<`).  A sign where a term is expected is that atom, so `compare(<, A, B)` and `Порядок = <` are written as in ISO.  `СОРТИРОВКА/2` and `msort/2` sort by this order and no longer refuse mixed lists, structures or free variables — only a first argument that is not a proper list.  One recorded difference from ISO: a string here is a kind of its own and one value with the atom of the same letters |
 | task_91_bagof_setof | planned | `bagof/3` and `setof/3` reopened, under the dialect's own names `ВСЕРЕШ/3` and `МНОРЕШ/3` (with the English spellings beside them, as `НАЙТИВСЕ` has `findall`): task_90 removed two of ADR-025's three reasons (the standard order now exists; a built-in can hand its groups to a library recursion instead of owning a choice point), and what is left is the `^` operator (ISO `xfy` 200, not a goal, an error outside `bagof`/`setof`) plus the engine-side analysis of the goal's free variables — the library cannot do it, having neither `==` nor `copy_term`.  The 4-argument form (key named by the caller) works today and is measured; the task file carries the design, the other uses of a choice-point frame (`retract/1`, `clause/2`, `repeat/0`, the occurrences of `sub_string/5`) and the semantics checklist |
-| task_92_iso_signs | done | stage 3 of task_82 — the spellings an ISO reader writes: `X is Выраж`, `Выраж1 =:= Выраж2`, `Выраж1 =\= Выраж2` (operands are arithmetic **without** `#…#`) and `X \= Y` («не унифицируется», `НЕ(РАВНО)`).  The parser decides before it parses the goal (`arithmeticComparisonAhead`: look ahead to the next top-level `,`/`;`/`.`/`\|` and require an arithmetic sign), so `is` stays an ordinary name — `is(X, Y)` and `ф(is)` are structures — and `2 + 3` in goal position is still an error with advice.  `/* … */` is a comment (no nesting; an unclosed one is a lexical error), and the formatter returns any text containing `/*` untouched rather than risk moving a multi-line comment into another clause.  The shelf `examples/iso/` holds six book-style programs (`arith`, `lists`, `family`, `order`, `if_then`, `sub_string` — the last three absorbed `examples/prologu/`, part 125) whose `%!` answers are checked, the GUI tokenizer reads `=:=`, `=\=` and `/*` on a line, and `help.typ` §1, §3.3, §5.1, §15, `prologd-diff.typ` and `technical.typ` §7.1–7.2 say so |
+| task_92_iso_signs | done | stage 3 of task_82 — the spellings an ISO reader writes: `X is Выраж`, `Выраж1 =:= Выраж2`, `Выраж1 =\= Выраж2` (operands are arithmetic **without** `#…#`) and `X \= Y` («не унифицируется», `НЕ(РАВНО)`).  The parser decides before it parses the goal (`arithmeticComparisonAhead`: look ahead to the next top-level `,`/`;`/`.`/`\|` and require an arithmetic sign), so `is` stays an ordinary name — `is(X, Y)` and `ф(is)` are structures — and `2 + 3` in goal position is still an error with advice.  `/* … */` is a comment (no nesting; an unclosed one is a lexical error), and the formatter returns any text containing `/*` untouched rather than risk moving a multi-line comment into another clause.  The folder `examples/iso/` holds six book-style programs (`arith`, `lists`, `family`, `order`, `if_then`, `sub_string` — the last three absorbed `examples/prologu/`, part 125) whose `%!` answers are checked, the GUI tokenizer reads `=:=`, `=\=` and `/*` on a line, and `help.typ` §1, §3.3, §5.1, §15, `prologd-diff.typ` and `technical.typ` §7.1–7.2 say so |
 
 ## Test suite
 
@@ -2761,7 +2761,7 @@ Added on 2026-10-03 while planning task_59:
   nested solve, and that `СОРТИРОВКА` and `БОЛЬШЕ` share one order.  Nothing was renamed and no
   name collided: the course sorts with `вставсорт/2` and `быстрсорт/2`, which are not reserved.
 
-* Examples round, part 83: **the examples folder gets a map and a `problems/` shelf**
+* Examples round, part 83: **the examples folder gets a map and a `problems/` folder**
   (2026-10-05).  The user asked to reformat `examples/*`: add examples for the predicates the
   dialect gained (`ПЕРВОЕ`, `СОРТИРОВКА`, `ПОЛНЫЙ`, `ДЛЯВСЕХ`), and put `factorial`, `monk*` and a
   new knapsack under `problems/`.
@@ -4208,9 +4208,9 @@ tests passed»: шаг обнаружения читает вывод в код�
 25 оконных сюит и `protocol_smoke.py` зелёные, шесть документов собираются без
 замечаний.  Руками — таблица ответов и замеры форматтера в `ai/task_85_if_then.md`.
 
-### 118. Две полки примеров: оригинал и дополнения (2026-10-13)
+### 118. Две папки примеров: оригинал и дополнения (2026-10-13)
 
-Задача 86.  Владелец попросил разложить `examples` на полки: программы
+Задача 86.  Владелец попросил разложить `examples` на папки: программы
 первоначального Пролог-Д, текущие и примеры дополнений.  Текущие остались на месте
 («можно наверное оставить так») — это его же уточнение, — поэтому новых двух полок
 две: `examples/prologd/` и `examples/prologu/`.
@@ -4224,14 +4224,14 @@ tests passed»: шаг обнаружения читает вывод в код�
   подстроки) и `if_then_demo.pld` (`->`).  Оба в стандартной форме, с
   `%!`-обещаниями, и проверяются как остальные демонстрации: `checkedExamples()` и
   `PINNED` (8 и 7 вопросов).
-* Полка оригинала — не наш корпус: другой конец предложения, другие имена, часть не
+* Папка оригинала — не наш корпус: другой конец предложения, другие имена, часть не
   разбирается.  Поэтому её пропускают **обе** прогулки форматтера и обе сверки
-  вопросов в `test_queries.py`; имя полки сравнивается по первому компоненту пути,
-  чтобы будущая полка `prologd2` не попала под пропуск случайно.
+  вопросов в `test_queries.py`; имя папки сравнивается по первому компоненту пути,
+  чтобы будущая папка `prologd2` не попала под пропуск случайно.
 * Документы: `examples/README.md` (карта полок), `examples/prologd/README.md`,
   раздел про examples в корневом `README.md`.
 
-*Ловушки.*  Полка сломала обе прогулки форматтера — вторая («каждый поставляемый
+*Ловушки.*  Папка сломала обе прогулки форматтера — вторая («каждый поставляемый
 файл уже в стандартной форме») пропускала только `_old` и споткнулась о первый же
 файл оригинала.  И `create_file` пишет CRLF, а форматтер сверяет байты: оба новых
 файла после создания переведены в LF.
@@ -4243,7 +4243,7 @@ tests passed»: шаг обнаружения читает вывод в код�
 Портативный пакет собран заново (`tools/build_portable.ps1`, все восемь стадий, в том
 числе `ctest` и шесть документов): `dist\prologd-2.3.0-win64` — 324 файла, 96,7 МиБ,
 архив `prologd-2.3.0-win64.zip` — 38,2 МиБ (40 068 240 байт; у 2.2.0 было
-39 786 345).  Обе полки в пакете на месте, и обе проверены запуском **из пакета**:
+39 786 345).  Обе папки в пакете на месте, и обе проверены запуском **из пакета**:
 `prologu.exe` отвечает на `examples\prologu\if_then_demo.pld` и
 `examples\prologu\sub_string_demo.pld`, а `prologd.exe` считает
 `examples\prologd\factorial.pld` (`ф=720`) и грузит `examples\prologd\lessons\lesson 1.pld`
@@ -4461,11 +4461,11 @@ ISO до конца».
 * Окно: `tokens.py` читает `=:=` и `=\=` тремя символами, `\=` двумя (раньше чем
   `=`), а `/*` до `*/` — комментарием строки (незакрытый красит остаток строки:
   токенизатор видит одну строку).
-* Примеры: полка `examples/iso/` — `arith.pld` (16 вопросов: `is`, `=:=`, `=\=`,
+* Примеры: папка `examples/iso/` — `arith.pld` (16 вопросов: `is`, `=:=`, `=\=`,
   `\=`), `lists.pld` (10: `member`, `append`, `length`, `last`, `nth1`, `msort`,
   `sort`), `family.pld` (4: родословная, `findall`, `length`, `\=`), `order.pld`
   (10: `compare/3`, `@<`, две сортировки).  Все четыре в `checkedExamples()` и в
-  `PINNED`; в шапке каждого — `/* … */`, так что полка заодно держит и блочный
+  `PINNED`; в шапке каждого — `/* … */`, так что папка заодно держит и блочный
   комментарий.
 * Документы: `help.typ` §1 (два вида комментария), §3.3 (знаки, таблица «знак —
   та же цель», почему `#…#` остаётся), §5.1 (`=:=`/`=\=` — сравнение выражений),
@@ -4495,12 +4495,12 @@ ISO до конца».
 
 *Verified.*  `ctest` 361/361; 25 оконных сюит и `protocol_smoke.py` зелёные; семь
 документов `doc/*.typ` собираются без замечаний.  Руками: `prologu -I stdlib -s`
-по каждому из четырёх примеров полки.
+по каждому из четырёх примеров папки.
 
-### 125. Полка `iso` одна: `prologu` влит в неё (2026-10-21)
+### 125. Папка `iso` одна: `prologu` влит в неё (2026-10-21)
 
 Владелец: «уберем `prologu`, а то что там перенесём в `iso`» — и заодно правило
-для полки: встроенные предикаты писать по-английски, комментарии оставить
+для папки: встроенные предикаты писать по-английски, комментарии оставить
 русскими.
 
 * `examples/prologu/` больше нет.  `standard_order_demo.pld` слит в
@@ -4509,21 +4509,98 @@ ISO до конца».
   `if_then_demo.pld` стал `examples/iso/if_then.pld` (8), `sub_string_demo.pld` —
   `examples/iso/sub_string.pld` (7).  Таблицы `checkedExamples()`, `PINNED`,
   `examples/README.md` и `README.md` знают только `iso/`.
-* Встроенные имена в полке — английские: `findall`, `sort`, `msort`, `compare`,
+* Встроенные имена в папке — английские: `findall`, `sort`, `msort`, `compare`,
   `member`, `append`, `length`, `last`, `nth1`, `sub_string`, `is`, `=:=`, `=\=`,
   `\=`; `НАЙТИВСЕ`/`СОРТИРОВКА`/`РАВНО(1, 1)` заменены (`РАВНО(1, 1)` стал
   `1 = 1`).  Названия своих предикатов остались русскими (`пролог/2`, `цена/2`,
   `дешёвое/1`) — это не встроенные имена.
-* Проза в полке приведена к одному виду: нет оборотов «это А, а не Б» («это
+* Проза в папке приведена к одному виду: нет оборотов «это А, а не Б» («это
   неудача, а не ошибка» → «это неудача»; «ошибкой, а не неудачей» → «ошибка»),
   тире везде длинное `—`, двойных пробелов в фразах нет.  Двойной пробел в строке
   `% Запуск:  prologu …` оставлен: так он стоит во всех примерах и служит
   выравниванием подписи, а не паузой в тексте.  Те же обороты убраны из абзацев
   `help.typ` §3.3 и `prologd-diff.typ`, написанных для этих знаков.
 * Проверки: `--print` пересчитал `PINNED` (`iso/order` 10 → 13, новые 8 и 7),
-  форматная выборка не изменилась (файлы полки начинаются с `/*` и потому
+  форматная выборка не изменилась (файлы папки начинаются с `/*` и потому
   возвращаются форматтером как есть).
 
 *Verified.*  `ctest` 361/361; 25 оконных сюит зелёные; документы `doc/*.typ`
-  собираются без замечаний; каждый файл полки прогнан через
+  собираются без замечаний; каждый файл папки прогнан через
   `prologu -I stdlib -s`.
+
+### 126. Имена без `_demo`, башня без следа, `ИМЕНА(2)` из примеров (2026-10-21)
+
+Три просьбы владельца разом: снять `_demo` у примеров, починить Ханойскую башню
+(диск рисуется на новом месте, а на старом остаётся) и убрать `ИМЕНА(2)` из
+примера.
+
+* **Переименования** (`git mv`, история сохранена): `findall_demo` → `findall`,
+  `first_demo` → `first`, `forall_demo` → `forall`, `ground_demo` → `ground`,
+  `import_demo` → `import`, `sort_demo` → `sort`, `stdlib_demo` → `stdlib`
+  (вместе с `stdlib_demo.input.txt` → `stdlib.input.txt`).  Заодно `sorts.pld` →
+  `sorting.pld`: рядом с `sort.pld` прежнее имя отличалось одной буквой.
+* **Ссылки**: `README.md`, `examples/README.md`, `doc/help.typ`, `doc/library.typ`,
+  `stdlib/README.md`, `src/tests/CMakeLists.txt` (`PROLOGD_DEMO`),
+  `src/tests/cli_format.cmake`, `src/tests/test_lessons.cpp`, `PINNED`,
+  `tools/build_portable.ps1`, `tools/portable-readme.txt`, `ai/README.md`,
+  `ai/porting_notes.md` и строки `% Запуск:` в шапках.
+* **Ханойская башня.**  Причина «следа» — цвет: `disk(..., 15)` стирал старое
+  место «белым» из старой палитры, а после перехода на 0xRRGGBB (task_63) 15 —
+  это 0x00000F, почти чёрный.  Теперь стирают 16777215.  Белая заливка фона
+  делается один раз перед игрой (экран по умолчанию чёрный), а не в каждом кадре.
+  В `monkd.pld` заодно `make(0,_,_)` → `make(0,_,_,_)`: стоп-предложение было
+  написано с арностью 3 и не вызывалось вовсе, поэтому «0» игру не заканчивал, а
+  запрос отвечал `НЕТ`.
+* **`ИМЕНА(2)`.**  `examples/lib/old_lib_2.pld` объявляет теперь `:- ИМЕНА(1).`;
+  написание `2` остаётся принятым (`test_builtins_control.cpp`,
+  `test_formatter.cpp`, `test_variable_modes.py`), но в примерах его больше нет.
+  Шапки `old_lib_2.pld` и `use_old_names.pld` переписаны под это.
+
+*Verified.*  `ctest` 361/361; 25 оконных сюит и `protocol_smoke.py` зелёные;
+  документы `doc/*.typ` собираются без замечаний; каждый пример совпадает с
+  выводом `prologu --format soft`.
+
+### 127. Башня в цвете, `names.pld` (2026-10-21)
+
+Владелец: «в monk* подключить `graphics.pld` и сделать нормальные цвета» и
+«`use_old_names.pld` -> `names.pld`».
+
+* **Цвета.**  Оба файла подключают `stdlib/graphics.pld` и берут цвет из его
+  имён: `colour(N, Цвет)` крутит семь цветов (`красный`, `оранжевый`, `жёлтый`,
+  `зелёный`, `голубой`, `синий`, `пурпурный`) по размеру диска — `Остаток is
+  (N - 1) mod 7 + 1`.  Рамка диска теперь чёрная, заливка цветная: `frame/6`
+  принимает два цвета (линия и заливка), `disk/3` берёт чёрный и цвет диска,
+  `erase/3` — белый и белый.
+* **Точка назначения.**  `monk(N)` вызывала `move(N,1,2,3,…)`, то есть башня
+  переезжала на стержень **2**, а шапка обещала третий.  Теперь `move(N,1,3,2,…)`,
+  и обещание верно; картинка проверена снимком экрана через протокол.
+* **`names.pld`.**  `examples/use_old_names.pld` → `examples/names.pld`
+  (`git mv`); обновлены `checkedExamples()`, `PINNED` и строка в
+  `examples/README.md` — файл теперь есть в карте папки.
+* Проверки: снимок экрана через `--protocol json` (`graphics_snapshot`) — башня
+  из шести дисков стоит на третьем стержне, следов на старом месте нет;
+  `monkd.pld` рисует четыре диска на первом.
+
+*Verified.*  `ctest` 361/361; 25 оконных сюит и `protocol_smoke.py` зелёные;
+  документы собираются; оба файла совпадают с выводом `--format soft`.
+
+### 128. Слово «полка» убрано, порядок `БОЛЬШЕ` объяснён (2026-10-21)
+
+* **«Полка».**  Владелец: «Что такое Полка, я не знаю этот термин».  Это была наша
+  метафора (задача 86) вместо «отдельной папки с примерами», нигде не определённая.
+  Заменена на «папку» в `examples/README.md` (там же шапка таблицы), в
+  `examples/prologd/README.md`, `tools/portable-readme.txt` и в записях `ai/`
+  (части 118, 124–127, `task_82`, `task_86`, `task_92`); английское «shelf» в
+  комментариях `test_formatter.cpp`, `test_lessons.cpp`, `test_queries.py` — тоже
+  «folder».  Файл задачи 86 переименован: `task_86_examples_shelves.md` →
+  `task_86_examples_folders.md`.
+* **`stdlib/README.md`.**  Фраза «у них тот же порядок, что у `СОРТИРОВКА`»
+  перестала быть верной после задачи 90: `БОЛЬШЕ(ф(1), 1)` — ошибка типа, а
+  `СОРТИРОВКА([ф(1), 1, молоко], S)` даёт `S=[1,молоко,ф(1)]` (проверено).
+  Теперь там сказано, что порядок `БОЛЬШЕ`/`МЕНЬШЕ` числовой, а любые термы
+  упорядочивает стандартный порядок (`@<`, `compare/3`), которым сортируют
+  `СОРТИРОВКА` и `msort/2`.  Владелец заодно убрал из этого README таблицу
+  «что стало с первой библиотекой» и сократил раздел про имена.
+
+*Verified.*  `ctest` 361/361; окна и `protocol_smoke.py` зелёные; документы
+  собираются.

@@ -360,7 +360,7 @@ try {
                 'doc\help.pdf', 'doc\builtins.json',
                 'doc\prologd2.png', 'doc\csu.png',
                 'examples\lib\library.pld', 'examples\lessons\lesson_01.pld',
-                'examples\problems\knapsack.pld', 'examples\sorts.pld',
+                'examples\problems\knapsack.pld', 'examples\sorting.pld',
                 'stdlib\lists.pld', 'stdlib\sets.pld', 'stdlib\iso.pld',
                 'stdlib\iso.pld',
                 $memoName)
@@ -403,13 +403,13 @@ try {
     try {
         & $packagedExe -s 'examples\lessons\lesson_01.pld' > $null 2>&1
         Assert-Exit 'lesson_01.pld'
-        & $packagedExe -I 'examples\lib' -s 'examples\import_demo.pld' > $null 2>&1
-        Assert-Exit 'import_demo.pld with -I examples\lib'
+        & $packagedExe -I 'examples\lib' -s 'examples\import.pld' > $null 2>&1
+        Assert-Exit 'import.pld with -I examples\lib'
         # No `-I` here on purpose: the interpreter is meant to find the standard
         # library beside itself, and this is where that promise is kept or broken.
-        & $packagedExe -i 'examples\stdlib_demo.input.txt' `
-            -s 'examples\stdlib_demo.pld' > $null 2>&1
-        Assert-Exit 'stdlib_demo.pld with the standard library beside the interpreter'
+        & $packagedExe -i 'examples\stdlib.input.txt' `
+            -s 'examples\stdlib.pld' > $null 2>&1
+        Assert-Exit 'stdlib.pld with the standard library beside the interpreter'
     } finally {
         Pop-Location
     }

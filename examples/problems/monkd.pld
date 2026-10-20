@@ -2,10 +2,14 @@
 %
 % Программа спрашивает номер переноса — две цифры: со стержня и на стержень
 % (12, 13, 21, 23, 31, 32) — и отказывается делать невозможный ход словом
-% «Нельзя!». Это та же задача, что в monk.pld, но решает её не программа,
-% а читатель.
+% «Нельзя!». Ноль заканчивает игру. Это та же задача, что в monk.pld, но решает
+% её не программа, а читатель. Диск со старого места стирается белым, а цвет
+% берётся из stdlib/graphics.pld — по кругу из семи, от размера диска.
 %
 % Запуск:  prologu -s examples/problems/monkd.pld
+% В дереве исходников, где папки stdlib рядом с интерпретатором нет, — с ключом
+% -I:  prologu -I stdlib -s examples/problems/monkd.pld
+:- ИМПОРТ("graphics.pld").
 
 monk(N):-begin(N,A,B,C), move(A,B,C).
 begin(N,A,[],[]):-БОЛЬШЕ(N,0), МЕНЬШЕ(N,11), list(N,B), rev(B,A), pyr(A).
@@ -18,53 +22,66 @@ conc([H|A],B,[H|C]):-conc(A,B,C).
 len([],0).
 len([_|B_],L_):-len(B_,M), СЛОЖЕНИЕ(M,1,L_).
 pyr([]).
-pyr([N|T_]):-len(T_,H), disk(N,1,H,N), pyr(T_).
+pyr([N|T_]):-len(T_,H), disk(N,1,H), pyr(T_).
 move(A,B,C):-ask(R), make(R,A,B,C).
-ask(R):-ВВОДЦЕЛ(R,"Введите инструкцию Монаху, например, 12 или 13...").
-make(0,_,_).
+ask(R):-ВВОДЦЕЛ(R,"Ход: 12 или 13; 0 — конец...").
+make(0,_,_,_).
 make(12,[],B,C):-move([],B,C).
-make(12,[A_|A],[],C):-len(A,D), disk(A_,1,D,15), disk(A_,2,0,A_),
-	move(A,[A_],C).
+make(12,[A_|A],[],C):-len(A,D), erase(A_,1,D), disk(A_,2,0), move(A,[A_],C).
 make(12,[A_|A],[B_|B],C):-БОЛЬШЕ(A_,B_), ВЫВОД("Нельзя!"),
 	move([A_|A],[B_|B],C).
-make(12,[A_|A],[B_|B],C):-МЕНЬШЕ(A_,B_), len(A,D), disk(A_,1,D,15),
-	len([B_|B],E), disk(A_,2,E,A_), move(A,[A_,B_|B],C).
+make(12,[A_|A],[B_|B],C):-МЕНЬШЕ(A_,B_), len(A,D), erase(A_,1,D), len([B_|B],E),
+	disk(A_,2,E), move(A,[A_,B_|B],C).
 make(13,[],B,C):-move([],B,C).
-make(13,[A_|A],B,[]):-len(A,D), disk(A_,1,D,15), disk(A_,3,0,A_),
-	move(A,B,[A_]).
+make(13,[A_|A],B,[]):-len(A,D), erase(A_,1,D), disk(A_,3,0), move(A,B,[A_]).
 make(13,[A_|A],B,[C_|C]):-БОЛЬШЕ(A_,C_), ВЫВОД("Нельзя!"),
 	move([A_|A],B,[C_|C]).
-make(13,[A_|A],B,[C_|C]):-МЕНЬШЕ(A_,C_), len(A,D), disk(A_,1,D,15),
-	len([C_|C],E), disk(A_,3,E,A_), move(A,B,[A_,C_|C]).
+make(13,[A_|A],B,[C_|C]):-МЕНЬШЕ(A_,C_), len(A,D), erase(A_,1,D), len([C_|C],E),
+	disk(A_,3,E), move(A,B,[A_,C_|C]).
 make(23,A,[],C):-move(A,[],C).
-make(23,A,[B_|B],[]):-len(B,D), disk(B_,2,D,15), disk(B_,3,0,B_),
-	move(A,B,[B_]).
+make(23,A,[B_|B],[]):-len(B,D), erase(B_,2,D), disk(B_,3,0), move(A,B,[B_]).
 make(23,A,[B_|B],[C_|C]):-БОЛЬШЕ(B_,C_), ВЫВОД("Нельзя!"),
 	move(A,[B_|B],[C_|C]).
-make(23,A,[B_|B],[C_|C]):-МЕНЬШЕ(B_,C_), len(B,D), disk(B_,2,D,15),
-	len([C_|C],E), disk(B_,3,E,B_), move(A,B,[B_,C_|C]).
+make(23,A,[B_|B],[C_|C]):-МЕНЬШЕ(B_,C_), len(B,D), erase(B_,2,D), len([C_|C],E),
+	disk(B_,3,E), move(A,B,[B_,C_|C]).
 make(21,A,[],C):-move(A,[],C).
-make(21,[],[B_|B],C):-len(B,D), disk(B_,2,D,15), disk(B_,1,0,B_),
-	move([B_],B,C).
+make(21,[],[B_|B],C):-len(B,D), erase(B_,2,D), disk(B_,1,0), move([B_],B,C).
 make(21,[A_|A],[B_|B],C):-БОЛЬШЕ(B_,A_), ВЫВОД("Нельзя!"),
 	move([A_|A],[B_|B],C).
-make(21,[A_|A],[B_|B],C):-МЕНЬШЕ(B_,A_), len(B,D), disk(B_,2,D,15),
-	len([A_|A],E), disk(B_,1,E,B_), move([B_,A_|A],B,C).
+make(21,[A_|A],[B_|B],C):-МЕНЬШЕ(B_,A_), len(B,D), erase(B_,2,D), len([A_|A],E),
+	disk(B_,1,E), move([B_,A_|A],B,C).
 make(32,A,B,[]):-move(A,B,[]).
-make(32,A,[],[C_|C]):-len(C,D), disk(C_,3,D,15), disk(C_,2,0,C_),
-	move(A,[C_],C).
+make(32,A,[],[C_|C]):-len(C,D), erase(C_,3,D), disk(C_,2,0), move(A,[C_],C).
 make(32,A,[B_|B],[C_|C]):-БОЛЬШЕ(C_,B_), ВЫВОД("Нельзя!"),
 	move(A,[B_|B],[C_|C]).
-make(32,A,[B_|B],[C_|C]):-МЕНЬШЕ(C_,B_), len(C,D), disk(C_,3,D,15),
-	len([B_|B],E), disk(C_,2,E,C_), move(A,[C_,B_|B],C).
+make(32,A,[B_|B],[C_|C]):-МЕНЬШЕ(C_,B_), len(C,D), erase(C_,3,D), len([B_|B],E),
+	disk(C_,2,E), move(A,[C_,B_|B],C).
 make(31,A,B,[]):-move(A,B,[]).
-make(31,[],B,[C_|C]):-len(C,D), disk(C_,3,D,15), disk(C_,1,0,C_),
-	move([C_],B,C).
+make(31,[],B,[C_|C]):-len(C,D), erase(C_,3,D), disk(C_,1,0), move([C_],B,C).
 make(31,[A_|A],B,[C_|C]):-БОЛЬШЕ(C_,A_), ВЫВОД("Нельзя!"),
 	move([A_|A],B,[C_|C]).
-make(31,[A_|A],B,[C_|C]):-МЕНЬШЕ(C_,A_), len(C,D), disk(C_,3,D,15),
-	len([A_|A],E), disk(C_,1,E,C_), move([C_,A_|A],B,C).
-disk(N,S,H,C_):-box(#S*100-5*N#,#300-10*H-1#,#S*100+5*N#,#300-10*H-10#,C_).
-box(A_,B_,C_,D,E):-ЛИНИЯ(A_,B_,A_,D,E), ЛИНИЯ(A_,D,C_,D,E), ЛИНИЯ(C_,D,C_,B_,E),
-	ЛИНИЯ(C_,B_,A_,B_,E), ЗАКРАСКА(#A_+1#,#B_-1#,E).
-?monk(4).
+make(31,[A_|A],B,[C_|C]):-МЕНЬШЕ(C_,A_), len(C,D), erase(C_,3,D), len([A_|A],E),
+	disk(C_,1,E), move([C_,A_|A],B,C).
+
+% disk(N,S,H) — диск размера N на стержне S на высоте H, erase — то же место
+% белым: диск переехал, и старого места быть не должно.
+disk(N,S,H):-colour(N,Цвет), чёрный(Линия),
+	frame(#S*100-5*N#,#300-10*H-1#,#S*100+5*N#,#300-10*H-10#,Линия,Цвет).
+erase(N,S,H):-белый(Белый),
+	frame(#S*100-5*N#,#300-10*H-1#,#S*100+5*N#,#300-10*H-10#,Белый,Белый).
+frame(A_,B_,C_,D_,Линия,Заливка):-ЛИНИЯ(A_,B_,A_,D_,Линия),
+	ЛИНИЯ(A_,D_,C_,D_,Линия), ЛИНИЯ(C_,D_,C_,B_,Линия), ЛИНИЯ(C_,B_,A_,B_,Линия),
+	ЗАКРАСКА(#A_+1#,#B_-1#,Заливка).
+
+% Цвет диска — по его размеру, по кругу из семи цветов библиотеки
+colour(N,Цвет):-Остаток is (N - 1) mod 7 + 1, colour_of(Остаток,Цвет).
+colour_of(1,Цвет):-красный(Цвет).
+colour_of(2,Цвет):-оранжевый(Цвет).
+colour_of(3,Цвет):-жёлтый(Цвет).
+colour_of(4,Цвет):-зелёный(Цвет).
+colour_of(5,Цвет):-голубой(Цвет).
+colour_of(6,Цвет):-синий(Цвет).
+colour_of(7,Цвет):-пурпурный(Цвет).
+
+% Экран по умолчанию чёрный: сначала заливаем его белым, потом ставим башню.
+?ЗАКРАСКА(1, 1, 16777215), monk(4).

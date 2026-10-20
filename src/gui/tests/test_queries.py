@@ -91,11 +91,11 @@ PINNED: dict[str, int] = {
     "diamond/right.pld": 0,
     "drawing.pld": 1,
     "file_io.pld": 3,
-    "findall_demo.pld": 2,
-    "first_demo.pld": 5,
-    "forall_demo.pld": 5,
-    "ground_demo.pld": 7,
-    "import_demo.pld": 2,
+    "findall.pld": 2,
+    "first.pld": 5,
+    "forall.pld": 5,
+    "ground.pld": 7,
+    "import.pld": 2,
     "iso/arith.pld": 16,
     "iso/family.pld": 4,
     "iso/if_then.pld": 8,
@@ -130,10 +130,10 @@ PINNED: dict[str, int] = {
     "problems/knapsack.pld": 2,
     "problems/monk.pld": 2,
     "problems/monkd.pld": 1,
-    "sort_demo.pld": 7,
-    "sorts.pld": 8,
-    "stdlib_demo.pld": 73,
-    "use_old_names.pld": 3,
+    "sort.pld": 7,
+    "sorting.pld": 8,
+    "stdlib.pld": 73,
+    "names.pld": 3,
 }
 
 
@@ -178,7 +178,7 @@ def interpreter_keywords() -> Keywords:
 def example_files() -> list[pathlib.Path]:
     """Every example program of *this* dialect, sorted.
 
-    `examples/prologd` is the original dialect's own shelf (task_86): those
+    `examples/prologd` is the original dialect's own folder (task_86): those
     programs are kept exactly as they were written there, so neither the question
     rule nor the count of markers has anything to say about them.
     """

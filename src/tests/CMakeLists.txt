@@ -54,7 +54,7 @@ catch_discover_tests(prlib_tests)
 # Command-line integration tests
 # ---------------------------------------------------------------------------
 if(TARGET prologu)
-  set(PROLOGD_DEMO "${CMAKE_SOURCE_DIR}/examples/findall_demo.pld")
+  set(PROLOGD_DEMO "${CMAKE_SOURCE_DIR}/examples/findall.pld")
 
   add_test(NAME cli_source_short COMMAND prologu -s "${PROLOGD_DEMO}")
   add_test(NAME cli_source_long COMMAND prologu --source "${PROLOGD_DEMO}")
@@ -80,7 +80,7 @@ if(TARGET prologu)
 
   add_test(NAME cli_include
     COMMAND prologu -I "${CMAKE_SOURCE_DIR}/examples/lib"
-            -s "${CMAKE_SOURCE_DIR}/examples/import_demo.pld")
+            -s "${CMAKE_SOURCE_DIR}/examples/import.pld")
   set_tests_properties(cli_include PROPERTIES
     PASS_REGULAR_EXPRESSION "Дважды=42")
 
