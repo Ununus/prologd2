@@ -239,7 +239,10 @@ int main(int argc, char** argv) {
 
   prologd::Engine engine;
   if (!inputFile.empty()) {
-    inputStream.open(inputFile);
+    // `-i`, `-o` and `-e` name files from the command line, which is UTF-8 like
+    // every other name here (part 133): the narrow `open` would read the bytes in
+    // the process's ANSI code page instead.
+    inputStream.open(prologd::fromUtf8Path(inputFile));
     if (!inputStream) {
       std::cerr << "Cannot open input file: " << inputFile << '\n';
       return 1;
@@ -247,7 +250,7 @@ int main(int argc, char** argv) {
     engine.setStreams(inputStream, std::cout, std::cerr);
   }
   if (!outputFile.empty()) {
-    outputStream.open(outputFile);
+    outputStream.open(prologd::fromUtf8Path(outputFile));
     if (!outputStream) {
       std::cerr << "Cannot open output file: " << outputFile << '\n';
       return 1;
@@ -256,7 +259,7 @@ int main(int argc, char** argv) {
                       errorFile.empty() ? std::cerr : errorStream);
   }
   if (!errorFile.empty()) {
-    errorStream.open(errorFile);
+    errorStream.open(prologd::fromUtf8Path(errorFile));
     if (!errorStream) {
       std::cerr << "Cannot open error file: " << errorFile << '\n';
       return 1;

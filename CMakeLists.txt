@@ -178,9 +178,16 @@ if(BUILD_WITH_PROLOGD)
   # against must not change under our feet.  The pinned one answers protocol 13 —
   # a *documented subset* of ours (its own `src/protocol.cpp` says so): the requests
   # and events both engines share exist, stepping, tracing, formatting and graphics
-  # do not.
-  set(PROLOGD_ENGINE_COMMIT "7b7f46fac9cee340f679953947d23ea165eb8135"
-      CACHE STRING "Commit of the original engine to build")
+  # do not.  Bumped in part 133 to the commit that made its paths UTF-8
+  # (`ce23afb`): a Cyrillic file name on the command line, in `-I` and in
+  # `?ИМПОРТ("…")` is taken as it was typed.
+  #
+  # Not a cache variable on purpose: a cache entry is written once, by the first
+  # configure, and every later bump of the pin would then be invisible in a tree
+  # that has already been built.  To build against another commit, point
+  # `PROLOGD_ENGINE_SOURCE` at a clone of it — that is the override this file
+  # documents.
+  set(PROLOGD_ENGINE_COMMIT "4f8425aa5a427749ea240a7c53e2c5e75142fb52")
   set(PROLOGD_ENGINE_SOURCE ""
       CACHE PATH "An existing clone of the original engine; skips the download")
 

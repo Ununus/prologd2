@@ -32,6 +32,13 @@ The console interpreter is `build/src/cli/prologu`.
 ./build/src/cli/prologu < examples/findall.pld
 ```
 
+File names — `-s`, `-I`, `-i`, `-o`, `-e`, a positional argument, and the name
+inside `ИМПОРТ("…")` — are UTF-8, so a path with Cyrillic letters is taken as it
+was typed (`-s "примеры/файл.pld"`).  On Windows the process code page comes from
+the embedded manifest (`src/utf8.manifest`), and `prlib` converts every path
+explicitly through `fromUtf8Path`/`toUtf8Path`, so neither depends on the system
+ANSI page being able to spell the name.
+
 ### Windows
 
 Prerequisites: Git, CMake 3.24 or newer, and Visual Studio 2026 with the

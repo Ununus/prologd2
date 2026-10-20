@@ -198,6 +198,44 @@ TEST_CASE("import works with UTF-8 file names") {
   REQUIRE(outcome.output == "X=мир\n");
 }
 
+TEST_CASE("a Cyrillic path names the program and the directory its imports come from") {
+  // The program's own name is UTF-8, so the directory it lives in is found through
+  // the same conversion as everything else — and an import beside it is read from
+  // there, not from the working directory (part 133, the rule the original engine
+  // gained with `path_utf8`).
+  TempDir dir;
+  const fs::path program_dir = dir.path() / fromUtf8Path("примеры");
+  fs::create_directories(program_dir);
+  {
+    std::ofstream library(program_dir / fromUtf8Path("книги.pld"), std::ios::binary);
+    library << "удвоить(Ч, Д):-УМНОЖЕНИЕ(Ч, 2, Д).\n";
+  }
+  {
+    std::ofstream program(program_dir / fromUtf8Path("программа.pld"), std::ios::binary);
+    program << "?ИМПОРТ(\"книги.pld\").\n?удвоить(21, Д).\n";
+  }
+  const LoadOutcome outcome = load(program_dir / fromUtf8Path("программа.pld"));
+  REQUIRE(outcome.ok);
+  REQUIRE(outcome.output == "Д=42\n");
+}
+
+TEST_CASE("an include directory with a Cyrillic name is searched") {
+  TempDir dir;
+  TempDir shared;
+  const fs::path include_dir = shared.path() / fromUtf8Path("библиотека");
+  fs::create_directories(include_dir);
+  {
+    std::ofstream library(include_dir / fromUtf8Path("книги.pld"), std::ios::binary);
+    library << "привет(мир).\n";
+  }
+  dir.write("main.pld",
+            "?ИМПОРТ(\"книги.pld\").\n"
+            "?привет(X).\n");
+  const LoadOutcome outcome = load(dir.path() / "main.pld", {include_dir});
+  REQUIRE(outcome.ok);
+  REQUIRE(outcome.output == "X=мир\n");
+}
+
 TEST_CASE("the diamond example loads its shared module once") {
   // `examples/diamond`: the top file imports two branches, each branch imports
   // `base.pld`, and the top file imports it directly as well - three paths to a

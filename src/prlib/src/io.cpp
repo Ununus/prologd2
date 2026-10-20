@@ -2,6 +2,8 @@
 
 #include <utility>
 
+#include "prlib/utf8_path.hpp"
+
 namespace prologd {
 
 IoContext::IoContext(std::istream& input, std::ostream& output, std::ostream& error)
@@ -199,7 +201,11 @@ bool IoContext::openInput(const std::string& path) {
   if (path.empty() || path == "con:" || path == "con") {
     return true;
   }
-  file_input_.open(path);
+  // The name arrives from the program's own text, which is UTF-8, while a narrow
+  // `open` reads its argument in the process's ANSI code page: on a machine whose
+  // ANSI page has no Cyrillic, `ЧТЕНИЕ_ИЗ("файл.txt")` would ask for `????.txt`.
+  // The helper is what makes the name mean what it says (part 133).
+  file_input_.open(fromUtf8Path(path));
   if (!file_input_.is_open()) {
     return false;
   }
@@ -221,7 +227,7 @@ bool IoContext::openOutput(const std::string& path) {
   if (path.empty() || path == "con:" || path == "con") {
     return true;
   }
-  file_output_.open(path);
+  file_output_.open(fromUtf8Path(path));
   if (!file_output_.is_open()) {
     return false;
   }

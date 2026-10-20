@@ -84,6 +84,40 @@ if(TARGET prologu)
   set_tests_properties(cli_include PROPERTIES
     PASS_REGULAR_EXPRESSION "Дважды=42")
 
+  # Part 133: a name of a file is UTF-8 — on the command line, in `-I` and in
+  # `?ИМПОРТ("…")` — so a Cyrillic path is taken as it was typed.  The directory and
+  # the programs are written here, at configure time; the needles are ASCII on
+  # purpose, because CMake decodes a child's output with the code page of the build's
+  # console (`cli_diagnostics.cmake` says the same in its own comment).
+  set(prologu_cyrillic "${CMAKE_CURRENT_BINARY_DIR}/кириллица")
+  file(MAKE_DIRECTORY "${prologu_cyrillic}" "${prologu_cyrillic}/библиотеки")
+  file(WRITE "${prologu_cyrillic}/программа.pld" "?СЛОЖЕНИЕ(2, 3, С).\n")
+  file(WRITE "${prologu_cyrillic}/вход.txt" "hello\n")
+  file(WRITE "${prologu_cyrillic}/чтение.pld" "?ВВОДСТР(X).\n")
+  file(WRITE "${prologu_cyrillic}/библиотеки/библиотека.pld"
+       "удвоить(Ч, Д):-УМНОЖЕНИЕ(Ч, 2, Д).\n")
+  file(WRITE "${prologu_cyrillic}/импорт.pld"
+       "?ИМПОРТ(\"библиотека.pld\").\n?удвоить(21, Д).\n")
+
+  add_test(NAME cli_cyrillic_path
+    COMMAND prologu -s "${prologu_cyrillic}/программа.pld")
+  set_tests_properties(cli_cyrillic_path PROPERTIES
+    PASS_REGULAR_EXPRESSION "=5")
+
+  # `-i` names a file too, and the same conversion opens it.
+  add_test(NAME cli_cyrillic_input_file
+    COMMAND prologu -s "${prologu_cyrillic}/чтение.pld"
+            -i "${prologu_cyrillic}/вход.txt")
+  set_tests_properties(cli_cyrillic_input_file PROPERTIES
+    PASS_REGULAR_EXPRESSION "X=hello")
+
+  # The library lies in another Cyrillic directory, so only `-I` can find it.
+  add_test(NAME cli_cyrillic_include
+    COMMAND prologu -I "${prologu_cyrillic}/библиотеки"
+            -s "${prologu_cyrillic}/импорт.pld")
+  set_tests_properties(cli_cyrillic_include PROPERTIES
+    PASS_REGULAR_EXPRESSION "Д=42")
+
   # task_32: an import that cannot be resolved must name the directories that
   # were searched, so a working-folder mistake is visible in the front-end.
   add_test(NAME cli_import_search_report

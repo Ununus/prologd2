@@ -8,9 +8,12 @@
 #include <string>
 #include <vector>
 
+#include "prlib/utf8_path.hpp"
 #include "test_helpers.hpp"
 
+using prologd::fromUtf8Path;
 using prologd::test::runProgram;
+using prologd::toUtf8PathGeneric;
 
 namespace {
 
@@ -128,6 +131,27 @@ TEST_CASE("file write and read round-trip") {
   const auto result = runProgram(source);
   REQUIRE(result.loaded);
   REQUIRE(result.output == "X=данные\n");
+}
+
+TEST_CASE("a file named by the program may have a Cyrillic name") {
+  // The name comes from the program's own text, which is UTF-8, so it is opened as
+  // UTF-8: a narrow `open` would read the bytes in the process's ANSI code page and
+  // look for `????.txt` (part 133).
+  const std::filesystem::path dir =
+      std::filesystem::temp_directory_path() / fromUtf8Path("prologd_ввод_вывод");
+  std::filesystem::create_directories(dir);
+  const std::string path = toUtf8PathGeneric(dir / fromUtf8Path("файл.txt"));
+  const std::string source = ":- ЗАПИСЬ_В(\"" + path + "\").\n" +
+                             ":- ВЫВОД(\"данные\").\n" +
+                             ":- ЗАПИСЬ_В(\"\").\n" +
+                             ":- ЧТЕНИЕ_ИЗ(\"" + path + "\").\n" +
+                             "?ВВОДСТР(X).\n" +
+                             ":- ЧТЕНИЕ_ИЗ(\"\").\n";
+  const auto result = runProgram(source);
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "X=данные\n");
+  std::error_code ignored;
+  std::filesystem::remove_all(dir, ignored);
 }
 
 TEST_CASE("one answer may carry two lines of input") {
