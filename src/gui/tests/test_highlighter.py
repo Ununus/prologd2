@@ -197,6 +197,60 @@ def test_astral_characters_do_not_shift_the_rest_of_the_line() -> None:
     print("ok: an astral character in a comment does not shift the colours")
 
 
+def coloured_lines(text: str) -> list[list[tuple[str, str | None]]]:
+    """Every line of a multi-line document, each as (text, colour) spans."""
+    document = QTextDocument()
+    highlighter = PrologHighlighter(document, TABLE, THEME, MODE_ISO)
+    document.setPlainText(text)
+    highlighter.rehighlight()
+    lines = []
+    block = document.firstBlock()
+    while block.isValid():
+        layout = block.layout()
+        assert layout is not None, "the document was never laid out"
+        line = block.text()
+        lines.append([
+            (line[item.start : item.start + item.length], item.format.foreground().color().name())
+            for item in layout.formats()
+        ])
+        block = block.next()
+    return lines
+
+
+def test_a_block_comment_is_coloured_on_every_line() -> None:
+    """A `/* … */` comment over several lines is one comment throughout (task_132).
+
+    Qt colours one block at a time, so a line that *begins* inside a comment has
+    to be told so by the block state; without it only the first line looked like
+    a comment and the rest of it was coloured as code.
+    """
+    first, middle, last = coloured_lines(
+        "p(X). /* начало\nсередина НАЙТИВСЕ\nконец */ q(X). % хвост"
+    )
+    # The opening line still has the code in front of the comment.  Qt merges
+    # neighbouring spans of one format, so `)` and `.` arrive as one span.
+    assert first == [
+        ("p", THEME.atom_latin),
+        ("(", THEME.punctuation),
+        ("X", THEME.variable_latin),
+        (").", THEME.punctuation),
+        ("/* начало", THEME.comment),
+    ]
+    # The middle line is nothing but comment — the line that used to be coloured
+    # as code, its built-in name included.
+    assert middle == [("середина НАЙТИВСЕ", THEME.comment)]
+    # The comment ends where `*/` closes it, and code follows on the same line.
+    assert last == [
+        ("конец */", THEME.comment),
+        ("q", THEME.atom_latin),
+        ("(", THEME.punctuation),
+        ("X", THEME.variable_latin),
+        (").", THEME.punctuation),
+        ("% хвост", THEME.comment),
+    ]
+    print("ok: a block comment is coloured on all of its lines")
+
+
 def main() -> int:
     application = QApplication(sys.argv[:1])
     test_colours_by_kind()
@@ -208,6 +262,7 @@ def main() -> int:
     test_changing_the_theme_recolours()
     test_the_naming_mode_changes_the_colours()
     test_astral_characters_do_not_shift_the_rest_of_the_line()
+    test_a_block_comment_is_coloured_on_every_line()
     print("all highlighter checks passed")
     del application
     return 0

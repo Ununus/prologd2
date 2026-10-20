@@ -11,7 +11,7 @@ from PySide6.QtGui import QColor, QFont, QSyntaxHighlighter, QTextCharFormat
 
 from .keywords import Keywords
 from .theme import Theme
-from .tokens import MODE_ISO, tokenize
+from .tokens import MODE_ISO, scan_line
 
 
 def _has_astral(text: str) -> bool:
@@ -38,6 +38,11 @@ def _utf16_offsets(text: str) -> list[int]:
 
 class PrologHighlighter(QSyntaxHighlighter):
     """Colours a document line by line, using the interpreter's keyword table."""
+
+    #: The block state that means «this line begins inside a `/* … */`
+    #: comment» (task_132).  Qt hands a block its predecessor's state, so a
+    #: comment of several lines is coloured whole, not line by line.
+    _BLOCK_COMMENT = 1
 
     def __init__(
         self,
@@ -93,7 +98,14 @@ class PrologHighlighter(QSyntaxHighlighter):
     # -- QSyntaxHighlighter -------------------------------------------------
     def highlightBlock(self, text: str) -> None:  # noqa: N802 - Qt spelling
         offsets = _utf16_offsets(text) if _has_astral(text) else None
-        for token in tokenize(text, self._keywords, self._mode):
+        tokens, still_open = scan_line(
+            text,
+            self._keywords,
+            self._mode,
+            block_comment=self.previousBlockState() == self._BLOCK_COMMENT,
+        )
+        self.setCurrentBlockState(self._BLOCK_COMMENT if still_open else 0)
+        for token in tokens:
             char_format = self._format_for(token.kind, token.alphabet)
             if char_format is None:
                 continue

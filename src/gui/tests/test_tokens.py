@@ -37,6 +37,7 @@ from prologd_gui.tokens import (  # noqa: E402
     QUOTED_ATOM,
     STRING,
     VARIABLE,
+    scan_line,
     tokenize,
 )
 
@@ -65,6 +66,12 @@ def alphabets(line: str) -> list[tuple[str, str]]:
         for token in tokenize(line, TABLE)
         if token.alphabet
     ]
+
+
+def scanned(line: str, inside: bool = False) -> tuple[list[tuple[str, str]], bool]:
+    """One line read with the block-comment state in, and the state it leaves."""
+    tokens, still_open = scan_line(line, TABLE, block_comment=inside)
+    return [(token.kind, token.text) for token in tokens], still_open
 
 
 def test_comments_and_clause_terminators() -> None:
@@ -201,16 +208,46 @@ def test_comparison_signs() -> None:
 
 
 def test_block_comment() -> None:
-    """`/* … */` is a comment, on one line here (task_92)."""
+    """`/* … */` is a comment, and it may run over several lines (task_92, task_132)."""
     assert kinds("p. /* пояснение */") == [
         (ATOM, "p"),
         (PUNCTUATION, "."),
         (COMMENT, "/* пояснение */"),
     ]
-    # An opener with no closer on the line colours the rest of the line: the
-    # tokenizer sees one line at a time, and that is what the text looks like.
+    # A line taken on its own colours an opener with no closer to its end …
     assert kinds("/* дальше") == [(COMMENT, "/* дальше")]
-    print("ok: the block comment")
+    # … and `scan_line` reports that the comment is still open, so a caller that
+    # has the next line can colour it as comment too — that is what makes a
+    # comment of several lines read as one comment and not as code (task_132).
+    assert scanned("p. /* начало") == (
+        [(ATOM, "p"), (PUNCTUATION, "."), (COMMENT, "/* начало")],
+        True,
+    )
+    assert scanned("  середина", True) == ([(COMMENT, "  середина")], True)
+    assert scanned("  конец */ q(X).", True) == (
+        [
+            (COMMENT, "  конец */"),
+            (ATOM, "q"),
+            (PUNCTUATION, "("),
+            (VARIABLE, "X"),
+            (PUNCTUATION, ")"),
+            (PUNCTUATION, "."),
+        ],
+        False,
+    )
+    # Inside the comment nothing else counts: a `%` does not end the line, and an
+    # unclosed quote is text.
+    assert scanned("ещё % не конец */", True) == ([(COMMENT, "ещё % не конец */")], False)
+    assert scanned('"не открыт', True) == ([(COMMENT, '"не открыт')], True)
+    # A `/*` inside a string opens nothing: the string is one token.
+    assert scanned('ВЫП("/* не комментарий")') == (
+        [(KEYWORD, "ВЫП"), (PUNCTUATION, "("), (STRING, '"/* не комментарий"'), (PUNCTUATION, ")")],
+        False,
+    )
+    # An empty line inside a comment leaves the state where it was.
+    assert scanned("", True) == ([], True)
+    assert scanned("", False) == ([], False)
+    print("ok: the block comment, on one line and over several")
 
 
 def test_expression_query_and_arrows() -> None:
@@ -264,6 +301,10 @@ def test_alphabet_of_identifiers() -> None:
 def test_tokens_cover_every_example_line() -> None:
     """Every non-whitespace character is inside exactly one token.
 
+    The sweep reads each file the way the highlighter does — carrying the
+    block-comment state from line to line — so a `/* … */` comment of several
+    lines is covered by one token per line and nothing inside it is code.
+
     A scanner bug shows up as a gap or an overlap, which is precisely what makes
     highlighting look "almost right".
     """
@@ -272,12 +313,14 @@ def test_tokens_cover_every_example_line() -> None:
     assert files, f"no example programs under {root}"
     checked = 0
     for path in files:
+        inside = False
         for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
             line = line.rstrip("\r")
             where = f"{path.name}:{number}"
             previous_end = 0
             covered = [False] * len(line)
-            for token in tokenize(line, TABLE):
+            tokens, inside = scan_line(line, TABLE, block_comment=inside)
+            for token in tokens:
                 assert token.start >= previous_end, f"{where}: overlap at {token!r}"
                 assert line[token.start : token.end] == token.text, f"{where}: {token!r}"
                 for index in range(token.start, token.end):

@@ -11,10 +11,12 @@ Differences from the lexer, both deliberate:
 
 * diagnostics are ignored — a malformed literal is highlighted as the text it
   looks like rather than reported;
-* there is no carried state between lines.  Neither a string nor `#…#` may span
-  lines in PrologD (the lexer rejects an unterminated one), so a line-local pass
-  is enough and typing stays cheap: an unterminated string is simply coloured to
-  the end of its own line;
+* there is no carried state between lines for *strings* and `#…#`: neither may
+  span lines in PrologD (the lexer rejects an unterminated one), so a line-local
+  pass is enough and typing stays cheap: an unterminated string is simply coloured
+  to the end of its own line.  One thing *does* span lines — the standard's
+  `/* … */` comment (task_92) — so its state is carried explicitly: `scan_line`
+  takes it in and gives it back, and the highlighter keeps it per text block;
 * whitespace is not a token.  There is nothing to colour in it, and the sweep
   test asserts the stronger property anyway: every other character of a line is
   inside exactly one token.
@@ -161,6 +163,10 @@ def plain_newlines(text: str) -> str:
 def tokenize(line: str, keywords: Keywords | None = None, mode: int = MODE_ISO) -> list[Token]:
     """Splits one line into highlightable tokens, in source order.
 
+    A line taken on its own: a block comment that does not close here ends with
+    the line.  For a document, use `scan_line`, which also reports whether the
+    line ends *inside* a comment.
+
     Without `keywords` no reserved name is recognised, which is what an
     interpreter older than protocol 2 leaves us with: everything is then an atom
     or a variable, and the GUI cannot tell a built-in from a user name.
@@ -169,9 +175,33 @@ def tokenize(line: str, keywords: Keywords | None = None, mode: int = MODE_ISO) 
     old dialect.  It is *one line's* rule and nothing more — the mode itself comes
     from the file's first line (see `mode_from_first_line`).
     """
+    return scan_line(line, keywords, mode)[0]
+
+
+def scan_line(
+    line: str,
+    keywords: Keywords | None = None,
+    mode: int = MODE_ISO,
+    block_comment: bool = False,
+) -> tuple[list[Token], bool]:
+    """Splits one line into tokens, and says whether it ends inside `/* … */`.
+
+    `block_comment` is the state on the way in: True means the line begins inside
+    a block comment, so everything up to `*/` (or to the end of the line) is one
+    comment token.  The second half of the answer is the state on the way out, to
+    be handed to the next line — that is how a comment of several lines is
+    coloured by a highlighter that sees one line at a time (task_132).
+    """
     tokens: list[Token] = []
     index = 0
     length = len(line)
+    if block_comment:
+        closer = line.find("*/")
+        if closer < 0:
+            # Still inside: the whole line is comment, and so is the next one.
+            return ([Token(COMMENT, line, 0, length)] if line else []), True
+        tokens.append(Token(COMMENT, line[: closer + 2], 0, closer + 2))
+        index = closer + 2
     while index < length:
         ch = line[index]
 
@@ -182,7 +212,8 @@ def tokenize(line: str, keywords: Keywords | None = None, mode: int = MODE_ISO) 
             # A question parked in a comment (`%   ?ВЕРСИЯ.`) is a question all the
             # same — the margin marks it and runs it (task_36) — so it is coloured
             # as one.  Only a comment that *starts* the line can be one: the rule
-            # the margin uses is `%`, blanks and `?` where the line begins.
+            # the margin uses is `%`, blanks and `?` where the line begins.  A `%`
+            # inside a block comment never reaches here: the block is one token.
             rest = line[index:]
             if not line[:index].strip() and rest[1:].lstrip(" \t").startswith("?"):
                 tokens.append(Token(QUERY_COMMENT, rest, index, length))
@@ -191,10 +222,13 @@ def tokenize(line: str, keywords: Keywords | None = None, mode: int = MODE_ISO) 
             break
         if line.startswith("/*", index):
             # The standard's block comment (task_92).  A line is tokenized on its
-            # own here, so an opener without its closer on the same line colours
-            # the rest of the line — which is what the text looks like anyway.
+            # own, so an opener without its closer here colours the rest of the
+            # line and tells the caller the comment is still open.
             closer = line.find("*/", index + 2)
-            end = length if closer < 0 else closer + 2
+            if closer < 0:
+                tokens.append(Token(COMMENT, line[index:], index, length))
+                return tokens, True
+            end = closer + 2
             tokens.append(Token(COMMENT, line[index:end], index, end))
             index = end
             continue
@@ -284,7 +318,7 @@ def tokenize(line: str, keywords: Keywords | None = None, mode: int = MODE_ISO) 
             continue
         tokens.append(Token(PUNCTUATION, ch, index, index + 1))
         index += 1
-    return tokens
+    return tokens, False
 
 
 def literal_text(text: str) -> str:
