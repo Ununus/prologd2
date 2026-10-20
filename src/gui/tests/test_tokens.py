@@ -88,7 +88,7 @@ def test_comments_and_clause_terminators() -> None:
     # A question parked in a comment is a question all the same: the margin marks
     # it and runs it (task_36), so it is not coloured as prose.
     assert kinds("%   ?ВЕРСИЯ.") == [(QUERY_COMMENT, "%   ?ВЕРСИЯ.")]
-    assert kinds("%?monk(14).") == [(QUERY_COMMENT, "%?monk(14).")]
+    assert kinds("%?hanoi(14).") == [(QUERY_COMMENT, "%?hanoi(14).")]
     # …but only where the line *begins*: a question after code is a comment, and
     # so is a comment that only starts like one.
     assert kinds("факт(1). % ?факт(X).")[-1] == (COMMENT, "% ?факт(X).")

@@ -870,7 +870,7 @@ class ElidedLabel(QLabel):
     the *end* of the text, because the end of a place in a file (the file's own
     name, then the line and the column) is the part being read.  Qt's own
     `elidedText(…, ElideMiddle, …)` was measured first and reads badly on a path:
-    at a third of the width the middle of `…\\examples\\problems\\monk.pld:2:1` is
+    at a third of the width the middle of `…\\examples\\problems\\hanoi.pld:2:1` is
     all that is left — the file's name and the line are gone, which is exactly the
     part being read.
     """
@@ -908,7 +908,7 @@ def step_where_text(position) -> str:
 
     A stepped run on an *opened* file reports the whole path, and the whole path
     in the strip's single row ran straight up against its buttons; the last two
-    parts (…\\examples\\monk.pld:2:1) say the same thing in a fifth of the room,
+    parts (…\\examples\\hanoi.pld:2:1) say the same thing in a fifth of the room,
     and the full text stays in the tooltip.
     """
     if position is None or not position.file:

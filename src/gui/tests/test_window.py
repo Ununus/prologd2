@@ -3191,12 +3191,12 @@ def test_the_step_strip_is_one_font_and_three_pictures(executable: str) -> None:
                 goal="цель(_1)",
                 depth=2,
                 position=Position(
-                    "C:/Users/vasla/source/projects/examples/monk.pld", 2, 1
+                    "C:/Users/vasla/source/projects/examples/hanoi.pld", 2, 1
                 ),
             ),
-            ["monk(6)"],
+            ["hanoi(6)"],
         )
-        assert pane.where_text().endswith("monk.pld:2:1"), ascii(pane.where_text())
+        assert pane.where_text().endswith("hanoi.pld:2:1"), ascii(pane.where_text())
         assert "C:/Users" not in pane.where_text(), ascii(pane.where_text())
         assert "C:/Users" in pane._where.toolTip(), ascii(pane._where.toolTip())
         # A window too narrow for the place drops its head and keeps the tail: the

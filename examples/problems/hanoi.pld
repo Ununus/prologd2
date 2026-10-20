@@ -7,12 +7,12 @@
 % по кругу из семи, от размера диска. Рисунок видно в окне (кнопка «Запустить»);
 % в консоли графика молчит и остаётся только время пауз.
 %
-% Запуск:  prologu -s examples/problems/monk.pld
+% Запуск:  prologu -s examples/problems/hanoi.pld
 % В дереве исходников, где папки stdlib рядом с интерпретатором нет, — с ключом
-% -I:  prologu -I stdlib -s examples/problems/monk.pld
+% -I:  prologu -I stdlib -s examples/problems/hanoi.pld
 :- ИМПОРТ("graphics.pld").
 
-monk(N):-begin(N,A,B,C), move(N,1,3,2,A,B,C,_,_,_).
+hanoi(N):-begin(N,A,B,C), move(N,1,3,2,A,B,C,_,_,_).
 move(1,X,Y,_,A,B,C,D,E,F):-make(X,Y,A,B,C,D,E,F).
 move(N,X,Y,Z,A,B,C,D,E,F):-БОЛЬШЕ(N,1), move(#N-1#,X,Z,Y,A,B,C,A_,B_,C_),
 	make(X,Y,A_,B_,C_,D_,E_,F_), move(#N-1#,Z,Y,X,D_,E_,F_,D,E,F).
@@ -61,7 +61,7 @@ colour_of(6,Цвет):-синий(Цвет).
 colour_of(7,Цвет):-пурпурный(Цвет).
 
 % Экран по умолчанию чёрный: сначала заливаем его белым, потом ставим башню.
-?ЗАКРАСКА(1, 1, 16777215), monk(6).
+?ЗАКРАСКА(1, 1, 16777215), hanoi(6).
 
 % Башня побольше:
-%?ЗАКРАСКА(1, 1, 16777215), monk(14).
+%?ЗАКРАСКА(1, 1, 16777215), hanoi(14).

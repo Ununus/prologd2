@@ -87,7 +87,7 @@ const std::vector<std::string>& checkedLessons() {
 /// sorts that left the library for `examples/sorting.pld` (task_89), and the folder
 /// `examples/iso` of programs written with ISO names and signs (task_92: the
 /// arithmetic signs, the library, a family tree, the standard order, `->` and
-/// `sub_string/5`); `problems/monk.pld` draws and `problems/monkd.pld` reads
+/// `sub_string/5`); `problems/hanoi.pld` draws and `problems/hanoi_play.pld` reads
 /// input, so those two are only parsed (see the test below).
 const std::vector<std::string>& checkedExamples() {
   static const std::vector<std::string> names = {
@@ -166,9 +166,8 @@ std::string withoutQueries(const std::string& source) {
 
 TEST_CASE("ported example programs parse cleanly") {
   const std::vector<std::string> files = {
-      "problems/factorial.pld", "problems/monk.pld",     "problems/monkd.pld",
-      "file_io.pld",           "drawing.pld",           "findall.pld",
-      "import.pld",       "lib/library.pld",
+      "problems/factorial.pld", "problems/hanoi.pld", "problems/hanoi_play.pld",
+      "file_io.pld", "drawing.pld", "findall.pld", "import.pld", "lib/library.pld",
   };
   // `lib/old_lib*.pld` are not here: `withoutQueries` strips every `:` line, and
   // that takes the naming marker with it, so the file would be read in mode 0 and

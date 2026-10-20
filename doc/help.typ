@@ -1330,7 +1330,7 @@ prologu -s "примеры/файл.pld"
 Например:
 
 ```sh
-prologu --format=hard -s examples/problems/monk.pld
+prologu --format=hard -s examples/problems/hanoi.pld
 prologu --format --format-width 100 -s program.pld > neat.pld
 ```
 

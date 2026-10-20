@@ -468,7 +468,7 @@ in the editor's monospace font: a monospace goal between proportional labels rea
 as a defect, and zooming used to move only half of the strip.
 
 The «где» label carries a *place*, not the whole path: the last two components
-(`…\problems\monk.pld:2:1`), with the whole path in its tooltip — a full path in
+(`…\problems\hanoi.pld:2:1`), with the whole path in its tooltip — a full path in
 that one row ran up against the buttons beside it.  A window too narrow even for
 that drops the head of the label and keeps its tail, in front of «…»: the file's
 own name, the line and the column are what is being read.  (Qt's own middle

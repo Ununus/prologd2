@@ -48,7 +48,7 @@ not a port; the old lesson it replaces is kept under `examples/lessons/_old/`.
 | `factorial.pld` | `н`, `ф`, `х` → `Н`, `Ф`, `Х`; the `;` sentence terminators became `.` when `;` was made a disjunction (task_41) — it was the only ported file that used the old terminator. |
 | `file_io.pld` | `Н` stays `Н`. |
 | `drawing.pld` | tabs preserved; single-letter coordinates renamed. |
-| `monk.pld`, `monkd.pld` | `a`, `b`, `c` become `A_`, `B_`, `C_` because `A`, `B`, `C` are already variables. |
+| `monk.pld`, `monkd.pld` (now `problems/hanoi.pld`, `problems/hanoi_play.pld`) | `a`, `b`, `c` become `A_`, `B_`, `C_` because `A`, `B`, `C` are already variables. |
 | `ranez.pld` | dropped: the reference copy was double-encoded; the `ranez` predicate is present in `lesson_4.pld`. |
 
 ## Regenerating the ports

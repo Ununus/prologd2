@@ -44,9 +44,9 @@ TABLE = Keywords(
 )
 
 #: The document the rows are read in: it is where the bare names come from that
-#: are not reserved (`хлеб`, `monk`) and where the refused names are absent
+#: are not reserved (`хлеб`, `hanoi`) and where the refused names are absent
 #: (`идиотизм`, `int`).
-DOCUMENT = "цена(хлеб, 40).\nmonk(14).\nis_whole(4).\nдлина(Х, 2).\n"
+DOCUMENT = "цена(хлеб, 40).\nhanoi(14).\nis_whole(4).\nдлина(Х, 2).\n"
 
 #: (line, expected statement) — every row is a rule that could drift.
 CASES: list[tuple[str, str | None]] = [
@@ -64,8 +64,8 @@ CASES: list[tuple[str, str | None]] = [
     # `?int("4").` was a question of lesson_03 once; `int` is a retired spelling
     # now, so the margin must not offer it — the call would fail at run time.
     ('% ?int("4").', None),
-    # `%?` with no space at all: `monk.pld` writes its questions this way.
-    ("%?monk(14).", "?monk(14)."),
+    # `%?` with no space at all: `hanoi.pld` writes its questions this way.
+    ("%?hanoi(14).", "?hanoi(14)."),
     # The sentence ends at the first free `.`; prose after it stays outside.
     ("?цена(хлеб, Ц1). Проверьте, что скажет интерпретатор.", "?цена(хлеб, Ц1)."),
     # A `.` inside brackets belongs to the number, not to the sentence.
@@ -127,9 +127,9 @@ PINNED: dict[str, int] = {
     "lib/old_lib.pld": 0,
     "lib/old_lib_2.pld": 0,
     "problems/factorial.pld": 2,
+    "problems/hanoi.pld": 2,
+    "problems/hanoi_play.pld": 1,
     "problems/knapsack.pld": 2,
-    "problems/monk.pld": 2,
-    "problems/monkd.pld": 1,
     "sort.pld": 7,
     "sorting.pld": 8,
     "stdlib.pld": 73,
