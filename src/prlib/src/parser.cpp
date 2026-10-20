@@ -77,19 +77,30 @@ bool beginsStatement(TokenKind kind) {
 /// how `>=` and `=<` are written without a second built-in, and why a free
 /// operand there is the runtime error of `БОЛЬШЕ`/`МЕНЬШЕ` rather than a
 /// silent failure.
+///
+/// `order` is set for the four standard-order signs of ISO (task_90): they are
+/// sugar over `compare/3` with its *answer* written down, so `A @< B` is
+/// `compare(<, A, B)` and `A @=< B` is `НЕ(compare(>, A, B))`.
 struct InfixOperator {
   TokenKind kind;
   const char* text;
   const char* functor;
   bool negated;
+  const char* order;
 };
 
 constexpr InfixOperator kInfixOperators[] = {
-    {TokenKind::Equal, "=", "РАВНО", false},
-    {TokenKind::Less, "<", "МЕНЬШЕ", false},
-    {TokenKind::Greater, ">", "БОЛЬШЕ", false},
-    {TokenKind::LessEqual, "=<", "БОЛЬШЕ", true},
-    {TokenKind::GreaterEqual, ">=", "МЕНЬШЕ", true},
+    {TokenKind::Equal, "=", "РАВНО", false, nullptr},
+    {TokenKind::Less, "<", "МЕНЬШЕ", false, nullptr},
+    {TokenKind::Greater, ">", "БОЛЬШЕ", false, nullptr},
+    {TokenKind::LessEqual, "=<", "БОЛЬШЕ", true, nullptr},
+    {TokenKind::GreaterEqual, ">=", "МЕНЬШЕ", true, nullptr},
+    // `A @< B` — «меньше по стандартному порядку»; «или равно» — то же сравнение
+    // под отрицанием, как `=<` и `>=` выше.
+    {TokenKind::AtLess, "@<", "compare", false, "<"},
+    {TokenKind::AtGreater, "@>", "compare", false, ">"},
+    {TokenKind::AtLessEqual, "@=<", "compare", true, ">"},
+    {TokenKind::AtGreaterEqual, "@>=", "compare", true, "<"},
 };
 
 /// The row for a token kind, `nullptr` when the kind is not an infix operator.
@@ -315,6 +326,9 @@ Term Parser::parseComparison() {
     return left;
   }
   std::vector<Term> arguments;
+  if (row->order != nullptr) {
+    arguments.push_back(makeAtom(row->order));
+  }
   arguments.push_back(std::move(left));
   arguments.push_back(std::move(right));
   if (row->negated) {
@@ -382,6 +396,21 @@ Term Parser::parsePrimary() {
       return parseCompoundOrAtom();
     case TokenKind::LBracket:
       return parseList();
+    // A comparison sign where a *term* is expected is the atom of that sign:
+    // `compare(<, A, B)`, `compare(=, A, B)` and `Порядок = <` are how ISO writes
+    // what `compare/3` answers (task_90).  As a goal the sign is still the infix
+    // layer above — `A < B` never reaches this branch.
+    case TokenKind::Equal:
+    case TokenKind::Less:
+    case TokenKind::Greater:
+    case TokenKind::LessEqual:
+    case TokenKind::GreaterEqual:
+    case TokenKind::AtLess:
+    case TokenKind::AtLessEqual:
+    case TokenKind::AtGreater:
+    case TokenKind::AtGreaterEqual:
+      advance();
+      return makeAtom(token.text);
     case TokenKind::LParen: {
       const Token open = advance();
       Term result = parseCommaGroup();

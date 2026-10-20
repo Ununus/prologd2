@@ -343,6 +343,23 @@ TEST_CASE("the comparison signs survive formatting") {
   REQUIRE(twice.text == once.text);
 }
 
+TEST_CASE("the standard-order signs survive formatting") {
+  // task_90: the signs are ordinary tokens to the formatter — the layout is
+  // rewritten, the text of the goals is not, and a sign used as an *atom*
+  // (`compare(<, А, Б)`, `А = @<`) keeps its place too.
+  const std::string source =
+      "правило(А, Б):-А @< Б, compare(<, А, Б), А @>= Б ; А = @<.\n";
+  const FormatResult once = format(source, hard());
+  REQUIRE(once.ok());
+  REQUIRE(once.text.find("А @< Б") != std::string::npos);
+  REQUIRE(once.text.find("compare(<, А, Б)") != std::string::npos);
+  REQUIRE(once.text.find("А @>= Б") != std::string::npos);
+  REQUIRE(once.text.find("А = @<") != std::string::npos);
+  const FormatResult twice = format(once.text, hard());
+  REQUIRE(twice.ok());
+  REQUIRE(twice.text == once.text);
+}
+
 TEST_CASE("every shipped program is already in the standard shape") {
   // `prologu --format` is the layout the repository keeps its own programs in,
   // and the lessons are the widest corpus of real text there is (task_47): the

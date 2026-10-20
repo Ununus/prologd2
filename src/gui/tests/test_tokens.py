@@ -186,6 +186,12 @@ def test_comparison_signs() -> None:
     assert kinds("2>=1") == [(INTEGER, "2"), (OPERATOR, ">="), (INTEGER, "1")]
     assert kinds("1<2") == [(INTEGER, "1"), (OPERATOR, "<"), (INTEGER, "2")]
     assert kinds(">") == [(OPERATOR, ">")]
+    # The four standard-order signs of task_90 are one token each, longest
+    # first: `@>=` is not `@>` and `=`, and `@=<` is not `@` and `=<`.
+    assert kinds("1 @< 2") == [(INTEGER, "1"), (OPERATOR, "@<"), (INTEGER, "2")]
+    assert kinds("1 @> 2") == [(INTEGER, "1"), (OPERATOR, "@>"), (INTEGER, "2")]
+    assert kinds("1 @=< 2") == [(INTEGER, "1"), (OPERATOR, "@=<"), (INTEGER, "2")]
+    assert kinds("1 @>= 2") == [(INTEGER, "1"), (OPERATOR, "@>="), (INTEGER, "2")]
     print("ok: the comparison signs")
 
 

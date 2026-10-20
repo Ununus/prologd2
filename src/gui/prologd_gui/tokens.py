@@ -246,6 +246,18 @@ def tokenize(line: str, keywords: Keywords | None = None, mode: int = MODE_ISO) 
             tokens.append(Token(OPERATOR, pair, index, index + 2))
             index += 2
             continue
+        # The four standard-order signs (task_90) are three and two characters
+        # long, and the longest wins: `@>=` is not `@>` followed by `=`, and
+        # `@=<` is not `@` plus `=<`.
+        triple = line[index : index + 3]
+        if triple in ("@=<", "@>="):
+            tokens.append(Token(OPERATOR, triple, index, index + 3))
+            index += 3
+            continue
+        if pair in ("@<", "@>"):
+            tokens.append(Token(OPERATOR, pair, index, index + 2))
+            index += 2
+            continue
         if ch in "=<>":
             tokens.append(Token(OPERATOR, ch, index, index + 1))
             index += 1

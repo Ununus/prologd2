@@ -37,6 +37,10 @@ enum class TokenKind : std::uint8_t {
   Greater,       ///< `>`, the sugar for `БОЛЬШЕ/2`
   LessEqual,     ///< `=<`, the sugar for `НЕ(МЕНЬШЕ(A, B))`
   GreaterEqual,  ///< `>=`, the sugar for `НЕ(БОЛЬШЕ(A, B))`
+  AtLess,          ///< `@<`, the standard order: `compare(<, A, B)` (task_90)
+  AtLessEqual,     ///< `@=<`, `НЕ(compare(>, A, B))`
+  AtGreater,       ///< `@>`, `compare(>, A, B)`
+  AtGreaterEqual,  ///< `@>=`, `НЕ(compare(<, A, B))`
   Plus,
   Minus,
   Star,

@@ -329,6 +329,45 @@ TEST_CASE("the comparison signs are sugar over the built-ins") {
     REQUIRE(goal.compound->name == ";");
     REQUIRE(goal.compound->args[0].compound->name == ",");
   }
+  SECTION("the four at-signs are compare with the answer given") {
+    // task_90: `A @< B` is `compare(<, A, B)`, and the two «or equal» rows are
+    // that call under `НЕ`, exactly like `=<` and `>=` above.
+    const struct {
+      std::string source;
+      bool negated;
+      std::string order;
+    } rows[] = {{"p :- X @< 1.", false, "<"},
+               {"p :- X @> 1.", false, ">"},
+               {"p :- X @=< 1.", true, ">"},
+               {"p :- X @>= 1.", true, "<"}};
+    for (const auto& row : rows) {
+      INFO("source: " << row.source);
+      DiagnosticSink sink;
+      const auto program = parse(row.source, sink);
+      REQUIRE_FALSE(sink.hasErrors());
+      const Term& goal = program.clauses[0].body[0];
+      const Term& call = row.negated ? goal.compound->args[0] : goal;
+      if (row.negated) {
+        REQUIRE(goal.compound->name == "НЕ");
+      }
+      REQUIRE(call.compound->name == "compare");
+      REQUIRE(call.compound->args.size() == 3);
+      REQUIRE(call.compound->args[0].text == row.order);
+    }
+  }
+  SECTION("a sign where a term is expected is the atom of the sign") {
+    // `compare(<, A, B)` and `Порядок = <` are how ISO reads the answer of
+    // `compare/3`; the same tokens are still infix after a term.
+    DiagnosticSink sink;
+    const auto program = parse("p :- compare(<, A, B), C = @>=.\n", sink);
+    REQUIRE_FALSE(sink.hasErrors());
+    const std::vector<Term>& body = program.clauses[0].body;
+    REQUIRE(body[0].compound->name == "compare");
+    REQUIRE(body[0].compound->args[0].kind == TermKind::Atom);
+    REQUIRE(body[0].compound->args[0].text == "<");
+    REQUIRE(body[1].compound->name == "РАВНО");
+    REQUIRE(body[1].compound->args[1].text == "@>=");
+  }
   SECTION("a chain is an error at the second sign") {
     DiagnosticSink sink;
     parse("p :- X = Y = 1.\n", sink);
@@ -345,6 +384,11 @@ TEST_CASE("the comparison signs are sugar over the built-ins") {
     REQUIRE(mixed.hasErrors());
     REQUIRE(mixed.diagnostics().front().message ==
             "«<» — не цепочка: разбейте на два сравнения, «A = B, B < C»");
+    DiagnosticSink chained;
+    parse("p :- X @< Y @< Z.\n", chained);
+    REQUIRE(chained.hasErrors());
+    REQUIRE(chained.diagnostics().front().message ==
+            "«@<» — не цепочка: разбейте на два сравнения, «A @< B, B @< C»");
   }
 }
 

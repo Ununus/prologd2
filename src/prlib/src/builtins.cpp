@@ -324,8 +324,8 @@ BuiltinResult builtinVariablesMarker(Engine& engine, std::span<const Term> args)
 }
 
 /// Names that are not listed are already English (`abs`, `sqrt`, `sin`, `cos`,
-/// `tan`, `exp`, `mod`, `div`) or are answered outside the dispatch table
-/// (`ВЫП`/`call`, handled by the solver; `ИМПОРТ`/`import`, handled by the
+/// `tan`, `exp`, `mod`, `div`, `compare`) or are answered outside the dispatch
+/// table (`ВЫП`/`call`, handled by the solver; `ИМПОРТ`/`import`, handled by the
 /// parser) — see `keywords.cpp` and `parser.cpp`.  `ПЕРВОЕ`/`first`,
 /// `ВЫВОД`/`write` and `ВЫВОДПС`/`writeln` are here for their English spelling,
 /// but they are registered by `kVariadicNames`, not by `add`.  `ИЛИ` is
@@ -453,6 +453,11 @@ const BuiltinTable& builtinTable() {
 
     // Lists.
     add("СОРТИРОВКА", 2, builtinSort);
+
+    // The standard order of terms (task_90): `compare/3` is English only, like
+    // `abs` and `sub_string` — ISO has no other word for it, and the four `@`
+    // signs of the same order are parser sugar over this call.
+    add("compare", 3, builtinCompare);
 
     // Arithmetic.
     add("БОЛЬШЕ", 2, builtinGreater);

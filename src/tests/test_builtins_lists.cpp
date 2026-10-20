@@ -6,10 +6,10 @@
 
 using prologd::test::runProgram;
 
-// `СОРТИРОВКА/2` (`sort`): the list is put in the dialect's own order --- numbers
-// by value, text by code point --- and the repeats are dropped.  The
-// expectations here are taken from the built interpreter, not written out of the
-// head.
+// `СОРТИРОВКА/2` (`sort`): the list is put in the standard order of terms ---
+// numbers by value, text by code point, compounds by arity, name and arguments
+// --- and the repeats are dropped (task_90).  The expectations here are taken
+// from the built interpreter, not written out of the head.
 
 TEST_CASE("sort orders numbers and drops the repeats") {
   const auto result = runProgram(
@@ -50,14 +50,27 @@ TEST_CASE("sort unifies its second argument with the ordered list") {
   REQUIRE(result.output == "ДА\nНЕТ\nНЕТ\n");
 }
 
-TEST_CASE("sort refuses a list that has no order") {
-  // One message for all of them: a list that mixes numbers and text, holds a
-  // compound, is not a proper list (`[1 | 2]`), is not a list at all, holds a
-  // free variable, or contains itself.  The last one is why the walk is guarded:
-  // a plain walk of the list would follow the cycle forever.
+TEST_CASE("sort orders any terms, not only numbers and text") {
+  // The standard order of task_90: numbers, then text, then compounds — and
+  // compounds by arity first, so `ф(б)` (arity 1) stands before `[а]` (arity 2,
+  // the list functor).  `никогда` is the user's example: the ISO `sort/2` sorts
+  // a list of pairs by its first element.
+  const auto result = runProgram(
+      "?СОРТИРОВКА([1, молоко, 2.5, [а], ф(б)], С).\n"
+      "?СОРТИРОВКА([[б, 2], [а, 1]], С).\n"
+      "?СОРТИРОВКА([ф(2), ф(1)], С).\n");
+  REQUIRE(result.loaded);
+  REQUIRE(result.output ==
+          "С=[1,2.5,молоко,ф(б),[а]]\nС=[[а,1],[б,2]]\nС=[ф(1),ф(2)]\n");
+}
+
+TEST_CASE("sort refuses a list that is not a proper list") {
+  // The order now compares anything, so the refusals left are the shape of the
+  // first argument: a listlike tail (`[1 | 2]`), something that is not a list,
+  // and a list that contains itself — the last is why the walk is guarded, a
+  // plain walk would follow the cycle forever.
   for (const std::string& goal :
-       {"СОРТИРОВКА([1, а], С)", "СОРТИРОВКА([ф(1), ф(2)], С)", "СОРТИРОВКА([1 | 2], С)",
-        "СОРТИРОВКА(Х, С)", "СОРТИРОВКА([Х, 1], С)",
+       {"СОРТИРОВКА([1 | 2], С)", "СОРТИРОВКА(Х, С)",
         "РАВНО(Ц, [1 | Ц]), СОРТИРОВКА(Ц, С)"}) {
     INFO("goal: " << goal);
     const auto result = runProgram("?" + goal + ".\n");

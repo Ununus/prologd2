@@ -255,8 +255,29 @@ TEST_CASE("the comparison signs are one token each") {
   }
 }
 
-TEST_CASE("an ISO operator the dialect lacks is explained") {
-  // A sign from another Prolog is a lexical error with advice (task_52), not
+TEST_CASE("the four standard-order signs are read as one token each") {
+  // task_90: `@<`, `@=<`, `@>` and `@>=` were advice until the standard order
+  // arrived; longest match first, or `@=<` would be read as `@=` and `>`.
+  const struct {
+    std::string source;
+    prologd::TokenKind kind;
+  } cases[] = {{"@<", prologd::TokenKind::AtLess},
+               {"@=<", prologd::TokenKind::AtLessEqual},
+               {"@>", prologd::TokenKind::AtGreater},
+               {"@>=", prologd::TokenKind::AtGreaterEqual}};
+  for (const auto& item : cases) {
+    INFO("source: " << item.source);
+    DiagnosticSink sink;
+    const auto tokens = lex(item.source, sink);
+    REQUIRE_FALSE(sink.hasErrors());
+    REQUIRE(tokens.size() == 2);
+    REQUIRE(tokens[0].kind == item.kind);
+    REQUIRE(tokens[0].text == item.source);
+    REQUIRE(tokens[1].kind == prologd::TokenKind::EndOfFile);
+  }
+}
+
+TEST_CASE("an ISO operator the dialect lacks is explained") {  // A sign from another Prolog is a lexical error with advice (task_52), not
   // the bare «недопустимый символ»: the reader is told what to write instead.
   const struct {
     std::string source;
@@ -266,8 +287,6 @@ TEST_CASE("an ISO operator the dialect lacks is explained") {
                {"X \\= Y", "не унифицируется"},
                {"1 + 1 =:= 2", "выражение вычисляет «#…#»"},
                {"X =\\= Y", "«не равно»"},
-               {"X @< Y", "сравнение по стандартному порядку"},
-               {"X @>= Y", "сравнение по стандартному порядку"},
                {"X <= Y", "«меньше или равно» записывают «=<»"}};
   for (const auto& item : cases) {
     INFO("source: " << item.source);

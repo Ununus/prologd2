@@ -52,6 +52,10 @@ const std::unordered_set<std::string> kReservedBuiltins = {
     "point", "line", "circle", "fill",
     // Lists
     "СОРТИРОВКА", "sort",
+    // The standard order of terms (task_90).  `compare/3` is English only: ISO
+    // has no Russian word for it, and it is the call the four `@` signs are
+    // sugar for.
+    "compare",
     // Newcomers
     "НАЙТИВСЕ", "ИМПОРТ", "findall", "import",
 };
@@ -73,17 +77,11 @@ const std::unordered_set<std::string> kRetiredBuiltinNames = {
 /// Operator spellings borrowed from other Prologs that this dialect does not
 /// have (task_52).  `=` now means unification, so reading `=:=` as three
 /// characters would be worse than useless: the advice names the Пролог-Д
-/// spelling of the same thing.  **Longest first** — `\==` must win over `\=`,
-/// `@=<` over `@<`.
+/// spelling of the same thing.  **Longest first** — `\==` must win over `\=`.
 struct ForeignOperator {
   std::string_view text;
   const char* hint;
 };
-
-/// The four `@`-signs of ISO say the same thing, and the row repeats it rather
-/// than hiding it behind a helper: the table stays readable on its own.
-constexpr const char* kStandardOrderHint =
-    "— не оператор: сравнение по стандартному порядку заменяют «<», «>», «=<», «>=»";
 
 constexpr ForeignOperator kForeignOperators[] = {
     {"=:=",
@@ -93,21 +91,11 @@ constexpr ForeignOperator kForeignOperators[] = {
     {"\\==", "«\\==» — не оператор: «термы не совпадают» — это «НЕ(A = B)»"},
     {"\\=", "«\\=» — не оператор: «не унифицируется» — это «НЕ(A = B)»"},
     {"==", "«==» — не оператор: сравнение термов записывают унификацией — «A = B»"},
-    {"@=<", "«@=<» "},
-    {"@>=", "«@>=» "},
-    {"@<", "«@<» "},
-    {"@>", "«@>» "},
     {"<=", "«<=» — не оператор: «меньше или равно» записывают «=<»"},
 };
 
-/// The advice for one spelling, with the shared sentence of the `@`-row.
-std::string foreignOperatorHint(const ForeignOperator& entry) {
-  std::string hint(entry.hint);
-  if (entry.text.front() == '@') {
-    hint += kStandardOrderHint;
-  }
-  return hint;
-}
+/// The advice for one spelling.
+std::string foreignOperatorHint(const ForeignOperator& entry) { return entry.hint; }
 
 /// The foreign spelling that starts at `offset`, or `nullptr`.
 const ForeignOperator* foreignOperatorAt(std::string_view source, std::size_t offset) {
@@ -539,13 +527,20 @@ std::vector<Token> Lexer::tokenizeImpl(DiagnosticSink* sink) {
         }
         break;
       case '@':
-        // Only the standard-order comparisons of ISO start with `@`; anything
-        // else after it is a sign like any other.
-        if (const ForeignOperator* foreign = foreignOperatorAt(source_, offset_);
-            foreign != nullptr) {
-          advanceByte(foreign->text.size());
-          reportInvalidSign(sink, start, foreignOperatorHint(*foreign));
-          tokens.push_back(makeToken(TokenKind::Unknown, std::string(foreign->text), start));
+        // The four standard-order signs of ISO (task_90), longest match first:
+        // `@=<` and `@>=` before `@<` and `@>`.  A lone `@` is still an error.
+        if (peek(1) == '=' && peek(2) == '<') {
+          advanceByte(3);
+          tokens.push_back(makeToken(TokenKind::AtLessEqual, "@=<", start));
+        } else if (peek(1) == '>' && peek(2) == '=') {
+          advanceByte(3);
+          tokens.push_back(makeToken(TokenKind::AtGreaterEqual, "@>=", start));
+        } else if (peek(1) == '<') {
+          advanceByte(2);
+          tokens.push_back(makeToken(TokenKind::AtLess, "@<", start));
+        } else if (peek(1) == '>') {
+          advanceByte(2);
+          tokens.push_back(makeToken(TokenKind::AtGreater, "@>", start));
         } else {
           advanceByte(1);
           reportInvalidSign(sink, start);

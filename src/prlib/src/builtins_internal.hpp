@@ -30,8 +30,9 @@ bool unifyText(Engine& engine, const Term& argument, const std::string& value);
 
 /// `-1`, `0` or `1` for two values in the dialect's own order: numbers among
 /// themselves by value, text among itself by code point.  Anything else is
-/// `badArguments(predicate)`.  Shared by `БОЛЬШЕ`/`МЕНЬШЕ` and `СОРТИРОВКА` so
-/// that «сравнить» and «отсортировать» are the same rule.
+/// `badArguments(predicate)`.  This is the rule of `БОЛЬШЕ`/`МЕНЬШЕ`; the
+/// standard order of `СОРТИРОВКА`, `@<` and `compare/3` is
+/// `compareStandardOrder` in `prlib/order.hpp` (task_90).
 int compareOrder(Engine& engine, const Term& first, const Term& second,
                  std::string_view predicate);
 
@@ -63,6 +64,12 @@ BuiltinResult builtinIsGround(Engine&, std::span<const Term>);
 
 // ---- lists ----
 BuiltinResult builtinSort(Engine&, std::span<const Term>);
+
+// ---------------------------------------------------------------------------
+// The standard order of terms
+// ---------------------------------------------------------------------------
+
+BuiltinResult builtinCompare(Engine&, std::span<const Term>);
 
 // ---- findall ----
 BuiltinResult builtinFindAll(Engine&, std::span<const Term>);

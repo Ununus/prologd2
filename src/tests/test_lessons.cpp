@@ -101,6 +101,7 @@ const std::vector<std::string>& checkedExamples() {
       "problems/knapsack.pld",
       "prologu/sub_string_demo.pld",
       "prologu/if_then_demo.pld",
+      "prologu/standard_order_demo.pld",
   };
   return names;
 }

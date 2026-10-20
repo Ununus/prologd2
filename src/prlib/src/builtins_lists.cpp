@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "builtins_internal.hpp"
+#include "prlib/order.hpp"
 
 namespace prologd {
 
@@ -40,22 +41,8 @@ std::optional<std::vector<Term>> listElements(Engine& engine, const Term& argume
   return elements;
 }
 
-/// What `СОРТИРОВКА` can put in order: the dialect compares numbers among
-/// themselves and text among itself (5.1), and nothing else.
-enum class ElementKind { Number, Text };
-
-std::optional<ElementKind> elementKind(Engine& engine, const Term& element) {
-  if (asNumeric(engine, element)) {
-    return ElementKind::Number;
-  }
-  if (asText(engine, element)) {
-    return ElementKind::Text;
-  }
-  return std::nullopt;
-}
-
 bool sameOrder(Engine& engine, const Term& left, const Term& right) {
-  return detail::compareOrder(engine, left, right, "СОРТИРОВКА") == 0;
+  return compareStandardOrder(engine.bindings(), left, right) == 0;
 }
 
 }  // namespace
@@ -65,25 +52,14 @@ BuiltinResult builtinSort(Engine& engine, std::span<const Term> args) {
   if (!elements) {
     badArguments("СОРТИРОВКА");
   }
-  // Every element is looked at *before* the sort, so a list that mixes numbers
-  // and text is refused once and in the same place, instead of depending on
-  // which pairs the algorithm happens to compare.
-  std::optional<ElementKind> kind;
-  for (const Term& element : *elements) {
-    const auto current = elementKind(engine, element);
-    if (!current || (kind && *kind != *current)) {
-      badArguments("СОРТИРОВКА");
-    }
-    kind = current;
-  }
   std::vector<Term> sorted = *elements;
   std::stable_sort(sorted.begin(), sorted.end(),
                    [&engine](const Term& left, const Term& right) {
-                     return detail::compareOrder(engine, left, right, "СОРТИРОВКА") < 0;
+                     return compareStandardOrder(engine.bindings(), left, right) < 0;
                    });
-  // `РАВНО(1, 1.0)` holds and `БОЛЬШЕ`/`МЕНЬШЕ` call those two equal, so they are
-  // one value here as well; the stable sort leaves the first of the equals in
-  // front, and it is the one that stays.
+  // Whatever the order calls equal is one value here — `РАВНО(1, 1.0)` holds,
+  // and two text constants with the same letters are one value too; the stable
+  // sort leaves the first of the equals in front, and it is the one that stays.
   sorted.erase(std::unique(sorted.begin(), sorted.end(),
                            [&engine](const Term& left, const Term& right) {
                              return sameOrder(engine, left, right);
@@ -91,6 +67,16 @@ BuiltinResult builtinSort(Engine& engine, std::span<const Term> args) {
                sorted.end());
   const Term result = makeListFromVector(sorted);
   return engine.unify(args[1], result) ? BuiltinResult::Continue : BuiltinResult::Fail;
+}
+
+BuiltinResult builtinCompare(Engine& engine, std::span<const Term> args) {
+  // ISO's `compare(Order, X, Y)`: the first argument may be free (it is bound to
+  // `<`, `=` or `>`) or given, in which case the call simply tests.  This is
+  // also what the four `@` signs are sugar for, so the two answer alike.
+  const int order = compareStandardOrder(engine.bindings(), args[1], args[2]);
+  const char* const answer = order < 0 ? "<" : (order > 0 ? ">" : "=");
+  return engine.unify(args[0], makeAtom(answer)) ? BuiltinResult::Continue
+                                                 : BuiltinResult::Fail;
 }
 
 }  // namespace prologd

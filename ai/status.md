@@ -81,7 +81,10 @@ stop button lit only while a run is in flight (part 119).
 * Strings (code-point based): `БУКВА`, `ЦИФРА`, `СЦЕП`, `КОПИЯ`, `ДЛИНА` and the rest.
 * Lists: `СОРТИРОВКА/2` (`sort`) — ascending, repeats dropped, in the dialect's own
   order; `ПОЛНЫЙ/1` (`ground`) — no free variable anywhere, cycle-safe; `ДЛЯВСЕХ/2`
-  (`forall`) — no solution of the condition fails the action (ADR-025).
+  (`forall`) — no solution of the condition fails the action (ADR-025).  Since
+  task_90 the order of `СОРТИРОВКА` is the **standard order of terms**, and the
+  comparison call of ISO is here too: `compare/3`, with the signs `@<`, `@=<`, `@>`,
+  `@>=` as its sugar.
 * I/O: `ВЫВОД`, `ВЫВОДПС`, `ВВКОД`, `ВВОДЦЕЛ`, `ВВОДВЕЩ`, `ВВОДСИМВ`, `ВВОДСТР`,
   `ЧТЕНИЕ_ИЗ`, `ЗАПИСЬ_В`; the front-end's answer is a piece of the input stream
   (ADR-023).
@@ -215,6 +218,7 @@ entries of the session log below and in `ai/task_*.md`.
 | task_87_stop_button_idle | done | «Остановить» is lit for a run in flight and dark for an idle interpreter with a base loaded: a lit stop button reads as «the program is looping» (the user's report), and the base is loaded again by the next start, so that state has nothing to stop.  `_sync_run_actions` uses `self._busy` — a paused step and a wait for input count as a run, and keep the button usable.  Only the *button* changed: `stop_program` still unloads an idle interpreter for a caller that asks directly (the engine switch and a margin click stop the session through `_stop_now`) |
 | task_88_iso_pld | done | `stdlib/iso.pld` — stage 1 of task_82: the ISO names of predicates that already existed (`member/2`, `append/3`, `length/2`, `last/2`, `between/3`, `msort/2` by import; `sort/2`, `forall/2`, `ground/1` are built-ins) plus the seven the library did not have — the type tests `nonvar/1`, `atom/1`, `number/1`, `atomic/1`, `compound/1`, `callable/1`, and `once/1`, `ignore/1`, `succ/2`, `nth1/3`, `memberchk/2`.  One recorded difference from ISO: text here is both an atom and a string, so `atom("молоко")` is true; `succ/2` answers once (the cut in the first clause) and `nth1/3` numbers from one with the index first.  `stdlib_demo.pld` grew an ISO section of 18 checked questions, and `doc/library.typ` a section 8.  Since 2026-10-19 (part 121) it is the **base** of the library: `member/2`, `append/3`, `length/2`, `last/2`, `between/3` and `msort/2` moved in from `lists`/`math` (and `msort/2` from the old `sorts`), which now import it — `msort/2` with its own merge and the two cuts that stop an empty list from dividing itself forever |
 | task_89_sorts_to_examples | done | `stdlib/sorts.pld` became `examples/sorts.pld` (the owner's suggestion): six study sorts of a job the library already answers with `СОРТИРОВКА` and `msort/2` were teaching material, not a library.  The file now carries the demonstration that used to sit in the library tour — eight `%!` questions, so it is checked like the other examples — and `stdlib_demo.pld` dropped the six sorts (81 → 73 questions) with a line pointing at the example.  `doc/library.typ` §4 became «Сортировка и учебные приёмы» (a table of what the example shows), §1 lost the file row, and the examples map, the README and the packaging script name the new home |
+| task_90_standard_order | done | stage 2 of task_82 and the cure for the book program that raised «СОРТИРОВКА: Недопустимый тип аргументов» on a list of pairs: `compareStandardOrder` (`prlib/order.cpp`) orders variables < numbers < text < compounds, compounds by arity, name and arguments, with a path guard for terms that contain themselves; `compare/3` binds `<`, `=` or `>` (or tests a given one) and the four `@` signs are sugar over it (`@=<` and `@>=` under `НЕ`, like `=<`).  A sign where a term is expected is that atom, so `compare(<, A, B)` and `Порядок = <` are written as in ISO.  `СОРТИРОВКА/2` and `msort/2` sort by this order and no longer refuse mixed lists, structures or free variables — only a first argument that is not a proper list.  One recorded difference from ISO: a string here is a kind of its own and one value with the atom of the same letters |
 
 ## Test suite
 
@@ -4385,3 +4389,48 @@ here-string не даёт последнего перевода строки —
 *Verified.*  `ctest` 348/348; 25 оконных сюит и `protocol_smoke.py` зелёные;
 `doc/library.typ` собирается без замечаний.  Руками: `examples/sorts.pld` печатает
 ровно восемь обещанных строк, `stdlib_demo.pld` проходит со своим вводом.
+
+### 123. Стандартный порядок термов (2026-10-20)
+
+Задача 90, этап 2 задачи 82.  Владелец принёс программу из книги — `НАЙТИВСЕ`
+собирает пары `[Диалект, Автор]`, `СОРТИРОВКА` их сортирует — и получил
+`error: СОРТИРОВКА: Недопустимый тип аргументов`: `СОРТИРОВКА` сравнивала
+встроенным `БОЛЬШЕ`, который знает только числа и текст.
+
+* `prlib/order.cpp` — `compareStandardOrder`: вид терма задаёт старшинство
+  (переменная, число, текст, составной), внутри вида — возраст переменной, значение
+  числа, коды текста, арность и имя составного, потом его аргументы.  Списки — это
+  `'.'`/2, то есть обычные составные, поэтому пара сортируется по первому элементу.
+  Терм с циклом сравнивается до повтора пары ячеек — сторож `ПОЛНЫЙ`.
+* `compare/3` — единственное новое имя: связать `<`, `=` или `>` либо проверить
+  заданное.  Знаки `@<`, `@=<`, `@>`, `@>=` — сахар над ним (`A @< B` разбирается
+  как `compare(<, A, B)`, `A @=< B` — как `НЕ(compare(>, A, B))`), а совет из
+  таблицы чужих записей «`@<` — не оператор» ушёл.
+* Знак в роли *терма* — это атом: `compare(<, A, B)` и `Порядок = <` пишутся как в
+  ISO, а после терма тот же знак по-прежнему инфиксный.
+* `СОРТИРОВКА` больше не отбирает элементы по виду заранее: смешанный список,
+  структуры и свободные переменные сортируются, а ошибкой осталась только форма
+  первого аргумента.  `msort/2` в `iso.pld` сливает через `@=<`/`@>`, чтобы две
+  сортировки не расходились.
+* Окно: `tokens.py` читает `@=<` и `@>=` тремя символами, `@<` и `@>` двумя —
+  иначе перо видело `@` и `>`.
+* Документы: `help.typ` §5.9 (таблица видов, примеры, отличие от ISO) и правки в
+  §5.1 и §3.7, строка таблицы сравнения, `prologd-diff.typ` (раздел и строка
+  сводной таблицы, `@`-строка убрана из «чего не добавлено»), `technical.typ`
+  §5.5.1 (как устроено), `library.typ` (`msort/2`), `builtins.json` (`compare`,
+  67 записей), `ai/conventions.md`.
+
+*Ловушка, стоящая времени.*  `@>=` — это `@`, `>`, `=`, а не `@`, `=`, `>`:
+  первый заход лексера искал «at, равно, больше», знак разваливался на два токена,
+  а разбор отвечал «предложение должно заканчиваться точкой» — ошибка, которая не
+  упоминает ни `@`, ни сравнение.  Симметрии с `@=<` нет: `@=<` повторяет `=<`,
+  `@>=` повторяет `>=`.
+
+*Проверки.*  Новый `test_standard_order.cpp` (пять случаев: ответы `compare/3`,
+  проверка, знаки, цикл, пары), сортировка в `test_builtins_lists.cpp`, разбор в
+  `test_parser.cpp`, токены в `test_lexer.cpp` и `test_tokens.py`, разметка в
+  `test_formatter.cpp`.  Новый пример `examples/prologu/standard_order_demo.pld`
+  (11 вопросов, проверяется как остальные), `sort_demo.pld` 6 → 7.
+
+*Verified.*  `ctest` 356/356; 25 оконных сюит и `protocol_smoke.py` зелёные; шесть
+документов собираются без замечаний.

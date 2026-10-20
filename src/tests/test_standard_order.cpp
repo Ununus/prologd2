@@ -1,0 +1,102 @@
+#include <catch2/catch_test_macros.hpp>
+
+#include <string>
+
+#include "test_helpers.hpp"
+
+using prologd::test::runProgram;
+
+// The standard order of terms (task_90): variables, then numbers, then text,
+// then compounds — numbers by value, text by code point, compounds by arity,
+// name and arguments.  `compare/3` is the call, and the four `@` signs are sugar
+// over it: `A @< B` *is* `compare(<, A, B)`, and `A @=< B` is the same call under
+// `НЕ`, the way `=<` is.  Every expectation here is taken from the built
+// interpreter.
+
+TEST_CASE("compare answers with the sign of the standard order") {
+  const auto result = runProgram(
+      "?compare(Порядок, 1, 2).\n"
+      "?compare(Порядок, 2, 1).\n"
+      "?compare(Порядок, 1, 1.0).\n"
+      "?compare(Порядок, а, \"а\").\n"
+      "?compare(Порядок, 1, а).\n"
+      "?compare(Порядок, ф(1), ф(1, 2)).\n"
+      "?compare(Порядок, ф(1), д(2)).\n"
+      "?compare(Порядок, [а], ф(б)).\n"
+      "?compare(Порядок, аб, аа).\n"
+      "?compare(Порядок, Х, 1).\n");
+  REQUIRE(result.loaded);
+  REQUIRE_FALSE(result.runtimeError);
+  // Numbers by value (`1` and `1.0` are one number, as `РАВНО` and `БОЛЬШЕ`
+  // have it), an atom and a string with the same letters are one text, arity is
+  // asked *before* the name (`ф/1` before `ф/2`, `ф/1` before `'.'/2`), and a
+  // free variable stands before everything.
+  REQUIRE(result.output ==
+          "Порядок=<\n"
+          "Порядок=>\n"
+          "Порядок==\n"
+          "Порядок==\n"
+          "Порядок=<\n"
+          "Порядок=<\n"
+          "Порядок=>\n"
+          "Порядок=>\n"
+          "Порядок=>\n"
+          "Порядок=<\n"
+          "Х=_1\n");
+}
+
+TEST_CASE("compare tests the order when its answer is already given") {
+  // The four `@` signs are built on exactly this form, so it has to answer
+  // «ДА»/«НЕТ» and not bind anything.
+  const auto result = runProgram(
+      "?compare(<, 1, 2).\n"
+      "?compare(=, 1, 1).\n"
+      "?compare(>, 1, 2).\n"
+      "?compare(<, 2, 1).\n");
+  REQUIRE(result.loaded);
+  REQUIRE_FALSE(result.runtimeError);
+  REQUIRE(result.output == "ДА\nДА\nНЕТ\nНЕТ\n");
+}
+
+TEST_CASE("the four at-signs compare by the standard order") {
+  const auto result = runProgram(
+      "?1 @< 2.\n"
+      "?2 @< 1.\n"
+      "?1 @=< 1.\n"
+      "?1 @>= 1.\n"
+      "?2 @> 1.\n"
+      "?ф(1) @< ф(1, 2).\n"
+      "?[а, б] @< [б].\n");
+  REQUIRE(result.loaded);
+  REQUIRE_FALSE(result.runtimeError);
+  REQUIRE(result.output == "ДА\nНЕТ\nДА\nДА\nДА\nДА\nДА\n");
+}
+
+TEST_CASE("a term that contains itself compares as far as it can") {
+  // `РАВНО(Ц, ф(Ц))` is legal here — there is no occurs check — so the walk
+  // stops at a pair of cells it has already seen, the guard `ПОЛНЫЙ` uses.  A
+  // plain walk would compare the two terms forever.
+  const auto result = runProgram(
+      "?РАВНО(Ц, ф(Ц)), compare(Порядок, Ц, Ц).\n"
+      "?РАВНО(А, ф(А)), РАВНО(Б, ф(Б)), compare(Порядок, А, Б).\n");
+  REQUIRE(result.loaded);
+  REQUIRE_FALSE(result.runtimeError);
+  REQUIRE(result.output == "Ц=ф(...)\nПорядок==\nА=ф(...)\nБ=ф(...)\nПорядок==\n");
+}
+
+TEST_CASE("a list of pairs sorts by its first element") {
+  // The example that started task_90 (a program from a book): `sort/2` over
+  // `[[Диалект, Автор], …]`.  Cyrillic comes after the Latin letters by code
+  // point, so «Д» stands last — that is the order, not a sorting fault.
+  const auto result = runProgram(
+      "пролог(\"Д\", \"Григорьев\").\n"
+      "пролог(\"GNU\", \"Диас\").\n"
+      "пролог(\"SWI\", \"Виламакер\").\n"
+      "?НАЙТИВСЕ([Диалект, Автор], пролог(Диалект, Автор), Q), СОРТИРОВКА(Q, W).\n");
+  REQUIRE(result.loaded);
+  REQUIRE_FALSE(result.runtimeError);
+  REQUIRE(result.output ==
+          "Диалект=_1\nАвтор=_1\n"
+          "Q=[[Д,Григорьев],[GNU,Диас],[SWI,Виламакер]]\n"
+          "W=[[GNU,Диас],[SWI,Виламакер],[Д,Григорьев]]\n");
+}

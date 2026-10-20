@@ -3,6 +3,7 @@ add_library(prlib STATIC
   src/utf8.cpp
   src/term.cpp
   src/term_print.cpp
+  src/order.cpp
   src/diagnostics.cpp
   src/checks.cpp
   src/lexer.cpp
