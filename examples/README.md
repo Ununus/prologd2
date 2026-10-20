@@ -30,7 +30,7 @@ prologu -s examples/first_demo.pld
 | Полка | Что там |
 |---|---|
 | `prologd/` | программы **первоначального** Пролог-Д — копия `src/examples` из `Ununus/prologd` как есть; их запускает `prologd.exe`, а наши проверки их не трогают (см. `prologd/README.md`) |
-| `prologu/` | примеры дополнений нашего диалекта: `sub_string_demo.pld` — форма ISO для подстроки, `if_then_demo.pld` — `->`, `standard_order_demo.pld` — стандартный порядок термов (`@<` и `compare/3`) |
+| `iso/` | программы, записанные **именами и знаками ISO**: `arith.pld` — `is`, `=:=`, `=\=`, `\=`; `lists.pld` — `member`, `append`, `length`, `msort`, `sort`; `family.pld` — родословная и `findall`; `order.pld` — `compare/3`, `@<` и две сортировки; `if_then.pld` — `->`; `sub_string.pld` — `sub_string/5`. Запуск: `prologu -I stdlib -s examples/iso/arith.pld` |
 
 Стандартная библиотека лежит рядом с интерпретатором — в папке
 `stdlib`; как её подключить, написано в `stdlib/README.md`.

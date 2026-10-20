@@ -841,3 +841,35 @@ last.  The reference is a sixth document, `doc/library.typ`, and `test_stdlib.cp
 fails when a predicate defined in `stdlib/*.pld` has no line in it.
 
 **Status.** Accepted.
+
+## ADR-027: The ISO arithmetic signs are accepted, and `#…#` stays
+
+**Context.** `help.typ` §3.3 said, as a decision and not an accident, that `is`, `=:=`
+and `=\=` were absent because `#…#` already evaluates everywhere a number is needed and
+`РАВНО` is reversible (`РАВНО(5, #2+3#)` holds).  The cost of that decision showed up
+when programs from books were read: `X is N - 1` got a hint instead of an answer, and a
+factorial had to be rewritten before it would run.  Stage 3 of task_82 (task_92) had to
+either keep the refusal or take the signs, and the second is what the owner asked for
+(«ISO до конца»).
+
+**Decision.** The three arithmetic signs are sugar of the same kind as `>`/`=<`: the
+parser recognises them before it parses the goal and builds `РАВНО(X, #E#)` (`is`),
+`РАВНО(#E1#, #E2#)` (`=:=`) and the same under `НЕ` (`=\=`, `\=`).  Their operands are
+ordinary arithmetic expressions with **no** `#…#`, which is the one place the dialect
+takes bare arithmetic in goal position.  The word `is` is *not* reserved: outside that
+arithmetic position it is a name like any other, so `is(X, Y)` and `ф(is)` keep working
+— that is why the decision is made by looking ahead (`arithmeticComparisonAhead`) rather
+than by lexing `is` as a sign.  `#…#` stays, exactly as before: it evaluates inside any
+term (`ВЫВОД(#2 + 3#)`) and remains the only way to write an expression as an argument.
+
+**Consequences.** Book programs now run as written, and the hints «`is` — не оператор»
+and «`\=` — не оператор» are gone; the remaining advice table is `==`, `\==` and `<=`,
+which this dialect still lacks (`\=` is not `\==`: the first asks about unification, the
+second about identity).  A free variable in an operand is the same runtime error as in
+`#…#`, so the two spellings cannot disagree.  `/* … */` came with the same stage: it is
+the standard's comment, non-nesting, an unclosed one is a lexical error — and the
+formatter returns any text containing `/*` untouched, because the layout rules were
+written for `%` and a multi-line comment inside a goal would be moved into another
+clause.  Losing a comment is worse than leaving the spacing alone.
+
+**Status.** Accepted.

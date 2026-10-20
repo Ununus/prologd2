@@ -279,14 +279,13 @@ TEST_CASE("the four standard-order signs are read as one token each") {
 
 TEST_CASE("an ISO operator the dialect lacks is explained") {  // A sign from another Prolog is a lexical error with advice (task_52), not
   // the bare «недопустимый символ»: the reader is told what to write instead.
+  // task_92 took `\=`, `=:=` and `=\=` off this list — the dialect reads them
+  // now, so what is left is the signs it still does not have.
   const struct {
     std::string source;
     std::string needle;
   } cases[] = {{"X == Y", "сравнение термов записывают унификацией"},
                {"X \\== Y", "термы не совпадают"},
-               {"X \\= Y", "не унифицируется"},
-               {"1 + 1 =:= 2", "выражение вычисляет «#…#»"},
-               {"X =\\= Y", "«не равно»"},
                {"X <= Y", "«меньше или равно» записывают «=<»"}};
   for (const auto& item : cases) {
     INFO("source: " << item.source);
@@ -296,6 +295,42 @@ TEST_CASE("an ISO operator the dialect lacks is explained") {  // A sign from an
     const std::string& message = sink.diagnostics().front().message;
     REQUIRE(message.find(item.needle) != std::string::npos);
   }
+}
+
+TEST_CASE("the ISO signs `\\=`, `=:=` and `=\\=` are single tokens") {
+  // Splitting them into `<` and `=` would turn the statement into a syntax
+  // error about a lost dot (the trap `@>=` set in task_90).
+  const struct {
+    std::string source;
+    TokenKind kind;
+  } cases[] = {{"X \\= Y", TokenKind::NotEqual},
+               {"1 + 1 =:= 2", TokenKind::ArithEqual},
+               {"2 =\\= 1 + 1", TokenKind::ArithNotEqual}};
+  for (const auto& item : cases) {
+    INFO("source: " << item.source);
+    DiagnosticSink sink;
+    const auto tokens = lex(item.source, sink);
+    REQUIRE_FALSE(sink.hasErrors());
+    const auto it = std::ranges::find_if(
+        tokens, [&](const Token& token) { return token.kind == item.kind; });
+    REQUIRE(it != tokens.end());
+  }
+}
+
+TEST_CASE("a block comment runs to its closer") {
+  DiagnosticSink sink;
+  const auto tokens = lex("foo. /* two\nlines */ bar.", sink);
+  REQUIRE_FALSE(sink.hasErrors());
+  REQUIRE(tokens[0].text == "foo");
+  REQUIRE(tokens[2].text == "bar");
+}
+
+TEST_CASE("an unclosed block comment is explained") {
+  DiagnosticSink sink;
+  lex("foo. /* no closer\nbar.", sink);
+  REQUIRE(sink.hasErrors());
+  REQUIRE(sink.diagnostics().front().message.find("не закрыт комментарий") !=
+          std::string::npos);
 }
 
 TEST_CASE("lexer reports malformed numbers") {

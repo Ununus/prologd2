@@ -36,13 +36,6 @@ Term commaGoal(std::vector<Term>& goals) {
 constexpr const char* kRetiredTerminator =
     "«;» — дизъюнкция; предложение должно заканчиваться точкой";
 
-/// The wording of an ISO `is` written as an infix operator (`X is 2+3`).  The
-/// dialect has no `is`: `#…#` marks an expression, and `РАВНО` evaluates it
-/// (task_55).  Without this the reader is told only «Цель не может быть
-/// переменной».
-constexpr const char* kInfixIsHint =
-    "«is» — не оператор: выражение помечают «#…#», например «РАВНО(X, #2+3#)»";
-
 /// The wording of an `->` with nothing after it.  A bare sign is what a reader
 /// writes when they delete the goal that stood there, and the generic message
 /// («Цель должна быть предикатом») would point at the wrong end of the line.
@@ -91,6 +84,7 @@ struct InfixOperator {
 
 constexpr InfixOperator kInfixOperators[] = {
     {TokenKind::Equal, "=", "РАВНО", false, nullptr},
+    {TokenKind::NotEqual, "\\=", "РАВНО", true, nullptr},
     {TokenKind::Less, "<", "МЕНЬШЕ", false, nullptr},
     {TokenKind::Greater, ">", "БОЛЬШЕ", false, nullptr},
     {TokenKind::LessEqual, "=<", "БОЛЬШЕ", true, nullptr},
@@ -298,9 +292,32 @@ Term Parser::parseTerm() {
 }
 
 Term Parser::parseComparison() {
-  Term left = parseOperand();
+  // `is`, `=:=` and `=\=` take *arithmetic* expressions written without `#…#`
+  // (task_92), so the operands are parsed by the arithmetic parser when one of
+  // them is ahead; every other sign keeps the ordinary term operand.
+  const bool arithmetic = arithmeticComparisonAhead();
+  Term left = arithmetic ? parseAdditive() : parseOperand();
   if (failed_) {
     return left;
+  }
+  if (arithmetic && check(TokenKind::Identifier) && peek().text == "is") {
+    advance();
+    Term right = parseArithmeticOperand();
+    if (failed_) {
+      return left;
+    }
+    return makeCompound("РАВНО", {std::move(left), std::move(right)});
+  }
+  if (arithmetic && (check(TokenKind::ArithEqual) || check(TokenKind::ArithNotEqual))) {
+    const bool negated = check(TokenKind::ArithNotEqual);
+    advance();
+    Term right = parseArithmeticOperand();
+    if (failed_) {
+      return left;
+    }
+    Term goal = makeCompound(
+        "РАВНО", {makeCompound(kExpressionFunctor, {std::move(left)}), std::move(right)});
+    return negated ? makeCompound("НЕ", {std::move(goal)}) : goal;
   }
   const InfixOperator* row = infixOperator(peek().kind);
   if (row == nullptr) {
@@ -344,6 +361,58 @@ Term Parser::parseOperand() {
     return parseArithmetic();
   }
   return parsePrimary();
+}
+
+bool Parser::arithmeticComparisonAhead() const {
+  // Only the part of the statement that can hold this operand is scanned: a
+  // `,`, `;`, `.` or a closing bracket at depth zero ends it, so `p(is)` and
+  // `f(a, is)` never look like the sign.
+  int depth = 0;
+  for (std::size_t lookahead = 0;; ++lookahead) {
+    const Token& token = peek(lookahead);
+    switch (token.kind) {
+      case TokenKind::LParen:
+      case TokenKind::LBracket:
+        ++depth;
+        break;
+      case TokenKind::RParen:
+      case TokenKind::RBracket:
+        if (depth == 0) {
+          return false;
+        }
+        --depth;
+        break;
+      case TokenKind::Comma:
+      case TokenKind::Semicolon:
+      case TokenKind::Dot:
+      case TokenKind::Bar:
+        if (depth == 0) {
+          return false;
+        }
+        break;
+      case TokenKind::EndOfFile:
+        // Always the end: a broken statement must not send this scan looking
+        // for a sign in an endless run of end-of-file tokens.
+        return false;
+      case TokenKind::ArithEqual:
+      case TokenKind::ArithNotEqual:
+        if (depth == 0) {
+          return true;
+        }
+        break;
+      case TokenKind::Identifier:
+        if (depth == 0 && token.text == "is") {
+          return true;
+        }
+        break;
+      default:
+        break;
+    }
+  }
+}
+
+Term Parser::parseArithmeticOperand() {
+  return makeCompound(kExpressionFunctor, {parseAdditive()});
 }
 
 Term Parser::parseCommaGroup() {
@@ -598,6 +667,10 @@ Term Parser::parsePrimaryArithmetic() {
       return parsePrimary();
     case TokenKind::Variable:
       return parsePrimary();
+    case TokenKind::Hash:
+      // `X is #1 + 1#` — the marked form still works inside an arithmetic
+      // operand; it is evaluated like the unmarked one.
+      return parseArithmetic();
     case TokenKind::LParen: {
       advance();
       Term inner = parseAdditive();
@@ -608,9 +681,10 @@ Term Parser::parsePrimaryArithmetic() {
       return inner;
     }
     default:
-      report(ErrorCode::InvalidArithmeticExpression, token.location,
-             "Ожидался операнд арифметического выражения");
-      return makeInt(0);
+      // An operand may be any term: `X is Y` and `X is f(Y)` are the arithmetic
+      // engine's business at run time — it is what refuses what it cannot
+      // evaluate (`X is "a"` is a type error, not a syntax error).
+      return parsePrimary();
   }
 }
 
@@ -623,9 +697,7 @@ Term Parser::parseGoal() {
     return goal;
   }
   if (goal.kind == TermKind::Var) {
-    if (check(TokenKind::Identifier) && peek().text == "is") {
-      report(ErrorCode::InvalidSentence, previous().location, kInfixIsHint);
-    } else if (goal.text.empty() || goal.text == "_") {
+    if (goal.text.empty() || goal.text == "_") {
       report(ErrorCode::MisplacedUnderscore, previous().location);
     } else {
       report(ErrorCode::InvalidSentence, previous().location,

@@ -185,17 +185,57 @@ TEST_CASE("`\\+` is ISO's spelling of the same negation") {
   }
 }
 
-TEST_CASE("an ISO infix `is` says what to write instead") {
-  // `X is 2+3` is how a reader of ISO Prolog evaluates an expression, and the
-  // dialect has no `is`: the message names `#…#` and the goal that takes it
-  // (task_55).  Without it the only reading given is «Цель не может быть
-  // переменной», which says nothing about the mistake.
-  DiagnosticSink sink;
-  const auto program = parse("?X is 2+3.\n", sink);
-  REQUIRE(sink.hasErrors());
-  REQUIRE(sink.diagnostics().front().message ==
-          "«is» — не оператор: выражение помечают «#…#», например «РАВНО(X, #2+3#)»");
-  (void)program;
+TEST_CASE("the arithmetic signs take expressions written without hash marks") {
+  // task_92: `is`, `=:=` and `=\=` are ISO signs, and their operands are
+  // arithmetic expressions — `X is 2 + 3` is the marked `РАВНО(X, #2 + 3#)`.
+  // Until this round the dialect answered them with advice instead of a goal.
+  {
+    DiagnosticSink sink;
+    const auto program = parse("p :- X is 2 + 3.\n", sink);
+    REQUIRE_FALSE(sink.hasErrors());
+    const Term& goal = program.clauses[0].body[0];
+    REQUIRE(goal.compound->name == "РАВНО");
+    REQUIRE(goal.compound->args.size() == 2);
+    REQUIRE(goal.compound->args[1].compound->name == kExpressionFunctor);
+  }
+  {
+    DiagnosticSink sink;
+    const auto program = parse("p :- 1 + 1 =:= 2.\n", sink);
+    REQUIRE_FALSE(sink.hasErrors());
+    const Term& goal = program.clauses[0].body[0];
+    REQUIRE(goal.compound->name == "РАВНО");
+    // Both sides are expressions: the left one is wrapped here, the right one by
+    // the arithmetic parser.
+    REQUIRE(goal.compound->args[0].compound->name == kExpressionFunctor);
+    REQUIRE(goal.compound->args[1].compound->name == kExpressionFunctor);
+  }
+  {
+    DiagnosticSink sink;
+    const auto program = parse("p :- 2 =\\= 1 + 1.\n", sink);
+    REQUIRE_FALSE(sink.hasErrors());
+    const Term& goal = program.clauses[0].body[0];
+    REQUIRE(goal.compound->name == "НЕ");
+    REQUIRE(goal.compound->args[0].compound->name == "РАВНО");
+  }
+  {
+    // `\=` is «не унифицируется», the same negation the sign `=<` uses.
+    DiagnosticSink sink;
+    const auto program = parse("p :- X \\= 1.\n", sink);
+    REQUIRE_FALSE(sink.hasErrors());
+    const Term& goal = program.clauses[0].body[0];
+    REQUIRE(goal.compound->name == "НЕ");
+    REQUIRE(goal.compound->args[0].compound->name == "РАВНО");
+  }
+  // A name that merely reads `is` is still a name: `is(X, Y)` is an ordinary
+  // compound, and the sign only stands between two terms.
+  {
+    DiagnosticSink sink;
+    const auto program = parse("p :- is(X, Y).\n", sink);
+    REQUIRE_FALSE(sink.hasErrors());
+    const Term& goal = program.clauses[0].body[0];
+    REQUIRE(goal.compound->name == "is");
+    REQUIRE(goal.compound->args.size() == 2);
+  }
 }
 
 TEST_CASE("a `;` where the dialect used to accept one is an error") {

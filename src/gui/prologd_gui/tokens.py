@@ -189,6 +189,15 @@ def tokenize(line: str, keywords: Keywords | None = None, mode: int = MODE_ISO) 
             else:
                 tokens.append(Token(COMMENT, rest, index, length))
             break
+        if line.startswith("/*", index):
+            # The standard's block comment (task_92).  A line is tokenized on its
+            # own here, so an opener without its closer on the same line colours
+            # the rest of the line — which is what the text looks like anyway.
+            closer = line.find("*/", index + 2)
+            end = length if closer < 0 else closer + 2
+            tokens.append(Token(COMMENT, line[index:end], index, end))
+            index = end
+            continue
         if ch == '"':
             end = _scan_delimited(line, index, '"', doubled=False, backslash=True)
             tokens.append(Token(STRING, line[index:end], index, end))
@@ -255,6 +264,17 @@ def tokenize(line: str, keywords: Keywords | None = None, mode: int = MODE_ISO) 
             index += 3
             continue
         if pair in ("@<", "@>"):
+            tokens.append(Token(OPERATOR, pair, index, index + 2))
+            index += 2
+            continue
+        # The ISO arithmetic signs (task_92): `=:=` and `=\=` are three characters
+        # and must be read before the `=` they start with, exactly as in the lexer.
+        if triple in ("=:=", "=\\="):
+            tokens.append(Token(OPERATOR, triple, index, index + 3))
+            index += 3
+            continue
+        # `\=` (`\(A) = B`, «не унифицируется») is one sign, not `\` and `=`.
+        if pair == "\\=":
             tokens.append(Token(OPERATOR, pair, index, index + 2))
             index += 2
             continue

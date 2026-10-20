@@ -135,9 +135,10 @@ superseded originals are kept in `examples/lessons/_old/`.
 Beside the course `examples/` carries two shelves: `examples/prologd/` — the
 original PrologD's own example programs, copied from
 [`Ununus/prologd`](https://github.com/Ununus/prologd) as they were written, to be
-run by `prologd.exe` and compared with the port — and `examples/prologu/`, the two
-examples of what this dialect added: `sub_string_demo.pld` (the ISO substring form)
-and `if_then_demo.pld` (`->`).
+run by `prologd.exe` and compared with the port — and `examples/iso/`, six programs
+written with ISO names and signs: the arithmetic signs (`is`, `=:=`, `=\=`, `\=`),
+the library predicates, a family tree with `findall`, the standard order of terms
+with `compare/3`, `->`, and `sub_string/5`.
 
 ## Standard library
 

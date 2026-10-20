@@ -343,6 +343,17 @@ TEST_CASE("the comparison signs survive formatting") {
   REQUIRE(twice.text == once.text);
 }
 
+TEST_CASE("a source with a block comment comes back untouched") {
+  // task_92: the layout rules were written for `%` comments, and a `/* … */`
+  // spans lines — a rewrite would either lose the comment or move it into a
+  // clause it does not belong to.  The honest answer is to leave the file as
+  // the author wrote it (and say the same about any other layout choice).
+  const std::string source = "p(X) :-\n  /* пояснение */\n  q(X).\n";
+  const FormatResult result = format(source, hard());
+  REQUIRE(result.ok());
+  REQUIRE(result.text == source);
+}
+
 TEST_CASE("the standard-order signs survive formatting") {
   // task_90: the signs are ordinary tokens to the formatter — the layout is
   // rewritten, the text of the goals is not, and a sign used as an *atom*

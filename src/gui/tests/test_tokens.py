@@ -192,7 +192,25 @@ def test_comparison_signs() -> None:
     assert kinds("1 @> 2") == [(INTEGER, "1"), (OPERATOR, "@>"), (INTEGER, "2")]
     assert kinds("1 @=< 2") == [(INTEGER, "1"), (OPERATOR, "@=<"), (INTEGER, "2")]
     assert kinds("1 @>= 2") == [(INTEGER, "1"), (OPERATOR, "@>="), (INTEGER, "2")]
+    # The ISO arithmetic signs of task_92 are one token each too: `=:=` and `=\=`
+    # are not `=` followed by `:=`, and `\=` is not `\` and `=`.
+    assert kinds("1 =:= 1") == [(INTEGER, "1"), (OPERATOR, "=:="), (INTEGER, "1")]
+    assert kinds("2 =\\= 3") == [(INTEGER, "2"), (OPERATOR, "=\\="), (INTEGER, "3")]
+    assert kinds("X \\= Y") == [(VARIABLE, "X"), (OPERATOR, "\\="), (VARIABLE, "Y")]
     print("ok: the comparison signs")
+
+
+def test_block_comment() -> None:
+    """`/* … */` is a comment, on one line here (task_92)."""
+    assert kinds("p. /* пояснение */") == [
+        (ATOM, "p"),
+        (PUNCTUATION, "."),
+        (COMMENT, "/* пояснение */"),
+    ]
+    # An opener with no closer on the line colours the rest of the line: the
+    # tokenizer sees one line at a time, and that is what the text looks like.
+    assert kinds("/* дальше") == [(COMMENT, "/* дальше")]
+    print("ok: the block comment")
 
 
 def test_expression_query_and_arrows() -> None:
@@ -280,6 +298,7 @@ def main() -> int:
     test_numbers()
     test_reserved_names_variables_and_atoms()
     test_comparison_signs()
+    test_block_comment()
     test_expression_query_and_arrows()
     test_alphabet_of_identifiers()
     test_tokens_cover_every_example_line()

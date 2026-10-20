@@ -115,8 +115,15 @@ class Parser {
   // Terms.
   Term parseTerm();
   /// The infix comparison layer of task_52: `A = B`, `A < B`, `A > B`,
-  /// `A >= B`, `A =< B`, each sugar for a built-in goal.
+  /// `A >= B`, `A =< B`, each sugar for a built-in goal; `\=` (task_92) is the
+  /// same sugar under `НЕ`, and `is`, `=:=`, `=\=` take arithmetic operands and
+  /// are handled here too.
   Term parseComparison();
+  /// True when the operand being parsed belongs to `is`, `=:=` or `=\=`, which
+  /// take arithmetic expressions written without `#…#` (task_92).
+  bool arithmeticComparisonAhead() const;
+  /// An arithmetic expression as a term of its own: `#expr(…)`.
+  Term parseArithmeticOperand();
   /// An operand of a comparison: `#…#` or a primary term.
   Term parseOperand();
   Term parsePrimary();

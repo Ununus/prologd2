@@ -84,12 +84,7 @@ struct ForeignOperator {
 };
 
 constexpr ForeignOperator kForeignOperators[] = {
-    {"=:=",
-     "«=:=» — не оператор: выражение вычисляет «#…#», поэтому «1 + 1 =:= 2» — "
-     "это «#1 + 1# = 2»"},
-    {"=\\=", "«=\\=» — не оператор: «не равно» — это «НЕ(A = B)»"},
-    {"\\==", "«\\==» — не оператор: «термы не совпадают» — это «НЕ(A = B)»"},
-    {"\\=", "«\\=» — не оператор: «не унифицируется» — это «НЕ(A = B)»"},
+    {"\\==", "«\\==» — не оператор: «термы не совпадают» — это «НЕ(A = B)"},
     {"==", "«==» — не оператор: сравнение термов записывают унификацией — «A = B»"},
     {"<=", "«<=» — не оператор: «меньше или равно» записывают «=<»"},
 };
@@ -409,6 +404,27 @@ std::vector<Token> Lexer::tokenizeImpl(DiagnosticSink* sink) {
       }
       continue;
     }
+    if (ch == '/' && peek(1) == '*') {
+      // `/* … */` — ISO's block comment (task_92).  It does not nest, as in ISO,
+      // and the closing `*/` may sit lines away.  The text is skipped here; the
+      // formatter leaves a file that has one exactly as it is written, so no
+      // comment can be lost.
+      const SourceLocation start = here();
+      advanceByte(2);
+      bool closed = false;
+      while (!atEnd()) {
+        if (peek() == '*' && peek(1) == '/') {
+          advanceByte(2);
+          closed = true;
+          break;
+        }
+        advanceByte(1);
+      }
+      if (!closed) {
+        reportInvalidSign(sink, start, "не закрыт комментарий «/*»");
+      }
+      continue;
+    }
     const SourceLocation start = here();
     const unsigned char byte = static_cast<unsigned char>(ch);
     if (byte >= 0x80) {
@@ -511,10 +527,17 @@ std::vector<Token> Lexer::tokenizeImpl(DiagnosticSink* sink) {
         break;
       case '=':
         // `=` is unification (task_52) — the sugar over `РАВНО/2`.  Longest
-        // match first: `=<` is «less or equal», while `=:=`, `=\=` and `==`
-        // belong to other Prologs and get advice instead of a token.
-        if (const ForeignOperator* foreign = foreignOperatorAt(source_, offset_);
-            foreign != nullptr) {
+        // match first: `=:=` and `=\=` are the arithmetic comparisons of ISO
+        // (task_92), `=<` is «less or equal», while `==` belongs to other
+        // Prologs and gets advice instead of a token.
+        if (peek(1) == ':' && peek(2) == '=') {
+          advanceByte(3);
+          tokens.push_back(makeToken(TokenKind::ArithEqual, "=:=", start));
+        } else if (peek(1) == '\\' && peek(2) == '=') {
+          advanceByte(3);
+          tokens.push_back(makeToken(TokenKind::ArithNotEqual, "=\\=", start));
+        } else if (const ForeignOperator* foreign = foreignOperatorAt(source_, offset_);
+                   foreign != nullptr) {
           advanceByte(foreign->text.size());
           reportInvalidSign(sink, start, foreignOperatorHint(*foreign));
           tokens.push_back(makeToken(TokenKind::Unknown, std::string(foreign->text), start));
@@ -550,9 +573,14 @@ std::vector<Token> Lexer::tokenizeImpl(DiagnosticSink* sink) {
       case '\\':
         // `\+` is the ISO spelling of `НЕ` (task_55): one token, not two, so
         // the parser sees a prefix operator and the formatter keeps it whole.
+        // `\=` is «не унифицируется» (task_92), and `\==` stays advice: identity
+        // of terms is not a thing this dialect has.
         if (peek(1) == '+') {
           advanceByte(2);
           tokens.push_back(makeToken(TokenKind::NotGoal, "\\+", start));
+        } else if (peek(1) == '=' && peek(2) != '=') {
+          advanceByte(2);
+          tokens.push_back(makeToken(TokenKind::NotEqual, "\\=", start));
         } else if (const ForeignOperator* foreign = foreignOperatorAt(source_, offset_);
                    foreign != nullptr) {
           advanceByte(foreign->text.size());

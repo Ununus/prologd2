@@ -84,10 +84,11 @@ const std::vector<std::string>& checkedLessons() {
 /// are the showcase for the predicates the dialect added on top of the port
 /// (`ПЕРВОЕ`, `СОРТИРОВКА`, `ПОЛНЫЙ`, `ДЛЯВСЕХ`), the two problems whose output
 /// is the same on every machine, the tour of the standard library, the study
-/// sorts that left the library for `examples/sorts.pld` (task_89) and the two
-/// examples of the ISO additions (task_84, task_85) in `examples/prologu`;
-/// `problems/monk.pld` draws and `problems/monkd.pld` reads input, so those two
-/// are only parsed (see the test below).
+/// sorts that left the library for `examples/sorts.pld` (task_89), and the shelf
+/// `examples/iso` of programs written with ISO names and signs (task_92: the
+/// arithmetic signs, the library, a family tree, the standard order, `->` and
+/// `sub_string/5`); `problems/monk.pld` draws and `problems/monkd.pld` reads
+/// input, so those two are only parsed (see the test below).
 const std::vector<std::string>& checkedExamples() {
   static const std::vector<std::string> names = {
       "first_demo.pld",
@@ -99,9 +100,12 @@ const std::vector<std::string>& checkedExamples() {
       "use_old_names.pld",
       "problems/factorial.pld",
       "problems/knapsack.pld",
-      "prologu/sub_string_demo.pld",
-      "prologu/if_then_demo.pld",
-      "prologu/standard_order_demo.pld",
+      "iso/arith.pld",
+      "iso/lists.pld",
+      "iso/family.pld",
+      "iso/order.pld",
+      "iso/if_then.pld",
+      "iso/sub_string.pld",
   };
   return names;
 }

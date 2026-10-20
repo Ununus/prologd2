@@ -57,6 +57,29 @@ TEST_CASE("the comparison signs are sugar over the long forms") {
           std::string::npos);
 }
 
+TEST_CASE("the ISO arithmetic signs are sugar over the long forms") {
+  // task_92: `is`, `=:=`, `=\=`, `\=` — the same goals an ISO reader writes,
+  // built from the parts the dialect already had.  Their operands are ordinary
+  // arithmetic expressions, so no `#…#` is needed.
+  const auto result = runProgram(
+      "?X is 2 + 3.\n"
+      "?X is 2*3 + 1.\n"
+      "?X is #2+2#.\n"
+      "?Y = 3, X is Y + 1.\n"
+      "?X is -1.\n"
+      "?1 + 1 =:= 2.\n"
+      "?2 =:= 1 + 2.\n"
+      "?2 =\\= 1 + 2.\n"
+      "?1 =:= 1.0.\n"
+      "?X \\= 1.\n"
+      "?2 \\= 2.\n"
+      "?f(a) \\= 1.\n");
+  REQUIRE(result.loaded);
+  REQUIRE_FALSE(result.runtimeError);
+  REQUIRE(result.output ==
+          "X=5\nX=7\nX=4\nY=3\nX=4\nX=-1\nДА\nНЕТ\nДА\nДА\nНЕТ\nНЕТ\nДА\n");
+}
+
 TEST_CASE("greater-than compares numbers and text") {
   // Two branches: two numbers (integer, float, big integer or an arithmetic
   // expression — `asNumeric` evaluates it) and two strings.  Text is compared

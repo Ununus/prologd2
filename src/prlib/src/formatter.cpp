@@ -750,6 +750,13 @@ FormatResult formatSource(std::string_view text, const FormatOptions& options) {
   if (options.mode == FormatMode::None || text.empty()) {
     return result;
   }
+  // A block comment can sit in the middle of a goal, where the layout pass
+  // copies a gap and would drop it.  Until the formatter knows how to carry
+  // one, a text that has `/*` is left exactly as it is written (task_92) — no
+  // comment is ever lost, and the file keeps the shape its author gave it.
+  if (text.find("/*") != std::string_view::npos) {
+    return result;
+  }
   const std::string_view source = stripByteOrderMark(text);
   // A file may say how its names are read in its first line (task_67), and that
   // line wins over the mode of the run — the same order the loader uses.  The

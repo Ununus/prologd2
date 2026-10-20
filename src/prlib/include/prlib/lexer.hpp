@@ -37,6 +37,9 @@ enum class TokenKind : std::uint8_t {
   Greater,       ///< `>`, the sugar for `БОЛЬШЕ/2`
   LessEqual,     ///< `=<`, the sugar for `НЕ(МЕНЬШЕ(A, B))`
   GreaterEqual,  ///< `>=`, the sugar for `НЕ(БОЛЬШЕ(A, B))`
+  NotEqual,      ///< `\=`, ISO's «не унифицируется»: `НЕ(РАВНО(A, B))` (task_92)
+  ArithEqual,    ///< `=:=`, arithmetic equality over `#… #` (task_92)
+  ArithNotEqual, ///< `=\=`, its negation
   AtLess,          ///< `@<`, the standard order: `compare(<, A, B)` (task_90)
   AtLessEqual,     ///< `@=<`, `НЕ(compare(>, A, B))`
   AtGreater,       ///< `@>`, `compare(>, A, B)`
