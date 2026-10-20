@@ -128,8 +128,8 @@ Tests are written **together with** the feature, never after.
 * The **product name** sits beside the number — `set(PROLOGD_PRODUCT_NAME "Пролог-У")` —
   and is injected the same way, through the generated source and *not* a `-D` macro: a
   non-ASCII value on the compiler's command line travels through a response file in the
-  machine's ANSI code page.  One function, `versionBanner()` (`Пролог-У 2.3.0
-  (2026-10-13)`), is what both `--version` and `ВЕРСИЯ/0` print, so the two cannot drift
+  machine's ANSI code page.  One function, `versionBanner()` (`Пролог-У 2.4.0
+  (2026-10-20)`), is what both `--version` and `ВЕРСИЯ/0` print, so the two cannot drift
   (task_76).  Consequence for scripts: `--version` is a *sentence*, so the number has to
   be read out of it (`tools/build_portable.ps1` matches `\d+\.\d+\.\d+`).
 * The **protocol version is a counter of its own** (`PROTOCOL_VERSION` in
