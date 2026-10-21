@@ -15,6 +15,9 @@ struct RunResult {
   std::string error;
   bool loaded = false;
   bool runtimeError = false;
+  /// Where the first runtime error happened: the clause it was raised in, or the
+  /// question it came from when the goal was written in the query (part 137).
+  SourceLocation errorLocation;
 };
 
 /// Run a whole program (clauses and queries) in-memory and capture output.
@@ -42,12 +45,14 @@ inline RunResult runProgram(const std::string& source, const std::string& input 
 
   ModuleLoader loader(engine, std::move(include_paths));
   bool runtime_error = false;
+  SourceLocation error_location;
   loader.setQueryRunner([&](const Query& query) {
     try {
       engine.runQuery(query);
     } catch (const PrologRuntimeError& error) {
       errorStream << error.what() << '\n';
       runtime_error = true;
+      error_location = error.error().location;
     }
   });
 
@@ -58,12 +63,14 @@ inline RunResult runProgram(const std::string& source, const std::string& input 
   } catch (const PrologRuntimeError& runtimeError) {
     errorStream << runtimeError.what() << '\n';
     runtime_error = true;
+    error_location = runtimeError.error().location;
     result.loaded = true;
   }
   if (!result.loaded) {
     errorStream << error << '\n';
   }
   result.runtimeError = runtime_error;
+  result.errorLocation = error_location;
   result.output = outputStream.str();
   result.error = errorStream.str();
   return result;

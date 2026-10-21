@@ -12,6 +12,7 @@
 
 namespace prologd {
 
+using detail::ArgKind;
 using detail::asNumeric;
 using detail::asText;
 using detail::badArguments;
@@ -62,9 +63,8 @@ BuiltinResult unifyValue(Engine& engine, const Term& target, const ArithValue& v
                                                      : BuiltinResult::Fail;
 }
 
-BuiltinResult compareGreater(Engine& engine, const Term& first, const Term& second,
-                             bool swap) {
-  const int cmp = detail::compareOrder(engine, first, second, swap ? "МЕНЬШЕ" : "БОЛЬШЕ");
+BuiltinResult compareGreater(Engine& engine, std::span<const Term> args, bool swap) {
+  const int cmp = detail::compareOrder(engine, args, swap ? "МЕНЬШЕ" : "БОЛЬШЕ");
   const bool greater = swap ? cmp < 0 : cmp > 0;
   return greater ? BuiltinResult::Continue : BuiltinResult::Fail;
 }
@@ -72,8 +72,10 @@ BuiltinResult compareGreater(Engine& engine, const Term& first, const Term& seco
 
 namespace detail {
 
-int compareOrder(Engine& engine, const Term& first, const Term& second,
+int compareOrder(Engine& engine, std::span<const Term> args,
                  std::string_view predicate) {
+  const Term& first = args[0];
+  const Term& second = args[1];
   const auto left = asNumeric(engine, first);
   const auto right = asNumeric(engine, second);
   if (left && right) {
@@ -87,17 +89,17 @@ int compareOrder(Engine& engine, const Term& first, const Term& second,
     }
     return *leftText > *rightText ? 1 : 0;
   }
-  badArguments(predicate);
+  badArguments(engine, args, predicate, ArgKind::NumberOrText);
 }
 
 }  // namespace detail
 
 BuiltinResult builtinGreater(Engine& engine, std::span<const Term> args) {
-  return compareGreater(engine, args[0], args[1], false);
+  return compareGreater(engine, args, false);
 }
 
 BuiltinResult builtinLess(Engine& engine, std::span<const Term> args) {
-  return compareGreater(engine, args[0], args[1], true);
+  return compareGreater(engine, args, true);
 }
 
 // ---------------------------------------------------------------------------
@@ -112,13 +114,13 @@ BuiltinResult builtinAdd(Engine& engine, std::span<const Term> args) {
   const auto bv = asNumeric(engine, b);
   const auto cv = asNumeric(engine, c);
   if (!av && !isUnbound(engine, a)) {
-    badArguments("СЛОЖЕНИЕ");
+    badArguments(engine, args, "СЛОЖЕНИЕ", ArgKind::Number);
   }
   if (!bv && !isUnbound(engine, b)) {
-    badArguments("СЛОЖЕНИЕ");
+    badArguments(engine, args, "СЛОЖЕНИЕ", ArgKind::Number);
   }
   if (!cv && !isUnbound(engine, c)) {
-    badArguments("СЛОЖЕНИЕ");
+    badArguments(engine, args, "СЛОЖЕНИЕ", ArgKind::Number);
   }
   const int known = (av ? 1 : 0) + (bv ? 1 : 0) + (cv ? 1 : 0);
   const bool anyFloat = (av && av->is_float) || (bv && bv->is_float) || (cv && cv->is_float);
@@ -151,7 +153,7 @@ BuiltinResult builtinAdd(Engine& engine, std::span<const Term> args) {
       return unifyValue(engine, a, ArithValue::ofInteger(cv->integer - bv->integer));
     }
   }
-  badArguments("СЛОЖЕНИЕ");
+  badArguments(engine, args, "СЛОЖЕНИЕ", ArgKind::Number);
 }
 
 // ---------------------------------------------------------------------------
@@ -166,13 +168,13 @@ BuiltinResult builtinMul3(Engine& engine, std::span<const Term> args) {
   const auto bv = asNumeric(engine, b);
   const auto cv = asNumeric(engine, c);
   if (!av && !isUnbound(engine, a)) {
-    badArguments("УМНОЖЕНИЕ");
+    badArguments(engine, args, "УМНОЖЕНИЕ", ArgKind::Number);
   }
   if (!bv && !isUnbound(engine, b)) {
-    badArguments("УМНОЖЕНИЕ");
+    badArguments(engine, args, "УМНОЖЕНИЕ", ArgKind::Number);
   }
   if (!cv && !isUnbound(engine, c)) {
-    badArguments("УМНОЖЕНИЕ");
+    badArguments(engine, args, "УМНОЖЕНИЕ", ArgKind::Number);
   }
   const int known = (av ? 1 : 0) + (bv ? 1 : 0) + (cv ? 1 : 0);
   const bool anyFloat = (av && av->is_float) || (bv && bv->is_float) || (cv && cv->is_float);
@@ -216,7 +218,7 @@ BuiltinResult builtinMul3(Engine& engine, std::span<const Term> args) {
       return unifyValue(engine, b, ArithValue::ofFloat(cv->asDouble() / av->asDouble()));
     }
   }
-  badArguments("УМНОЖЕНИЕ");
+  badArguments(engine, args, "УМНОЖЕНИЕ", ArgKind::Number);
 }
 
 BuiltinResult builtinMul4(Engine& engine, std::span<const Term> args) {
@@ -302,7 +304,7 @@ BuiltinResult builtinMul4(Engine& engine, std::span<const Term> args) {
   if (isUnbound(engine, b) && af && cf && df && *af != 0.0) {
     return unifyValue(engine, b, ArithValue::ofFloat((*df - *cf) / *af));
   }
-  badArguments("УМНОЖЕНИЕ");
+  badArguments(engine, args, "УМНОЖЕНИЕ", ArgKind::Number);
 }
 
 // ---------------------------------------------------------------------------
@@ -334,7 +336,7 @@ BuiltinResult builtinAbs(Engine& engine, std::span<const Term> args) {
     }
     return x->integer.abs() == y->integer ? BuiltinResult::Continue : BuiltinResult::Fail;
   }
-  badArguments("ABS");
+  badArguments(engine, args, "ABS", ArgKind::Number);
 }
 
 BuiltinResult builtinSqrt(Engine& engine, std::span<const Term> args) {
@@ -366,7 +368,7 @@ BuiltinResult builtinSqrt(Engine& engine, std::span<const Term> args) {
     return std::sqrt(x->asDouble()) == y->asDouble() ? BuiltinResult::Continue
                                                      : BuiltinResult::Fail;
   }
-  badArguments("SQRT");
+  badArguments(engine, args, "SQRT", ArgKind::Number);
 }
 
 namespace {
@@ -399,7 +401,7 @@ BuiltinResult unaryFloat(Engine& engine, std::span<const Term> args, double (*fo
     return forward(x->asDouble()) == y->asDouble() ? BuiltinResult::Continue
                                                    : BuiltinResult::Fail;
   }
-  badArguments(name);
+  badArguments(engine, args, name, ArgKind::Number);
 }
 
 }  // namespace
@@ -465,12 +467,12 @@ BuiltinResult builtinRandom(Engine& engine, std::span<const Term> args) {
                  ? BuiltinResult::Continue
                  : BuiltinResult::Fail;
     }
-    badArguments("СЛУЧ");
+    badArguments(engine, args, "СЛУЧ", ArgKind::Integer);
   }
   const auto low = detail::asInteger(engine, args[1]);
   const auto high = detail::asInteger(engine, args[2]);
   if (!isUnbound(engine, args[0]) || !low || !high) {
-    badArguments("СЛУЧ");
+    badArguments(engine, args, "СЛУЧ", ArgKind::Integer);
   }
   if (*low > *high) {
     engine.raise(ErrorCode::TypeMismatch, "СЛУЧ: АРГ2 > АРГ3");
@@ -512,7 +514,7 @@ BuiltinResult builtinConvertIntFloat(Engine& engine, std::span<const Term> args)
     return integer.integer == BigInt::fromDouble(real.real) ? BuiltinResult::Continue
                                                             : BuiltinResult::Fail;
   }
-  badArguments("ЦЕЛВЕЩ");
+  badArguments(engine, args, "ЦЕЛВЕЩ", ArgKind::Number);
 }
 
 BuiltinResult builtinStringToInt(Engine& engine, std::span<const Term> args) {
@@ -539,7 +541,7 @@ BuiltinResult builtinStringToInt(Engine& engine, std::span<const Term> args) {
     return unifyText(engine, args[0], rendered) ? BuiltinResult::Continue
                                                 : BuiltinResult::Fail;
   }
-  badArguments("СТРЦЕЛ");
+  badArguments(engine, args, "СТРЦЕЛ", ArgKind::NumberOrText);
 }
 
 BuiltinResult builtinStringToFloat(Engine& engine, std::span<const Term> args) {
@@ -577,7 +579,7 @@ BuiltinResult builtinStringToFloat(Engine& engine, std::span<const Term> args) {
                ? BuiltinResult::Continue
                : BuiltinResult::Fail;
   }
-  badArguments("СТРВЕЩ");
+  badArguments(engine, args, "СТРВЕЩ", ArgKind::NumberOrText);
 }
 
 BuiltinResult builtinStringToList(Engine& engine, std::span<const Term> args) {
@@ -593,7 +595,7 @@ BuiltinResult builtinStringToList(Engine& engine, std::span<const Term> args) {
   if (isUnbound(engine, args[0])) {
     const Term resolved = engine.bindings().deref(args[1]);
     if (!isList(resolved)) {
-      badArguments("СТРСПИС");
+      badArguments(engine, args, "СТРСПИС", ArgKind::List);
     }
     std::vector<Term> elements;
     Term tail;
@@ -606,7 +608,7 @@ BuiltinResult builtinStringToList(Engine& engine, std::span<const Term> args) {
     for (const Term& element : elements) {
       const auto value = detail::asInteger(engine, element);
       if (!value) {
-        badArguments("СТРСПИС");
+        badArguments(engine, "СТРСПИС");
       }
       long long code = value->toInt64();
       code %= 0x110000;
@@ -619,7 +621,7 @@ BuiltinResult builtinStringToList(Engine& engine, std::span<const Term> args) {
                ? BuiltinResult::Continue
                : BuiltinResult::Fail;
   }
-  badArguments("СТРСПИС");
+  badArguments(engine, args, "СТРСПИС", ArgKind::Text);
 }
 
 // ---------------------------------------------------------------------------

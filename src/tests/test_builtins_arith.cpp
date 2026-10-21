@@ -57,6 +57,52 @@ TEST_CASE("the comparison signs are sugar over the long forms") {
           std::string::npos);
 }
 
+TEST_CASE("a wrong argument is named, with what was given and what was expected") {
+  // Part 136: `БОЛЬШЕ(терм(один, 2), атом).` used to say only that the types were
+  // wrong.  The argument, the term in it and the expectation are what a reader
+  // needs, and the short message is still the prefix, so everything that looked
+  // for `БОЛЬШЕ: Недопустимый тип аргументов` still finds it.
+  const auto comparison = runProgram("?БОЛЬШЕ(терм(один, 2), атом).\n");
+  REQUIRE(comparison.loaded);
+  REQUIRE(comparison.runtimeError);
+  REQUIRE(comparison.error.find(
+              "БОЛЬШЕ: Недопустимый тип аргументов: аргумент 1 — терм(один,2), "
+              "нужно число или текст") != std::string::npos);
+
+  // A free variable is not a wrong type — nobody bound it — and the message says
+  // that instead of blaming the type.
+  const auto unbound = runProgram("?БОЛЬШЕ(X, 1).\n");
+  REQUIRE(unbound.loaded);
+  REQUIRE(unbound.runtimeError);
+  REQUIRE(unbound.error.find("БОЛЬШЕ: Недопустимый тип аргументов: аргумент 1 — "
+                             "несвязанная переменная, нужно число или текст") !=
+          std::string::npos);
+
+  // The culprit is found where it is, not just the first argument: here the first
+  // one is a number and the second is the atom.
+  const auto second = runProgram("?СЛОЖЕНИЕ(1, атом, С).\n");
+  REQUIRE(second.loaded);
+  REQUIRE(second.runtimeError);
+  REQUIRE(second.error.find("СЛОЖЕНИЕ: Недопустимый тип аргументов: аргумент 2 — атом, "
+                            "нужно число") != std::string::npos);
+}
+
+TEST_CASE("a type error in a rule names the clause it happened in") {
+  // Part 137: `badArguments` used to throw on its own, so the error carried no
+  // place and the window's «Место» column was empty for every type error — while a
+  // division by zero, raised through `Engine::raise`, had one.  The message text
+  // is the same; only the place is new.
+  const auto rule = runProgram("плохо(X) :- БОЛЬШЕ(X, терм(один, 2)).\n?плохо(1).\n");
+  REQUIRE(rule.runtimeError);
+  REQUIRE(rule.errorLocation.file == "<test>");
+  REQUIRE(rule.errorLocation.line == 1);
+
+  // A goal written in the question itself is reported at the question's own line.
+  const auto question = runProgram("хорошо(1).\n?БОЛЬШЕ(терм(один, 2), 1).\n");
+  REQUIRE(question.runtimeError);
+  REQUIRE(question.errorLocation.line == 2);
+}
+
 TEST_CASE("the ISO arithmetic signs are sugar over the long forms") {
   // task_92: `is`, `=:=`, `=\=`, `\=` — the same goals an ISO reader writes,
   // built from the parts the dialect already had.  Their operands are ordinary

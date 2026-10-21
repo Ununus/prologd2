@@ -8,6 +8,7 @@
 
 namespace prologd {
 
+using detail::ArgKind;
 using detail::asInteger;
 using detail::asText;
 using detail::badArguments;
@@ -44,7 +45,7 @@ BuiltinResult classifyCharacter(Engine& engine, std::span<const Term> args,
                                 bool (*classify)(CodePoint), std::string_view name) {
   const auto text = asText(engine, args[0]);
   if (!text) {
-    badArguments(name);
+    badArgument(engine, args[0], name, 1, ArgKind::Text);
   }
   const std::size_t length = utf8Length(*text);
   if (isUnbound(engine, args[1])) {
@@ -60,7 +61,7 @@ BuiltinResult classifyCharacter(Engine& engine, std::span<const Term> args,
   }
   const auto position = positionOf(engine, args[1]);
   if (!position) {
-    badArguments(name);
+    badArgument(engine, args[1], name, 2, ArgKind::Integer);
   }
   if (*position < 1 || static_cast<std::size_t>(*position) > length) {
     return BuiltinResult::Fail;
@@ -95,14 +96,16 @@ struct SubStringCount {
 /// error*: the goal is not «not satisfied», the number is nonsense — so it is
 /// raised, the way an out-of-range colour is (`builtins_graphics.cpp`), and not
 /// failed.  A count that is not a number at all is the usual type error.
-SubStringCount subStringCount(Engine& engine, const Term& term, const char* name) {
+SubStringCount subStringCount(Engine& engine, std::span<const Term> args, std::size_t index,
+                              const char* name) {
   SubStringCount count;
+  const Term& term = args[index];
   if (isUnbound(engine, term)) {
     return count;
   }
   const auto value = asInteger(engine, term);
   if (!value) {
-    badArguments("sub_string");
+    badArgument(engine, term, "sub_string", index + 1, ArgKind::Integer);
   }
   const long long number = value->toInt64();
   if (number < 0) {
@@ -128,7 +131,7 @@ BuiltinResult builtinIsDigit(Engine& engine, std::span<const Term> args) {
 BuiltinResult builtinStringLength(Engine& engine, std::span<const Term> args) {
   const auto text = asText(engine, args[0]);
   if (!text) {
-    badArguments("ДЛИНА");
+    badArgument(engine, args[0], "ДЛИНА", 1, ArgKind::Text);
   }
   const auto length = static_cast<std::int64_t>(utf8Length(*text));
   if (isUnbound(engine, args[1])) {
@@ -137,7 +140,7 @@ BuiltinResult builtinStringLength(Engine& engine, std::span<const Term> args) {
   }
   const auto expected = positionOf(engine, args[1]);
   if (!expected) {
-    badArguments("ДЛИНА");
+    badArgument(engine, args[1], "ДЛИНА", 2, ArgKind::Integer);
   }
   return *expected == length ? BuiltinResult::Continue : BuiltinResult::Fail;
 }
@@ -155,7 +158,7 @@ BuiltinResult builtinConcat(Engine& engine, std::span<const Term> args) {
       return unifyText(engine, args[2], combined) ? BuiltinResult::Continue
                                                   : BuiltinResult::Fail;
     }
-    badArguments("СЦЕП");
+    badArguments(engine, args, "СЦЕП", ArgKind::Text);
   }
   if (first && third && isUnbound(engine, args[1])) {
     // C = A ++ B with A and C known: C must start with A.
@@ -176,7 +179,7 @@ BuiltinResult builtinConcat(Engine& engine, std::span<const Term> args) {
     }
     return BuiltinResult::Fail;
   }
-  badArguments("СЦЕП");
+  badArguments(engine, args, "СЦЕП", ArgKind::Text);
 }
 
 BuiltinResult builtinCopy(Engine& engine, std::span<const Term> args) {
@@ -187,7 +190,7 @@ BuiltinResult builtinCopy(Engine& engine, std::span<const Term> args) {
 
   const auto source = asText(engine, source_arg);
   if (!source) {
-    badArguments("КОПИЯ");
+    badArgument(engine, source_arg, "КОПИЯ", 1, ArgKind::Text);
   }
   const bool have_position = !isUnbound(engine, position_arg);
   const bool have_length = !isUnbound(engine, length_arg);
@@ -198,8 +201,11 @@ BuiltinResult builtinCopy(Engine& engine, std::span<const Term> args) {
   if (have_position && have_length) {
     const auto position = positionOf(engine, position_arg);
     const auto length = positionOf(engine, length_arg);
-    if (!position || !length) {
-      badArguments("КОПИЯ");
+    if (!position) {
+      badArgument(engine, position_arg, "КОПИЯ", 2, ArgKind::Integer);
+    }
+    if (!length) {
+      badArgument(engine, length_arg, "КОПИЯ", 3, ArgKind::Integer);
     }
     long long count = *length;
     if (count < 0) {
@@ -219,14 +225,14 @@ BuiltinResult builtinCopy(Engine& engine, std::span<const Term> args) {
       return unifyText(engine, substring_arg, piece) ? BuiltinResult::Continue
                                                      : BuiltinResult::Fail;
     }
-    badArguments("КОПИЯ");
+    badArgument(engine, substring_arg, "КОПИЯ", 4, ArgKind::Text);
   }
 
   // str int var str
   if (have_position && !have_length && substring) {
     const auto position = positionOf(engine, position_arg);
     if (!position) {
-      badArguments("КОПИЯ");
+      badArgument(engine, position_arg, "КОПИЯ", 2, ArgKind::Integer);
     }
     const std::size_t piece_length = utf8Length(*substring);
     if (*position >= 1 &&
@@ -246,7 +252,7 @@ BuiltinResult builtinCopy(Engine& engine, std::span<const Term> args) {
   if (!have_position && have_length && substring) {
     const auto length = positionOf(engine, length_arg);
     if (!length) {
-      badArguments("КОПИЯ");
+      badArgument(engine, length_arg, "КОПИЯ", 3, ArgKind::Integer);
     }
     long long count = *length;
     const bool from_right = count < 0;
@@ -294,7 +300,7 @@ BuiltinResult builtinCopy(Engine& engine, std::span<const Term> args) {
     return ok ? BuiltinResult::Continue : BuiltinResult::Fail;
   }
 
-  badArguments("КОПИЯ");
+  badArguments(engine, "КОПИЯ");
 }
 
 /// `sub_string(Стр, До, Длина, После, Подстрока)` — the ISO shape of `КОПИЯ/4`
@@ -312,18 +318,18 @@ BuiltinResult builtinCopy(Engine& engine, std::span<const Term> args) {
 BuiltinResult builtinSubString(Engine& engine, std::span<const Term> args) {
   const auto source = asText(engine, args[0]);
   if (!source) {
-    badArguments("sub_string");
+    badArgument(engine, args[0], "sub_string", 1, ArgKind::Text);
   }
   const std::size_t total = utf8Length(*source);
-  const SubStringCount before = subStringCount(engine, args[1], "До");
-  const SubStringCount length = subStringCount(engine, args[2], "Длина");
-  const SubStringCount after = subStringCount(engine, args[3], "После");
+  const SubStringCount before = subStringCount(engine, args, 1, "До");
+  const SubStringCount length = subStringCount(engine, args, 2, "Длина");
+  const SubStringCount after = subStringCount(engine, args, 3, "После");
 
   std::optional<std::string> wanted;
   if (!isUnbound(engine, args[4])) {
     wanted = asText(engine, args[4]);
     if (!wanted) {
-      badArguments("sub_string");
+      badArgument(engine, args[4], "sub_string", 5, ArgKind::Text);
     }
   }
 

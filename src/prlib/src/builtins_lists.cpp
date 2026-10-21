@@ -12,6 +12,7 @@ namespace prologd {
 
 namespace {
 
+using detail::ArgKind;
 using detail::asNumeric;
 using detail::asText;
 using detail::badArguments;
@@ -50,7 +51,7 @@ bool sameOrder(Engine& engine, const Term& left, const Term& right) {
 BuiltinResult builtinSort(Engine& engine, std::span<const Term> args) {
   const auto elements = listElements(engine, args[0]);
   if (!elements) {
-    badArguments("СОРТИРОВКА");
+    badArguments(engine, args, "СОРТИРОВКА", ArgKind::List);
   }
   std::vector<Term> sorted = *elements;
   std::stable_sort(sorted.begin(), sorted.end(),

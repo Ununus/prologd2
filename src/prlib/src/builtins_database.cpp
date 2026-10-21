@@ -7,6 +7,7 @@
 
 namespace prologd {
 
+using detail::ArgKind;
 using detail::asInteger;
 using detail::asText;
 using detail::badArguments;
@@ -33,7 +34,7 @@ bool isCallable(Engine& engine, const Term& term) {
 BuiltinResult builtinClauseCount(Engine& engine, std::span<const Term> args) {
   const auto name = asText(engine, args[0]);
   if (!name) {
-    badArguments("СКОЛЬКО");
+    badArgument(engine, args[0], "СКОЛЬКО", 1, ArgKind::Text);
   }
   const auto count = static_cast<std::int64_t>(engine.database().clauseCountByName(*name));
   if (isUnbound(engine, args[1])) {
@@ -42,7 +43,7 @@ BuiltinResult builtinClauseCount(Engine& engine, std::span<const Term> args) {
   }
   const auto expected = integerValue(engine, args[1]);
   if (!expected) {
-    badArguments("СКОЛЬКО");
+    badArgument(engine, args[1], "СКОЛЬКО", 2, ArgKind::Integer);
   }
   return *expected == count ? BuiltinResult::Continue : BuiltinResult::Fail;
 }
@@ -50,8 +51,11 @@ BuiltinResult builtinClauseCount(Engine& engine, std::span<const Term> args) {
 BuiltinResult builtinClauseInfo(Engine& engine, std::span<const Term> args) {
   const auto name = asText(engine, args[0]);
   const auto index = integerValue(engine, args[1]);
-  if (!name || !index) {
-    badArguments("ПРЕДЛ");
+  if (!name) {
+    badArgument(engine, args[0], "ПРЕДЛ", 1, ArgKind::Text);
+  }
+  if (!index) {
+    badArgument(engine, args[1], "ПРЕДЛ", 2, ArgKind::Integer);
   }
   const std::vector<Clause> merged = engine.database().clausesByName(*name);
   if (*index < 1 || static_cast<std::size_t>(*index) > merged.size()) {
@@ -130,15 +134,16 @@ BuiltinResult builtinTermConvert(Engine& engine, std::span<const Term> args) {
 BuiltinResult builtinAssert(Engine& engine, std::span<const Term> args) {
   const Term head = engine.bindings().deref(args[0]);
   if (head.kind != TermKind::Atom && head.kind != TermKind::Compound) {
-    badArguments("ДОБ");
+    badArgument(engine, args[0], "ДОБ", 1, ArgKind::Text,
+                "имя предиката или голова предложения");
   }
   const Term goals = engine.bindings().deref(args[1]);
   if (!isList(goals)) {
-    badArguments("ДОБ");
+    badArgument(engine, args[1], "ДОБ", 2, ArgKind::List);
   }
   const auto position = integerValue(engine, args[2]);
   if (!position) {
-    badArguments("ДОБ");
+    badArgument(engine, args[2], "ДОБ", 3, ArgKind::Integer);
   }
   std::vector<Term> body;
   Term tail;
@@ -148,7 +153,7 @@ BuiltinResult builtinAssert(Engine& engine, std::span<const Term> args) {
   }
   for (const Term& goal : body) {
     if (!isCallable(engine, goal)) {
-      badArguments("ДОБ");
+      badArguments(engine, "ДОБ");
     }
   }
   Clause clause;
@@ -160,8 +165,11 @@ BuiltinResult builtinAssert(Engine& engine, std::span<const Term> args) {
 BuiltinResult builtinRetract(Engine& engine, std::span<const Term> args) {
   const auto name = asText(engine, args[0]);
   const auto index = integerValue(engine, args[1]);
-  if (!name || !index) {
-    badArguments("УДАЛЕНИЕ");
+  if (!name) {
+    badArgument(engine, args[0], "УДАЛЕНИЕ", 1, ArgKind::Text);
+  }
+  if (!index) {
+    badArgument(engine, args[1], "УДАЛЕНИЕ", 2, ArgKind::Integer);
   }
   return engine.database().retractByNamePosition(*name, *index) ? BuiltinResult::Continue
                                                                : BuiltinResult::Fail;

@@ -89,6 +89,25 @@ if(NOT errors MATCHES "cli_runtime\\.pld:1:[0-9]+: error:")
   message(FATAL_ERROR "A runtime error did not name its place: ${errors}")
 endif()
 
+# A *type* error names its clause too (part 137).  It used to be thrown without a
+# place at all, so the window's «Место» column stayed empty for exactly the errors
+# a learner meets most often.  The needle is the ASCII part of the line again.
+file(WRITE "${WORK_DIR}/cli_type.pld"
+     "плохо(X) :- БОЛЬШЕ(X, терм(один, 2)).\n?плохо(1).\n")
+
+execute_process(
+  COMMAND "${PROLOGD_EXE}" -s "${WORK_DIR}/cli_type.pld"
+  OUTPUT_VARIABLE output
+  ERROR_VARIABLE errors
+  RESULT_VARIABLE exit_code)
+
+if(NOT exit_code EQUAL 3)
+  message(FATAL_ERROR "A type error should exit 3, got ${exit_code}: ${errors}")
+endif()
+if(NOT errors MATCHES "cli_type\\.pld:1:[0-9]+: error:")
+  message(FATAL_ERROR "A type error did not name its place: ${errors}")
+endif()
+
 # A reserved name with an arity it does not have can never work, so it is an
 # error too (and exit code 2).
 file(WRITE "${WORK_DIR}/cli_arity.pld" "?УМНОЖЕНИЕ(2, 3).\n")

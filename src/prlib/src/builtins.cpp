@@ -8,6 +8,8 @@
 #include <vector>
 
 #include "builtins_internal.hpp"
+#include "prlib/term_print.hpp"
+#include "prlib/utf8.hpp"
 #include "prlib/version.hpp"
 
 namespace prologd {
@@ -90,18 +92,124 @@ bool unifyText(Engine& engine, const Term& argument, const std::string& value) {
   return engine.unify(argument, makeString(value));
 }
 
-[[noreturn]] void badArguments(std::string_view predicate) {
-  throw PrologRuntimeError(
-      PrologError{.code = ErrorCode::TypeMismatch,
-                  .message = std::string(predicate) + ": Недопустимый тип аргументов"});
+[[noreturn]] void badArguments(Engine& engine, std::string_view predicate) {
+  engine.raise(ErrorCode::TypeMismatch,
+               std::string(predicate) + ": Недопустимый тип аргументов");
+}
+
+namespace {
+
+/// How much of an argument a diagnostic may quote: it is printed as one line, and a
+/// long term would either wrap it or push the expectation out of view.
+constexpr std::size_t kArgumentTextLimit = 60;
+
+/// An argument as the message shows it.  The engine's printer evaluates `#… #`, so
+/// `БОЛЬШЕ(#1+1#, атом)` names the first argument `2`; an expression that cannot be
+/// evaluated is named, because the printer would show `#_?_#` — a gap that says
+/// nothing at all.
+std::string argumentText(Engine& engine, const Term& term) {
+  std::string text;
+  try {
+    text = engine.format(term);
+  } catch (const std::exception&) {
+    text = "арифметическое выражение";
+  }
+  if (utf8Length(text) <= kArgumentTextLimit) {
+    return text;
+  }
+  std::string cut;
+  std::size_t taken = 0;
+  for (const CodePoint code_point : utf8Decode(text)) {
+    if (++taken > kArgumentTextLimit) {
+      break;
+    }
+    cut += utf8Encode(code_point);
+  }
+  return cut + "…";
+}
+
+bool fitsKind(Engine& engine, const Term& term, ArgKind kind) {
+  if (kind == ArgKind::Number) {
+    return asNumeric(engine, term).has_value();
+  }
+  if (kind == ArgKind::NumberOrText) {
+    return asNumeric(engine, term).has_value() || asText(engine, term).has_value();
+  }
+  if (kind == ArgKind::Integer) {
+    return asInteger(engine, term).has_value();
+  }
+  if (kind == ArgKind::Text) {
+    return asText(engine, term).has_value();
+  }
+  // A cell or the empty list.  Whether the list is *proper* is a different
+  // question — an improper one is refused by the predicate itself, and the short
+  // message is the honest one there.
+  return isList(engine.bindings().deref(term));
+}
+
+std::string_view expectedText(ArgKind kind) {
+  if (kind == ArgKind::Number) {
+    return "число";
+  }
+  if (kind == ArgKind::NumberOrText) {
+    return "число или текст";
+  }
+  if (kind == ArgKind::Integer) {
+    return "целое число";
+  }
+  if (kind == ArgKind::Text) {
+    return "строка или атом";
+  }
+  return "список";
+}
+
+[[noreturn]] void raiseTypeError(Engine& engine, std::string message) {
+  engine.raise(ErrorCode::TypeMismatch, std::move(message));
+}
+
+}  // namespace
+
+[[noreturn]] void badArgument(Engine& engine, const Term& term, std::string_view predicate,
+                              std::size_t index, ArgKind kind, std::string_view expected) {
+  const std::string_view wanted = expected.empty() ? expectedText(kind) : expected;
+  std::string message = std::string(predicate) + ": Недопустимый тип аргументов: аргумент " +
+                        std::to_string(index) + " — ";
+  message += isUnbound(engine, term) ? std::string("несвязанная переменная")
+                                     : argumentText(engine, term);
+  message += ", нужно ";
+  message += wanted;
+  raiseTypeError(engine, std::move(message));
+}
+
+[[noreturn]] void badArguments(Engine& engine, std::span<const Term> args,
+                               std::string_view predicate, ArgKind kind,
+                               std::string_view expected) {
+  std::size_t first_unbound = 0;
+  for (std::size_t i = 0; i < args.size(); ++i) {
+    if (isUnbound(engine, args[i])) {
+      if (first_unbound == 0) {
+        first_unbound = i + 1;
+      }
+      continue;
+    }
+    if (!fitsKind(engine, args[i], kind)) {
+      badArgument(engine, args[i], predicate, i + 1, kind, expected);
+    }
+  }
+  if (first_unbound != 0) {
+    badArgument(engine, args[first_unbound - 1], predicate, first_unbound, kind, expected);
+  }
+  raiseTypeError(engine, std::string(predicate) + ": Недопустимый тип аргументов");
 }
 
 }  // namespace detail
 
+using detail::ArgKind;
 using detail::asFloat;
 using detail::asInteger;
 using detail::asNumeric;
 using detail::asText;
+using detail::badArgument;
 using detail::badArguments;
 using detail::derefTerm;
 using detail::isUnbound;
@@ -183,7 +291,7 @@ BuiltinResult builtinNewline(Engine& engine, std::span<const Term>) {
 BuiltinResult builtinWait(Engine& engine, std::span<const Term> args) {
   const auto milliseconds = asInteger(engine, args[0]);
   if (!milliseconds) {
-    badArguments("ЖДИ");
+    badArguments(engine, args, "ЖДИ", ArgKind::Integer);
   }
   const long long value = milliseconds->toInt64();
   if (value > 0) {

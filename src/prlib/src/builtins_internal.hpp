@@ -3,7 +3,9 @@
 // Internal declarations shared by the built-in predicate implementation files.
 // This header is private to prlib and is not installed.
 
+#include <cstddef>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -30,13 +32,46 @@ bool unifyText(Engine& engine, const Term& argument, const std::string& value);
 
 /// `-1`, `0` or `1` for two values in the dialect's own order: numbers among
 /// themselves by value, text among itself by code point.  Anything else is
-/// `badArguments(predicate)`.  This is the rule of `БОЛЬШЕ`/`МЕНЬШЕ`; the
+/// `badArguments(engine, predicate)`.  This is the rule of `БОЛЬШЕ`/`МЕНЬШЕ`; the
 /// standard order of `СОРТИРОВКА`, `@<` and `compare/3` is
 /// `compareStandardOrder` in `prlib/order.hpp` (task_90).
-int compareOrder(Engine& engine, const Term& first, const Term& second,
-                 std::string_view predicate);
+int compareOrder(Engine& engine, std::span<const Term> args, std::string_view predicate);
 
-[[noreturn]] void badArguments(std::string_view predicate);
+/// The short `"<predicate>: Недопустимый тип аргументов"`, for the failures where no
+/// single argument is at fault (part 136).
+///
+/// Raised **through the engine**, not thrown directly: `Engine::raise` is what adds
+/// the clause being solved, so the console prints `файл:строка:столбец:` and the
+/// window can show the place (part 137).
+[[noreturn]] void badArguments(Engine& engine, std::string_view predicate);
+
+/// What a built-in expects of one argument: the kind is what `badArguments`
+/// tests, and the kind also names the expectation in the message (`ArgKind::Text`
+/// reads «строка или атом»).  `NumberOrText` is the rule of `БОЛЬШЕ`/`МЕНЬШЕ`,
+/// which compare two numbers or two texts.
+enum class ArgKind { Number, NumberOrText, Integer, Text, List };
+
+/// `<predicate>: Недопустимый тип аргументов: аргумент <index> — <что подано>,
+/// нужно <ожидаемое>`.  `index` is 1-based, the way the message counts, and an
+/// unbound variable is named as such instead of being printed as `_N` (part 136).
+///
+/// `expected` overrides the kind's own wording; keep it short — a diagnostic is
+/// one line.
+[[noreturn]] void badArgument(Engine& engine, const Term& term, std::string_view predicate,
+                              std::size_t index, ArgKind kind, std::string_view expected = {});
+
+/// The same, with the culprit found among `args`: the first *bound* argument that
+/// is not of `kind`, and failing that the first unbound one — nothing had the wrong
+/// type, the variable was simply never bound, which is a different mistake and
+/// used to get the same message.
+///
+/// When every argument fits, the short message is kept: then no single argument is
+/// at fault (an improper list, a range, a digit that is not one), and pretending
+/// otherwise would mislead.  So this never lies; it either says which argument is
+/// wrong or says nothing more than before.
+[[noreturn]] void badArguments(Engine& engine, std::span<const Term> args,
+                               std::string_view predicate, ArgKind kind,
+                               std::string_view expected = {});
 
 }  // namespace prologd::detail
 

@@ -78,3 +78,13 @@ TEST_CASE("sort refuses a list that is not a proper list") {
     REQUIRE(result.error.find("СОРТИРОВКА: Недопустимый тип аргументов") != std::string::npos);
   }
 }
+
+TEST_CASE("sorting names the argument that is not a list") {
+  // Part 136: the list family reports the way the arithmetic one does.  A number
+  // where a list belongs is an argument to name; an improper list is not (it *is*
+  // a list, just not a proper one), and that message stays short.
+  const auto named = runProgram("?СОРТИРОВКА(12, С).\n");
+  REQUIRE(named.runtimeError);
+  REQUIRE(named.error.find("СОРТИРОВКА: Недопустимый тип аргументов: аргумент 1 — 12, "
+                           "нужно список") != std::string::npos);
+}

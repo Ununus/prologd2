@@ -138,6 +138,29 @@ def main(argv: list[str]) -> int:
     assert find(events, "loaded"), events
     print("ok: a request with a bad field is an error event, and the session goes on")
 
+    # Part 137: an error names the place it happened in, in fields of its own —
+    # the window's «Место» column is filled from them and never parses the
+    # message.  A rule points at its clause, a goal written in the question at the
+    # question's line, and a text load at `<buffer>`.
+    code, events = run_session(
+        executable,
+        [protocol.load_text("плохо(X) :- БОЛЬШЕ(X, терм(один, 2)).\n?плохо(1).\n")],
+    )
+    assert code == 3, f"expected exit code 3, got {code}"
+    named = find(events, "error", kind="runtime")
+    assert named.get("file") == "<buffer>", named
+    assert named.get("line") == 1, named
+    assert named.get("column"), named
+
+    code, events = run_session(
+        executable, [protocol.query("?БОЛЬШЕ(терм(один, 2), 1).")]
+    )
+    assert code == 3, f"expected exit code 3, got {code}"
+    named = find(events, "error", kind="runtime")
+    assert named.get("file") == "<query>", named
+    assert named.get("line") == 1, named
+    print("ok: a runtime error carries the place it happened in")
+
     print("all protocol checks passed")
     return 0
 

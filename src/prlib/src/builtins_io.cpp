@@ -7,6 +7,7 @@
 
 namespace prologd {
 
+using detail::ArgKind;
 using detail::asNumeric;
 using detail::asText;
 using detail::badArguments;
@@ -29,7 +30,7 @@ void writePrompt(Engine& engine, std::span<const Term> args, std::string_view pr
   }
   const auto prompt = asText(engine, args[1]);
   if (!prompt) {
-    badArguments(predicate);
+    badArgument(engine, args[1], predicate, 2, ArgKind::Text);
   }
   engine.io().write(*prompt);
 }
@@ -64,7 +65,7 @@ BuiltinResult builtinWriteCode(Engine& engine, std::span<const Term> args) {
     // are not UTF-8 at all — and the JSON protocol cannot carry those back to a
     // front-end.
     if (code < 0 || code > kMaxCodePoint || (code >= 0xD800 && code <= 0xDFFF)) {
-      badArguments("ВВКОД");
+      badArgument(engine, args[0], "ВВКОД", 1, ArgKind::Integer, "код символа от 0 до 1114111");
     }
     engine.io().write(utf8Encode(static_cast<CodePoint>(code)));
     return BuiltinResult::Continue;
@@ -78,7 +79,7 @@ BuiltinResult builtinWriteCode(Engine& engine, std::span<const Term> args) {
                ? BuiltinResult::Continue
                : BuiltinResult::Fail;
   }
-  badArguments("ВВКОД");
+  badArguments(engine, args, "ВВКОД", ArgKind::Integer);
 }
 
 BuiltinResult builtinReadInt(Engine& engine, std::span<const Term> args) {
@@ -97,7 +98,7 @@ BuiltinResult builtinReadInt(Engine& engine, std::span<const Term> args) {
   }
   const auto current = asNumeric(engine, args[0]);
   if (!current || current->is_float) {
-    badArguments("ВВОДЦЕЛ");
+    badArgument(engine, args[0], "ВВОДЦЕЛ", 1, ArgKind::Integer);
   }
   return current->integer == *parsed ? BuiltinResult::Continue : BuiltinResult::Fail;
 }
@@ -124,7 +125,7 @@ BuiltinResult builtinReadFloat(Engine& engine, std::span<const Term> args) {
   }
   const auto current = asNumeric(engine, args[0]);
   if (!current || !current->is_float) {
-    badArguments("ВВОДВЕЩ");
+    badArgument(engine, args[0], "ВВОДВЕЩ", 1, ArgKind::Number, "вещественное число");
   }
   return current->real == parsed ? BuiltinResult::Continue : BuiltinResult::Fail;
 }
@@ -141,7 +142,7 @@ BuiltinResult builtinReadSymbol(Engine& engine, std::span<const Term> args) {
   }
   const auto current = asText(engine, args[0]);
   if (!current) {
-    badArguments("ВВОДСИМВ");
+    badArgument(engine, args[0], "ВВОДСИМВ", 1, ArgKind::Text);
   }
   return *current == *token ? BuiltinResult::Continue : BuiltinResult::Fail;
 }
@@ -158,7 +159,7 @@ BuiltinResult builtinReadString(Engine& engine, std::span<const Term> args) {
   }
   const auto current = asText(engine, args[0]);
   if (!current) {
-    badArguments("ВВОДСТР");
+    badArgument(engine, args[0], "ВВОДСТР", 1, ArgKind::Text);
   }
   return *current == *line ? BuiltinResult::Continue : BuiltinResult::Fail;
 }
@@ -170,7 +171,7 @@ BuiltinResult builtinSee(Engine& engine, std::span<const Term> args) {
   }
   const auto path = asText(engine, args[0]);
   if (!path) {
-    badArguments("ЧТЕНИЕ_ИЗ");
+    badArgument(engine, args[0], "ЧТЕНИЕ_ИЗ", 1, ArgKind::Text);
   }
   if (!engine.io().openInput(*path)) {
     return BuiltinResult::Fail;
@@ -185,7 +186,7 @@ BuiltinResult builtinTell(Engine& engine, std::span<const Term> args) {
   }
   const auto path = asText(engine, args[0]);
   if (!path) {
-    badArguments("ЗАПИСЬ_В");
+    badArgument(engine, args[0], "ЗАПИСЬ_В", 1, ArgKind::Text);
   }
   if (!engine.io().openOutput(*path)) {
     return BuiltinResult::Fail;
