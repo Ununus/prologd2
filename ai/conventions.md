@@ -219,6 +219,11 @@ Tests are written **together with** the feature, never after.
   lessons, and the plans of tasks that have not started.  Grep the old numbers
   across the tree in the same change: `test_reference.py` only checks that a
   `section` is *some* heading of the manual, not that it is the right one.
+* `.pld` sources stay within the alphabet the *original* engine reads: it refuses
+  `—`, `–`, `−`, `…`, `№` and `§` even inside a `%` comment («Недопустимый
+  символ»), although it reads UTF-8 like we do.  Write `-` and `...`.  `#…#`
+  expressions and `/* */` comments are ours and need rewriting anyway before a
+  file can be run by the original (part 142).
 * Update `ai/status.md` and the task file status after every work session.
 * Any deviation from this plan is recorded in `ai/decisions.md`.
 
