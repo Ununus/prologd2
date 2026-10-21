@@ -47,9 +47,10 @@ int compareOrder(Engine& engine, std::span<const Term> args, std::string_view pr
 
 /// What a built-in expects of one argument: the kind is what `badArguments`
 /// tests, and the kind also names the expectation in the message (`ArgKind::Text`
-/// reads «строка или атом»).  `NumberOrText` is the rule of `БОЛЬШЕ`/`МЕНЬШЕ`,
-/// which compare two numbers or two texts.
-enum class ArgKind { Number, NumberOrText, Integer, Text, List };
+/// reads «строка или атом»).  `NumberOrText` is the rule of `СЦЕП` and of the
+/// conversions; `Comparable` is the rule of `БОЛЬШЕ`/`МЕНЬШЕ`, which compare two
+/// numbers, two texts or two lists of those (part 138).
+enum class ArgKind { Number, NumberOrText, Integer, Text, List, Comparable };
 
 /// `<predicate>: Недопустимый тип аргументов: аргумент <index> — <что подано>,
 /// нужно <ожидаемое>`.  `index` is 1-based, the way the message counts, and an

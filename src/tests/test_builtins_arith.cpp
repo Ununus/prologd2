@@ -67,7 +67,7 @@ TEST_CASE("a wrong argument is named, with what was given and what was expected"
   REQUIRE(comparison.runtimeError);
   REQUIRE(comparison.error.find(
               "БОЛЬШЕ: Недопустимый тип аргументов: аргумент 1 — терм(один,2), "
-              "нужно число или текст") != std::string::npos);
+              "нужно число, текст или список") != std::string::npos);
 
   // A free variable is not a wrong type — nobody bound it — and the message says
   // that instead of blaming the type.
@@ -75,8 +75,8 @@ TEST_CASE("a wrong argument is named, with what was given and what was expected"
   REQUIRE(unbound.loaded);
   REQUIRE(unbound.runtimeError);
   REQUIRE(unbound.error.find("БОЛЬШЕ: Недопустимый тип аргументов: аргумент 1 — "
-                             "несвязанная переменная, нужно число или текст") !=
-          std::string::npos);
+                             "несвязанная переменная, нужно число, текст или "
+                             "список") != std::string::npos);
 
   // The culprit is found where it is, not just the first argument: here the first
   // one is a number and the second is the atom.
@@ -101,6 +101,46 @@ TEST_CASE("a type error in a rule names the clause it happened in") {
   const auto question = runProgram("хорошо(1).\n?БОЛЬШЕ(терм(один, 2), 1).\n");
   REQUIRE(question.runtimeError);
   REQUIRE(question.errorLocation.line == 2);
+}
+
+TEST_CASE("lists compare element by element") {
+  // Part 138, the rule the original gained in `112e241`: lexicographic, the way
+  // strings compare — the empty list is the smallest, heads follow the same rules
+  // as the arguments themselves, and equal heads leave the tails to decide.
+  const auto result = runProgram(
+      "?БОЛЬШЕ([1,3],[1,2]).\n"
+      "?МЕНЬШЕ([1,2],[1,3]).\n"
+      "?БОЛЬШЕ([1,2],[1,3]).\n"
+      "?МЕНЬШЕ([1,2],[1,2,3]).\n"
+      "?БОЛЬШЕ([1,2,3],[1,2]).\n"
+      "?МЕНЬШЕ([],[1]).\n"
+      "?БОЛЬШЕ([1],[]).\n"
+      "?БОЛЬШЕ([],[]).\n"
+      "?МЕНЬШЕ([],[]).\n"
+      "?МЕНЬШЕ([аня],[боря]).\n"
+      "?МЕНЬШЕ([\"аб\"],[\"ав\"]).\n"
+      "?МЕНЬШЕ([[1],[2]],[[1],[3]]).\n"
+      "?МЕНЬШЕ([1.5],[2]).\n"
+      "?БОЛЬШЕ([1,2],[1,2]).\n"
+      "?РАВНО([1,2],[1,2]).\n");
+  REQUIRE(result.loaded);
+  REQUIRE_FALSE(result.runtimeError);
+  REQUIRE(result.output ==
+          "ДА\nДА\nНЕТ\nДА\nДА\nДА\nДА\nНЕТ\nНЕТ\nДА\nДА\nДА\nДА\nНЕТ\nДА\n");
+}
+
+TEST_CASE("a list is compared only with a list of comparable elements") {
+  // Kinds do not mix: a list is not comparable with a number or with text, and
+  // the elements obey the same rule — a number against an atom inside a list is
+  // the same refusal.
+  for (const std::string& goal :
+       {"БОЛЬШЕ([1,2], 5)", "БОЛЬШЕ(5, [1,2])", "БОЛЬШЕ([1], [аня])",
+        "БОЛЬШЕ([Х], [1])"}) {
+    INFO("goal: " << goal);
+    const auto result = runProgram("?" + goal + ".\n");
+    REQUIRE(result.runtimeError);
+    REQUIRE(result.error.find("Недопустимый тип аргументов") != std::string::npos);
+  }
 }
 
 TEST_CASE("the ISO arithmetic signs are sugar over the long forms") {

@@ -180,14 +180,20 @@ if(BUILD_WITH_PROLOGD)
   # and events both engines share exist, stepping, tracing, formatting and graphics
   # do not.  Bumped in part 133 to the commit that made its paths UTF-8
   # (`ce23afb`): a Cyrillic file name on the command line, in `-I` and in
-  # `?ИМПОРТ("…")` is taken as it was typed.
+  # `?ИМПОРТ("…")` is taken as it was typed.  Bumped in part 139 to `cf4001e` —
+  # «БОЛЬШЕ: сравнение списков» (`112e241`) together with the commit that put
+  # `prlib/extfunc.cpp` back into CP1251: that file had been re-saved as UTF-8 and
+  # every message from it came out as garbage, which is why the pin waited (part
+  # 138).  Bumped in part 140 to c36f101 — «Предикат СОРТИРОВКА»: its СОРТИРОВКА/2
+  # orders by the comparison of БОЛЬШЕ and refuses lists of mixed kinds, which
+  # ours does not (ours follows the standard order, task_90).
   #
   # Not a cache variable on purpose: a cache entry is written once, by the first
   # configure, and every later bump of the pin would then be invisible in a tree
   # that has already been built.  To build against another commit, point
   # `PROLOGD_ENGINE_SOURCE` at a clone of it — that is the override this file
   # documents.
-  set(PROLOGD_ENGINE_COMMIT "4f8425aa5a427749ea240a7c53e2c5e75142fb52")
+  set(PROLOGD_ENGINE_COMMIT "c36f101c86e3584046e347f3496e8b5120a28f02")
   set(PROLOGD_ENGINE_SOURCE ""
       CACHE PATH "An existing clone of the original engine; skips the download")
 

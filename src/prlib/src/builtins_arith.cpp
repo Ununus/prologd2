@@ -54,6 +54,100 @@ int compareValues(const ArithValue& left, const ArithValue& right) {
   return 0;
 }
 
+/// Pairs of list cells being compared right now, so a cyclic list
+/// (`РАВНО(Л, [1 | Л])` builds one) stops instead of walking forever — the idiom
+/// of `compareStandardOrder`.
+using ComparePath = std::vector<std::pair<const CompoundTerm*, const CompoundTerm*>>;
+
+std::optional<int> compareComparable(Engine& engine, const Term& first, const Term& second,
+                                     ComparePath& path);
+
+/// Lexicographic comparison of two lists (part 138): the empty list is the
+/// smallest, the heads are compared by the same rule as the arguments themselves,
+/// and equal heads leave the tails to decide.  `nullopt` when the pair has no
+/// order — an improper tail, or two heads of different kinds.
+std::optional<int> compareLists(Engine& engine, const Term& first, const Term& second,
+                                ComparePath& path) {
+  const std::size_t base = path.size();
+  std::optional<int> answer;
+  Term left = engine.deref(first);
+  Term right = engine.deref(second);
+  while (true) {
+    const bool left_nil = isNil(left);
+    const bool right_nil = isNil(right);
+    if (left_nil && right_nil) {
+      answer = 0;
+      break;
+    }
+    if (left_nil) {
+      answer = -1;
+      break;
+    }
+    if (right_nil) {
+      answer = 1;
+      break;
+    }
+    if (!isListCell(left) || !isListCell(right)) {
+      answer = std::nullopt;
+      break;
+    }
+    const CompoundTerm* left_cell = left.compound.get();
+    const CompoundTerm* right_cell = right.compound.get();
+    bool seen = false;
+    for (const auto& entry : path) {
+      if (entry.first == left_cell && entry.second == right_cell) {
+        seen = true;
+        break;
+      }
+    }
+    if (seen) {
+      answer = 0;  // the cycle compares equal to itself
+      break;
+    }
+    path.emplace_back(left_cell, right_cell);
+    const std::optional<int> heads =
+        compareComparable(engine, left_cell->args[0], right_cell->args[0], path);
+    if (!heads) {
+      answer = std::nullopt;
+      break;
+    }
+    if (*heads != 0) {
+      answer = *heads;
+      break;
+    }
+    left = engine.deref(left_cell->args[1]);
+    right = engine.deref(right_cell->args[1]);
+  }
+  path.resize(base);
+  return answer;
+}
+
+/// `-1`, `0`, `1` for two terms `БОЛЬШЕ` can compare: numbers by value, text by code
+/// point, lists element by element.  `nullopt` when they are not comparable — a
+/// number with text, a list with either of them, a free variable.
+std::optional<int> compareComparable(Engine& engine, const Term& first, const Term& second,
+                                     ComparePath& path) {
+  const auto left_number = asNumeric(engine, first);
+  const auto right_number = asNumeric(engine, second);
+  if (left_number && right_number) {
+    return compareValues(*left_number, *right_number);
+  }
+  const auto left_text = asText(engine, first);
+  const auto right_text = asText(engine, second);
+  if (left_text && right_text) {
+    if (*left_text < *right_text) {
+      return -1;
+    }
+    return *left_text > *right_text ? 1 : 0;
+  }
+  const Term left = engine.deref(first);
+  const Term right = engine.deref(second);
+  if (isList(left) && isList(right)) {
+    return compareLists(engine, left, right, path);
+  }
+  return std::nullopt;
+}
+
 BuiltinResult unifyValue(Engine& engine, const Term& target, const ArithValue& value) {
   if (value.is_float) {
     return unifyFloat(engine, target, value.real) ? BuiltinResult::Continue
@@ -74,22 +168,14 @@ namespace detail {
 
 int compareOrder(Engine& engine, std::span<const Term> args,
                  std::string_view predicate) {
-  const Term& first = args[0];
-  const Term& second = args[1];
-  const auto left = asNumeric(engine, first);
-  const auto right = asNumeric(engine, second);
-  if (left && right) {
-    return compareValues(*left, *right);
+  ComparePath path;
+  if (const auto order = compareComparable(engine, args[0], args[1], path)) {
+    return *order;
   }
-  const auto leftText = asText(engine, first);
-  const auto rightText = asText(engine, second);
-  if (leftText && rightText) {
-    if (*leftText < *rightText) {
-      return -1;
-    }
-    return *leftText > *rightText ? 1 : 0;
-  }
-  badArguments(engine, args, predicate, ArgKind::NumberOrText);
+  // The pair has no order.  An argument that is not even of a comparable kind is
+  // named; when both are comparable but of different kinds — a list against a
+  // number — no single argument is at fault, and the short message says that.
+  badArguments(engine, args, predicate, ArgKind::Comparable);
 }
 
 }  // namespace detail

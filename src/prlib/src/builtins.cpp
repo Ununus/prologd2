@@ -141,6 +141,12 @@ bool fitsKind(Engine& engine, const Term& term, ArgKind kind) {
   if (kind == ArgKind::Text) {
     return asText(engine, term).has_value();
   }
+  if (kind == ArgKind::Comparable) {
+    // A list is comparable, but only with a list; whether the *pair* fits is the
+    // comparison's own business, not this argument's.
+    return asNumeric(engine, term).has_value() || asText(engine, term).has_value() ||
+           isList(engine.bindings().deref(term));
+  }
   // A cell or the empty list.  Whether the list is *proper* is a different
   // question — an improper one is refused by the predicate itself, and the short
   // message is the honest one there.
@@ -159,6 +165,9 @@ std::string_view expectedText(ArgKind kind) {
   }
   if (kind == ArgKind::Text) {
     return "строка или атом";
+  }
+  if (kind == ArgKind::Comparable) {
+    return "число, текст или список";
   }
   return "список";
 }
