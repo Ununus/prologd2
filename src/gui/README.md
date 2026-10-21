@@ -87,7 +87,7 @@ version does not know are left alone (task_29 adds the dialog).
 | Key | Command |
 | --- | --- |
 | `F5`, `Ctrl+R` | **Запустить** — a run in a fresh interpreter; while a step is paused it means «продолжить» |
-| `Shift+F5` | **Остановить** |
+| `Shift+F5` | **Остановить**: красная `execution-abort` — прервать прогон, синяя `execution-stop` — выгрузить базу |
 | `F10` | **Шаг** — one step point further in (starts a stepped run) |
 | `Shift+F10` | **Шаг с обходом** — to the end of the current goal |
 | `Ctrl+N` | **Новый** — an empty untitled buffer |
@@ -711,15 +711,20 @@ the user sees: the pane holds the first line while the program is still sleeping
 and not the third.
 
 Undo, redo, «Запустить» and «Остановить» follow the *state*, and the state of the
-interpreter is **two** things, not one: the process can be up and idle, and a
-computation can be in flight in it.  «Запустить» needs the second — a run in
-flight is not started twice, and the answer frees the button so that the next
-press restarts the whole file — while «Остановить» is lit for the *run*: an idle
-interpreter with a base loaded leaves it dark (task_87 — a lit button reads as «the
-program is looping», and the next start loads the base again anyway, so there is
-nothing to stop in that state; the command `stop_program` still unloads an idle
-interpreter when a caller asks for it).  An interrupted run therefore gets its
-`--- остановлено ---` and leaves the interpreter idle *with* its base.  Stopping a
+interpreter is **three** things, not one: nothing is running, a run is in flight,
+and the process is up with a base and idle.  «Запустить» needs the second to be
+absent — a run in flight is not started twice, and the answer frees the button so
+that the next press restarts the whole file.  «Остановить» says ahead of time what
+the click will do, because the command has two meanings: dark while there is
+nothing to stop; the red `execution-abort` while a run is in flight (that click
+breaks a computation); and the blue `execution-stop` while an idle interpreter
+holds a base (that click unloads it — part 141, which replaced task_87's «dark
+while idle»: one picture for two acts read as «the program is looping», and the
+dark button took away the only way out of a program that loaded and waits for
+input).  The picture and the tooltip are set only when the state changes, because
+a refresh runs on every caret move.  An interrupted run therefore gets its
+`--- остановлено ---` and leaves the interpreter idle *with* its base — and the
+same button, now blue, unloads that base on the next click.  Stopping a
 *run* is polite first: the session is asked to
 end the query (`interrupt`), and the process is taken down only if the interpreter
 has not finished on its own within `STOP_GRACE_MS` (500 ms).  A

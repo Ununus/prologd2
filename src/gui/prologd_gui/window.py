@@ -200,6 +200,10 @@ class MainWindow(QMainWindow):
         #: True while a stop of our own is in flight, so the exit code it produces
         #: (a termination status, not an exit code) is not reported as one.
         self._stopping = False
+        #: Which picture «Остановить» carries: `True` for the red octagon (a run to
+        #: break), `False` for the blue stop (a base to unload), `None` before the
+        #: first refresh (part 141).
+        self._stop_abort: bool | None = None
         #: How many output events the run in flight has produced (task_66): the
         #: counter behind «Предел вывода», reset when a run starts.
         self._output_events = 0
@@ -1169,16 +1173,20 @@ class MainWindow(QMainWindow):
         self._refollow_find()
 
     def _sync_run_actions(self) -> None:
-        """Two states, two buttons.
+        """Three states for «Остановить», two for «Запустить».
 
         `Запустить` is for a computation that is not in flight — it restarts the
         whole file, whether the interpreter is idle with a base loaded or gone
-        altogether.  `Остановить` is for a run in flight and for nothing else
-        (task_87): an idle interpreter with a base loaded used to keep it lit, and
-        a lit stop button reads as «the program is looping».  The next start loads
-        the base again, so that state has nothing to stop — the command itself
-        still knows the other meaning (`stop_program`), it is only the button that
-        no longer offers it.
+        altogether.
+
+        `Остановить` is the command with two meanings, and the button says which one
+        it will do (part 141, after task_87's two-state button): dark while there is
+        nothing to stop; red — `execution-abort` — while a run is in flight, because
+        then the click breaks a computation; blue — `execution-stop` — while the
+        interpreter is up and idle with its base, because then the click unloads the
+        base, which is the one act that is immediate.  A red button over an idle
+        session read as «the program is looping», and a dark one took away the only
+        way to unload a base that is waiting for input.
 
         The deadline of a run (task_46) is dropped here as well: every path that
         ends a run comes through this method, and a timer that outlived its run
@@ -1195,8 +1203,19 @@ class MainWindow(QMainWindow):
         # flag, which the flag ordering of `run_program` then fixed.)
         free = not self._busy or self._session.paused()
         self._actions["run"].setEnabled(free)
-        # A run in flight, and nothing else: see the docstring above.
-        self._actions["stop"].setEnabled(self._busy)
+        # «Остановить» has three states (part 141, after task_87's two): dark while
+        # there is nothing to stop; the red octagon while a run is in flight, because
+        # then the click breaks a computation; and the blue stop while the interpreter
+        # is up and idle with its base, because then the click only unloads the base.
+        # One picture for both acts was what made the red one misleading: over an
+        # idle session it read as «the program is looping».
+        in_flight = self._busy or self._session.paused()
+        stop = self._actions["stop"]
+        enabled = self._session.is_running() and (in_flight or self._loaded)
+        stop.setEnabled(enabled)
+        # Blue only where it will really unload: a disabled button, and a run to
+        # break, both keep the red octagon.
+        self._stop_picture(in_flight or not enabled)
         # A step and a traced run need a second thing beyond a program that may be
         # started: an engine that answers the request (task_79).  «Запустить» above
         # is deliberately not gated — running a program is what both engines do.
@@ -1217,6 +1236,28 @@ class MainWindow(QMainWindow):
         action = getattr(self, "_actions", {}).get("open_import")
         if action is not None:
             action.setEnabled(self._import_under_cursor() is not None)
+
+    def _stop_picture(self, in_flight: bool) -> None:
+        """Puts the picture of the moment on «Остановить» (part 141).
+
+        Red is a computation to break, blue is a base to unload — the same command,
+        two very different acts.  Set only when the state changes: a refresh runs on
+        every caret move, and repainting the toolbar there would be pure noise.
+        """
+        if self._stop_abort == in_flight:
+            return
+        self._stop_abort = in_flight
+        action = self._actions["stop"]
+        picture = assets.icon("execution-abort" if in_flight else "execution-stop")
+        if picture is not None:
+            action.setIcon(picture)
+        hint = (
+            "Остановить (Shift+F5): прервать прогон"
+            if in_flight
+            else "Остановить (Shift+F5): выгрузить базу знаний"
+        )
+        action.setToolTip(hint)
+        action.setStatusTip(hint)
 
     def _update_details(self) -> None:
         """The right-hand side of the status bar: state, caret, file shape."""
@@ -2793,7 +2834,7 @@ class MainWindow(QMainWindow):
         if not self._session.is_running():
             self._status.setText("интерпретатор уже остановлен")
             return
-        unloading = self._loaded and not self._busy
+        unloading = self._loaded and not self._busy and not self._session.paused()
         if self._closing:
             # Closing the window must not wait for a timer: the child goes at once,
             # even if a polite stop is still on its way.

@@ -1002,42 +1002,58 @@ def test_the_recent_menu_and_the_window_carry_the_pictures(
         discard_changes(window)
 
 
-def test_the_run_state_drives_the_buttons(executable: str) -> None:
-    """Two states, not one: the process can be *up and idle*, and a run can be
-    *in flight*.
+def stop_picture(window) -> str | None:
+    """Which picture «Остановить» carries, by the name of the asset it was made from.
 
-    `Запустить` needs a computation that is not in flight (there is nothing to
-    start while one is running, and it is what restarts the whole file), while
-    `Остановить` is lit for the run itself and dark for an idle interpreter with a
-    base loaded (task_87): a lit button reads as «the program is looping», and the
-    base is loaded again by the next start, so there is nothing to stop.  A window
-    the user has only opened has nothing running at all, which is what the startup
-    state wrongly said it had.
+    `assets.icon` keeps one `QIcon` per name, so the cache key identifies the file.
+    """
+    from prologd_gui import assets
+
+    shown = window._actions["stop"].icon().cacheKey()
+    for name in ("execution-abort", "execution-stop"):
+        picture = assets.icon(name)
+        if picture is not None and picture.cacheKey() == shown:
+            return name
+    return None
+
+
+def test_the_run_state_drives_the_buttons(executable: str) -> None:
+    """Three states: dark, red while a run is in flight, blue while the base waits.
+
+    «Остановить» has two meanings and the picture says which one the click will
+    perform (part 141): a run in flight is the red octagon — that click breaks a
+    computation; an interpreter idle with its base is the blue stop — that click
+    unloads the base, the one act that is immediate, and the only way out of a
+    program that has loaded and is waiting.  A window the user has only opened has
+    nothing to stop at all, and carries the greyed red octagon.
     """
     window = make_window(executable, ready=False)
     try:
         assert window.session.is_running() is False, "a new window starts no interpreter"
         assert window._actions["run"].isEnabled() is True
         assert window._actions["stop"].isEnabled() is False
+        assert stop_picture(window) == "execution-abort", stop_picture(window)
         assert "остановлен" in window._details.text(), window._details.text()
 
-        # The first run starts the interpreter *and* the computation.
+        # The first run starts the interpreter *and* the computation: red.
         window.open_path(str(EXAMPLE))
         window._actions["run"].trigger()
         assert window._actions["run"].isEnabled() is False, "a run is in flight"
         assert window._actions["stop"].isEnabled() is True
+        assert stop_picture(window) == "execution-abort", stop_picture(window)
         assert pump(window, lambda: "решение" in window.status_text()), window.status_text()
 
-        # The answer frees `Запустить` and *darkens* `Остановить`: the process is up
-        # with its base, but a run is not what is going on.
+        # The answer frees `Запустить`; «Остановить» stays lit, now in blue: the base
+        # is loaded and the click would unload it.
         assert window._actions["run"].isEnabled() is True, "the answer frees the button"
-        assert window._actions["stop"].isEnabled() is False, "the run is over"
+        assert window._actions["stop"].isEnabled() is True, "the base can be unloaded"
+        assert stop_picture(window) == "execution-stop", stop_picture(window)
         assert "база знаний загружена" in window._details.text(), window._details.text()
 
-        # The base is still there and the next start loads it again — which is why
-        # leaving that button dark costs nothing.
+        # The next start loads the base again, and the picture turns red with it.
         window._actions["run"].trigger()
         assert window._actions["stop"].isEnabled() is True, "a new run lights it again"
+        assert stop_picture(window) == "execution-abort", stop_picture(window)
 
         # Stopping a computation in flight is asked politely first and ends on the
         # deadline when nobody is reading (a load runs to its end before the request
@@ -1047,7 +1063,7 @@ def test_the_run_state_drives_the_buttons(executable: str) -> None:
         assert pump(window, lambda: "--- остановлено ---" in window.system_text()), (
             window.system_text()
         )
-        print("ok: run and stop follow the two states of the interpreter")
+        print("ok: run and stop follow the three states of the interpreter")
     finally:
         discard_changes(window)
 
@@ -1076,9 +1092,17 @@ def test_stopping_a_query_asks_first_and_keeps_the_base(executable: str) -> None
         assert "база знаний загружена" in window._details.text(), window._details.text()
         assert window._input_console.waiting() is False, "the pending request is dismissed"
 
-        # The run is over, so the button is dark again (task_87): the interpreter is
-        # idle with its base, and nothing there needs stopping.
-        assert window._actions["stop"].isEnabled() is False, "the run is over"
+        # The run is over, and «Остановить» stays lit — in blue now: the base is
+        # loaded, and that click unloads it (part 141).  That is the way out of a
+        # program that has loaded and waits for input.
+        assert window._actions["stop"].isEnabled() is True, "the base can be unloaded"
+        assert stop_picture(window) == "execution-stop", stop_picture(window)
+        window._actions["stop"].trigger()
+        assert pump(window, lambda: "база знаний выгружена" in window.status_text()), (
+            window.status_text()
+        )
+        assert window.session.is_running() is False, "the base went with the process"
+        assert window._actions["stop"].isEnabled() is False, "nothing left to stop"
     finally:
         discard_changes(window)
     print("ok: «Остановить» asks first and leaves the base loaded")
