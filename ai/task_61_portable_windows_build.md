@@ -396,6 +396,27 @@ tested.
 same Qt table).  The package pins PySide6 6.11.2, so on Windows 10 the portable build
 keeps working; we would only lose it by moving to Qt 6.13+.
 
+## §10. Три вида пакета (часть 143)
+
+Один и тот же скрипт собирает три пакета, и разница только в том, что кладётся рядом с
+окном (`-Engine`):
+
+| `-Engine` | движки | примеры | документы | библиотека | имя папки |
+|---|---|---|---|---|---|
+| `both` (по умолчанию) | `prologu.exe` + `prologd.exe` | наши (`examples`) | шесть наших PDF | `stdlib` | `prologd-<наша версия>-win64` |
+| `u` | `prologu.exe` | наши | шесть наших PDF | `stdlib` | `prologd-<наша версия>-win64` |
+| `d` | `prologd.exe` | `examples/prologd` (файлы репозитория Пролог-Д) | `help.pdf` из его `help.typ`, его `builtins.json`, наш `gui.pdf` | нет | `prologd-<его версия>-win64`, то есть `prologd-1.27-win64` |
+
+Версию `d`-пакета даёт строка `project("prologd" VERSION …)` из `CMakeLists.txt`
+пиннутого движка: у него нет `--version` (`-s` он при этом печатает в `--help`, но
+не принимает — работает только `--source=`).  Примеры его репозитория ссылаются на
+библиотеку относительно текущей папки (`?ИМПОРТ("examples/lib/library.pld")`),
+поэтому проверки запускают их из корня пакета.
+
+Окно такого пакета открывается на единственном движке (сохранённое имя другого ему
+не мешает — `paths.starting_engine`) и кнопки выбора движка не показывает: рядом
+только один файл, и переключать нечего.
+
 ## Definition of done
 
 * `tools/build_portable.ps1` builds the folder with one command on this machine, and a

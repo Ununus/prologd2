@@ -186,14 +186,17 @@ if(BUILD_WITH_PROLOGD)
   # every message from it came out as garbage, which is why the pin waited (part
   # 138).  Bumped in part 140 to c36f101 — «Предикат СОРТИРОВКА»: its СОРТИРОВКА/2
   # orders by the comparison of БОЛЬШЕ and refuses lists of mixed kinds, which
-  # ours does not (ours follows the standard order, task_90).
+  # ours does not (ours follows the standard order, task_90).  Bumped in part 143 to
+  # 823a9d1, which moved the built-in reference into the engine (`doc/builtins.json`)
+  # and generated its manual in Typst (`doc/help.typ`, `doc/style.typ`): a package
+  # that ships only this engine takes both from here instead of ours (part 143).
   #
   # Not a cache variable on purpose: a cache entry is written once, by the first
   # configure, and every later bump of the pin would then be invisible in a tree
   # that has already been built.  To build against another commit, point
   # `PROLOGD_ENGINE_SOURCE` at a clone of it — that is the override this file
   # documents.
-  set(PROLOGD_ENGINE_COMMIT "c36f101c86e3584046e347f3496e8b5120a28f02")
+  set(PROLOGD_ENGINE_COMMIT "823a9d18212a26c64672b7812be56268d4e91206")
   set(PROLOGD_ENGINE_SOURCE ""
       CACHE PATH "An existing clone of the original engine; skips the download")
 

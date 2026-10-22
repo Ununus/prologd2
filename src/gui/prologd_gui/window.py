@@ -120,6 +120,12 @@ class MainWindow(QMainWindow):
         #: the window open at all.
         launch = str(executable or "").strip() or self._settings.legacy_interpreter
         self._engine, self._engine_folder = engines.launch(launch, self._settings.engine)
+        #: Whether the choice had to make way for the only engine this build has
+        #: (part 143): a package with «Пролог-Д» alone starts it, and the window
+        #: says so in the pane instead of leaving the user to guess.
+        self._engine, self._engine_folder, self._engine_swapped = paths.starting_engine(
+            self._engine, folder=self._engine_folder
+        )
         #: The built-in reference (`doc/builtins.json`), read once for the whole
         #: window: the popup's detail label and `F1` read the same object, and a
         #: checkout without the file is an empty reference, not a failure.
@@ -589,6 +595,22 @@ class MainWindow(QMainWindow):
         self._apply_engine()
         self._sync_actions()
         self._update_details()
+        self._announce_engine()
+
+    def _announce_engine(self) -> None:
+        """Says in the pane when the stored choice was not there to start (part 143).
+
+        A one-engine package has nothing to choose: the file it carries is the one
+        that runs, and the opening line of the pane is where that is written down —
+        the button that would say it is not on the toolbar at all (`_sync_engine_button`).
+        """
+        if not self._engine_swapped:
+            return
+        missing = engines.other(self._engine)
+        self._append_note(
+            f"--- движок: {self._engine.title} ({self._engine.file_name}); "
+            f"{missing.title} ({missing.file_name}) в этой сборке нет ---\n"
+        )
 
     # -- the engine (task_79) ----------------------------------------------
     def engine(self) -> engines.Engine:
@@ -799,11 +821,20 @@ class MainWindow(QMainWindow):
             if key == actions.SEPARATOR:
                 self._toolbar.addSeparator()
             elif key == actions.FORMAT_MODE:
-                self._toolbar.addWidget(self._build_format_button())
+                # Kept as an action for the same reason as the two below: the toolbar
+                # lays its items out on show and shows every widget whose action is
+                # visible, so the mode control of an engine that cannot format is
+                # hidden by the action (part 145).
+                self._format_action = self._toolbar.addWidget(self._build_format_button())
             elif key == actions.ENGINE:
-                self._toolbar.addWidget(self._build_engine_button())
+                # The action `addWidget` answers with, not just the widget: a build
+                # with one engine hides this control (part 144), and hiding the
+                # widget alone is undone by the toolbar's own layout as soon as the
+                # window is shown — the action is what decides whether the item is
+                # in the layout at all.
+                self._engine_action = self._toolbar.addWidget(self._build_engine_button())
             elif key == actions.NAMING:
-                self._toolbar.addWidget(self._build_naming_button())
+                self._naming_action = self._toolbar.addWidget(self._build_naming_button())
             else:
                 self._toolbar.addAction(self._actions[key])
         self._toolbar.setVisible(self._settings.toolbar_visible)
@@ -829,17 +860,19 @@ class MainWindow(QMainWindow):
     def _sync_engine_button(self) -> None:
         """The picture, the tooltip and the state of the engine switch (task_79).
 
-        The button is disabled when the *other* engine's file is not where a run
-        would look for it, and its tooltip names that path: a press that would run
-        nothing is the «нажимается впустую» the button must not be.  The way back
-        stays open — the other engine of a broken pin is the one that ran.
+        The button is the *choice* between two programs, so a build that carries one
+        engine does not show it at all (part 143): a control with nothing to switch
+        to is furniture, and a disabled one still takes the place of a command that
+        might have been there.  With both engines present the picture is the one
+        that runs and the tooltip names the other side and its file.
         """
         target = engines.other(self._engine)
         found = assets.icon(self._engine.icon)
         if found is not None:
             self._engine_button.setIcon(found)
         available = self._engine_available(target)
-        self._engine_button.setEnabled(available)
+        self._engine_action.setVisible(available)
+        self._engine_button.setVisible(available)
         if available:
             self._engine_button.setToolTip(
                 f"Движок: сейчас {self._engine.title}.  Нажмите, чтобы переключиться "
@@ -880,7 +913,9 @@ class MainWindow(QMainWindow):
         # command itself is greyed out beside it.  The naming control stays **visible
         # but disabled** — the row it duplicates is disabled in the dialog as well, and
         # a control that says why is worth more than one that vanishes.
-        self._format_button.setVisible(self._engine.has(engines.FORMAT))
+        formats = self._engine.has(engines.FORMAT)
+        self._format_action.setVisible(formats)
+        self._format_button.setVisible(formats)
         self._sync_naming_button()
         # `run`, `stop`, the two steps and the traced run are computed with the
         # state of the session as well, and that formula lives in one place.
@@ -1049,7 +1084,20 @@ class MainWindow(QMainWindow):
         *is* the old dialect — so the menu would be a choice between one thing and
         nothing.  The control is disabled there, exactly as the row it duplicates is
         in the dialog, and the tooltip says who decides instead.
+
+        In a build with **one** engine that has no dialects either — the package of
+        «Пролог-Д» alone (part 144) — the control has nothing to offer at all, and it
+        goes with the engine switch: two dead buttons at the end of the toolbar are
+        worse than none, and their place is where a command could have been.
         """
+        if not self._engine.has(engines.NAMING) and not self._engine_available(
+            engines.other(self._engine)
+        ):
+            self._naming_action.setVisible(False)
+            self._naming_button.setVisible(False)
+            return
+        self._naming_action.setVisible(True)
+        self._naming_button.setVisible(True)
         if not self._engine.has(engines.NAMING):
             self._naming_button.setEnabled(False)
             self._naming_button.setToolTip(
@@ -3703,9 +3751,19 @@ class MainWindow(QMainWindow):
 
     @staticmethod
     def _reference_text(record: dict) -> str:
-        """A record as the dock shows it: the title, the section, the modes."""
+        """A record as the dock shows it: the title, the section, the modes.
+
+        The section line is added only when the record names one.  The records of
+        the *original* engine's repository (`doc/builtins.json` of `Ununus/prologd`,
+        the reference a package of that engine ships) carry no `section` and no
+        `aliases` — that file serves the window, not a manual — and indexing the key
+        raised inside the slot, so `F1` in the 1.27 package did nothing at all
+        (part 146).
+        """
         lines = [reference.record_title(record)]
-        lines.append(f"раздел руководства: {record['section']}")
+        section = record.get("section")
+        if isinstance(section, str) and section:
+            lines.append(f"раздел руководства: {section}")
         variants = record.get("variants") or []
         if variants:
             lines.append("")

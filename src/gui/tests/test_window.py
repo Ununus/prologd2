@@ -3070,6 +3070,35 @@ def test_f1_shows_the_record_of_the_word_under_the_caret(executable: str) -> Non
         view.setTextCursor(cursor)
         window._actions["reference"].trigger()
         assert "нет справки" in window.reference_text(), ascii(window.reference_text())
+
+        # The reference of the *original* engine's repository (the one the 1.27
+        # package ships) has no `section` and no `aliases`: `F1` must show what the
+        # record has rather than nothing at all (part 146 — indexing `section` raised
+        # inside the slot, and the dock never opened).
+        from prologd_gui import reference as reference_module
+
+        window._reference = reference_module.Reference(
+            [
+                {
+                    "name": "БОЛЬШЕ",
+                    "kind": "predicate",
+                    "arities": [2],
+                    "group": "compare",
+                    "summary": "Сравнение на больше",
+                    "variants": ["БОЛЬШЕ(А, Б) — истинно, если А больше Б"],
+                }
+            ]
+        )
+        window.editor().setPlainText("тест :- БОЛЬШЕ(1, 2).\n")
+        view = window.editor()
+        cursor = view.textCursor()
+        cursor.setPosition(view.toPlainText().index("БОЛЬШЕ") + 2)
+        view.setTextCursor(cursor)
+        window._actions["reference"].trigger()
+        text = window.reference_text()
+        assert text.startswith("БОЛЬШЕ — Сравнение на больше"), ascii(text)
+        assert "раздел руководства" not in text, ascii(text)
+        assert "БОЛЬШЕ(А, Б)" in text, ascii(text)
     finally:
         discard_changes(window)
     print("ok: F1 shows the record of the word under the caret, and says «нет справки»")
@@ -4210,6 +4239,64 @@ def test_a_missing_engine_is_reported_not_half_started(executable: str, director
         discard_changes(window)
 
 
+def test_a_build_with_one_engine_opens_on_it_and_offers_no_switch(
+    executable: str, directory: pathlib.Path
+) -> None:
+    """Part 143: the package of «Пролог-Д» alone opens on it, and has no switch.
+
+    The settings of a fresh machine say «Пролог-У», and a package that carries the
+    original engine only must not refuse to open over it: the one engine file that
+    *is* there runs, the pane says why, and the toolbar carries no button that would
+    switch to a file which is not there (a disabled control is furniture and takes
+    the place a command might have had).
+    """
+    from prologd_gui import engines
+
+    folder = directory / "один движок"
+    folder.mkdir(exist_ok=True)
+    shutil.copy2(
+        pathlib.Path(executable).parent / engines.ORIGINAL.file_name,
+        folder / engines.ORIGINAL.file_name,
+    )
+    # The launch names the engine the package does *not* carry — `prologu.exe` is
+    # absent where a run would look for it — which is the state of a fresh machine
+    # over a one-engine package: no `gui.ini`, so the choice is the default one.
+    window = make_window(str(folder / engines.OURS.file_name), ready=False)
+    try:
+        assert window.engine() is engines.ORIGINAL, "the engine of this build runs"
+        assert window.session.executable() == str(folder / engines.ORIGINAL.file_name)
+        # The window has to be *shown* before the toolbar is asked: `QToolBar` lays
+        # its widgets out on show and shows every item whose action is visible, which
+        # is why hiding the widget alone was undone in the package (part 145) — the
+        # action `addWidget` answers with is what the layout reads.
+        window.show()
+        from PySide6.QtWidgets import QApplication
+
+        QApplication.processEvents()
+        assert window._engine_button.isHidden(), (
+            "a build with one engine has nothing to switch to"
+        )
+        # The naming control goes with it (part 144): the original reads names its own
+        # way, and there is no second engine whose dialects could be chosen either —
+        # two dead buttons at the end of the toolbar are worse than none.
+        assert window._naming_button.isHidden(), (
+            "a build with one engine and one dialect has nothing to choose"
+        )
+        assert window._engine_action.isVisible() is False, "the toolbar's item is still there"
+        assert window._naming_action.isVisible() is False, "the toolbar's item is still there"
+        assert "в этой сборке нет" in window.system_text(), ascii(window.system_text())
+        assert engines.OURS.file_name in window.system_text(), ascii(window.system_text())
+
+        # And it runs, in its own dialect: no `#…#`, an ASCII literal for the pane.
+        window.editor().setPlainText('?ВЫВОД("ok"),ПС.\n')
+        window.run_program()
+        wait_for_result(window)
+        assert "ok" in window.output_text(), ascii(window.output_text())
+        print("ok: a one-engine build opens on its engine, says so, and has no switch")
+    finally:
+        discard_changes(window)
+
+
 def test_the_engine_button_switches_and_remembers(
     executable: str, directory: pathlib.Path
 ) -> None:
@@ -4312,13 +4399,21 @@ def test_the_other_engine_gets_only_what_it_answers(
     window = make_window(str(folder / engines.OURS.file_name), ready=False)
     gated = ("format", "step", "step_over", "run_trace", "graphics")
     try:
+        # Shown first: the toolbar lays its widgets out on show, and only then does a
+        # hidden control stay hidden (part 145 — hiding the widget alone was undone).
+        window.show()
+        from PySide6.QtWidgets import QApplication
+
+        QApplication.processEvents()
         for key in gated:
             assert window._actions[key].isEnabled() is True, key
         assert window._format_button.isHidden() is False
+        assert window._format_action.isVisible() is True
         window._settings.max_steps = 5000
         assert "«Предел шагов» 5000" in window._limits_note()
 
         window.switch_engine()
+        QApplication.processEvents()
         assert window.engine() is engines.ORIGINAL
         for key in gated:
             action = window._actions[key]
@@ -4329,6 +4424,7 @@ def test_the_other_engine_gets_only_what_it_answers(
         assert window._actions["run"].isEnabled() is True
         assert window._actions["stop"].isEnabled() is False, "nothing is running"
         assert window._format_button.isHidden() is True, "the mode control goes with the command"
+        assert window._format_action.isVisible() is False, "the toolbar's item is still there"
         note = window._limits_note()
         assert "не читает" in note and "Предел шагов" in note, note
         assert "--- пределы:" not in note, note
@@ -4889,6 +4985,7 @@ def main(argv: list[str]) -> int:
         test_the_launch_binary_names_the_folder_and_the_engine(executable, files)
         test_a_launch_naming_the_other_engine_starts_it(executable, files)
         test_a_missing_engine_is_reported_not_half_started(executable, files)
+        test_a_build_with_one_engine_opens_on_it_and_offers_no_switch(executable, files)
         test_the_engine_button_switches_and_remembers(executable, files)
         test_the_engine_button_stops_the_run_first(executable, files)
         test_the_other_engine_gets_only_what_it_answers(executable, files)

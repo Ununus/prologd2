@@ -371,6 +371,29 @@ for the other kind of state: one key with the dialog's row, disabled while the
 engine reads names its own way — the format mode control *hides* there instead,
 because it belongs to a command that engine does not have at all.
 
+A build may carry **one** engine (part 143 — the portable package of the original
+`prologd.exe`, `tools/build_portable.ps1 -Engine d`).  Three things follow, and all
+are in `paths.starting_engine`, `window._sync_engine_button` and
+`window._sync_naming_button`: a stored choice whose file is not there gives way to
+the engine that *is* there (the window writes `--- движок: … в этой сборке нет ---`
+into the pane, so this is announced rather than silent); a package with one engine
+answers it even when the settings name a file somewhere else — an old `gui.ini`
+copied from another machine must not point the window at an engine this folder does
+not have (part 144); and both state controls — the engine switch and the naming
+menu — are not shown at all, because a control with nothing to switch to is
+furniture, and it would take the place of a command a single-engine build might
+have had.  The commands that engine cannot answer are greyed by the same capability
+table either way.
+
+Hiding a toolbar widget has to go through the **action** that `QToolBar.addWidget`
+answers with (part 145): the toolbar lays its items out when the window is shown and
+calls `setVisible(...)` on each widget according to that action, so a bare
+`button.setVisible(False)` survives only until the first `show()` — it looked right
+in a test that never showed the window and came back in the package, which always
+shows it.  `_build_toolbar` keeps the three actions (`_format_action`,
+`_engine_action`, `_naming_action`), and the three places that decide a control's
+visibility set both the action and the widget.
+
 Two commands left the toolbar in this round.  «Сохранить все» acts on *every*
 tab, so it lives in «Файл» where the rest of them are: the toolbar keeps the
 three file buttons that act on the tab in front of the user.  And «Найти

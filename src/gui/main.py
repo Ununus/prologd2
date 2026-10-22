@@ -27,7 +27,9 @@ from PySide6.QtWidgets import QApplication, QMessageBox  # noqa: E402
 
 
 
-def report_missing_interpreter(executable: str, engine: engines.Engine) -> int:
+def report_missing_interpreter(
+    executable: str, engine: engines.Engine, folder: str = ""
+) -> int:
     """Says why the window cannot start, in the way the build can be heard.
 
     A checkout is started from a terminal, so printing is enough and the message
@@ -37,26 +39,38 @@ def report_missing_interpreter(executable: str, engine: engines.Engine) -> int:
     printing into nothing, so the one thing that is wrong with the package gets a
     box instead.  The box is modal on purpose — it is the last thing the process
     does (task_61 §7.1).
+
+    Both engine files are named when neither is there (part 143): the window can
+    start on whichever one a build carries, so a folder with none of them is a
+    broken copy, and the reader should see both names rather than the default one.
     """
     name = engine.file_name
+    other = engines.other(engine)
+    other_path = paths.engine_executable(other, folder=folder)
+    also_missing = not pathlib.Path(other_path).is_file()
     if not paths.frozen():
         print(f"{name} not found: {executable}", file=sys.stderr)
+        if also_missing:
+            print(f"{other.file_name} not found either: {other_path}", file=sys.stderr)
         print(
             "build it first (cmake --preset windows-msvc && cmake --build build/windows-msvc --config Release)",
             file=sys.stderr,
         )
-        if engine is engines.ORIGINAL:
+        if engine is engines.ORIGINAL or also_missing:
             print("the original engine is optional: configure with -DBUILD_WITH_PROLOGD=ON (task_78)",
                   file=sys.stderr)
         return 1
     QApplication(sys.argv[:1])  # a box needs an application object first
+    wanted = f"{name}"
+    if also_missing:
+        wanted = f"{name} и {other.file_name}"
     QMessageBox.critical(
         None,
         "Пролог-Д 2.0",
         f"Рядом с окном нет интерпретатора {name}.\n\n"
         f"Искали здесь: {executable}\n"
         f"Папка сборки: {paths.data_root()}\n\n"
-        f"Сборка неполная: файл {name} должен лежать рядом с prologd-gui.exe.",
+        f"Сборка неполная: файл {wanted} должен лежать рядом с prologd-gui.exe.",
     )
     return 1
 
@@ -107,9 +121,17 @@ def main(argv: list[str] | None = None) -> int:
     # because the default build path does not exist there.
     launch = (arguments.exe or "").strip() or preferences.legacy_interpreter
     engine, folder = engines.launch(launch, preferences.engine)
+    # A build may carry one engine only (part 143 — the package of the original
+    # «Пролог-Д»): the choice whose file is not there gives way to the one that is,
+    # and the window says so in the pane.  A package with one engine answers it
+    # whatever the settings say (part 144), so a `gui.ini` copied from another
+    # machine cannot point the window at an engine the folder does not have.
+    # `starting_engine` answers the choice itself when *neither* file is there, and
+    # the report below names what is missing.
+    engine, folder, _ = paths.starting_engine(engine, folder=folder)
     executable = paths.engine_executable(engine, folder=folder)
     if not pathlib.Path(executable).is_file():
-        return report_missing_interpreter(executable, engine)
+        return report_missing_interpreter(executable, engine, folder)
 
     # Qt must not see our own options: it parses the arguments it is given and
     # would complain about `--theme`.

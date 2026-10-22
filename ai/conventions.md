@@ -196,9 +196,19 @@ Tests are written **together with** the feature, never after.
   what was true then** and stay as they are — the rule the old section numbers follow.
 * The release routine (task_61, `tools/build_portable.ps1`): Release build → `ctest` →
   `docs` (six PDFs) → PyInstaller for the window → `dist/prologd-<version>-win64` (the name
-  comes from `prologd.exe --version`, which the script reads itself and then checks again
+  comes from `prologu.exe --version`, which the script reads itself and then checks again
   inside the package) → the script's own checks → zip.  `-SkipTests`, `-SkipFreeze`,
   `-NoTrim`, `-NoZip` shorten a round.
+* Three package flavours (part 143), `-Engine`:
+  * `both` (default) — `prologu.exe` + `prologd.exe`, our examples, our `stdlib`, six
+    manuals;
+  * `u` — ours only;
+  * `d` — the original alone: `dist/prologd-<its version>-win64` (its number is the
+    `project(... VERSION …)` line of the pinned `CMakeLists.txt`, because the engine has no
+    `--version`), `examples/prologd` as `examples`, `doc/help.pdf` compiled from the pinned
+    `help.typ`, the pinned `builtins.json` (the `F1` dock reads it), our `gui.pdf`, and no
+    `stdlib` — our library is written in our dialect.  The window of such a package opens on
+    that engine and has no engine switch (`paths.starting_engine`, `_sync_engine_button`).
 
 ## Commit / change hygiene
 
