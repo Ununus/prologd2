@@ -209,6 +209,8 @@ Tests are written **together with** the feature, never after.
     `help.typ`, the pinned `builtins.json` (the `F1` dock reads it), our `gui.pdf`, and no
     `stdlib` — our library is written in our dialect.  The window of such a package opens on
     that engine and has no engine switch (`paths.starting_engine`, `_sync_engine_button`).
+    What each kind carries is the `$kinds` table at the top of the script (part 150); a new
+    difference belongs there, not in another `if` inside a step.
 
 ## Commit / change hygiene
 

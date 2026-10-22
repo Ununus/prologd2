@@ -637,6 +637,15 @@ class MainWindow(QMainWindow):
             paths.engine_executable(engine, folder=self._engine_folder)
         ).is_file()
 
+    def _only_engine(self) -> bool:
+        """True when this build has no second engine, so nothing to choose (parts 143–148).
+
+        The test the three «one engine» rules share: the naming control hides with it,
+        the names row takes the old dialect with it, and `_announce_engine` explains a
+        choice that had to give way to it.
+        """
+        return not self._engine_available(engines.other(self._engine))
+
     def _adopt_engine_dialect(self) -> None:
         """Writes «PLD» into the names row when this build has nothing to choose.
 
@@ -652,9 +661,9 @@ class MainWindow(QMainWindow):
         stored choice — there the row is our engine's, and switching to the original
         is a visit, not a new home.
         """
-        if self._engine.has(engines.NAMING) or self._engine_available(
-            engines.other(self._engine)
-        ):
+        if self._engine.has(engines.NAMING):
+            return
+        if not self._only_engine():
             return
         if self._settings.variable_mode != "1":
             self._settings.variable_mode = "1"
@@ -847,24 +856,33 @@ class MainWindow(QMainWindow):
             if key == actions.SEPARATOR:
                 self._toolbar.addSeparator()
             elif key == actions.FORMAT_MODE:
-                # Kept as an action for the same reason as the two below: the toolbar
-                # lays its items out on show and shows every widget whose action is
-                # visible, so the mode control of an engine that cannot format is
-                # hidden by the action (part 145).
                 self._format_action = self._toolbar.addWidget(self._build_format_button())
             elif key == actions.ENGINE:
-                # The action `addWidget` answers with, not just the widget: a build
-                # with one engine hides this control (part 144), and hiding the
-                # widget alone is undone by the toolbar's own layout as soon as the
-                # window is shown — the action is what decides whether the item is
-                # in the layout at all.
                 self._engine_action = self._toolbar.addWidget(self._build_engine_button())
             elif key == actions.NAMING:
                 self._naming_action = self._toolbar.addWidget(self._build_naming_button())
             else:
                 self._toolbar.addAction(self._actions[key])
+        #: The three controls of the toolbar that stand for a *capability* of the
+        #: engine, each as the pair `addWidget` returns: the action it answers with
+        #: and the widget inside it.  Hiding has to go through the action (part 145) —
+        #: the toolbar lays its items out on show and calls `setVisible` on the widget
+        #: by the action's visibility, so a bare `widget.setVisible(False)` lives only
+        #: until the window appears.  One table, one setter (`_show_toolbar_control`),
+        #: so no call site can forget half of the pair.
+        self._toolbar_controls: dict[str, tuple[QAction, QToolButton]] = {
+            "format": (self._format_action, self._format_button),
+            "engine": (self._engine_action, self._engine_button),
+            "naming": (self._naming_action, self._naming_button),
+        }
         self._toolbar.setVisible(self._settings.toolbar_visible)
         self.addToolBar(self._toolbar)
+
+    def _show_toolbar_control(self, key: str, visible: bool) -> None:
+        """Shows or hides a toolbar control — the action **and** the widget (part 145)."""
+        action, widget = self._toolbar_controls[key]
+        action.setVisible(visible)
+        widget.setVisible(visible)
 
     def _build_engine_button(self) -> QToolButton:
         """The engine switch, the last control of the toolbar (task_79).
@@ -897,8 +915,7 @@ class MainWindow(QMainWindow):
         if found is not None:
             self._engine_button.setIcon(found)
         available = self._engine_available(target)
-        self._engine_action.setVisible(available)
-        self._engine_button.setVisible(available)
+        self._show_toolbar_control("engine", available)
         if available:
             self._engine_button.setToolTip(
                 f"Движок: сейчас {self._engine.title}.  Нажмите, чтобы переключиться "
@@ -940,8 +957,7 @@ class MainWindow(QMainWindow):
         # but disabled** — the row it duplicates is disabled in the dialog as well, and
         # a control that says why is worth more than one that vanishes.
         formats = self._engine.has(engines.FORMAT)
-        self._format_action.setVisible(formats)
-        self._format_button.setVisible(formats)
+        self._show_toolbar_control("format", formats)
         self._sync_naming_button()
         # `run`, `stop`, the two steps and the traced run are computed with the
         # state of the session as well, and that formula lives in one place.
@@ -1116,14 +1132,10 @@ class MainWindow(QMainWindow):
         goes with the engine switch: two dead buttons at the end of the toolbar are
         worse than none, and their place is where a command could have been.
         """
-        if not self._engine.has(engines.NAMING) and not self._engine_available(
-            engines.other(self._engine)
-        ):
-            self._naming_action.setVisible(False)
-            self._naming_button.setVisible(False)
+        if not self._engine.has(engines.NAMING) and self._only_engine():
+            self._show_toolbar_control("naming", False)
             return
-        self._naming_action.setVisible(True)
-        self._naming_button.setVisible(True)
+        self._show_toolbar_control("naming", True)
         if not self._engine.has(engines.NAMING):
             self._naming_button.setEnabled(False)
             self._naming_button.setToolTip(

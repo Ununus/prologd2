@@ -154,6 +154,11 @@ def launch(pin: str, chosen: str) -> tuple[Engine, str]:
     then `paths.interpreter` searches the usual places.  `main.py`, which refuses
     to start without the file, and the window, which starts with it, both call
     this: one rule, so they cannot disagree about which binary was asked for.
+
+    What happens when that file is not there is *not* this function's business:
+    `paths.starting_engine` answers it — the other engine when it is present, and,
+    in a package that carries one engine only, that one whatever the settings say
+    (parts 143 and 144).
     """
     text = str(pin or "").strip()
     parent = str(pathlib.PurePath(text).parent) if text else ""

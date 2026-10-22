@@ -14,7 +14,9 @@
     memo `tools\portable-readme.txt`, copied under its Russian name (`$memoName`
     below, spelled in code points because of the ANSI reading).  The window finds the
     interpreter next to itself and keeps its settings (`gui.ini`) there too, so the
-    folder can be copied anywhere.
+    folder can be copied anywhere.  `-Engine d` collects a different package — the
+    original's own examples, its manual and no standard library of ours; what each
+    kind carries is the `$kinds` table below.
 
     Every message in this file is ASCII on purpose: PowerShell 5.1 reads a script
     without a byte-order mark as ANSI, so Cyrillic text written here would reach the
@@ -135,6 +137,59 @@ $trimmedFiles = @(
 $memoName = (-join (0x0427, 0x0418, 0x0422, 0x0410, 0x0419, 0x005F,
                     0x041C, 0x0415, 0x041D, 0x042F | ForEach-Object { [char]$_ })) + '.txt'
 
+# Everything that differs between the three kinds of package, in one table (part 150),
+# so the steps below read their answers instead of asking `-Engine` in a dozen
+# branches.  The branches that remain are the ones whose *work* differs: our banner
+# carries the version, the original's manual is compiled from its own `help.typ`.
+#
+# `Needed` is every file the checks insist on besides the ones all packages have,
+# and `Programs` is the arguments of the programs the packaged interpreter must run
+# from the package's own folder.
+$oursNeeded = @(
+    'prologu.exe', 'doc\builtins.json', 'doc\prologd2.png', 'doc\csu.png',
+    'examples\lib\library.pld', 'examples\lessons\lesson_01.pld',
+    'examples\problems\knapsack.pld', 'examples\sorting.pld',
+    'stdlib\lists.pld', 'stdlib\sets.pld', 'stdlib\iso.pld'
+)
+$oursPrograms = @(
+    @('-s', 'examples\lessons\lesson_01.pld'),
+    @('-I', 'examples\lib', '-s', 'examples\import.pld'),
+    @('-i', 'examples\stdlib.input.txt', '-s', 'examples\stdlib.pld')
+)
+$originalNeeded = @(
+    'prologd.exe', 'doc\builtins.json', 'examples\factorial.pld',
+    'examples\lib\library.pld', 'examples\lessons\lesson 1.pld', 'examples\import.pld'
+)
+$originalPrograms = @(
+    @('--source=examples\factorial.pld'),
+    @('--source=examples\import.pld')
+)
+
+$kinds = @{
+    both = @{
+        Ours = $true; Legacy = $true
+        Examples = 'examples'; ExamplesDrop = @('lessons\_old')
+        StandardLibrary = $true; Documents = 'ours'
+        Memo = 'tools\portable-readme.txt'; Program = 'prologu.exe'
+        Needed = $oursNeeded + @('prologd.exe'); Programs = $oursPrograms
+    }
+    u = @{
+        Ours = $true; Legacy = $false
+        Examples = 'examples'; ExamplesDrop = @('lessons\_old')
+        StandardLibrary = $true; Documents = 'ours'
+        Memo = 'tools\portable-readme.txt'; Program = 'prologu.exe'
+        Needed = $oursNeeded; Programs = $oursPrograms
+    }
+    d = @{
+        Ours = $false; Legacy = $true
+        Examples = 'examples\prologd'; ExamplesDrop = @('README.md')
+        StandardLibrary = $false; Documents = 'engine'
+        Memo = 'tools\portable-readme-prologd.txt'; Program = 'prologd.exe'
+        Needed = $originalNeeded; Programs = $originalPrograms
+    }
+}
+$kind = $kinds[$Engine]
+
 function Write-Step([string]$Text) {
     Write-Host ''
     Write-Host "=== $Text" -ForegroundColor Cyan
@@ -153,6 +208,43 @@ function Format-Size([long]$Bytes) {
     if ($Bytes -ge 1GB) { return ('{0:N2} GiB' -f ($Bytes / 1GB)) }
     if ($Bytes -ge 1MB) { return ('{0:N1} MiB' -f ($Bytes / 1MB)) }
     return ('{0:N0} KiB' -f ($Bytes / 1KB))
+}
+
+function Copy-OurDocuments([string]$Target) {
+    # By name, never "every .pdf": a stale PDF of a target that no longer exists has
+    # slipped into a build before (task_61, section 6).
+    foreach ($name in $documentNames) {
+        Copy-Item "doc\$name.pdf" $Target -Force
+        Copy-Item "doc\$name.typ" $Target -Force
+    }
+    Copy-Item 'doc\style.typ' $Target -Force
+    Copy-Item 'doc\builtins.json' $Target -Force
+    # The two logos the documents put on their first page: without them the shipped
+    # `.typ` sources cannot be compiled from the package.
+    foreach ($image in 'prologd2.png', 'csu.png') {
+        Copy-Item (Join-Path 'doc' $image) $Target -Force
+    }
+}
+
+function Copy-EngineDocuments([string]$Target, [string]$EngineSource) {
+    # The manual and the built-in reference of the original come from its own
+    # repository (part 143): its `help.typ` describes *its* dialect, and its
+    # `builtins.json` is what the window's `F1` dock reads.  Our language manuals are
+    # about a dialect this package does not run, so they stay behind; the window's own
+    # manual is about the window and goes with it.
+    $engineDoc = Join-Path $EngineSource 'doc'
+    foreach ($wanted in 'help.typ', 'style.typ', 'builtins.json') {
+        if (-not (Test-Path (Join-Path $engineDoc $wanted))) {
+            Fail "the pinned engine has no doc\$wanted (bump the pin or check PROLOGD_ENGINE_SOURCE)"
+        }
+    }
+    & typst compile (Join-Path $engineDoc 'help.typ') (Join-Path $Target 'help.pdf')
+    Assert-Exit 'typst on the help.typ of the original'
+    Copy-Item (Join-Path $engineDoc 'builtins.json') $Target -Force
+    foreach ($name in 'gui.pdf', 'gui.typ', 'style.typ') {
+        Copy-Item (Join-Path 'doc' $name) $Target -Force
+    }
+    Write-Host 'documents  : help.pdf (the original) and gui.pdf, with builtins.json'
 }
 
 $root = Split-Path -Parent $PSScriptRoot
@@ -190,8 +282,8 @@ try {
     $cli = Join-Path $build "src\cli\$Configuration\prologu.exe"
     $legacy = Join-Path $build "src\cli\$Configuration\prologd.exe"
     $engineSource = Join-Path $build 'prologd-engine\src\prologd_engine'
-    $withOurs = $Engine -ne 'd'
-    $withLegacy = $Engine -ne 'u'
+    $withOurs = $kind.Ours
+    $withLegacy = $kind.Legacy
     if ($withOurs -and -not (Test-Path $cli)) { Fail "the interpreter was not built: $cli" }
     if ($withLegacy) {
         # A build made with -DBUILD_WITH_PROLOGD=ON has it beside ours; a build
@@ -342,65 +434,27 @@ try {
     }
     Write-Host "runtime    : $CrtDirectory"
 
-    if ($withOurs) {
-        Copy-Item 'examples' $package -Recurse -Force
-        $old = Join-Path $package 'examples\lessons\_old'
-        if (Test-Path $old) { Remove-Item $old -Recurse -Force }
-
+    Copy-Item $kind.Examples (Join-Path $package 'examples') -Recurse -Force
+    foreach ($relative in $kind.ExamplesDrop) {
+        $gone = Join-Path $package "examples\$relative"
+        if (Test-Path $gone) { Remove-Item $gone -Recurse -Force }
+    }
+    if ($kind.StandardLibrary) {
         # The standard library travels beside the interpreter: `-I stdlib` is the path the
         # manual, the demo and `stdlib\README.md` name, and a library the user cannot
         # find is no library.
         Copy-Item 'stdlib' $package -Recurse -Force
-    } else {
-        # The programs of the original and nothing of ours (part 143): they are written
-        # in its dialect, and our standard library is written in ours.
-        Copy-Item 'examples\prologd' (Join-Path $package 'examples') -Recurse -Force
-        $ours = Join-Path $package 'examples\README.md'
-        if (Test-Path $ours) { Remove-Item $ours -Force }
     }
 
     $docTarget = Join-Path $package 'doc'
     New-Item -ItemType Directory -Path $docTarget | Out-Null
-    if ($withOurs) {
-        # By name, never "every .pdf": a stale PDF of a target that no longer exists has
-        # slipped into a build before (task_61, section 6).
-        foreach ($name in $documentNames) {
-            Copy-Item "doc\$name.pdf" $docTarget -Force
-            Copy-Item "doc\$name.typ" $docTarget -Force
-        }
-        Copy-Item 'doc\style.typ' $docTarget -Force
-        Copy-Item 'doc\builtins.json' $docTarget -Force
-        # The two logos the documents put on their first page: without them the shipped
-        # `.typ` sources cannot be compiled from the package.
-        foreach ($image in 'prologd2.png', 'csu.png') {
-            Copy-Item (Join-Path 'doc' $image) $docTarget -Force
-        }
+    if ($kind.Documents -eq 'ours') {
+        Copy-OurDocuments $docTarget
     } else {
-        # The manual and the built-in reference of the original come from its own
-        # repository (part 143): its `help.typ` describes *its* dialect, and its
-        # `builtins.json` is what the window's `F1` dock reads.  Our language manuals
-        # are about a dialect this package does not run, so they stay behind; the
-        # window's own manual is about the window and goes with it.
-        $engineDoc = Join-Path $engineSource 'doc'
-        foreach ($wanted in 'help.typ', 'style.typ', 'builtins.json') {
-            if (-not (Test-Path (Join-Path $engineDoc $wanted))) {
-                Fail "the pinned engine has no doc\$wanted (bump the pin or check PROLOGD_ENGINE_SOURCE)"
-            }
-        }
-        & typst compile (Join-Path $engineDoc 'help.typ') (Join-Path $docTarget 'help.pdf')
-        Assert-Exit 'typst on the help.typ of the original'
-        Copy-Item (Join-Path $engineDoc 'builtins.json') $docTarget -Force
-        foreach ($name in 'gui.pdf', 'gui.typ', 'style.typ') {
-            Copy-Item (Join-Path 'doc' $name) $docTarget -Force
-        }
-        Write-Host 'documents  : help.pdf (the original) and gui.pdf, with builtins.json' 
+        Copy-EngineDocuments $docTarget $engineSource
     }
 
-    if ($withOurs) {
-        Copy-Item 'tools\portable-readme.txt' (Join-Path $package $memoName) -Force
-    } else {
-        Copy-Item 'tools\portable-readme-prologd.txt' (Join-Path $package $memoName) -Force
-    }
+    Copy-Item $kind.Memo (Join-Path $package $memoName) -Force
 
     if (-not $NoTrim) {
         $freed = 0
@@ -425,22 +479,7 @@ try {
                 'msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll',
                 '_internal\base_library.zip',
                 'doc\help.pdf',
-                $memoName)
-    if ($withOurs) {
-        $needed += @('prologu.exe', 'doc\builtins.json', 'doc\prologd2.png', 'doc\csu.png',
-                     'examples\lib\library.pld', 'examples\lessons\lesson_01.pld',
-                     'examples\problems\knapsack.pld', 'examples\sorting.pld',
-                     'stdlib\lists.pld', 'stdlib\sets.pld', 'stdlib\iso.pld')
-    } else {
-        # The reference the window's `F1` dock reads is the original's own file, and the
-        # examples are the programs of its repository (part 143).
-        $needed += @('doc\builtins.json', 'examples\factorial.pld',
-                     'examples\lib\library.pld', 'examples\lessons\lesson 1.pld')
-    }
-    if ($withLegacy) {
-        $needed += 'prologd.exe'
-        if (-not $withOurs) { $needed += 'examples\import.pld' }
-    }
+                $memoName) + $kind.Needed
     foreach ($wanted in $needed) {
         if (-not (Test-Path (Join-Path $package $wanted))) { Fail "the package is missing $wanted" }
     }
@@ -451,10 +490,9 @@ try {
         }
     }
 
-    $openProgram = $null
-    $openPrograms = @()
+    $openProgram = Join-Path $package $kind.Program
     if ($withOurs) {
-        $packagedExe = Join-Path $package 'prologu.exe'
+        $packagedExe = $openProgram
         # The banner again, read the same way: the number inside it must be the one the
         # folder is named after.  The date may differ if the package was built on another
         # day, so the whole line is not compared.
@@ -462,23 +500,6 @@ try {
         if ($theirs -ne $Version) { Fail "the packaged interpreter says '$theirs', expected '$Version'" }
         $keywords = (& $packagedExe --list-keywords | Measure-Object -Line).Lines
         if ($keywords -lt 100) { Fail "the packaged interpreter lists only $keywords keyword lines" }
-        $openProgram = $packagedExe
-        $openPrograms = @(
-            @('-s', 'examples\lessons\lesson_01.pld'),
-            @('-I', 'examples\lib', '-s', 'examples\import.pld'),
-            @('-i', 'examples\stdlib.input.txt', '-s', 'examples\stdlib.pld')
-        )
-    } else {
-        # The package is the original's, so the folder is named after *its* number, and
-        # that number is the `project(...)` line of the build that produced the exe.
-        $openProgram = Join-Path $package 'prologd.exe'
-        # `-s` is advertised but rejected by this engine (checked on the pinned commit):
-        # only `--source=` works, and the import demo of its repository names its library
-        # relative to the folder the program is run from.
-        $openPrograms = @(
-            @('--source=examples\factorial.pld'),
-            @('--source=examples\import.pld')
-        )
     }
 
     if ($withLegacy) {
@@ -498,7 +519,7 @@ try {
     # pipe would decode Cyrillic output as ANSI and could not compare it.
     Push-Location $package
     try {
-        foreach ($arguments in $openPrograms) {
+        foreach ($arguments in $kind.Programs) {
             $what = $arguments[-1]
             & $openProgram @arguments > $null 2>&1
             Assert-Exit $what
