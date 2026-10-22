@@ -4284,6 +4284,11 @@ def test_a_build_with_one_engine_opens_on_it_and_offers_no_switch(
         )
         assert window._engine_action.isVisible() is False, "the toolbar's item is still there"
         assert window._naming_action.isVisible() is False, "the toolbar's item is still there"
+        # The names row is written down as «PLD» (part 148): the only engine reads the
+        # old dialect, so the row must say that rather than keep a choice that belongs
+        # to an engine this build does not carry.
+        assert window._settings.variable_mode == "1", window._settings.variable_mode
+        assert window._naming_label() == "PLD", window._naming_label()
         assert "в этой сборке нет" in window.system_text(), ascii(window.system_text())
         assert engines.OURS.file_name in window.system_text(), ascii(window.system_text())
 

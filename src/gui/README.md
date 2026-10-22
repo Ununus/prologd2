@@ -383,7 +383,10 @@ not have (part 144); and both state controls — the engine switch and the namin
 menu — are not shown at all, because a control with nothing to switch to is
 furniture, and it would take the place of a command a single-engine build might
 have had.  The commands that engine cannot answer are greyed by the same capability
-table either way.
+table either way.  The «Имена переменных» row is *written down as `1` (PLD)* on the
+first start of such a build (`_adopt_engine_dialect`, part 148): the stored «ISO»
+would describe a choice that belongs to an engine the copy does not carry, while the
+engine beside the window reads the old dialect whatever the row says.
 
 Hiding a toolbar widget has to go through the **action** that `QToolBar.addWidget`
 answers with (part 145): the toolbar lays its items out when the window is shown and

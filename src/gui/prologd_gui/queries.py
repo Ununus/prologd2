@@ -16,7 +16,10 @@ and none next to the prose.  The rule, in one sentence: the first non-blank
 characters of the line are `?` or `%` followed by blanks and `?`, the sentence
 ends at the first `.` outside `"..."`, `'...'` and `#...#` and outside every
 bracket, and every bare word inside it is a variable (upper case or `_`), a
-reserved name, or a name the document itself uses.
+reserved name, or a name the document itself uses.  A `'` opens `'атом'` only
+where a token may start: after a name it is the old dialect's suffix (`Ф'`,
+`Сумма'`), exactly as `tokens.scan_line` reads it — one apostrophe must not
+swallow the sentence's own `.` (part 149).
 
 The last clause is what separates a *commented* question from prose, and it is
 deliberately shallow: `?длина(Х, 2) не завершится.` is refused because `не` is a
@@ -104,6 +107,18 @@ def _question_start(line: str) -> int | None:
     return index
 
 
+def _starts_quoted_atom(line: str, index: int) -> bool:
+    """Whether the `'` at `index` opens `'атом'` rather than ending a name.
+
+    The old dialect writes a long name with a trailing apostrophe (`Ф'`, `Сумма'`),
+    and the tokenizer reads such a quote as part of the name: a quoted atom starts
+    only where a token starts (`tokens.scan_line`).  Reading `Ф'` as the opening of
+    an unterminated atom swallowed the sentence's own `.`, so a live question with
+    one apostrophe in it got no margin marker while two of them did (part 149).
+    """
+    return index == 0 or not is_name_character(line[index - 1])
+
+
 def _candidate_ends(line: str, start: int):
     """The positions a sentence could end at, left to right.
 
@@ -130,7 +145,7 @@ def _candidate_ends(line: str, start: int):
                 in_expr = False
         elif char == '"':
             in_string = True
-        elif char == "'":
+        elif char == "'" and _starts_quoted_atom(line, index):
             in_quoted = True
         elif char == "#":
             in_expr = True
@@ -160,7 +175,7 @@ def _is_sentence(text: str, keywords: Keywords | None, names: Names) -> bool:
     length = len(text)
     while index < length:
         char = text[index]
-        if char in "\"'":
+        if char == '"' or (char == "'" and _starts_quoted_atom(text, index)):
             index += 1
             while index < length and text[index] != char:
                 index += 1

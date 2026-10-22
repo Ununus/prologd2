@@ -126,6 +126,10 @@ class MainWindow(QMainWindow):
         self._engine, self._engine_folder, self._engine_swapped = paths.starting_engine(
             self._engine, folder=self._engine_folder
         )
+        #: A build with one engine and no names to choose writes that answer into the
+        #: row (part 148) — before the first buffer exists, so nothing is coloured by
+        #: the other dialect for a moment.
+        self._adopt_engine_dialect()
         #: The built-in reference (`doc/builtins.json`), read once for the whole
         #: window: the popup's detail label and `F1` read the same object, and a
         #: checkout without the file is an empty reference, not a failure.
@@ -632,6 +636,28 @@ class MainWindow(QMainWindow):
         return pathlib.Path(
             paths.engine_executable(engine, folder=self._engine_folder)
         ).is_file()
+
+    def _adopt_engine_dialect(self) -> None:
+        """Writes «PLD» into the names row when this build has nothing to choose.
+
+        The row belongs to our own engine: the original has no modes and always reads
+        names the old way (`_default_variable_mode`).  A build that carries **only**
+        that engine therefore keeps a row that cannot be changed and, left as it is,
+        says «ISO» while the engine reads «PLD» — a setting that lies about what
+        happens is worse than one written down once (part 148).  So the first start
+        of such a build stores the old dialect.
+
+        The condition is the one that hides the two state controls: no naming modes on
+        the engine *and* no second engine to switch to.  A two-engine build keeps the
+        stored choice — there the row is our engine's, and switching to the original
+        is a visit, not a new home.
+        """
+        if self._engine.has(engines.NAMING) or self._engine_available(
+            engines.other(self._engine)
+        ):
+            return
+        if self._settings.variable_mode != "1":
+            self._settings.variable_mode = "1"
 
     def switch_engine(self) -> None:
         """The button: stop the run, then run the *other* engine (task_79).

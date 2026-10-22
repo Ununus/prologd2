@@ -72,6 +72,15 @@ CASES: list[tuple[str, str | None]] = [
     ("?сумма(1.5, С).", "?сумма(1.5, С)."),
     # A `?` inside a string is just text.
     ('?ВЫВОД("?сумма(5, С).").', '?ВЫВОД("?сумма(5, С).").'),
+    # The old dialect's long names end with an apostrophe (`Ф'`, `Сумма'`): one
+    # apostrophe is a name suffix, not an unterminated `'атом'`, so the sentence
+    # still ends at `).` — it used to swallow the `.` and leave the line without a
+    # margin marker while two apostrophes worked (part 149).
+    ("?сумма(5, Ф').", "?сумма(5, Ф')."),
+    ("?сумма(Ф', 5).", "?сумма(Ф', 5)."),
+    ("?сумма(Ф', И').", "?сумма(Ф', И')."),
+    # A quoted atom where a token may start is still a quoted atom.
+    ("?сумма(5, 'атом').", "?сумма(5, 'атом')."),
     # An unknown bare word makes prose *in a comment*.  In a live line the same
     # word is a name the document uses (the line is part of it), which is right:
     # a run executes that line, so it is a question by construction.
