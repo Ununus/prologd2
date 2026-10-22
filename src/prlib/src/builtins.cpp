@@ -436,9 +436,11 @@ using BuiltinTable = std::unordered_map<BuiltinKey, BuiltinFn, BuiltinKeyHash>;
 /// was written somewhere else, so say where it belongs instead of failing quietly.
 BuiltinResult builtinVariablesMarker(Engine& engine, std::span<const Term> args) {
   (void)args;
+  // No `return` after this: `Engine::raise` is `[[noreturn]]`, so the end of the
+  // body is unreachable, and a value written there is dead code — MSVC says so
+  // out loud (C4702, part 153).
   engine.raise(ErrorCode::InvalidGoal,
                "режим имён задаётся первой строкой файла: `:- ИМЕНА(0|1|2).`");
-  return BuiltinResult::Continue;  // unreachable: `raise` throws
 }
 
 /// Names that are not listed are already English (`abs`, `sqrt`, `sin`, `cos`,
