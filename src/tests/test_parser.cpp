@@ -531,3 +531,33 @@ TEST_CASE("parser rejects a variable head") {
   parse("X :- foo.", sink);
   REQUIRE(sink.hasErrors());
 }
+
+TEST_CASE("a quoted atom is a functor as well as a term") {
+  // task_96: ISO writes `'Вася'(X)` when the name is not an ordinary identifier,
+  // and the quoting is syntax, not part of the name.  A *string* constant is not
+  // a functor (in ISO it is a list of character codes), and an unquoted
+  // capitalised head stays the error it is in both naming modes.
+  SECTION("a quoted head and a quoted goal are a compound") {
+    DiagnosticSink sink;
+    const auto program = parse("'Вася'(15, дунай) :- 'Он'(X).\n", sink);
+    REQUIRE_FALSE(sink.hasErrors());
+    const Term& head = program.clauses[0].head;
+    REQUIRE(head.kind == TermKind::Compound);
+    REQUIRE(head.compound->name == "Вася");
+    REQUIRE(head.compound->args.size() == 2);
+    REQUIRE(program.clauses[0].body[0].compound->name == "Он");
+  }
+  SECTION("a quoted atom on its own is still a term") {
+    DiagnosticSink sink;
+    const auto program = parse("p :- X = 'Вася'.\n", sink);
+    REQUIRE_FALSE(sink.hasErrors());
+    const Term& goal = program.clauses[0].body[0];
+    REQUIRE(goal.compound->args[1].kind == TermKind::Atom);
+    REQUIRE(goal.compound->args[1].text == "Вася");
+  }
+  SECTION("a string constant is not a functor") {
+    DiagnosticSink sink;
+    parse("\"Вася\"(1).\n", sink);
+    REQUIRE(sink.hasErrors());
+  }
+}

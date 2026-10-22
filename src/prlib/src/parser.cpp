@@ -476,9 +476,18 @@ Term Parser::parsePrimary() {
     case TokenKind::String:
       advance();
       return makeString(token.text);
-    case TokenKind::QuotedAtom:
-      advance();
-      return makeAtom(token.text);
+    case TokenKind::QuotedAtom: {
+      const Token atom = advance();
+      // A quoted atom is a legal *functor*: ISO writes `'Вася'(X)` when the name is
+      // not an ordinary identifier, and a predicate named `'Вася'` is then an
+      // ordinary compound (task_96).  Only the atom may do this — in ISO a string
+      // constant is a list of character codes, and a list is not a functor; the
+      // original dialect's capitalised heads are its own rule (`prologd-diff.typ`).
+      if (check(TokenKind::LParen)) {
+        return parseArguments(atom);
+      }
+      return makeAtom(atom.text);
+    }
     case TokenKind::Variable:
       advance();
       return makeVar(variableFor(token.text, token.text == "_", token.location),
@@ -561,6 +570,10 @@ Term Parser::parseCompoundOrAtom() {
   if (!check(TokenKind::LParen)) {
     return makeAtom(name.text);
   }
+  return parseArguments(name);
+}
+
+Term Parser::parseArguments(const Token& name) {
   // Keep the opening bracket: when the closing one is missing, that is where
   // a reader has to look.
   const Token open = advance();

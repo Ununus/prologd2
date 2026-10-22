@@ -129,6 +129,10 @@ class Parser {
   Term parsePrimary();
   Term parseList();
   Term parseCompoundOrAtom();
+  /// The `(...)` of `name(...)`, the opening bracket still being the current
+  /// token.  Shared by an ordinary name and a quoted atom, because in ISO the two
+  /// are the same functor written two ways (task_96).
+  Term parseArguments(const Token& name);
   Term parseArithmetic();
   Term parseAdditive();
   Term parseMultiplicative();

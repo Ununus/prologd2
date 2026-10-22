@@ -241,3 +241,15 @@ TEST_CASE("quiet suppresses solution output for its query only") {
   REQUIRE(result.loaded);
   REQUIRE(result.output == "фывкуц\nДА\nX=5\n");
 }
+
+TEST_CASE("a name in quotes is the same predicate as the bare one") {
+  // task_96: `'Вася'(15, …)` defines `Вася/2`, and a query written the same way
+  // finds it.  The quotes are syntax: the name is the text between them, so the
+  // bare `'Вася'` (as a term) and the functor speak of one name.
+  const auto result = runProgram(
+      "'Вася'(15, задунайский).\n"
+      "?'Вася'(Лет, Фамилия).\n"
+      "?'вася'(Лет, Фамилия).\n");
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "Лет=15\nФамилия=задунайский\nНЕТ\n");
+}
