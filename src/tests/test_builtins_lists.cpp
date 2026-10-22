@@ -88,3 +88,62 @@ TEST_CASE("sorting names the argument that is not a list") {
   REQUIRE(named.error.find("СОРТИРОВКА: Недопустимый тип аргументов: аргумент 1 — 12, "
                            "нужно список") != std::string::npos);
 }
+
+// `СОРТИРОВКА/3` (`sort/3`, task_95): the same sort with the order written down.
+// The four signs are the standard order read in two directions, and the duplicate
+// rule is SWI's for `sort/4` — the signs that admit equality are the ones that
+// keep repeats.  Taken from the built interpreter.
+
+TEST_CASE("sort with an order sign: four signs, and what each does to repeats") {
+  const auto result = runProgram(
+      "?СОРТИРОВКА(@<, [3, 1, 2, 1], С).\n"
+      "?СОРТИРОВКА(@=<, [3, 1, 2, 1], С).\n"
+      "?СОРТИРОВКА(@>, [3, 1, 2, 1], С).\n"
+      "?СОРТИРОВКА(@>=, [3, 1, 2, 1], С).\n"
+      "?СОРТИРОВКА(@>, [], С).\n"
+      "?СОРТИРОВКА(@=<, [б, а, б], С).\n");
+  REQUIRE(result.loaded);
+  REQUIRE(result.output ==
+          "С=[1,2,3]\nС=[1,1,2,3]\nС=[3,2,1]\nС=[3,2,1,1]\nС=[]\nС=[а,б,б]\n");
+}
+
+TEST_CASE("sort with the ascending sign is the plain sort, value for value") {
+  // `СОРТИРОВКА/2` is ISO's `sort/2`, and the two arities go through one function:
+  // this is the check that they cannot drift apart.  `@=<` keeps what the order
+  // calls equal, so `1` and `1.0` — one number — both stay.
+  const auto result = runProgram(
+      "?СОРТИРОВКА([3, 1, 2, 1], А), СОРТИРОВКА(@<, [3, 1, 2, 1], А).\n"
+      "?СОРТИРОВКА(@<, [1, 1.0], С).\n"
+      "?СОРТИРОВКА(@=<, [1, 1.0], С).\n"
+      "?sort(@>, [1, 2], С).\n");
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "А=[1,2,3]\nС=[1]\nС=[1,1.0]\nС=[2,1]\n");
+}
+
+TEST_CASE("sort with an order sign refuses anything but the four signs") {
+  // The order is an atom from a set of four: `<` and `>` are arithmetic, not the
+  // standard order, and a bare word is a typo.  An improper list keeps the short
+  // message — it is a list, just not one that ends.
+  for (const std::string& goal :
+       {"СОРТИРОВКА(<, [1], С)", "СОРТИРОВКА(порядок, [1], С)",
+        "СОРТИРОВКА(@<, [1 | 2], С)"}) {
+    INFO("goal: " << goal);
+    const auto result = runProgram("?" + goal + ".\n");
+    REQUIRE(result.runtimeError);
+    REQUIRE(result.error.find("СОРТИРОВКА: Недопустимый тип аргументов") != std::string::npos);
+  }
+}
+
+TEST_CASE("sort with an order sign counts its own arguments") {
+  // Part 136: a refusal names the argument the way the predicate counts it, so a
+  // list that is argument 2 is called «аргумент 2», not «1».
+  const auto order = runProgram("?СОРТИРОВКА(12, [1], С).\n");
+  REQUIRE(order.runtimeError);
+  REQUIRE(order.error.find("СОРТИРОВКА: Недопустимый тип аргументов: аргумент 1 — 12, "
+                           "нужно @<, @=<, @> или @>=") != std::string::npos);
+
+  const auto list = runProgram("?СОРТИРОВКА(@<, 12, С).\n");
+  REQUIRE(list.runtimeError);
+  REQUIRE(list.error.find("СОРТИРОВКА: Недопустимый тип аргументов: аргумент 2 — 12, "
+                          "нужно список") != std::string::npos);
+}

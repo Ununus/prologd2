@@ -192,7 +192,7 @@ std::string_view expectedText(ArgKind kind) {
 
 [[noreturn]] void badArguments(Engine& engine, std::span<const Term> args,
                                std::string_view predicate, ArgKind kind,
-                               std::string_view expected) {
+                               std::string_view expected, std::size_t index_base) {
   std::size_t first_unbound = 0;
   for (std::size_t i = 0; i < args.size(); ++i) {
     if (isUnbound(engine, args[i])) {
@@ -202,11 +202,12 @@ std::string_view expectedText(ArgKind kind) {
       continue;
     }
     if (!fitsKind(engine, args[i], kind)) {
-      badArgument(engine, args[i], predicate, i + 1, kind, expected);
+      badArgument(engine, args[i], predicate, index_base + i, kind, expected);
     }
   }
   if (first_unbound != 0) {
-    badArgument(engine, args[first_unbound - 1], predicate, first_unbound, kind, expected);
+    badArgument(engine, args[first_unbound - 1], predicate,
+                index_base + first_unbound - 1, kind, expected);
   }
   raiseTypeError(engine, std::string(predicate) + ": Недопустимый тип аргументов");
 }
@@ -441,7 +442,7 @@ BuiltinResult builtinVariablesMarker(Engine& engine, std::span<const Term> args)
 }
 
 /// Names that are not listed are already English (`abs`, `sqrt`, `sin`, `cos`,
-/// `tan`, `exp`, `mod`, `div`, `compare`) or are answered outside the dispatch
+/// `tan`, `exp`, `mod`, `div`) or are answered outside the dispatch
 /// table (`ВЫП`/`call`, handled by the solver; `ИМПОРТ`/`import`, handled by the
 /// parser) — see `keywords.cpp` and `parser.cpp`.  `ПЕРВОЕ`/`first`,
 /// `ВЫВОД`/`write` and `ВЫВОДПС`/`writeln` are here for their English spelling,
@@ -460,6 +461,7 @@ constexpr std::pair<std::string_view, std::string_view> kEnglishNames[] = {
     {"ВЕЩ", "float"},         {"СИМВ", "is_text"},
     {"СПИСОК", "is_list"},      {"ПОЛНЫЙ", "ground"},
     {"НАЙТИВСЕ", "findall"},    {"СОРТИРОВКА", "sort"},
+    {"СРАВНЕНИЕ", "compare"},
     {"БОЛЬШЕ", "greater"},      {"МЕНЬШЕ", "less"},
     {"СЛОЖЕНИЕ", "plus"},       {"УМНОЖЕНИЕ", "mul"},
     {"СЛУЧ", "random"},       {"ЦЕЛВЕЩ", "int_to_float"},
@@ -568,13 +570,16 @@ const BuiltinTable& builtinTable() {
     // findall.
     add("НАЙТИВСЕ", 3, builtinFindAll);
 
-    // Lists.
+    // Lists.  `СОРТИРОВКА/2` is ISO's `sort/2`; `/3` is the same sort with the
+    // order written down (task_95) — the cheap form of the `sort/4` that SWI has,
+    // and `sort/2` is exactly its `sort(0, @<, …)`.
     add("СОРТИРОВКА", 2, builtinSort);
+    add("СОРТИРОВКА", 3, builtinSort3);
 
-    // The standard order of terms (task_90): `compare/3` is English only, like
-    // `abs` and `sub_string` — ISO has no other word for it, and the four `@`
-    // signs of the same order are parser sugar over this call.
-    add("compare", 3, builtinCompare);
+    // The standard order of terms (task_90): `СРАВНЕНИЕ/3` is the dialect's own
+    // name and `compare` its English spelling (task_94); the four `@` signs of the
+    // same order are parser sugar over this call.
+    add("СРАВНЕНИЕ", 3, builtinCompare);
 
     // Arithmetic.
     add("БОЛЬШЕ", 2, builtinGreater);

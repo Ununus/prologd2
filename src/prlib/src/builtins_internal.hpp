@@ -70,9 +70,15 @@ enum class ArgKind { Number, NumberOrText, Integer, Text, List, Comparable };
 /// at fault (an improper list, a range, a digit that is not one), and pretending
 /// otherwise would mislead.  So this never lies; it either says which argument is
 /// wrong or says nothing more than before.
+///
+/// `index_base` is the number the first element of `args` carries in the predicate:
+/// `1` when `args` is the whole argument list, and the right number when a caller
+/// hands over a *slice* — `СОРТИРОВКА/3` checks its list, which is argument 2, and
+/// the message must count the way the predicate does (task_95).
 [[noreturn]] void badArguments(Engine& engine, std::span<const Term> args,
                                std::string_view predicate, ArgKind kind,
-                               std::string_view expected = {});
+                               std::string_view expected = {},
+                               std::size_t index_base = 1);
 
 }  // namespace prologd::detail
 
@@ -100,6 +106,7 @@ BuiltinResult builtinIsGround(Engine&, std::span<const Term>);
 
 // ---- lists ----
 BuiltinResult builtinSort(Engine&, std::span<const Term>);
+BuiltinResult builtinSort3(Engine&, std::span<const Term>);
 
 // ---------------------------------------------------------------------------
 // The standard order of terms

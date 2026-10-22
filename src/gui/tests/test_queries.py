@@ -94,6 +94,7 @@ CASES: list[tuple[str, str | None]] = [
 #: Counts of `find_statements` per example program (posix separators), refreshed
 #: with `--print` when a lesson gains or loses a question on purpose.
 PINNED: dict[str, int] = {
+    "compare.pld": 9,
     "diamond/base.pld": 0,
     "diamond/left.pld": 0,
     "diamond/main.pld": 5,
@@ -139,7 +140,7 @@ PINNED: dict[str, int] = {
     "problems/hanoi.pld": 2,
     "problems/hanoi_play.pld": 1,
     "problems/knapsack.pld": 2,
-    "sort.pld": 7,
+    "sort.pld": 12,
     "sorting.pld": 8,
     "stdlib.pld": 73,
     "names.pld": 3,

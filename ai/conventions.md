@@ -116,6 +116,12 @@ Tests are written **together with** the feature, never after.
 * Golden tests: the ported `test.txt` corpus is executed by a Catch2 generator
   (`TEST`/`INPUT`/`EXPECTED`/`END` format) once the porting task is complete.
 * Long-running test programs must be bounded (iteration limits) so CI stays fast.
+* Test **names** stay ASCII (task_95): `catch_discover_tests` runs the binary while the
+  build configures and writes the discovered names into `..._tests.cmake` through
+  `execute_process`, which decodes the child's stdout with the **console** code page.  A
+  Cyrillic `TEST_CASE` name comes back as mojibake, and ctest then reports the case as
+  failed because the name it passes back does not match.  The body may be Russian; the
+  name is Latin.
 
 ## Versioning
 

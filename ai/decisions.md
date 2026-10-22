@@ -954,3 +954,36 @@ has no `NAMING` keeps the control hidden (parts 143, 148); a row that would star
 this copy does not carry is greyed out with the reason, not hidden.
 
 **Status.** Accepted 2026-10-22 (task_93).
+
+## ADR-030: The order sign on `СОРТИРОВКА/3`, and why `@=<` keeps repeats
+
+**Context.**  `СОРТИРОВКА/2` is ISO's `sort/2`: ascending, repeats dropped, and nothing
+else — descending had no spelling at all, and «keep the repeats» was `msort/2` from the
+standard library, ascending only.  SWI's `sort/4` covers every combination with
+`(Key, Order, List, Sorted)`, but its `Key` — the number of an argument of a compound —
+is a concept this dialect does not otherwise use: there are no dicts here, and compounds
+are taught late.
+
+**Decision.**  A middle arity: `СОРТИРОВКА(Порядок, Список, Результат)` with the four
+signs of the standard order.  `@<` and `@>` drop the repeats; `@=<` and `@>=` keep them —
+the rule of SWI's `sort/4`, kept word for word so that a reader who moves to SWI finds
+the same table.  It reads backwards until it is said out loud: a repeat *is* equal to its
+twin, and the sign that admits equality is the one that leaves the equal element in
+place.  The sort is stable, so with a «keep» sign the repeats stand in their original
+order, and with a «drop» sign the first of a run survives.
+
+`СОРТИРОВКА/2` is exactly `СОРТИРОВКА(@<, …)`, and both arities go through one function
+(`sortTerms`), so the two cannot drift apart.  A later `СОРТИРОВКА/4` with a key is
+additive: the keyed form *is* `sort(0, Порядок, …)` when the key is `0`.
+
+The order is an atom from a set of four; `<` and `>` are refused, because they compare
+numbers rather than terms (`БОЛЬШЕ`/`МЕНЬШЕ` with an infix spelling), and a bare word is
+refused as a typo.
+
+**Consequences.**  `sort/3` exists as the English spelling — every Russian name carries
+its English twin at every arity (`test_aliases.cpp` enforces it) — and that is an arity
+SWI does not have, so the manual and `prologd-diff.typ` say plainly that the form with
+the order is ours while SWI's has the key first.  `msort/2` in the standard library is
+now describable as `СОРТИРОВКА(@=<, …)`, which is how the manual explains it.
+
+**Status.** Accepted 2026-10-22 (task_95).

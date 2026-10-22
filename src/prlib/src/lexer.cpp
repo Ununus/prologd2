@@ -52,10 +52,10 @@ const std::unordered_set<std::string> kReservedBuiltins = {
     "point", "line", "circle", "fill",
     // Lists
     "СОРТИРОВКА", "sort",
-    // The standard order of terms (task_90).  `compare/3` is English only: ISO
-    // has no Russian word for it, and it is the call the four `@` signs are
-    // sugar for.
-    "compare",
+    // The standard order of terms (task_90): the dialect's own name is `СРАВНЕНИЕ`,
+    // and `compare` is its English spelling — the call the four `@` signs are sugar
+    // for (task_94).
+    "СРАВНЕНИЕ", "compare",
     // Newcomers
     "НАЙТИВСЕ", "ИМПОРТ", "findall", "import",
 };

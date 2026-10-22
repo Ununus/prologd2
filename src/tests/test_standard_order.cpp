@@ -100,3 +100,18 @@ TEST_CASE("a list of pairs sorts by its first element") {
           "Q=[[Д,Григорьев],[GNU,Диас],[SWI,Виламакер]]\n"
           "W=[[GNU,Диас],[SWI,Виламакер],[Д,Григорьев]]\n");
 }
+
+TEST_CASE("the dialect's own name for compare reaches the same function") {
+  // task_94: `СРАВНЕНИЕ/3` is the Russian name the manual leads with, and
+  // `compare` is its English spelling — one function behind two names, as with
+  // every other pair.  The answers are signs, so they read the same either way.
+  // (The test *name* stays ASCII: `catch_discover_tests` writes the names into a
+  // file with the console code page, and a Cyrillic one comes back mangled.)
+  const auto result = runProgram(
+      "?СРАВНЕНИЕ(Порядок, 1, 2).\n"
+      "?СРАВНЕНИЕ(<, 2, 1).\n"
+      "?СРАВНЕНИЕ(=, а, \"а\").\n");
+  REQUIRE(result.loaded);
+  REQUIRE_FALSE(result.runtimeError);
+  REQUIRE(result.output == "Порядок=<\nНЕТ\nДА\n");
+}
