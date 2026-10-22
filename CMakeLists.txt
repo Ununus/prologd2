@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.24)
 
 project(prologd
-  VERSION 2.4.2
+  VERSION 2.5.0
   DESCRIPTION "PrologD logic programming language interpreter"
   LANGUAGES CXX)
 

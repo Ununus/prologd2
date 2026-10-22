@@ -375,7 +375,10 @@ bool Solver::backtrack() {
       if (engine_.traceEnabled()) {
         traceText("Переделка. Цель " + engine_.format(cp.goal));
       }
-      step(StepAction::Redo, &cp.goal, env_->location, env_->depth);
+      // No `step()` here: a built-in produces no `call`/`exit` points (it is not
+      // a clause — `resolveGoal` and `run` emit those), so a `redo` without the
+      // `call` it answers is a point a front-end cannot place on its stack.  The
+      // trace says the redo, which is text and needs no pairing.
       if (!deliverBuiltinAnswer(cp)) {
         continue;
       }
@@ -982,7 +985,7 @@ void Engine::copyClauseResolved(const Term& head, const std::vector<Term>& body,
 }
 
 std::vector<Term> Engine::collectAll(const Term& goal, const Term& templ,
-                                     std::size_t limit) {
+                                     std::size_t limit, std::string_view predicate) {
   const std::size_t mark = bindings_.trailMark();
   std::vector<Term> collected;
   bool exceeded = false;
@@ -1012,9 +1015,12 @@ std::vector<Term> Engine::collectAll(const Term& goal, const Term& templ,
   if (exceeded) {
     // A limit that fires is a *diagnostic*, never a silent truncation: a list
     // that stops early and looks complete is the one outcome worse than an
-    // error.  The message names the limit and its value, nothing more (ADR-020).
+    // error.  The message names the limit and its value, nothing more (ADR-020)
+    // — and the predicate the program actually called, so a `ВСЕРЕШ` is not
+    // sent looking for `НАЙТИВСЕ` (task_91).
     raise(ErrorCode::TooManySolutions,
-          "Превышен предел решений НАЙТИВСЕ: " + std::to_string(limit));
+          "Превышен предел решений " + std::string(predicate) + ": " +
+              std::to_string(limit));
   }
   return collected;
 }
@@ -1049,7 +1055,8 @@ std::vector<VarId> Engine::groupingVariables(const Term& templ, const Term& goal
 }
 
 CollectedGroups Engine::collectGroupedSolutions(const Term& templ, const Term& goal,
-                                                std::size_t limit) {
+                                                std::size_t limit,
+                                                std::string_view predicate) {
   std::vector<VarId> quantified;
   const Term stripped = stripQuantifiers(goal, quantified);
   CollectedGroups result;
@@ -1065,7 +1072,7 @@ CollectedGroups Engine::collectGroupedSolutions(const Term& templ, const Term& g
   const Term item = makeCompound(
       "$group", std::vector<Term>{makeCompound(kGroupKeyFunctor, std::move(key_arguments)),
                                   templ});
-  std::vector<Term> collected = collectAll(stripped, item, limit);
+  std::vector<Term> collected = collectAll(stripped, item, limit, predicate);
 
   const auto key_of = [](const Term& pair) -> const Term& { return pair.compound->args[0]; };
   const auto value_of = [](const Term& pair) -> const Term& { return pair.compound->args[1]; };

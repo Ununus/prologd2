@@ -444,13 +444,15 @@ BuiltinResult yieldGroups(Engine& engine, std::span<const Term> args,
 
 BuiltinResult builtinBagOf(Engine& engine, std::span<const Term> args) {
   const std::size_t limit = engine.options().maxFindAllSolutions;
-  const CollectedGroups collected = engine.collectGroupedSolutions(args[0], args[1], limit);
+  const CollectedGroups collected =
+      engine.collectGroupedSolutions(args[0], args[1], limit, "ВСЕРЕШ");
   return yieldGroups(engine, args, collected, /*sorted=*/false);
 }
 
 BuiltinResult builtinSetOf(Engine& engine, std::span<const Term> args) {
   const std::size_t limit = engine.options().maxFindAllSolutions;
-  const CollectedGroups collected = engine.collectGroupedSolutions(args[0], args[1], limit);
+  const CollectedGroups collected =
+      engine.collectGroupedSolutions(args[0], args[1], limit, "МНОРЕШ");
   return yieldGroups(engine, args, collected, /*sorted=*/true);
 }
 

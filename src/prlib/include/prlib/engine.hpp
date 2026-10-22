@@ -282,8 +282,12 @@ class Engine {
   /// Solve `goal` once and keep the bindings of the first solution on success
   /// (undoing them on failure).  Used by `ПЕРВОЕ`.
   bool callOnce(const Term& goal);
-  std::vector<Term> collectAll(const Term& goal, const Term& templ,
-                               std::size_t limit);
+  /// Every solution of `goal`, with `templ` copied on each; `limit` is
+  /// `maxFindAllSolutions` (0 = unlimited).  `predicate` is the name the limit
+  /// diagnostic uses — the one the program called, so that `ВСЕРЕШ` is not told
+  /// about `НАЙТИВСЕ` (task_91, part 156).
+  std::vector<Term> collectAll(const Term& goal, const Term& templ, std::size_t limit,
+                              std::string_view predicate = "НАЙТИВСЕ");
   /// The variables `ВСЕРЕШ` groups by: every variable of `goal` that is neither
   /// in `templ` nor in `quantified` (the `^`-names), sorted by id so that the key
   /// of a group is the same on every solution (task_91).
@@ -295,7 +299,8 @@ class Engine {
   /// their keys; the values inside a group keep the order of the solutions.  The
   /// bindings of the caller are left as they were.
   CollectedGroups collectGroupedSolutions(const Term& templ, const Term& goal,
-                                          std::size_t limit);
+                                          std::size_t limit,
+                                          std::string_view predicate = "ВСЕРЕШ");
   /// The answers a `Yield`-ing built-in left for the solver.
   void setBuiltinChoice(BuiltinChoice choice) { builtin_choice_ = std::move(choice); }
   std::optional<BuiltinChoice> takeBuiltinChoice() { return std::exchange(builtin_choice_, std::nullopt); }

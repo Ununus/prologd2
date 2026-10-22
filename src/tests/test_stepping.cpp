@@ -1,5 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <cstddef>
 #include <sstream>
 #include <string>
@@ -137,6 +138,40 @@ TEST_CASE("the hook is asked nothing when it is not installed") {
   REQUIRE(result.loaded);
   CHECK(result.output.find("X=1\nX=2\n") != std::string::npos);
   CHECK_FALSE(result.runtimeError);
+}
+
+TEST_CASE("a collecting built-in keeps the step points to itself") {
+  // The second group of `ВСЕРЕШ` is a *choice point of the machine* (task_91),
+  // but a built-in emits no `call`/`exit` points — those belong to clauses — so a
+  // `redo` of the built-in would be a point the window cannot place on its call
+  // stack.  The trace still names the redo; the step hook stays quiet.
+  std::vector<std::string> points;
+  const test::RunResult result = runProgram(
+      "оценка(аня, матем, 5).\n"
+      "оценка(аня, физика, 4).\n"
+      "?ВСЕРЕШ(А, оценка(аня, П, А), С).\n",
+      {}, nullptr, [&points](Engine& engine) {
+        engine.options().stepHook = [&points, &engine](const StepInfo& info) {
+          points.push_back(describe(engine, info));
+          return StepDecision::Continue;
+        };
+      });
+
+  REQUIRE(result.loaded);
+  REQUIRE_FALSE(result.runtimeError);
+  // Both groups are printed, so the second one came from backtracking.
+  CHECK(result.output.find("П=матем") != std::string::npos);
+  CHECK(result.output.find("П=физика") != std::string::npos);
+
+  for (const std::string& point : points) {
+    INFO(point);
+    CHECK(point.find("ВСЕРЕШ") == std::string::npos);
+  }
+  // What is left is the goal inside the collected goal's own run.
+  const bool visited = std::any_of(points.begin(), points.end(), [](const std::string& point) {
+    return point.rfind("call оценка(", 0) == 0;
+  });
+  CHECK(visited);
 }
 
 TEST_CASE("a runtime error names the clause it happened in") {

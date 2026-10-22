@@ -2,7 +2,9 @@
 
 A modern C++23 re-implementation of the **PrologD** logic programming
 interpreter: UTF-8 native, console first, with Russian built-in predicates,
-arbitrary precision integers and the `НАЙТИВСЕ/3` (`findall`) predicate.
+arbitrary precision integers and the collecting predicates — `НАЙТИВСЕ/3`
+(`findall`), `ВСЕРЕШ/3` (`bagof`) and `МНОРЕШ/3` (`setof`) with the `У^Цель`
+quantifier.
 
 The original PrologD sources are not bundled with this
 repository; the previous implementation is published at
@@ -125,6 +127,9 @@ round; what a person still has to do is listed in
 * Clauses end with `.` or `;`; rules use `:-` or `<-`; queries start with `?`.
 * Arithmetic expressions are written `#expr#` and support `+ - * / mod div`.
 * Lists: `[a, b | T]`, `[]`.
+* Collecting: `НАЙТИВСЕ` (`findall`), and `ВСЕРЕШ`/`МНОРЕШ` (`bagof`/`setof`) —
+  one list per value of the goal's free variables, with `У^Цель` meaning «У does
+  not matter».
 
 See `doc/help.typ` for the full reference and `doc/prologd-diff.typ` for the
 differences from the original PrologD (most importantly: single-letter
@@ -255,7 +260,8 @@ Implemented: lexer, parser with diagnostics, unification with trail, the
 resolution engine (backtracking, cut, meta-call, negation, disjunction),
 arithmetic with a hand-written `BigInt`, all documented built-in predicate
 groups (control, types, conversions, strings, I/O, program database, graphics
-stubs), `НАЙТИВСЕ/3`, the module loader (`ИМПОРТ`) and the CLI.
+stubs), `НАЙТИВСЕ/3` with `ВСЕРЕШ/3` (`bagof`) and `МНОРЕШ/3` (`setof`), the
+module loader (`ИМПОРТ`) and the CLI.
 
 Examples live in `examples/` — one demo per predicate of the language surface, the
 problems (`factorial`, the Hanoi tower, `knapsack`), the lessons and the library —

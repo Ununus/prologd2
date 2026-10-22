@@ -558,6 +558,11 @@ stale the moment a front-end renames a row or disappears.
 * A limit that fires prints the limit and its value and stops there:
   «Превышен предел шагов выполнения: 5000», «Превышена глубина рекурсии: 200»,
   «Превышен предел решений НАЙТИВСЕ: 50».  No flag, no row, no advice.
+  *Поправка 2026-10-22 (task_91).*  «Its own name» is the *predicate's* name as
+  well: `collectAll` takes it from the caller, so a `ВСЕРЕШ` that hits the same
+  setting is told «Превышен предел решений ВСЕРЕШ: 50» and is not sent looking
+  for a `НАЙТИВСЕ` it never called.  The number still comes from one place
+  (`maxFindAllSolutions`), which is about the setting, not about the name.
 * «Where do I raise it» is answered by whoever put the number there, in their own
   vocabulary: the CLI's `--help`, and in the window a line the run prints before
   it starts, in the words of the dialog's rows («пределы: «Предел шагов» 5000 —

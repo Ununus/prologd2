@@ -17,7 +17,9 @@ order:
 5. `status.md` — living progress tracker: the task table first, then the
    journal in parts, oldest first (the tail is the current state);
 6. `task_NN_*.md` — one file per task (scope, deliverables, tests, acceptance
-   criteria); `porting_notes.md` maps the old lesson files to the new ones.
+   criteria); `porting_notes.md` maps the old lesson files to the new ones;
+7. `gprolog_findings.md` — the GNU Prolog measurements of 2026-10-22 and why a
+   fourth engine row was dropped; read it only if that question returns.
 
 The folder itself is under version control, like the rest of the repository:
 only `ai/_ref/` (the local reference copy) and `ai/_venv/` are ignored, so notes

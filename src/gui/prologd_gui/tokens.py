@@ -316,6 +316,12 @@ def scan_line(
             tokens.append(Token(OPERATOR, ch, index, index + 1))
             index += 1
             continue
+        # `^` is the quantifier of `ВСЕРЕШ`/`МНОРЕШ` (task_91): a sign, not
+        # punctuation, so it is coloured like the others.
+        if ch == "^":
+            tokens.append(Token(OPERATOR, ch, index, index + 1))
+            index += 1
+            continue
         tokens.append(Token(PUNCTUATION, ch, index, index + 1))
         index += 1
     return tokens, False

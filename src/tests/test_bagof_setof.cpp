@@ -138,3 +138,24 @@ TEST_CASE("an error raised by the collected goal is reported") {
   REQUIRE(result.runtimeError);
   REQUIRE(result.error.find("ЦЕЛВЕЩ: Недопустимый тип аргументов") != std::string::npos);
 }
+
+TEST_CASE("the solution limit names the predicate that hit it") {
+  // `collectGroupedSolutions` hands its own name down to `collectAll` (task_91):
+  // a program that wrote `ВСЕРЕШ` must not be told about `НАЙТИВСЕ`.
+  const auto cap = [](prologd::Engine& engine) {
+    prologd::Limits limits;
+    limits.maxFindAllSolutions = 2;
+    limits.applyTo(engine.options());
+  };
+  const char* facts = "много(1).\nмного(2).\nмного(3).\n";
+
+  const auto bag =
+      runProgram(std::string(facts) + "?ВСЕРЕШ(Х, много(Х), С).\n", {}, nullptr, cap);
+  REQUIRE(bag.runtimeError);
+  REQUIRE(bag.error.find("Превышен предел решений ВСЕРЕШ: 2") != std::string::npos);
+
+  const auto set =
+      runProgram(std::string(facts) + "?МНОРЕШ(Х, много(Х), С).\n", {}, nullptr, cap);
+  REQUIRE(set.runtimeError);
+  REQUIRE(set.error.find("Превышен предел решений МНОРЕШ: 2") != std::string::npos);
+}

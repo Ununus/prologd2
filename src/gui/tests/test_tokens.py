@@ -46,6 +46,7 @@ from prologd_gui.tokens import (  # noqa: E402
 TABLE = Keywords(
     [
         {"name": "НАЙТИВСЕ", "kind": "predicate", "arities": [3]},
+        {"name": "ВСЕРЕШ", "kind": "predicate", "arities": [3]},
         {"name": "ВЫВОД", "kind": "predicate", "arities": [], "variadic": True},
         {"name": "ВЫП", "kind": "predicate", "arities": [1]},
         {"name": "ПС", "kind": "predicate", "arities": [0]},
@@ -207,6 +208,32 @@ def test_comparison_signs() -> None:
     print("ok: the comparison signs")
 
 
+def test_quantifier_caret() -> None:
+    """`^` is the quantifier sign of task_91, not punctuation."""
+    assert kinds("ВСЕРЕШ(А, П^оценка(У, П, А), С)") == [
+        (KEYWORD, "ВСЕРЕШ"),
+        (PUNCTUATION, "("),
+        (VARIABLE, "А"),
+        (PUNCTUATION, ","),
+        (VARIABLE, "П"),
+        (OPERATOR, "^"),
+        (ATOM, "оценка"),
+        (PUNCTUATION, "("),
+        (VARIABLE, "У"),
+        (PUNCTUATION, ","),
+        (VARIABLE, "П"),
+        (PUNCTUATION, ","),
+        (VARIABLE, "А"),
+        (PUNCTUATION, ")"),
+        (PUNCTUATION, ","),
+        (VARIABLE, "С"),
+        (PUNCTUATION, ")"),
+    ]
+    # The letters of a quoted atom stay inside it, sign or not.
+    assert kinds("'^'") == [(QUOTED_ATOM, "'^'")]
+    print("ok: the quantifier sign")
+
+
 def test_block_comment() -> None:
     """`/* … */` is a comment, and it may run over several lines (task_92, task_132)."""
     assert kinds("p. /* пояснение */") == [
@@ -341,6 +368,7 @@ def main() -> int:
     test_numbers()
     test_reserved_names_variables_and_atoms()
     test_comparison_signs()
+    test_quantifier_caret()
     test_block_comment()
     test_expression_query_and_arrows()
     test_alphabet_of_identifiers()
