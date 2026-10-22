@@ -8,6 +8,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "prlib/engine.hpp"
 
@@ -108,6 +109,13 @@ BuiltinResult builtinIsGround(Engine&, std::span<const Term>);
 BuiltinResult builtinSort(Engine&, std::span<const Term>);
 BuiltinResult builtinSort3(Engine&, std::span<const Term>);
 
+/// `elements` in the standard order (task_95, task_91): ascending or not, with
+/// the repeats dropped or kept.  `СОРТИРОВКА/2`, `/3` and `МНОРЕШ/3` share this
+/// one sort, so `setof` and `СОРТИРОВКА` cannot disagree about what «sorted»
+/// means.
+std::vector<Term> sortedTerms(Engine& engine, std::vector<Term> elements, bool ascending,
+                              bool keepDuplicates);
+
 // ---------------------------------------------------------------------------
 // The standard order of terms
 // ---------------------------------------------------------------------------
@@ -116,6 +124,9 @@ BuiltinResult builtinCompare(Engine&, std::span<const Term>);
 
 // ---- findall ----
 BuiltinResult builtinFindAll(Engine&, std::span<const Term>);
+// ---- collecting by groups (task_91) ----
+BuiltinResult builtinBagOf(Engine&, std::span<const Term>);
+BuiltinResult builtinSetOf(Engine&, std::span<const Term>);
 
 // ---- arithmetic ----
 BuiltinResult builtinGreater(Engine&, std::span<const Term>);

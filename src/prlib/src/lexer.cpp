@@ -58,6 +58,9 @@ const std::unordered_set<std::string> kReservedBuiltins = {
     "СРАВНЕНИЕ", "compare",
     // Newcomers
     "НАЙТИВСЕ", "ИМПОРТ", "findall", "import",
+    // Collecting by groups (task_91): `ВСЕРЕШ`/`МНОРЕШ` are the dialect's names,
+    // `bagof`/`setof` the English ones.
+    "ВСЕРЕШ", "МНОРЕШ", "bagof", "setof",
 };
 
 /// Spellings the dialect has retired.  They stay reserved so that a call to
@@ -483,6 +486,13 @@ std::vector<Token> Lexer::tokenizeImpl(DiagnosticSink* sink) {
         }
         break;
       case '*': advanceByte(1); tokens.push_back(makeToken(TokenKind::Star, "*", start)); break;
+      case '^':
+        // `^` is ISO's existential quantifier (task_91): `ВСЕРЕШ(Х, У^Ц, С)` says
+        // «У of the goal does not matter», so the bag is not split by it.  It is
+        // a token of its own so the parser can bind it tighter than `,`.
+        advanceByte(1);
+        tokens.push_back(makeToken(TokenKind::Caret, "^", start));
+        break;
       case '/': advanceByte(1); tokens.push_back(makeToken(TokenKind::Slash, "/", start)); break;
       case '(': advanceByte(1); tokens.push_back(makeToken(TokenKind::LParen, "(", start)); break;
       case ')': advanceByte(1); tokens.push_back(makeToken(TokenKind::RParen, ")", start)); break;

@@ -201,23 +201,26 @@ TEST_CASE("an ISO exception is told there are none") {
           "ЛОЖЬ, а объяснение печатает ВЫВОД");
 }
 
-TEST_CASE("`bagof` and `setof` are pointed at what collects today") {  // The two are on the roadmap (task_91, under the names `ВСЕРЕШ` and
-  // `МНОРЕШ`), so the warning names no future predicate: it names the one that
-  // is there.  For `setof` that is `НАЙТИВСЕ` plus `СОРТИРОВКА`, which is the
-  // whole answer when the goal has no free variables but the template.
-  const std::vector<PrologError> bag = diagnosticsOf("?bagof(_Х, ЛОЖЬ, _С).\n");
-  REQUIRE(bag.size() == 1);
-  REQUIRE(bag.front().code == ErrorCode::UnknownPredicate);
-  REQUIRE(bag.front().message ==
-          "не найдено: bagof/3; все решения собирает «НАЙТИВСЕ/3»; групп по "
-          "свободным переменным пока нет");
+TEST_CASE("bagof and setof are predicates of their own, not advice") {
+  // Task_91: the two used to be unknown names with a hint pointing at
+  // `НАЙТИВСЕ/3`; they are built-ins now, so a program that calls them — in
+  // either spelling — gets no warning at all.
+  REQUIRE(diagnosticsOf("?bagof(_Х, ЛОЖЬ, _С).\n").empty());
+  REQUIRE(diagnosticsOf("?ВСЕРЕШ(_Х, ЛОЖЬ, _С).\n").empty());
+  REQUIRE(diagnosticsOf("?setof(_Х, ЛОЖЬ, _С).\n").empty());
+  REQUIRE(diagnosticsOf("?МНОРЕШ(_Х, ЛОЖЬ, _С).\n").empty());
+}
 
-  const std::vector<PrologError> set = diagnosticsOf("?setof(_Х, ЛОЖЬ, _С).\n");
-  REQUIRE(set.size() == 1);
-  REQUIRE(set.front().code == ErrorCode::UnknownPredicate);
-  REQUIRE(set.front().message ==
-          "не найдено: setof/3; все решения собирает «НАЙТИВСЕ/3», порядок и "
-          "повторы наводит «СОРТИРОВКА/2»");
+TEST_CASE("a bare caret is told where a quantifier belongs") {
+  // `^` is the quantifier of the goal of `ВСЕРЕШ`/`МНОРЕШ` and nothing else
+  // (task_91): away from them there is no `^/2` predicate, and the warning says
+  // where the sign does belong rather than «не найдено» alone.
+  const std::vector<PrologError> caret = diagnosticsOf("р(1).\n?Х^р(Х).\n");
+  REQUIRE(caret.size() == 1);
+  REQUIRE(caret.front().code == ErrorCode::UnknownPredicate);
+  REQUIRE(caret.front().message ==
+          "не найдено: ^/2; «^» — не предикат, а квантор: он стоит перед всей целью "
+          "«ВСЕРЕШ/3» или «МНОРЕШ/3» — ВСЕРЕШ(Х, У^(р(Х), ц(У)), С)");
 }
 
 TEST_CASE("a module and a rational are told they do not exist") {

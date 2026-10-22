@@ -197,13 +197,11 @@ constexpr ForeignSpelling kForeignSpellings[] = {
     {"throw", 1,
      "исключений в Пролог-Д нет: «не получилось» — это ЛОЖЬ, а объяснение печатает "
      "ВЫВОД"},
-    {"bagof", 3,
-     "все решения собирает «НАЙТИВСЕ/3»; групп по свободным переменным пока нет"},
-    {"setof", 3,
-     "все решения собирает «НАЙТИВСЕ/3», порядок и повторы наводит «СОРТИРОВКА/2»"},
     {"module", 1,
      "модулей в Пролог-Д нет: файл подключают директивой «ИМПОРТ(\"файл.pld\")»"},
-    {"rational", 1,
+    {"^", 2,
+     "«^» — не предикат, а квантор: он стоит перед всей целью «ВСЕРЕШ/3» или "
+     "«МНОРЕШ/3» — ВСЕРЕШ(Х, У^(р(Х), ц(У)), С)"},    {"rational", 1,
      "рациональных чисел в Пролог-Д нет: числа — целые и вещественные"},
 };
 
@@ -288,6 +286,21 @@ void walkGoal(const Term& goal, const SourceLocation& location,
   }
   if ((name == "НАЙТИВСЕ" || name == "findall") && arity == 3) {
     walkGoal(args[1], location, visit);
+    visit(name, 3, location);
+    return;
+  }
+  if ((name == "ВСЕРЕШ" || name == "bagof" || name == "МНОРЕШ" || name == "setof") &&
+      arity == 3) {
+    // The goal may carry a quantifier (`ВСЕРЕШ(Х, У^Ц, С)`), and `^` is not a
+    // predicate: strip it here, so what is checked is the goal underneath, and
+    // `^/2` written anywhere else is still reported as the unknown name it is
+    // (task_91).
+    Term inner = args[1];
+    while (inner.kind == TermKind::Compound && inner.compound != nullptr &&
+           inner.compound->name == "^" && inner.compound->args.size() == 2) {
+      inner = inner.compound->args[1];
+    }
+    walkGoal(inner, location, visit);
     visit(name, 3, location);
     return;
   }

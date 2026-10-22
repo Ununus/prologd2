@@ -10,6 +10,27 @@
 
 namespace prologd {
 
+std::vector<Term> sortedTerms(Engine& engine, std::vector<Term> elements, bool ascending,
+                              bool keepDuplicates) {
+  std::stable_sort(elements.begin(), elements.end(),
+                   [&engine, ascending](const Term& left, const Term& right) {
+                     const int sign = compareStandardOrder(engine.bindings(), left, right);
+                     return ascending ? sign < 0 : sign > 0;
+                   });
+  if (!keepDuplicates) {
+    // Whatever the order calls equal is one value here — `РАВНО(1, 1.0)` holds,
+    // and two text constants with the same letters are one value too; the stable
+    // sort leaves the first of the equals in front, and it is the one that stays.
+    elements.erase(std::unique(elements.begin(), elements.end(),
+                               [&engine](const Term& left, const Term& right) {
+                                 return compareStandardOrder(engine.bindings(), left, right) ==
+                                        0;
+                               }),
+                   elements.end());
+  }
+  return elements;
+}
+
 namespace {
 
 using detail::ArgKind;
@@ -41,10 +62,6 @@ std::optional<std::vector<Term>> listElements(Engine& engine, const Term& argume
     return std::nullopt;
   }
   return elements;
-}
-
-bool sameOrder(Engine& engine, const Term& left, const Term& right) {
-  return compareStandardOrder(engine.bindings(), left, right) == 0;
 }
 
 /// How `СОРТИРОВКА/3` was asked to order the list (task_95).
@@ -93,23 +110,8 @@ BuiltinResult sortTerms(Engine& engine, const Term& source, const Term& result,
     badArguments(engine, std::span<const Term>(&source, 1), "СОРТИРОВКА", ArgKind::List, {},
                  argument);
   }
-  std::vector<Term> sorted = *elements;
-  const bool ascending = order.ascending;
-  std::stable_sort(sorted.begin(), sorted.end(),
-                   [&engine, ascending](const Term& left, const Term& right) {
-                     const int sign = compareStandardOrder(engine.bindings(), left, right);
-                     return ascending ? sign < 0 : sign > 0;
-                   });
-  if (!order.keepDuplicates) {
-    // Whatever the order calls equal is one value here — `РАВНО(1, 1.0)` holds,
-    // and two text constants with the same letters are one value too; the stable
-    // sort leaves the first of the equals in front, and it is the one that stays.
-    sorted.erase(std::unique(sorted.begin(), sorted.end(),
-                             [&engine](const Term& left, const Term& right) {
-                               return sameOrder(engine, left, right);
-                             }),
-                 sorted.end());
-  }
+  std::vector<Term> sorted = sortedTerms(engine, *elements, order.ascending,
+                                         order.keepDuplicates);
   const Term answer = makeListFromVector(sorted);
   return engine.unify(result, answer) ? BuiltinResult::Continue : BuiltinResult::Fail;
 }

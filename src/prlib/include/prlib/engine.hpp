@@ -143,6 +143,42 @@ enum class BuiltinResult {
   Continue,  ///< succeeded, advance to the next goal
   Fail,      ///< failed, backtrack
   Handled,   ///< the built-in already advanced the machine state
+  /// The built-in has answers left and put them in the engine
+  /// (`Engine::setBuiltinChoice`): the solver turns them into a choice point and
+  /// hands them out on backtracking (task_91).
+  Yield,
+};
+
+/// One answer a `Yield`-ing built-in offers: the terms of the call to unify and
+/// the values to unify them with, in order.
+///
+/// A pair list and not one value because `ВСЕРЕШ` binds *every* free variable of
+/// its goal as well as the bag (task_91); `sub_string/5` will bind two arguments
+/// at once for the same reason.
+struct BuiltinAnswer {
+  std::vector<std::pair<Term, Term>> unify;
+};
+
+/// The answers a built-in has left for the solver, with the position it got to.
+struct BuiltinChoice {
+  std::vector<BuiltinAnswer> answers;
+  std::size_t next = 0;
+};
+
+/// One group of `ВСЕРЕШ` (task_91): the values of the goal's free variables —
+/// the key — and the template instances that came with them, in the order the
+/// solutions were found.
+struct GroupedSolution {
+  std::vector<Term> key;
+  std::vector<Term> values;
+};
+
+/// Everything `ВСЕРЕШ` collected: the variables the groups are keyed by, in the
+/// order the keys list them, and the groups themselves in the standard order of
+/// their keys.
+struct CollectedGroups {
+  std::vector<VarId> free;
+  std::vector<GroupedSolution> groups;
 };
 
 using BuiltinFn = BuiltinResult (*)(Engine&, std::span<const Term>);
@@ -248,6 +284,21 @@ class Engine {
   bool callOnce(const Term& goal);
   std::vector<Term> collectAll(const Term& goal, const Term& templ,
                                std::size_t limit);
+  /// The variables `ВСЕРЕШ` groups by: every variable of `goal` that is neither
+  /// in `templ` nor in `quantified` (the `^`-names), sorted by id so that the key
+  /// of a group is the same on every solution (task_91).
+  std::vector<VarId> groupingVariables(const Term& templ, const Term& goal,
+                                       std::span<const VarId> quantified);
+  /// `ВСЕРЕШ`'s grouping in one call (task_91): the `^` quantifiers of `goal` are
+  /// stripped, the free variables are found (`groupingVariables`) and the
+  /// solutions are grouped by their values.  Groups come in the standard order of
+  /// their keys; the values inside a group keep the order of the solutions.  The
+  /// bindings of the caller are left as they were.
+  CollectedGroups collectGroupedSolutions(const Term& templ, const Term& goal,
+                                          std::size_t limit);
+  /// The answers a `Yield`-ing built-in left for the solver.
+  void setBuiltinChoice(BuiltinChoice choice) { builtin_choice_ = std::move(choice); }
+  std::optional<BuiltinChoice> takeBuiltinChoice() { return std::exchange(builtin_choice_, std::nullopt); }
   /// Copy a head and body with one shared variable mapping (for `ДОБ`).
   void copyClauseResolved(const Term& head, const std::vector<Term>& body, Term& out_head,
                           std::vector<Term>& out_body);
@@ -306,6 +357,9 @@ class Engine {
   bool quiet_ = false;
   bool stop_requested_ = false;
   std::size_t nested_depth_ = 0;
+  /// Answers a built-in left behind for the solver (task_91); empty between
+  /// calls, and consumed by the solver right after the call returns `Yield`.
+  std::optional<BuiltinChoice> builtin_choice_;
 
   Term instantiateImpl(const Term& templ, std::unordered_map<VarId, VarId>& mapping);
   /// `path` collects the compound nodes on the way to the term being copied;

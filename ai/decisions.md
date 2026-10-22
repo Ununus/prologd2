@@ -987,3 +987,46 @@ the order is ours while SWI's has the key first.  `msort/2` in the standard libr
 now describable as `СОРТИРОВКА(@=<, …)`, which is how the manual explains it.
 
 **Status.** Accepted 2026-10-22 (task_95).
+
+## ADR-031: `ВСЕРЕШ`/`МНОРЕШ` — a built-in that answers more than once
+
+**Context.**  ADR-025 refused `bagof`/`setof` for three reasons, and the first of them
+was the real one: `BuiltinResult` was `Continue`/`Fail`/`Handled`, so a built-in gave
+one verdict and the machine moved on.  Task_91 wrote down two ways to get past it — **А**
+a deterministic `группы_по/3` built-in plus a library recursion over the list of groups,
+**Б** a new kind of choice point — and the owner chose **Б** (2026-10-22).  The same
+frame is what `sub_string/5` needs to enumerate occurrences (task_84), so it is bought
+once and used twice; the library version must hold *every* group in memory before the
+first answer, and a cut inside a group cannot save that work.
+
+**Decision.**  A built-in may now report `BuiltinResult::Yield` and leave its answers
+in the engine (`Engine::setBuiltinChoice` / `takeBuiltinChoice`); `Solver::solveGoal`
+turns them into a `ChoicePoint::Kind::Builtin` frame and hands out the first, and
+`Solver::backtrack` takes the next one.  The frame is an ordinary `ChoicePoint` with one
+more field — `std::unique_ptr<BuiltinChoice> payload`, null for the other kinds, so an
+ordinary choice point pays one pointer for a feature it never uses — and its
+`trail_mark` is taken *before* the call, because the bindings to undo are the previous
+answer's, not only the last solution's.
+
+Grouping happens once, up front, exactly as `НАЙТИВСЕ` collects:
+`Engine::collectGroupedSolutions` rewrites the goal into
+`$group($key(Свободные…), Шаблон)`, collects with `collectAll`, sorts by the key with
+`stable_sort` and merges adjacent equal keys.  Free variables are the goal's minus the
+template's minus the quantified ones, sorted by `VarId` so the key reads the same on
+every solution.  `^` becomes a token and a parser level (`xfy 200`: tighter than `,`
+and `;`, right-nested), and it is not a predicate: the checker opens it in front of a
+`ВСЕРЕШ`/`МНОРЕШ` goal, and anywhere else `^/2` gets the usual unknown-name warning
+plus the sentence that says where a quantifier belongs.
+
+**Consequences.**  `ВСЕРЕШ/3` (`bagof`) answers once per group of free variables, `^`
+keeps a variable out of the key, `МНОРЕШ/3` (`setof`) is the same plus `sortedTerms` —
+the very function `СОРТИРОВКА` uses, so the two cannot disagree about «sorted».  An
+empty collection **fails** (ISO, and the opposite of `НАЙТИВСЕ`'s `[]`), which is said
+in three places: the manual, the technical reference and the example.  `!` after the
+call cuts the remaining groups, as it cuts the clauses of a predicate.  A quantifier in
+the middle of a conjunction stays what it looks like — an unknown `^/2` — and the hint
+says the quantifier goes in front of the whole goal.  The old hint table rows for
+`bagof`/`setof` are gone: they are built-ins now, and `test_diagnostics.cpp` asserts the
+refusal is *no longer* there.
+
+**Status.** Accepted 2026-10-22 (task_91).

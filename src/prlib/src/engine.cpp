@@ -3,9 +3,11 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <unordered_set>
 #include <utility>
 
 #include "prlib/checks.hpp"
+#include "prlib/order.hpp"
 #include "prlib/term_print.hpp"
 
 namespace prologd {
@@ -94,9 +96,10 @@ EnvRef advanceEnv(const EnvRef& env) {
 }
 
 struct ChoicePoint {
-  /// What the alternative is: the next clause of a predicate, or the right
-  /// operand of a disjunction (where `clauses` is unused).
-  enum class Kind { Clause, Alternative };
+  /// What the alternative is: the next clause of a predicate, the right
+  /// operand of a disjunction (where `clauses` is unused), or the next answer a
+  /// built-in left behind in `payload` (task_91).
+  enum class Kind { Clause, Alternative, Builtin };
   Kind kind = Kind::Clause;
   Database::ClauseListPtr clauses;
   std::size_t next = 0;
@@ -105,11 +108,54 @@ struct ChoicePoint {
   std::size_t barrier = 0;
   Term goal;
   EnvRef env;  // continuation captured when the choice point was created
+  /// The answers of a `BuiltinResult::Yield` built-in; null for the other kinds,
+  /// so an ordinary choice point pays eight bytes for a feature it never uses.
+  std::unique_ptr<BuiltinChoice> payload;
 };
 
 bool isExpression(const Term& term) {
   return term.kind == TermKind::Compound && term.compound != nullptr &&
          term.compound->name == kExpressionFunctor && term.compound->args.size() == 1;
+}
+
+/// The functor that holds the values of a group's free variables while a
+/// `ВСЕРЕШ` is collecting (task_91).  It starts with `$`, which no identifier can
+/// spell, so a user term cannot be mistaken for one.
+constexpr std::string_view kGroupKeyFunctor = "$key";
+
+/// Every variable of `term`, in the order met.  A compound that appears twice —
+/// a term that contains itself — is walked once, so the collector neither loops
+/// nor reports.
+void collectVariables(const Term& term, std::vector<VarId>& out,
+                      std::unordered_set<const CompoundTerm*>& visited) {
+  if (term.kind == TermKind::Var) {
+    out.push_back(term.var);
+    return;
+  }
+  if (term.kind != TermKind::Compound || term.compound == nullptr) {
+    return;
+  }
+  if (!visited.insert(term.compound.get()).second) {
+    return;
+  }
+  for (const Term& argument : term.compound->args) {
+    collectVariables(argument, out, visited);
+  }
+}
+
+/// Removes the `^` quantifiers in front of a goal, collecting the variables they
+/// name (task_91).  `Х^Цель` says «Х does not matter».  Only the quantifiers
+/// *in front* are stripped, as in ISO: `ВСЕРЕШ(Т, Х^(р(Х), ц(У)), С)` is the
+/// way to quantify a conjunction — a `^` in the middle of one is an ordinary
+/// compound, and the checker reports it as the unknown `^/2` it would be.
+Term stripQuantifiers(const Term& goal, std::vector<VarId>& quantified) {
+  if (goal.kind != TermKind::Compound || goal.compound == nullptr ||
+      goal.compound->name != "^" || goal.compound->args.size() != 2) {
+    return goal;
+  }
+  std::unordered_set<const CompoundTerm*> visited;
+  collectVariables(goal.compound->args[0], quantified, visited);
+  return stripQuantifiers(goal.compound->args[1], quantified);
 }
 
 /// Releases a chain of environments without recursing through it.
@@ -167,6 +213,9 @@ class Solver {
  private:
   bool resolveGoal(const Term& goal);
   bool selectClause(ChoicePoint& cp);
+  /// Unifies the next stored answer of a `Kind::Builtin` point with the terms of
+  /// the call; a failed answer is undone before the next one is tried.
+  bool deliverBuiltinAnswer(ChoicePoint& cp);
   bool backtrack();
   void applyCut();
   /// Keep `keep` choice points and release the rest through `releaseEnvChain`.
@@ -288,11 +337,53 @@ bool Solver::selectClause(ChoicePoint& cp) {
   return false;
 }
 
+bool Solver::deliverBuiltinAnswer(ChoicePoint& cp) {
+  BuiltinChoice& choice = *cp.payload;
+  while (choice.next < choice.answers.size()) {
+    const std::size_t mark = engine_.bindings().trailMark();
+    bool fits = true;
+    for (const auto& [argument, value] : choice.answers[choice.next].unify) {
+      if (!engine_.unify(argument, value)) {
+        fits = false;
+        break;
+      }
+    }
+    ++choice.next;
+    if (fits) {
+      return true;
+    }
+    // A stored answer can fail on a *bound* argument — `ВСЕРЕШ(Х, Ц, [1,2])` is
+    // a check — so a half-made unification is undone before the next one.
+    engine_.bindings().unwind(mark);
+  }
+  return false;
+}
+
 bool Solver::backtrack() {
   while (!cps_.empty()) {
     ChoicePoint cp = std::move(cps_.back());
     cps_.pop_back();
     engine_.bindings().unwind(cp.trail_mark);
+    if (cp.kind == ChoicePoint::Kind::Builtin) {
+      // A built-in that yields (task_91): the answers are already copied out, so
+      // a redo is «take the next one» — and the continuation is the frame the
+      // call was made in, exactly like `Continue`.
+      if (cp.payload == nullptr) {
+        continue;
+      }
+      setEnv(advanceEnv(cp.env));
+      if (engine_.traceEnabled()) {
+        traceText("Переделка. Цель " + engine_.format(cp.goal));
+      }
+      step(StepAction::Redo, &cp.goal, env_->location, env_->depth);
+      if (!deliverBuiltinAnswer(cp)) {
+        continue;
+      }
+      if (cp.payload->next < cp.payload->answers.size()) {
+        cps_.push_back(std::move(cp));
+      }
+      return true;
+    }
     if (cp.kind == ChoicePoint::Kind::Alternative) {
       // The right branch of a disjunction: the continuation is the goal that
       // follows the `;` goal, and the cut barrier sits where the alternative was,
@@ -462,6 +553,10 @@ bool Solver::resolveGoal(const Term& goal) {
     if (goal.kind == TermKind::Compound) {
       args = std::span<const Term>(goal.compound->args.data(), goal.compound->args.size());
     }
+    // The mark is taken *before* the call: a built-in that yields has already
+    // bound its first answer when it returns, and a redo must undo exactly that
+    // (task_91).
+    const std::size_t mark = engine_.bindings().trailMark();
     const BuiltinResult result = builtin(engine_, args);
     switch (result) {
       case BuiltinResult::Continue:
@@ -471,6 +566,29 @@ bool Solver::resolveGoal(const Term& goal) {
         return false;
       case BuiltinResult::Handled:
         return true;
+      case BuiltinResult::Yield: {
+        std::optional<BuiltinChoice> choice = engine_.takeBuiltinChoice();
+        if (!choice || choice->answers.empty()) {
+          setEnv(advanceEnv(env_));
+          return true;  // one answer and nothing to choose between
+        }
+        ChoicePoint cp;
+        cp.kind = ChoicePoint::Kind::Builtin;
+        cp.goal = goal;
+        cp.goal_index = env_->index;
+        cp.trail_mark = mark;
+        cp.barrier = cps_.size();
+        cp.env = env_;
+        cp.payload = std::make_unique<BuiltinChoice>(std::move(*choice));
+        if (!deliverBuiltinAnswer(cp)) {
+          return false;  // not one stored answer fits the call
+        }
+        if (cp.payload->next < cp.payload->answers.size()) {
+          cps_.push_back(std::move(cp));
+        }
+        setEnv(advanceEnv(env_));
+        return true;
+      }
     }
     return true;
   }
@@ -899,6 +1017,81 @@ std::vector<Term> Engine::collectAll(const Term& goal, const Term& templ,
           "Превышен предел решений НАЙТИВСЕ: " + std::to_string(limit));
   }
   return collected;
+}
+
+std::vector<VarId> Engine::groupingVariables(const Term& templ, const Term& goal,
+                                             std::span<const VarId> quantified) {
+  std::unordered_set<const CompoundTerm*> visited;
+  std::vector<VarId> in_goal;
+  collectVariables(goal, in_goal, visited);
+  visited.clear();
+  std::vector<VarId> in_template;
+  collectVariables(templ, in_template, visited);
+
+  std::vector<VarId> free;
+  for (const VarId id : in_goal) {
+    if (std::find(in_template.begin(), in_template.end(), id) != in_template.end()) {
+      continue;  // the template is what is copied, not what is grouped by
+    }
+    if (std::find(quantified.begin(), quantified.end(), id) != quantified.end()) {
+      continue;  // `^` says «this one does not matter»
+    }
+    if (std::find(free.begin(), free.end(), id) != free.end()) {
+      continue;
+    }
+    free.push_back(id);
+  }
+  // By id and not by the order met: the key of a group must read the same on
+  // every solution, and the id is the one thing about a variable that does not
+  // wander as the goal is walked.
+  std::sort(free.begin(), free.end());
+  return free;
+}
+
+CollectedGroups Engine::collectGroupedSolutions(const Term& templ, const Term& goal,
+                                                std::size_t limit) {
+  std::vector<VarId> quantified;
+  const Term stripped = stripQuantifiers(goal, quantified);
+  CollectedGroups result;
+  result.free = groupingVariables(templ, stripped, quantified);
+
+  // One collected item is `$key(Свободные...)` and the template: `collectAll`
+  // copies both, so the values of the key are the ones the solution had.
+  std::vector<Term> key_arguments;
+  key_arguments.reserve(result.free.size());
+  for (const VarId id : result.free) {
+    key_arguments.push_back(makeVar(id));
+  }
+  const Term item = makeCompound(
+      "$group", std::vector<Term>{makeCompound(kGroupKeyFunctor, std::move(key_arguments)),
+                                  templ});
+  std::vector<Term> collected = collectAll(stripped, item, limit);
+
+  const auto key_of = [](const Term& pair) -> const Term& { return pair.compound->args[0]; };
+  const auto value_of = [](const Term& pair) -> const Term& { return pair.compound->args[1]; };
+  // Stable and by the key alone: the values inside one group keep the order in
+  // which the solutions came.
+  std::stable_sort(collected.begin(), collected.end(),
+                   [this, &key_of](const Term& left, const Term& right) {
+                     return compareStandardOrder(bindings_, key_of(left), key_of(right)) < 0;
+                   });
+
+  std::vector<GroupedSolution> groups;
+  Term previous_key;
+  for (const Term& pair : collected) {
+    const Term& key = key_of(pair);
+    const bool starts_a_group =
+        groups.empty() || compareStandardOrder(bindings_, previous_key, key) != 0;
+    if (starts_a_group) {
+      GroupedSolution group;
+      group.key = key.compound->args;
+      groups.push_back(std::move(group));
+      previous_key = key;
+    }
+    groups.back().values.push_back(value_of(pair));
+  }
+  result.groups = std::move(groups);
+  return result;
 }
 
 void Engine::raise(ErrorCode code, std::string message) {

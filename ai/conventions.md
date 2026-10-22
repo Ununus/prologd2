@@ -45,6 +45,12 @@ where the standard means the same thing (`var`, `integer`, `float`, `compare`),
 `is_whole`, `is_number`), and `X_to_Y` with the short stems `int`, `float`,
 `str`, `list` for a conversion (`int_to_float`, `str_to_int`).
 
+A built-in that has more than one answer returns `BuiltinResult::Yield` and leaves
+them with `Engine::setBuiltinChoice`; the solver turns them into a
+`ChoicePoint::Kind::Builtin` frame (ADR-031, `ВСЕРЕШ`/`МНОРЕШ`).  A built-in that
+answers once keeps `Continue`/`Fail`: the frame costs memory until the last answer
+or the next cut, so `Yield` is worth it only when backtracking is the point.
+
 ## File layout
 
 * Public headers: `src/prlib/include/prlib/<name>.hpp`.

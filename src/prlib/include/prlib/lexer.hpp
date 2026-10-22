@@ -44,6 +44,7 @@ enum class TokenKind : std::uint8_t {
   AtLessEqual,     ///< `@=<`, `НЕ(compare(>, A, B))`
   AtGreater,       ///< `@>`, `compare(>, A, B)`
   AtGreaterEqual,  ///< `@>=`, `НЕ(compare(<, A, B))`
+  Caret,           ///< `^`, the existential quantifier of `ВСЕРЕШ`/`МНОРЕШ` (task_91)
   Plus,
   Minus,
   Star,

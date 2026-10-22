@@ -93,6 +93,7 @@ const std::vector<std::string>& checkedExamples() {
   static const std::vector<std::string> names = {
       "first.pld",
       "sort.pld",
+      "bagof.pld",
       "ground.pld",
       "forall.pld",
       "sorting.pld",
@@ -103,6 +104,7 @@ const std::vector<std::string>& checkedExamples() {
       "iso/arith.pld",
       "iso/lists.pld",
       "iso/family.pld",
+      "iso/groups.pld",
       "iso/order.pld",
       "iso/if_then.pld",
       "iso/sub_string.pld",

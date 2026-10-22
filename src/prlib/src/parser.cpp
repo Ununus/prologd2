@@ -310,7 +310,16 @@ Term Parser::parseTerm() {
   }
   // `#…#` is not special here: it is one of the operands the comparison layer
   // takes, so `#1 + 1# = 2` parses like any other comparison (task_52).
-  return parseComparison();
+  Term left = parseComparison();
+  // `А^Ц` — the existential quantifier of `ВСЕРЕШ`/`МНОРЕШ` (task_91).  ISO
+  // gives it `xfy 200`: tighter than `,` and `;`, looser than the comparisons,
+  // and right-nested, so `А^Б^Ц` is `А^(Б^Ц)` and the whole quantifier stays
+  // inside the goal argument of the collecting predicate.
+  if (!failed_ && check(TokenKind::Caret)) {
+    advance();
+    return makeCompound("^", {std::move(left), parseTerm()});
+  }
+  return left;
 }
 
 Term Parser::parseComparison() {

@@ -395,6 +395,66 @@ BuiltinResult builtinFindAll(Engine& engine, std::span<const Term> args) {
 }
 
 // ---------------------------------------------------------------------------
+// ВСЕРЕШ/3 (bagof) and МНОРЕШ/3 (setof) — task_91
+//
+// The first built-ins that are not deterministic: one call leaves a *choice
+// point* in the machine (`BuiltinResult::Yield`), and every answer binds the
+// free variables of the goal as well as the bag.  The collection is done once,
+// up front, exactly as `НАЙТИВСЕ` does it; the answers only hand out what was
+// collected, so a side effect in the goal still happens once per solution.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+/// Turns the collected groups into answers, `sorted` for `МНОРЕШ`.
+///
+/// An empty collection **fails**: that is the one place where `bagof` does not
+/// copy `НАЙТИВСЕ`, which answers `[]`.  Ordinary Prolog does the same, and the
+/// difference is worth knowing — `ВСЕРЕШ(Х, ЛОЖЬ, С)` is a goal that does not
+/// hold, not a goal with an empty bag.
+BuiltinResult yieldGroups(Engine& engine, std::span<const Term> args,
+                          const CollectedGroups& collected, bool sorted) {
+  if (collected.groups.empty()) {
+    return BuiltinResult::Fail;
+  }
+  BuiltinChoice choice;
+  choice.answers.reserve(collected.groups.size());
+  for (const GroupedSolution& group : collected.groups) {
+    BuiltinAnswer answer;
+    const std::size_t pairs = std::min(collected.free.size(), group.key.size());
+    answer.unify.reserve(pairs + 1);
+    for (std::size_t index = 0; index < pairs; ++index) {
+      answer.unify.emplace_back(makeVar(collected.free[index]), group.key[index]);
+    }
+    std::vector<Term> values = group.values;
+    if (sorted) {
+      // `МНОРЕШ` is `ВСЕРЕШ` plus the order `СОРТИРОВКА/2` gives — the same
+      // function, so the two cannot disagree about what «sorted» means.
+      values = sortedTerms(engine, std::move(values), /*ascending=*/true,
+                           /*keepDuplicates=*/false);
+    }
+    answer.unify.emplace_back(args[2], makeListFromVector(values));
+    choice.answers.push_back(std::move(answer));
+  }
+  engine.setBuiltinChoice(std::move(choice));
+  return BuiltinResult::Yield;
+}
+
+}  // namespace
+
+BuiltinResult builtinBagOf(Engine& engine, std::span<const Term> args) {
+  const std::size_t limit = engine.options().maxFindAllSolutions;
+  const CollectedGroups collected = engine.collectGroupedSolutions(args[0], args[1], limit);
+  return yieldGroups(engine, args, collected, /*sorted=*/false);
+}
+
+BuiltinResult builtinSetOf(Engine& engine, std::span<const Term> args) {
+  const std::size_t limit = engine.options().maxFindAllSolutions;
+  const CollectedGroups collected = engine.collectGroupedSolutions(args[0], args[1], limit);
+  return yieldGroups(engine, args, collected, /*sorted=*/true);
+}
+
+// ---------------------------------------------------------------------------
 // Dispatch
 // ---------------------------------------------------------------------------
 
@@ -463,6 +523,10 @@ constexpr std::pair<std::string_view, std::string_view> kEnglishNames[] = {
     {"ВЕЩ", "float"},         {"СИМВ", "is_text"},
     {"СПИСОК", "is_list"},      {"ПОЛНЫЙ", "ground"},
     {"НАЙТИВСЕ", "findall"},    {"СОРТИРОВКА", "sort"},
+    // `ВСЕРЕШ`/`bagof` and `МНОРЕШ`/`setof` collect by groups (task_91); the words
+    // are made of the same letters as `НАЙТИВСЕ`, so a reader of the course can
+    // guess them: «все решения», «много решений».
+    {"ВСЕРЕШ", "bagof"},      {"МНОРЕШ", "setof"},
     {"СРАВНЕНИЕ", "compare"},
     {"БОЛЬШЕ", "greater"},      {"МЕНЬШЕ", "less"},
     {"СЛОЖЕНИЕ", "plus"},       {"УМНОЖЕНИЕ", "mul"},
@@ -571,6 +635,8 @@ const BuiltinTable& builtinTable() {
 
     // findall.
     add("НАЙТИВСЕ", 3, builtinFindAll);
+    add("ВСЕРЕШ", 3, builtinBagOf);
+    add("МНОРЕШ", 3, builtinSetOf);
 
     // Lists.  `СОРТИРОВКА/2` is ISO's `sort/2`; `/3` is the same sort with the
     // order written down (task_95) — the cheap form of the `sort/4` that SWI has,
