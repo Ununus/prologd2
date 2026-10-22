@@ -922,3 +922,35 @@ not is unaffected.  The refusal is documented where a reader looks for it — `h
 `help.typ` §8 и в разделе «Импорт модулей» файла `prologd-diff.typ`.
 
 **Status.** Accepted.
+
+## ADR-029: The state control names an engine *line*, not a release
+
+**Context.**  Task_79 ended the toolbar with two state controls: `n.png` («имена») with a
+menu of the two dialects, and `u.png`/`d.png` switching the engine.  Both had to be
+deciphered, and the first reader of a package took `Д` for «Пролог-Д 2.0» — the name of
+the whole product — rather than for the original engine.  Exact release numbers made it
+worse rather than better: `2.0` is the *shell's* version in the About box while the
+interpreter is at 2.4.x, and the pinned original repository declares
+`project("prologd" VERSION 1.27)` — a value that once meant January 2026 (year.month) and
+is read now as «version 1, number 27».
+
+**Decision.**  One control, three states, named by the **line** of the engine and never by
+a release: `2.x ISO`, `2.x PLD`, `1.x` (`actions.STATES`, marker `actions.STATE`).  `x` is
+deliberate: it is the notation the manual's own comparison table already uses («Пролог-Д
+(1.x)», «(2.x)», «(2.x ISO)», `doc/help.typ`), and nothing has to be edited when the
+interpreter's minor number moves.  The exact version lives in exactly one place — «О
+программе», filled from the live `ready`; the pinned original cannot report its own at
+all (it has no `--version`).
+
+**Consequences.**  The three pictures are the words themselves (`engine-iso`,
+`engine-pld`, `engine-1.x`), so the state is read off the toolbar without a click, and a
+missing file falls back to the text (`test_icons` keeps the file from going missing in the
+first place).  The control is one switch over two questions, so its rows differ in price
+and the code says so: `2.x ISO` ↔ `2.x PLD` writes `execution/variable_mode` and leaves a
+live session alone, while `1.x` — and either `2.x` row while the original runs — goes
+through `choose_engine`, which stops the session first.  `1.x` does not rewrite the stored
+dialect, so a visit and a return keep the choice the user made.  A build whose only engine
+has no `NAMING` keeps the control hidden (parts 143, 148); a row that would start an engine
+this copy does not carry is greyed out with the reason, not hidden.
+
+**Status.** Accepted 2026-10-22 (task_93).

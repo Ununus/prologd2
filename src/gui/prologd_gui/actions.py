@@ -44,12 +44,6 @@ REPLACE_ICON = "edit-find-replace"
 #: to a control rather than to a command.
 FORMAT_ICON = "edit-format-set"
 
-#: The picture of the *naming mode* control (task_79): `n` — «имена» — for the second
-#: state control of the toolbar, whose menu carries the two dialects the «Имена
-#: переменных» row edits.  Like the format mode control it is a control and not a
-#: command, so it is named here for the audit.
-NAMING_ICON = "n"
-
 #: Names that belong to no action: the tab picture of a buffer (never saved,
 #: saved, modified) and the application icon.  They live here because
 #: `ICON_NAMES` is the list `test_icons.py` holds the code to.
@@ -69,12 +63,52 @@ THEME_ICON = "view-theme"
 ADD_ICON = "settings-add"
 REMOVE_ICON = "settings-remove"
 
-#: The two pictures of the engine switch (task_79): `u.png` while our own engine is
-#: the one that runs, `d.png` while the original is — the button says which program
-#: the toolbar belongs to.  Both belong to the audit: a missing file would leave the
-#: button text-only, and the one picture the user has for «which engine is this»
-#: would be gone.
-ENGINE_ICONS: tuple[str, ...] = tuple(engine.icon for engine in engines.ENGINES)
+#: The three states of the right-hand toolbar control (task_93): which engine runs
+#: and, for our own, in which dialect it reads a name the file does not spell out.
+#: It replaced the two controls of task_79 — a picture of an `И` and a picture of a
+#: `Д`, which asked the reader to know what the letters stood for, and `Д` was in
+#: fact read as «Пролог-Д 2.0», the name of the whole product rather than the
+#: original engine.  These three pictures carry their words themselves.
+@dataclass(frozen=True)
+class State:
+    """One state of «which program, and how it reads names»."""
+
+    #: The name the window and the tests use for it.
+    key: str
+    #: The words of the menu entry — the version line the manual uses for the two
+    #: engines («Пролог-Д (1.x)», «Пролог-Д (2.x)», `doc/help.typ`).
+    label: str
+    #: The picture in `assets/`, which is the same words drawn.
+    icon: str
+    #: The tooltip, verbatim as the author of the pictures worded it.
+    hint: str
+
+
+STATE_ISO = "iso"
+STATE_PLD = "pld"
+STATE_ORIGINAL = "original"
+
+STATES: tuple[State, ...] = (
+    State(STATE_ISO, "2.x ISO", "engine-iso", "новый движок, имена ISO"),
+    State(
+        STATE_PLD,
+        "2.x PLD",
+        "engine-pld",
+        "новый движок, имена совместимые с оригинальным Д",
+    ),
+    State(
+        STATE_ORIGINAL,
+        "1.x",
+        "engine-1.x",
+        "оригинальный движок, не совместимый с именами ISO",
+    ),
+)
+
+STATE_BY_KEY: dict[str, State] = {state.key: state for state in STATES}
+
+#: The pictures of the control, for the audit: a missing file would leave the button
+#: wordless, because here the picture *is* the label.
+STATE_ICONS: tuple[str, ...] = tuple(state.icon for state in STATES)
 
 #: A menu entry that is a separator or a submenu rather than an action.
 SEPARATOR = "-"
@@ -91,20 +125,13 @@ RECENT = "recent"
 #: three zoom commands, and an exact value is a row of the settings dialog.
 FORMAT_MODE = "#format-mode"
 
-#: The engine switch (task_79): a control at the *right end* of the toolbar, the
-#: counterpart of `FORMAT_MODE` — it is not a command of the program but a
-#: property of the whole window, and its picture is the engine that is running.
-#: The window builds it (`window._build_engine_button`) and finds the engines
-#: table in `engines`.
-ENGINE = "#engine"
-
-#: The naming-mode control (task_79): the third control of that kind, right before the
-#: engine switch — it is not a command either but the dialect the *running* engine
-#: reads a file in, and its menu carries the same two values as the «Имена
-#: переменных» row of the dialog (read from that row's own description, so the two
-#: cannot drift apart).  On an engine that has no modes the control is disabled, as
-#: the row is.
-NAMING = "#naming"
+#: The state control (task_93): the *right end* of the toolbar, the counterpart of
+#: `FORMAT_MODE`, and the one control that answers «which program runs, and how does
+#: it read names» — the two questions of task_79 asked together, because they are the
+#: same three answers in practice (`STATES`).  It is not a command of the program but
+#: a property of the whole window; the window builds it
+#: (`window._build_state_button`).
+STATE = "#state"
 
 #: The appearance (task_29's dark theme): a submenu of «Вид», because a *set* of
 #: three themes is not something one checkable entry can say.  It used to be a
@@ -291,9 +318,9 @@ BY_KEY: dict[str, Action] = {action.key: action for action in ACTIONS}
 #: files in `assets/` and against the documented `MISSING` list.
 ICON_NAMES: frozenset[str] = frozenset(
     [action.icon for action in ACTIONS if action.icon]
-    + [RECENT_ICON, FIND_ICON, REPLACE_ICON, FORMAT_ICON, NAMING_ICON, FILE_ICON,
+    + [RECENT_ICON, FIND_ICON, REPLACE_ICON, FORMAT_ICON, FILE_ICON,
        SAVED_ICON, MODIFIED_ICON, APPLICATION_ICON, THEME_ICON, ADD_ICON, REMOVE_ICON]
-    + list(ENGINE_ICONS)
+    + list(STATE_ICONS)
 )
 
 #: The menu bar: (title, entries).  `-` is a separator, `recent` the submenu of
@@ -398,13 +425,12 @@ MENUS: tuple[tuple[str, tuple[str, ...]], ...] = (
 #: tab belongs in «Файл», and the toolbar keeps the three file buttons that act on
 #: the tab in front of the user (task_48).
 #:
-#: The naming control (task_79) and the engine switch after it are the last two
-#: controls of all: they are not commands of the program but the dialect it reads
-#: names in and the choice of *which* program runs — the two things the toolbar's
-#: buttons above them are about — so they stand apart, after a separator, in the
-#: order the questions are asked in (how is the file read, and by what), with the
-#: engine last: it is the wider question, and the right edge is where the eye looks
-#: for it.
+#: The state control (task_93) is the last control of all: it is not a command of the
+#: program but the choice of *which program runs and how it reads names* — the two
+#: things the toolbar's buttons above it are about — so it stands apart, after a
+#: separator, at the right edge, where the eye looks for it.  It is one control and
+#: not the two of task_79 (task_93): a row of three states is fewer words than two
+#: buttons whose pictures have to be deciphered.
 TOOLBAR: tuple[str, ...] = (
     "new",
     "open",
@@ -423,8 +449,7 @@ TOOLBAR: tuple[str, ...] = (
     SEPARATOR,
     "settings",
     SEPARATOR,
-    NAMING,
-    ENGINE,
+    STATE,
 )
 
 #: The context menu of an editor *tab* (task_68), built from the same table as

@@ -17,6 +17,7 @@ from PySide6.QtGui import (
     QColor,
     QDesktopServices,
     QFont,
+    QIcon,
     QKeySequence,
     QTextCursor,
 )
@@ -606,7 +607,8 @@ class MainWindow(QMainWindow):
 
         A one-engine package has nothing to choose: the file it carries is the one
         that runs, and the opening line of the pane is where that is written down —
-        the button that would say it is not on the toolbar at all (`_sync_engine_button`).
+        the control that would say it is not on the toolbar at all
+        (`_sync_state_button`).
         """
         if not self._engine_swapped:
             return
@@ -668,12 +670,13 @@ class MainWindow(QMainWindow):
         if self._settings.variable_mode != "1":
             self._settings.variable_mode = "1"
 
-    def switch_engine(self) -> None:
-        """The button: stop the run, then run the *other* engine (task_79).
+    def choose_engine(self, target: engines.Engine) -> None:
+        """Runs `target`: the one door every engine change goes through.
 
-        The order is the reason this is not one line.  A live child process goes on
-        sending its events, and after the choice changed they would arrive as the
-        output of a run that belongs to another binary — so the stop comes first.
+        A row of the state control ends up here (task_93), and the order is the
+        reason this is not one line.  A live child process goes on sending its
+        events, and after the choice changed they would arrive as the output of a
+        run that belongs to another binary — so the stop comes first.
 
         And it is the *session* that goes, not just the run: the process belongs to
         the engine being left, the base it holds is of no use to the other one, and
@@ -681,17 +684,23 @@ class MainWindow(QMainWindow):
         window that now says it runs the other engine.  So it ends the way the grace
         deadline ends a run (`_stop_now`), and the pane says why.
 
-        What the press writes is the *choice*: `view/engine`, so the next window
-        starts on the same engine.  The folder the engines are looked for in is not
-        touched — a build tree is where both of them lie — and the value task_46's
-        removed row left in the file is dropped, because otherwise it would name
-        the engine again on the next start and outlive the click.  The reserved names are re-read as well: the two engines answer
-        `--list-keywords` with different tables (66 names against our 131), and
-        completion, colouring and the cheat sheet are all built from them.
+        What the choice writes is `view/engine`, so the next window starts on the
+        same engine.  The folder the engines are looked for in is not touched — a
+        build tree is where both of them lie — and the value task_46's removed row
+        left in the file is dropped, because otherwise it would name the engine again
+        on the next start and outlive the click.  The reserved names are re-read as
+        well: the two engines answer `--list-keywords` with different tables (66
+        names against our 131), and completion, colouring and the cheat sheet are all
+        built from them.
+
+        Asking for the engine that already runs does nothing: the menu has three
+        rows, and the one in force must not end a session when it is clicked.
         """
+        if target is self._engine:
+            return
         if self._session.is_running():
             self._stop_now("движок изменён")
-        self._engine = engines.other(self._engine)
+        self._engine = target
         self._settings.engine = self._engine.key
         self._settings.clear_legacy_interpreter()
         self._session.set_executable(self._interpreter_path())
@@ -857,13 +866,11 @@ class MainWindow(QMainWindow):
                 self._toolbar.addSeparator()
             elif key == actions.FORMAT_MODE:
                 self._format_action = self._toolbar.addWidget(self._build_format_button())
-            elif key == actions.ENGINE:
-                self._engine_action = self._toolbar.addWidget(self._build_engine_button())
-            elif key == actions.NAMING:
-                self._naming_action = self._toolbar.addWidget(self._build_naming_button())
+            elif key == actions.STATE:
+                self._state_action = self._toolbar.addWidget(self._build_state_button())
             else:
                 self._toolbar.addAction(self._actions[key])
-        #: The three controls of the toolbar that stand for a *capability* of the
+        #: The two controls of the toolbar that stand for a *capability* of the
         #: engine, each as the pair `addWidget` returns: the action it answers with
         #: and the widget inside it.  Hiding has to go through the action (part 145) —
         #: the toolbar lays its items out on show and calls `setVisible` on the widget
@@ -872,8 +879,7 @@ class MainWindow(QMainWindow):
         #: so no call site can forget half of the pair.
         self._toolbar_controls: dict[str, tuple[QAction, QToolButton]] = {
             "format": (self._format_action, self._format_button),
-            "engine": (self._engine_action, self._engine_button),
-            "naming": (self._naming_action, self._naming_button),
+            "state": (self._state_action, self._state_button),
         }
         self._toolbar.setVisible(self._settings.toolbar_visible)
         self.addToolBar(self._toolbar)
@@ -884,48 +890,139 @@ class MainWindow(QMainWindow):
         action.setVisible(visible)
         widget.setVisible(visible)
 
-    def _build_engine_button(self) -> QToolButton:
-        """The engine switch, the last control of the toolbar (task_79).
+    def _build_state_button(self) -> QToolButton:
+        """«Which program runs, and how it reads names» — the last control (task_93).
 
-        A `QToolButton` and not a `QAction`, like the format mode control: it is
-        not a command of the program but a property of the whole window — *which*
-        program — and it carries no text.  The picture is the engine that is
-        **running**: `u.png` while our own engine is the one a run starts, `d.png`
-        while the original is, so the button says which program the toolbar below
-        it belongs to.  The tooltip names both sides, because one picture alone
-        cannot say whether it is the state or the destination.  Everything about the
-        button follows from the engine (`_sync_engine_button`).
+        One `QToolButton` with a menu of three states, in place of the two controls
+        of task_79.  Those carried a picture of an `И` and a picture of a `Д`, so the
+        reader had to know what the letters stood for — and `Д` was taken for
+        «Пролог-Д 2.0», the name of the whole product, rather than for the original
+        engine.  The three pictures (`engine-iso`, `engine-pld`, `engine-1.x`) are the
+        words themselves, so the state is read off the toolbar without a click, and
+        the menu spells each one out.
+
+        Everything about the button follows from the state of the window
+        (`_sync_state_button`).
         """
         button = QToolButton(self)
-        button.clicked.connect(self.switch_engine)
-        self._engine_button = button
+        button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        button.setMenu(self._build_state_menu())
+        self._state_button = button
         return button
 
-    def _sync_engine_button(self) -> None:
-        """The picture, the tooltip and the state of the engine switch (task_79).
+    def _build_state_menu(self) -> QMenu:
+        """The three states, word for word as the dialog and the manual name them.
 
-        The button is the *choice* between two programs, so a build that carries one
-        engine does not show it at all (part 143): a control with nothing to switch
-        to is furniture, and a disabled one still takes the place of a command that
-        might have been there.  With both engines present the picture is the one
-        that runs and the tooltip names the other side and its file.
+        The two `2.x` entries are the «Имена переменных» row, so their words are read
+        from the `Setting` record itself — from the part after its own `ISO:`/`PLD:`,
+        which the state label already carries — and a renamed row renames the menu with
+        it.  A second copy of those words is exactly what would drift.
         """
-        target = engines.other(self._engine)
-        found = assets.icon(self._engine.icon)
-        if found is not None:
-            self._engine_button.setIcon(found)
-        available = self._engine_available(target)
-        self._show_toolbar_control("engine", available)
-        if available:
-            self._engine_button.setToolTip(
-                f"Движок: сейчас {self._engine.title}.  Нажмите, чтобы переключиться "
-                f"на {target.title} ({target.file_name})"
+        menu = QMenu("Движок и имена", self)
+        # A menu row is read at a glance; the rest of the sentence goes to the tooltip.
+        menu.setToolTipsVisible(True)
+        self._state_menu = menu
+        group = QActionGroup(self)
+        group.setExclusive(True)
+        self._state_actions: dict[str, QAction] = {}
+        for state in actions.STATES:
+            entry = menu.addAction(f"{state.label}: {self._state_detail(state)}")
+            entry.setCheckable(True)
+            entry.setActionGroup(group)
+            entry.setToolTip(state.hint)
+            entry.triggered.connect(
+                lambda _checked=False, key=state.key: self._choose_state(key)
             )
+            self._state_actions[state.key] = entry
+        self._sync_state_menu()
+        return menu
+
+    def _state_detail(self, state: actions.State) -> str:
+        """The words after the state label in its menu row.
+
+        «2.x ISO: переменная с большой буквы» is assembled from the label and the
+        settings row itself, so the menu says what the dialog says.
+        """
+        if state.key == actions.STATE_ORIGINAL:
+            return "оригинальный движок"
+        value = "0" if state.key == actions.STATE_ISO else "1"
+        for choice, title in settings.BY_KEY[settings.VARIABLE_MODE].choices:
+            if choice == value:
+                return title.split(":", 1)[-1].strip() or title
+        return ""
+
+    def _current_state(self) -> str:
+        """Which of the three rows is in force: the engine first, then the dialect."""
+        if self._engine is engines.ORIGINAL:
+            return actions.STATE_ORIGINAL
+        if self._settings.variable_mode == "1":
+            return actions.STATE_PLD
+        return actions.STATE_ISO
+
+    def _sync_state_button(self) -> None:
+        """The picture, the tooltip and the availability of the state control.
+
+        The control answers two questions at once, so it is hidden only when neither
+        has an answer: a build whose only engine is the original has no other program
+        to start and no dialects to choose (`_only_engine`, parts 143 and 148) — the
+        package of «Пролог-Д» alone.  Every other build keeps the control on either
+        engine: on the original the two `2.x` rows are the way back, which the old
+        naming button could not offer at all.
+
+        A row that would start an engine this build does not carry is *greyed out*
+        rather than hidden: the menu is a map of three states, and a hole in it says
+        less than a row that names what is missing.
+        """
+        other_available = self._engine_available(engines.other(self._engine))
+        self._show_toolbar_control(
+            "state", other_available or self._engine.has(engines.NAMING)
+        )
+        state = actions.STATE_BY_KEY[self._current_state()]
+        found = assets.icon(state.icon)
+        if found is None:
+            # The picture *is* the label here, so a missing file would leave a button
+            # with nothing on it: the words are the fallback, and `test_icons` is what
+            # keeps the file from going missing in the first place.
+            self._state_button.setIcon(QIcon())
+            self._state_button.setText(state.label)
+            self._state_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
         else:
-            self._engine_button.setToolTip(
-                f"Движок: сейчас {self._engine.title}.  {target.title} не найден: "
-                f"{paths.engine_executable(target, folder=self._engine_folder)}"
+            self._state_button.setIcon(found)
+            self._state_button.setText("")
+            self._state_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+        self._state_button.setToolTip(f"{state.hint} — нажмите, чтобы сменить")
+        self._sync_state_menu()
+
+    def _sync_state_menu(self) -> None:
+        """Shows the state in force, and greys out what this build cannot start."""
+        if not hasattr(self, "_state_menu"):
+            return
+        current = self._current_state()
+        for state in actions.STATES:
+            entry = self._state_actions[state.key]
+            target = (
+                engines.ORIGINAL if state.key == actions.STATE_ORIGINAL else engines.OURS
             )
+            entry.setEnabled(target is self._engine or self._engine_available(target))
+            entry.blockSignals(True)
+            entry.setChecked(state.key == current)
+            entry.blockSignals(False)
+
+    def _choose_state(self, key: str) -> None:
+        """A row of the menu: the light answer and the heavy one, told apart.
+
+        `2.x ISO` and `2.x PLD` differ only in the dialect — a stored value and the
+        colouring of the open buffers — so on our own engine they cost nothing and a
+        live session is left alone.  `1.x`, and either `2.x` row while the original
+        runs, changes *which program* answers: that is `choose_engine`, and it stops
+        the session first.  Choosing `1.x` leaves the stored dialect untouched, so
+        coming back to `2.x` restores the one the user picked last.
+        """
+        if key == actions.STATE_ORIGINAL:
+            self.choose_engine(engines.ORIGINAL)
+            return
+        self.choose_engine(engines.OURS)
+        self._set_variable_mode("0" if key == actions.STATE_ISO else "1")
 
     def _apply_engine(self) -> None:
         """Everything that follows from *which* engine runs (task_79).
@@ -953,16 +1050,15 @@ class MainWindow(QMainWindow):
         # The two controls that stand for a *capability* of the engine go with it.  The
         # format mode control is *hidden*: it belongs to a command that does not exist
         # on that engine (a hidden widget takes no room, so no hole is left), and the
-        # command itself is greyed out beside it.  The naming control stays **visible
-        # but disabled** — the row it duplicates is disabled in the dialog as well, and
-        # a control that says why is worth more than one that vanishes.
+        # command itself is greyed out beside it.  The state control stays **visible**
+        # on the original — two of its three rows are the way back to our own engine —
+        # and a row it cannot offer is greyed out instead (`_sync_state_menu`).
         formats = self._engine.has(engines.FORMAT)
         self._show_toolbar_control("format", formats)
-        self._sync_naming_button()
+        self._sync_state_button()
         # `run`, `stop`, the two steps and the traced run are computed with the
         # state of the session as well, and that formula lives in one place.
         self._sync_run_actions()
-        self._sync_engine_button()
 
     def _build_format_button(self) -> QToolButton:
         """The formatter's mode, on the toolbar beside «Форматировать» (task_47).
@@ -1037,73 +1133,17 @@ class MainWindow(QMainWindow):
         self._settings.format_selection = bool(flag)
         self._sync_format_menu()
 
-    def _build_naming_button(self) -> QToolButton:
-        """The naming mode, at the right end of the toolbar, before the switch (task_79).
-
-        The second state control, in front of the engine switch: a `QToolButton` whose
-        menu carries the two dialects the «Имена переменных» row of the dialog edits.
-        It stands on the toolbar for the reason the format mode control does — the
-        dialect is chosen *while looking at the program*, and walking into a dialog
-        for it is two levels too far — and it duplicates that row rather than owning
-        a preference of its own.  The picture is `n.png` («имена»), the tooltip names
-        the mode in force, and everything else follows from the engine
-        (`_sync_naming_button`).
-        """
-        button = QToolButton(self)
-        button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        found = assets.icon(actions.NAMING_ICON)
-        if found is not None:
-            button.setIcon(found)
-        button.setMenu(self._build_naming_menu())
-        self._naming_button = button
-        return button
-
-    def _build_naming_menu(self) -> QMenu:
-        """The two dialects, word for word as the row of the dialog names them.
-
-        The labels are read from the `Setting` record itself, so a row that is renamed
-        renames the menu with it: the menu *is* the row, and a second copy of those
-        words is exactly what would drift apart.
-        """
-        menu = QMenu("Имена переменных", self)
-        self._naming_menu = menu
-        group = QActionGroup(self)
-        group.setExclusive(True)
-        self._naming_actions: dict[str, QAction] = {}
-        for value, entry_title in settings.BY_KEY[settings.VARIABLE_MODE].choices:
-            entry = menu.addAction(entry_title)
-            entry.setCheckable(True)
-            entry.setActionGroup(group)
-            entry.triggered.connect(
-                lambda _checked=False, mode=value: self._set_variable_mode(mode)
-            )
-            self._naming_actions[value] = entry
-        self._sync_naming_menu()
-        return menu
-
-    def _sync_naming_menu(self) -> None:
-        """Shows the stored mode without answering for it.
-
-        The stored `2` arrives as `1` (`Settings.variable_mode` spells it that way),
-        so the check lands on the entry the row would show as well.
-        """
-        if not hasattr(self, "_naming_menu"):
-            return
-        mode = self._settings.variable_mode
-        for value, entry in self._naming_actions.items():
-            entry.blockSignals(True)
-            entry.setChecked(value == mode)
-            entry.blockSignals(False)
-
     def _set_variable_mode(self, mode: str) -> None:
-        """The menu writes the row's own key, and the open buffers follow at once.
+        """The state control writes the row's own key, and the open buffers follow.
 
         One key, one write: the dialog reads the same `execution/variable_mode`, and
         the fallback of every buffer that declares no dialect is handed out again
         (`_apply_dialect`) — a mode chosen here is in force as soon as it is clicked.
+        The control itself follows too: it wears the picture of the dialect in force
+        (`_sync_state_button`).
         """
         self._settings.variable_mode = mode
-        self._sync_naming_menu()
+        self._sync_state_button()
         self._apply_dialect()
         self._status.setText(f"имена переменных: {self._naming_label()}")
 
@@ -1118,34 +1158,6 @@ class MainWindow(QMainWindow):
             if value == self._settings.variable_mode:
                 return entry_title.split(":", 1)[0].strip() or entry_title
         return self._settings.variable_mode
-
-    def _sync_naming_button(self) -> None:
-        """The naming control: on with its capability, and its tooltip says what.
-
-        An engine that reads names its own way has no modes to choose — the original
-        *is* the old dialect — so the menu would be a choice between one thing and
-        nothing.  The control is disabled there, exactly as the row it duplicates is
-        in the dialog, and the tooltip says who decides instead.
-
-        In a build with **one** engine that has no dialects either — the package of
-        «Пролог-Д» alone (part 144) — the control has nothing to offer at all, and it
-        goes with the engine switch: two dead buttons at the end of the toolbar are
-        worse than none, and their place is where a command could have been.
-        """
-        if not self._engine.has(engines.NAMING) and self._only_engine():
-            self._show_toolbar_control("naming", False)
-            return
-        self._show_toolbar_control("naming", True)
-        if not self._engine.has(engines.NAMING):
-            self._naming_button.setEnabled(False)
-            self._naming_button.setToolTip(
-                f"Имена переменных: {self._engine.title} читает имена по-старому — "
-                f"выбирать нечего"
-            )
-        else:
-            self._naming_button.setEnabled(True)
-            self._naming_button.setToolTip(f"Имена переменных: {self._naming_label()}")
-        self._sync_naming_menu()
 
     def _build_theme_menu(self, title: str) -> QMenu:
         """The appearance: light, dark or the platform's own (task_29).

@@ -31,10 +31,11 @@ python -m venv .venv
 engines are looked for — `prologu.exe` of this repository and `prologd.exe`, the
 original one task_78 builds beside it — and a file name that *is* one of the two
 picks that engine.  Which engine a run starts is otherwise a preference
-(`view/engine`), written by the button at the **right end of the toolbar**, whose
-picture is the engine that is *running* (`u.png` / `d.png`).  A value an older file
+(`view/engine`), written by the **state control at the right end of the toolbar** —
+`2.x ISO`, `2.x PLD` or `1.x`, whose picture is the state in force (task_93).  A
+value an older file
 still holds under `execution/interpreter` is read as the same kind of launch pin,
-and the first press of that button clears it (task_79).  `--include` adds an
+and the first change of engine clears it (task_79).  `--include` adds an
 `ИМПОРТ` search directory and may be repeated, and `--icons DIR` points the icon
 loader at another directory (the default is `src/gui/assets` in a checkout, the copy
 inside its own folder in a package).  The status bar names the engine a run will
@@ -346,11 +347,9 @@ the reference front-end had it: file | run/stop/step | editing (comment,
 uncomment, format and, right beside it, the formatter's **mode control** — a
 `QToolButton` with the three modes and «только выделенное», where a mode is
 switched while looking at the code) | tools (graphics, settings) | the window's own
-**state controls**: the **naming mode** (`n.png`, `actions.NAMING`) — a `QToolButton`
-whose menu carries the two dialects the «Имена переменных» row edits, read from that
-row's own labels, so the dialog and the toolbar cannot drift apart — and, as the last
-control of all, the **engine switch**, whose picture is the engine that is *running*
-(task_79, `actions.ENGINE` and the module `prologd_gui/engines.py`);
+**state control** — one `QToolButton` with three rows, `2.x ISO`, `2.x PLD` and
+`1.x`, whose picture is the state in force (task_93, `actions.STATE` and the
+`actions.STATES` table);
 `QToolBar.setIconSize(QSize(24, 24))` is set explicitly so the layout does not
 depend on the style.  The right end lost three buttons in task_58.  «Руководство
 пользователя» went first: a button that opens a PDF takes room in the middle of the
@@ -360,27 +359,31 @@ the run.  And the font-size box went with them: `Ctrl`+wheel and the three zoom
 commands cover the everyday change, and an exact value is the «Размер шрифта» row of
 the settings dialog.
 
-The engine switch belongs to no action: it is not a command of the program but the
-choice of *which* program, so it is a `QToolButton` added by the window
-(`_build_engine_button`) as the last entry of `actions.TOOLBAR`, and everything
-about it — the picture, the tooltip, whether it is usable at all — follows from
-the engine a run would start (`Action.needs` is where a *command* declares what it
-needs of an engine, and `settings.GATED_ROWS` does the same for a row of the
-dialog).  The naming control in front of it (`_build_naming_button`) is the same shape
-for the other kind of state: one key with the dialog's row, disabled while the
-engine reads names its own way — the format mode control *hides* there instead,
-because it belongs to a command that engine does not have at all.
+The state control belongs to no action: it is not a command of the program but the
+choice of *which* program runs and how it reads names, so it is a `QToolButton`
+added by the window (`_build_state_button`) as the last entry of `actions.TOOLBAR`,
+and everything about it — the picture, the tooltip, which rows are usable — follows
+from the engine and the stored dialect (`Action.needs` is where a *command*
+declares what it needs of an engine, and `settings.GATED_ROWS` does the same for a
+row of the dialog).  The two `2.x` rows write `execution/variable_mode`, the same
+key the «Имена переменных» row edits, and read their words from that row, so the
+dialog and the toolbar cannot drift apart.  Only the `1.x` row — and either `2.x`
+row while the original runs — changes the program, and that is `choose_engine`,
+which stops the session first; the dialect is left alone there, so a visit to
+`1.x` and back gives the choice the user made.  The format mode control still
+*hides* under the original, because it belongs to a command that engine does not
+have at all.
 
 A build may carry **one** engine (part 143 — the portable package of the original
 `prologd.exe`, `tools/build_portable.ps1 -Engine d`).  Three things follow, and all
-are in `paths.starting_engine`, `window._sync_engine_button` and
-`window._sync_naming_button`: a stored choice whose file is not there gives way to
+are in `paths.starting_engine` and `window._sync_state_button`: a stored choice whose
+file is not there gives way to
 the engine that *is* there (the window writes `--- движок: … в этой сборке нет ---`
 into the pane, so this is announced rather than silent); a package with one engine
 answers it even when the settings name a file somewhere else — an old `gui.ini`
 copied from another machine must not point the window at an engine this folder does
-not have (part 144); and both state controls — the engine switch and the naming
-menu — are not shown at all, because a control with nothing to switch to is
+not have (part 144); and the state control is not shown at all, because a control
+with nothing to switch to is
 furniture, and it would take the place of a command a single-engine build might
 have had.  The commands that engine cannot answer are greyed by the same capability
 table either way.  The «Имена переменных» row is *written down as `1` (PLD)* on the
@@ -393,9 +396,9 @@ answers with (part 145): the toolbar lays its items out when the window is shown
 calls `setVisible(...)` on each widget according to that action, so a bare
 `button.setVisible(False)` survives only until the first `show()` — it looked right
 in a test that never showed the window and came back in the package, which always
-shows it.  `_build_toolbar` keeps the three actions (`_format_action`,
-`_engine_action`, `_naming_action`), and the three places that decide a control's
-visibility set both the action and the widget.
+shows it.  `_build_toolbar` keeps the two actions (`_format_action`,
+`_state_action`), and the places that decide a control's visibility set both the
+action and the widget.
 
 Two commands left the toolbar in this round.  «Сохранить все» acts on *every*
 tab, so it lives in «Файл» where the rest of them are: the toolbar keeps the
@@ -952,7 +955,7 @@ table).
 | Редактор | font family and size, line numbers, the current-line band, word wrap, tabs or spaces and the width, auto-indent, completion (on/off, after how many letters, `Учитывать регистр`) |
 | Вид | theme (light, dark or system), toolbar, the output panel (shown; right or bottom, the bottom being the default since task_50), the goal field, where a program's input question is asked (console or dialog), the output's font size, its line limit and whether it follows the end |
 | Формат | the formatter's mode, width, indent and unit, «только выделенное» |
-| Выполнение | whether a run answers the program's own `?`-questions, save before run, the four limits (steps, depth, НАЙТИВСЕ solutions, milliseconds), the naming mode (the fallback for a file that declares none — under the original engine it *is* the old dialect, and the row and its toolbar button are disabled; the same key is edited by the `n.png` control), **the process directory** (the running file's folder, the window's folder, or a fixed one — `ЗАПИСЬ_В`/`ЧТЕНИЕ_ИЗ` open relative to it), the `ИМПОРТ` search folders |
+| Выполнение | whether a run answers the program's own `?`-questions, save before run, the four limits (steps, depth, НАЙТИВСЕ solutions, milliseconds), the naming mode (the fallback for a file that declares none — under the original engine it *is* the old dialect, and the row is disabled; the same key is edited by the `2.x` rows of the state control), **the process directory** (the running file's folder, the window's folder, or a fixed one — `ЗАПИСЬ_В`/`ЧТЕНИЕ_ИЗ` open relative to it), the `ИМПОРТ` search folders |
 | Файлы | autosave in minutes (0 = off), how many recent files to remember, restoring the open tabs at start-up |
 | Подсветка | the syntax colours, one swatch per highlighted role («Комментарий», «Строка», «Атом латиницей» …) for the light and the dark theme side by side; a click on a swatch asks for a new colour and the hex is stored per theme (`syntax/light`, `syntax/dark`) and applied at once, «Вернуть встроенные цвета» drops every override |
 | Вставки | the live `Ctrl`+key table (task_31), the settings file path, «Вернуть встроенную таблицу» |

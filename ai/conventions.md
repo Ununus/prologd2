@@ -173,11 +173,14 @@ Tests are written **together with** the feature, never after.
   capability no command or row asks about (prose dressed as a table).  Which engine a launch uses is
   `engines.launch(pin, chosen)` — `--exe` (or the value task_46's removed «Интерпретатор» row still
   holds) names the *folder* both engines are built in **and**, when its file name is one of them, the
-  engine; `view/engine` is the stored choice, written by the button at the right end of the toolbar.
+  engine; `view/engine` is the stored choice, written by the state control at the right end of the
+  toolbar.
   A switch **stops the session** rather than asking the run to end: a live process belongs to the
   engine being left, and its events would land in the output of a window that says it runs the other
-  one.  The button's picture is the engine that is *running* (`u.png` / `d.png`), so the toolbar
-  says which program it belongs to; the tooltip names the other one.  A capability also decides
+  one.  The control's picture is the state in force (`engine-iso`, `engine-pld`, `engine-1.x`,
+  task_80), so the toolbar says both which program runs and how it reads names; its menu writes
+  `execution/variable_mode` for the two `2.x` rows and `view/engine` for `1.x`, and only the second
+  kind stops a session.  A capability also decides
   *reading*: «Имена переменных» is a fallback for a file that declares none, so under an engine
   without `NAMING` a marker-less file is coloured, completed and sent as the old dialect
   (`window._default_variable_mode`, one door: `_apply_dialect`).  A file with a `:- ИМЕНА(N).`

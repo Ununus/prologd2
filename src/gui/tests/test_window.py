@@ -1953,26 +1953,26 @@ def test_the_toolbar_reuses_the_actions(executable: str) -> None:
             assert actions.BY_KEY[key].title in shown, (key, shown)
         # task_58: «Очистить вывод» left the toolbar for the «Выполнение» menu, and
         # the size control left it too (see `test_two_font_sizes_and_one_wheel`).
-        # task_79: the right end carries two controls that stand for *states* of the
-        # window — the naming mode and, last of all, the engine switch — so the last
-        # *labelled* entry is «Настройки…» and the three empty-text entries are those
-        # two and the formatter's mode control.
+        # task_93: the right end carries one control that stands for the *state* of the
+        # window — which engine runs and how it reads names — so the last *labelled*
+        # entry is «Настройки…» and the two empty-text entries are that control and
+        # the formatter's mode control.
         labels = [entry.text() for entry in toolbar.actions() if not entry.isSeparator()]
         assert actions.BY_KEY["help_doc"].title not in labels, labels
         assert actions.BY_KEY["clear_output"].title not in labels, labels
-        assert labels[-1] == "" and labels[-2] == "", labels
-        assert labels[-3] == actions.BY_KEY["settings"].title, labels
+        assert labels[-1] == "", labels
+        assert labels[-2] == actions.BY_KEY["settings"].title, labels
         widgets = [index for index, label in enumerate(labels) if not label]
-        assert len(widgets) == 3, labels
+        assert len(widgets) == 2, labels
         assert widgets[0] == labels.index(actions.BY_KEY["format"].title) + 1, labels
         trailing = [entry.defaultWidget() for entry in toolbar.actions()
-                    if isinstance(entry, QWidgetAction)][-2:]
-        assert trailing == [window._naming_button, window._engine_button], trailing
-        # The switch is a control, not a command: its picture is the engine that is
-        # running, and its tooltip names both sides (task_79).
-        assert window._engine_button.isEnabled() is True
-        assert window._engine_button.toolTip().startswith("Движок: сейчас"), (
-            window._engine_button.toolTip()
+                    if isinstance(entry, QWidgetAction)][-1:]
+        assert trailing == [window._state_button], trailing
+        # The state control is not a command: its picture is the state in force, and
+        # its tooltip says which one that is (task_93).
+        assert window._state_button.isEnabled() is True
+        assert window._state_button.toolTip().startswith("новый движок"), (
+            window._state_button.toolTip()
         )
         # The toolbar keeps the three file buttons that act on the tab in front of
         # the user; «Сохранить все» acts on every tab and belongs in «Файл» (task_48).
@@ -4273,17 +4273,14 @@ def test_a_build_with_one_engine_opens_on_it_and_offers_no_switch(
         from PySide6.QtWidgets import QApplication
 
         QApplication.processEvents()
-        assert window._engine_button.isHidden(), (
-            "a build with one engine has nothing to switch to"
-        )
-        # The naming control goes with it (part 144): the original reads names its own
-        # way, and there is no second engine whose dialects could be chosen either —
-        # two dead buttons at the end of the toolbar are worse than none.
-        assert window._naming_button.isHidden(), (
+        # The one state control goes too (task_93): its three rows are two ways to
+        # reach our own engine and one to reach the original, and this build has
+        # neither — a control with nothing to choose is furniture, and a dead button
+        # at the end of the toolbar is worse than none.
+        assert window._state_button.isHidden(), (
             "a build with one engine and one dialect has nothing to choose"
         )
-        assert window._engine_action.isVisible() is False, "the toolbar's item is still there"
-        assert window._naming_action.isVisible() is False, "the toolbar's item is still there"
+        assert window._state_action.isVisible() is False, "the toolbar's item is still there"
         # The names row is written down as «PLD» (part 148): the only engine reads the
         # old dialect, so the row must say that rather than keep a choice that belongs
         # to an engine this build does not carry.
@@ -4302,11 +4299,11 @@ def test_a_build_with_one_engine_opens_on_it_and_offers_no_switch(
         discard_changes(window)
 
 
-def test_the_engine_button_switches_and_remembers(
+def test_the_state_control_switches_and_remembers(
     executable: str, directory: pathlib.Path
 ) -> None:
-    """task_79: one button, two engines, and the choice outlives the window."""
-    from prologd_gui import engines
+    """task_93: one control, three states, and the engine choice outlives the window."""
+    from prologd_gui import actions, assets, engines
     from prologd_gui.settings import Settings
 
     folder = both_engines(directory, executable)
@@ -4314,29 +4311,29 @@ def test_the_engine_button_switches_and_remembers(
     window = make_window(
         str(folder / engines.OURS.file_name), ready=False, settings=Settings(ini)
     )
-    from prologd_gui import assets
-
     try:
         ours_names = set(window.session.keywords.all_labels())
-        # The picture is the engine that is *running*, not the one a press would
-        # start: the button says which program the toolbar belongs to.
+        # The picture is the state in force — our own engine, the ISO dialect — not a
+        # destination: the control says what the window is set to (task_93).
         assert (
-            window._engine_button.icon().cacheKey()
-            == assets.icon(engines.OURS.icon).cacheKey()
-        ), "the button does not wear our own engine's picture"
+            window._state_button.icon().cacheKey()
+            == assets.icon(actions.STATE_BY_KEY[actions.STATE_ISO].icon).cacheKey()
+        ), "the control does not wear the state in force"
+        assert window._state_actions[actions.STATE_ISO].isChecked() is True
         window.editor().setPlainText('?ВЫВОД("ok"),ПС.\n')
         window.run_program()
         wait_for_result(window)
         assert "ok" in window.output_text(), ascii(window.output_text())
 
-        window.switch_engine()
+        window.choose_engine(engines.ORIGINAL)
         assert window.engine() is engines.ORIGINAL
         assert window.session.executable() == str(folder / engines.ORIGINAL.file_name)
         assert Settings(ini).engine == engines.ORIGINAL.key, "the choice is not remembered"
         assert (
-            window._engine_button.icon().cacheKey()
-            == assets.icon(engines.ORIGINAL.icon).cacheKey()
-        ), "the button did not follow the engine"
+            window._state_button.icon().cacheKey()
+            == assets.icon(actions.STATE_BY_KEY[actions.STATE_ORIGINAL].icon).cacheKey()
+        ), "the control did not follow the engine"
+        assert window._state_actions[actions.STATE_ORIGINAL].isChecked() is True
         assert f"движок: {engines.ORIGINAL.title}" in window._details.text()
         assert f"--- движок: {engines.ORIGINAL.title}" in window.system_text(), (
             ascii(window.system_text())
@@ -4352,7 +4349,7 @@ def test_the_engine_button_switches_and_remembers(
         window.run_program()
         wait_for_result(window)
         assert "ok2" in window.output_text(), ascii(window.output_text())
-        print("ok: the button switches the engine, the other one runs, the choice is stored")
+        print("ok: the control switches the engine, the other one runs, the choice is stored")
     finally:
         discard_changes(window)
 
@@ -4360,12 +4357,12 @@ def test_the_engine_button_switches_and_remembers(
     try:
         assert second.engine() is engines.ORIGINAL, "a new window starts on the chosen engine"
         assert "движок" in second._details.text(), second._details.text()
-        print("ok: the engine the button chose is the one the next window starts")
+        print("ok: the engine the control chose is the one the next window starts")
     finally:
         discard_changes(second)
 
 
-def test_the_engine_button_stops_the_run_first(
+def test_the_state_control_stops_the_run_first(
     executable: str, directory: pathlib.Path
 ) -> None:
     """A live process belongs to the engine being left, so it goes first (task_79).
@@ -4384,7 +4381,7 @@ def test_the_engine_button_stops_the_run_first(
         assert pump(window, lambda: window._busy), "the run never started"
         assert window.session.is_running() is True
 
-        window.switch_engine()
+        window.choose_engine(engines.ORIGINAL)
         assert window.session.is_running() is False, "the old engine's process survived the press"
         assert window._busy is False
         assert "--- движок изменён ---" in window.system_text(), ascii(window.system_text())
@@ -4417,7 +4414,7 @@ def test_the_other_engine_gets_only_what_it_answers(
         window._settings.max_steps = 5000
         assert "«Предел шагов» 5000" in window._limits_note()
 
-        window.switch_engine()
+        window.choose_engine(engines.ORIGINAL)
         QApplication.processEvents()
         assert window.engine() is engines.ORIGINAL
         for key in gated:
@@ -4459,7 +4456,7 @@ def test_the_other_engine_reads_names_its_own_way(
         buffer = window.buffers()[0]
         assert buffer.variable_mode() == tokens.MODE_ISO
 
-        window.switch_engine()
+        window.choose_engine(engines.ORIGINAL)
         assert buffer.variable_mode() == tokens.MODE_OLD, "the engine reads the old dialect"
         assert buffer.highlighter.mode == tokens.MODE_OLD, "and the colouring follows it"
         assert window._variable_mode() == tokens.MODE_OLD, "a question of its own too"
@@ -4473,7 +4470,7 @@ def test_the_other_engine_reads_names_its_own_way(
         window.new_buffer()
         assert window.current_buffer().variable_mode() == tokens.MODE_OLD
 
-        window.switch_engine()
+        window.choose_engine(engines.OURS)
         assert buffer.variable_mode() == tokens.MODE_ISO, "and the row answers again under ours"
         print("ok: a marker-less file is read the way the engine that runs reads it")
     finally:
@@ -4517,17 +4514,18 @@ def test_the_welcome_program_runs_on_both_engines(
     print("ok: the welcome program answers the same on both engines")
 
 
-def test_the_naming_button_duplicates_the_row(
+def test_the_state_control_duplicates_the_names_row(
     executable: str, directory: pathlib.Path
 ) -> None:
-    """task_79: the naming mode from the toolbar — the row's own key, and its words.
+    """task_93: the two `2.x` rows are the «Имена переменных» row, and its words.
 
-    It duplicates the «Имена переменных» row rather than owning a preference: one
-    key, the labels read from the `Setting` record, so a renamed row renames the menu
-    with it.  A mode chosen here is in force at once (the buffers that declare no
-    dialect follow), and on an engine that reads names its own way the control is off.
+    The control owns no preference of its own: it writes the row's key, and the words
+    are read from the `Setting` record (from behind its own `ISO:`/`PLD:`, which the
+    state label already carries), so a renamed row renames the menu with it.  A mode
+    chosen here is in force at once — the buffers that declare no dialect follow — and
+    a visit to the original engine leaves the stored dialect where it was.
     """
-    from prologd_gui import engines, tokens
+    from prologd_gui import actions, engines, tokens
     from prologd_gui import settings as settings_module
 
     row = settings_module.BY_KEY[settings_module.VARIABLE_MODE]
@@ -4536,28 +4534,52 @@ def test_the_naming_button_duplicates_the_row(
     try:
         window.editor().setPlainText("шапка(Сумма).\n")
         buffer = window.current_buffer()
+        iso, pld = (title.split(":", 1)[-1].strip() for _value, title in row.choices)
         assert window._settings.variable_mode == "0"
         assert buffer.variable_mode() == tokens.MODE_ISO
-        assert window._naming_button.isEnabled() is True
-        assert [entry.text() for entry in window._naming_menu.actions()] == [
-            title for _value, title in row.choices
-        ], [entry.text() for entry in window._naming_menu.actions()]
-        assert window._naming_actions["0"].isChecked() is True
+        assert window._state_button.isEnabled() is True
+        assert [entry.text() for entry in window._state_menu.actions()] == [
+            f"2.x ISO: {iso}",
+            f"2.x PLD: {pld}",
+            "1.x: оригинальный движок",
+        ], [entry.text() for entry in window._state_menu.actions()]
+        assert window._state_actions[actions.STATE_ISO].isChecked() is True
         assert window._naming_label() == "ISO"
-        assert "ISO" in window._naming_button.toolTip(), window._naming_button.toolTip()
+        assert "новый движок, имена ISO" in window._state_button.toolTip(), (
+            window._state_button.toolTip()
+        )
 
-        window._naming_actions["1"].trigger()
+        window._state_actions[actions.STATE_PLD].trigger()
         assert window._settings.variable_mode == "1", "the menu must write the row's key"
-        assert window._naming_actions["1"].isChecked() is True
-        assert window._naming_actions["0"].isChecked() is False, "the entries are exclusive"
+        assert window._state_actions[actions.STATE_PLD].isChecked() is True
+        assert window._state_actions[actions.STATE_ISO].isChecked() is False, (
+            "the entries are exclusive"
+        )
         assert buffer.variable_mode() == tokens.MODE_OLD, "the buffer follows at once"
         assert "имена переменных" in window.status_text(), window.status_text()
 
-        # An engine that reads names its own way: the control is off, and says so.
-        window.switch_engine()
-        assert window._naming_button.isEnabled() is False
-        assert "по-старому" in window._naming_button.toolTip(), window._naming_button.toolTip()
-        print("ok: the naming button duplicates the row, and goes off with the engine")
+        window._state_actions[actions.STATE_ISO].trigger()
+        assert window._settings.variable_mode == "0", "the dialect is the light answer"
+        assert buffer.variable_mode() == tokens.MODE_ISO
+
+        # The original engine: the row in force is `1.x`, and the stored dialect is
+        # left alone — so the way back keeps the choice the user made (task_93; the old
+        # naming button was simply disabled on that engine).
+        window._state_actions[actions.STATE_ORIGINAL].trigger()
+        assert window.engine() is engines.ORIGINAL
+        assert window._state_actions[actions.STATE_ORIGINAL].isChecked() is True
+        assert window._state_button.isEnabled() is True
+        assert window._settings.variable_mode == "0", "a visit must not rewrite the row"
+        assert "оригинальный движок" in window._state_button.toolTip(), (
+            window._state_button.toolTip()
+        )
+
+        # And a `2.x` row is the way back as well as the choice of dialect.
+        window._state_actions[actions.STATE_PLD].trigger()
+        assert window.engine() is engines.OURS, "a `2.x` row starts our own engine again"
+        assert window._settings.variable_mode == "1"
+        assert buffer.variable_mode() == tokens.MODE_OLD
+        print("ok: the state control writes the names row and the engine, and keeps them apart")
     finally:
         discard_changes(window)
 
@@ -4991,12 +5013,12 @@ def main(argv: list[str]) -> int:
         test_a_launch_naming_the_other_engine_starts_it(executable, files)
         test_a_missing_engine_is_reported_not_half_started(executable, files)
         test_a_build_with_one_engine_opens_on_it_and_offers_no_switch(executable, files)
-        test_the_engine_button_switches_and_remembers(executable, files)
-        test_the_engine_button_stops_the_run_first(executable, files)
+        test_the_state_control_switches_and_remembers(executable, files)
+        test_the_state_control_stops_the_run_first(executable, files)
         test_the_other_engine_gets_only_what_it_answers(executable, files)
         test_the_other_engine_reads_names_its_own_way(executable, files)
         test_the_welcome_program_runs_on_both_engines(executable, files)
-        test_the_naming_button_duplicates_the_row(executable, files)
+        test_the_state_control_duplicates_the_names_row(executable, files)
         test_the_settings_dialog_follows_the_engine_that_runs(executable, files)
         test_the_process_directory_is_where_files_go(executable, files)
         test_autosave_writes_named_buffers_and_skips_the_rest(executable, files)

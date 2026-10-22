@@ -66,9 +66,6 @@ class Engine:
     title: str
     #: The file, looked for beside the window and in the build trees (`paths`).
     file_name: str
-    #: The picture of the engine switch *while this engine is the one that runs*
-    #: (`assets`): `u.png` for ours, `d.png` for the original.
-    icon: str
     #: What a front-end command may ask of it.
     features: frozenset[str]
 
@@ -82,7 +79,6 @@ OURS = Engine(
     key="u",
     title="Пролог-У",
     file_name=_executable("prologu"),
-    icon="u",
     features=ALL_FEATURES,
 )
 
@@ -97,7 +93,6 @@ ORIGINAL = Engine(
     key="d",
     title="Пролог-Д",
     file_name=_executable("prologd"),
-    icon="d",
     features=frozenset(),
 )
 

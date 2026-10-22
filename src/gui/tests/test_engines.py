@@ -28,15 +28,14 @@ from prologd_gui import settings as settings_module  # noqa: E402
 
 
 def test_the_two_engines_are_named_once() -> None:
-    """One key, title, file and picture each, and one of them the default."""
+    """One key, title and file each, and one of them the default."""
     assert len(engines.ENGINES) == 2, engines.ENGINES
-    for attribute in ("key", "title", "file_name", "icon"):
+    for attribute in ("key", "title", "file_name"):
         values = [getattr(engine, attribute) for engine in engines.ENGINES]
         assert len(set(values)) == len(values), (attribute, values)
     assert engines.DEFAULT in engines.ENGINES
     assert engines.BY_KEY == {engine.key: engine for engine in engines.ENGINES}
-    assert set(actions.ENGINE_ICONS) == {engine.icon for engine in engines.ENGINES}
-    print("ok: two engines, one key/title/file/picture each, and a default")
+    print("ok: two engines, one key/title/file each, and a default")
 
 
 def test_the_file_names_are_the_ones_the_build_makes() -> None:
@@ -123,24 +122,34 @@ def test_a_gated_row_is_a_row_and_really_is_missing() -> None:
     print("ok: every gated key is a real row, and the engine that gates it lacks it")
 
 
-def test_the_state_controls_are_the_last_thing_on_the_toolbar() -> None:
-    """Two controls of the whole window, not commands of the program (task_79).
+def test_the_state_control_is_the_last_thing_on_the_toolbar() -> None:
+    """One control of the whole window, not a command of the program (task_93).
 
-    The naming mode and, as the very last control, the engine switch: both are
-    *states* of the window — in which dialect a file that declares none is read, and
-    which program runs — so they stand apart at the right edge, after a separator,
-    with the wider question last.
+    Which program runs and how it reads names are the same three answers in
+    practice, so they are one control: three states, the last thing on the toolbar,
+    after a separator.  It replaced the two controls of task_79, whose pictures had
+    to be deciphered — `Д` was read as «Пролог-Д 2.0», the name of the whole product.
     """
-    assert actions.TOOLBAR[-2:] == (actions.NAMING, actions.ENGINE), actions.TOOLBAR
-    assert actions.SEPARATOR in actions.TOOLBAR, actions.TOOLBAR
-    markers = (actions.SEPARATOR, actions.FORMAT_MODE, actions.ENGINE, actions.NAMING)
-    assert actions.ENGINE not in actions.BY_KEY, "the switch is a control, not a command"
-    assert actions.NAMING not in actions.BY_KEY, "and so is the naming mode"
+    assert actions.TOOLBAR[-1] == actions.STATE, actions.TOOLBAR
+    assert actions.TOOLBAR[-2] == actions.SEPARATOR, actions.TOOLBAR
+    markers = (actions.SEPARATOR, actions.FORMAT_MODE, actions.STATE)
+    assert actions.STATE not in actions.BY_KEY, "the control is not a command"
     for key in actions.TOOLBAR:
         if key in markers:
             continue
         assert key in actions.BY_KEY, key
-    print(f"ok: the toolbar ends with the two state controls ({len(actions.TOOLBAR)} entries)")
+    # The three states speak the version line of the manual's comparison table
+    # (`doc/help.typ`: «Пролог-Д (1.x)», «Пролог-Д (2.x)», «Пролог-Д (2.x ISO)»), so
+    # no release number is written into a picture that would then have to follow it.
+    assert [state.label for state in actions.STATES] == ["2.x ISO", "2.x PLD", "1.x"]
+    assert [state.icon for state in actions.STATES] == [
+        "engine-iso",
+        "engine-pld",
+        "engine-1.x",
+    ], actions.STATE_ICONS
+    for state in actions.STATES:
+        assert state.hint, state.key
+    print(f"ok: the toolbar ends with the one state control ({len(actions.TOOLBAR)} entries)")
 
 
 def main() -> int:
@@ -150,7 +159,7 @@ def main() -> int:
     test_a_launch_answers_the_engine_and_the_folder()
     test_every_capability_of_the_table_is_asked_about()
     test_a_gated_row_is_a_row_and_really_is_missing()
-    test_the_state_controls_are_the_last_thing_on_the_toolbar()
+    test_the_state_control_is_the_last_thing_on_the_toolbar()
     print("all engine checks passed")
     return 0
 
