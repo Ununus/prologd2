@@ -1333,3 +1333,39 @@ this dialect's name, not ISO's (ISO writes `=(X, Y)`, which our parser does not
 read), and that is the one place where "as ISO as possible" stops.
 
 **Status.** Accepted 2026-10-23 (task_101).
+
+## ADR-040: the popup reads an imported file once, and only its predicates
+
+**Context.**  Completion offered the names written in the buffer, and a name that
+a program *imports* lives in another file — in Prolog that is very often the name
+of the next goal (lesson 11 is «import the library, then call `член`»).  The two
+halves of the answer already existed: `paths.resolve_import` repeats the engine's
+search order for `F12` (task_69), and `collect_names` is a pure function of a text.
+
+**Decision.**  A third source of candidates, `IMPORTED`, filled from the files the
+`ИМПОРТ` directives of a buffer name.  The window is the half that knows the search
+directories and the interpreter, so it hands the editor a *lookup* — directive names
+in, `{path: text}` out — and the editor asks it only when the list of directive
+names changed.  Files are read once per version (size and modification time), and
+the walk is recursive with a `seen` set and the search restarted in each importing
+file's own folder, because a file may import its own and the engine tolerates a
+cycle.
+
+Only **predicates** are taken from an imported file.  Its atoms (a colour, a kind
+of friction) are not what the next goal is typed with, and a library of a thousand
+facts would bury the names of the document itself.  A name the document already has
+stays the document's, and a reserved name stays reserved; the ranking puts a
+reserved name first, the document's own next and an imported one last, so the
+import can add names but never push the buffer's own out of the way.
+
+**Consequences.**  The popup is a function of three things now — reserved names,
+the buffer's text and the imported texts — and `set_imported` invalidates the
+candidate list only when the set of texts actually differs.  The label under the
+popup says «импорт: библиотека.pld» for a name that has no record of its own: a
+library predicate has no description, but it does have a file.  A file edited in
+another tab is picked up when it is saved, not before: the cache is keyed by the
+file's version on disk, and keying it by the buffer's text instead would mean
+wiring every buffer into the popup.  A name that cannot be found is not reported —
+the interpreter says so when the program runs.
+
+**Status.** Accepted 2026-10-23 (task_102).

@@ -170,13 +170,47 @@ def test_the_word_being_typed_is_read_from_the_caret() -> None:
     print("ok: the typed word is taken from the caret, quotes included")
 
 
+def test_an_imported_file_adds_its_predicates() -> None:
+    """What `ИМПОРТ` brings in is offered too, and says where it came from (task_102).
+
+    Predicates only: a library's atoms are not what the next goal is typed with.
+    A name the document itself has stays the document's, and a reserved name is
+    still a reserved name.
+    """
+    imported = {
+        "/tmp/библиотека.pld": (
+            "% библиотека\n"
+            "член_списка(X, [X|_]).\n"
+            "цвет(красный).\n"
+            "ВЫВОД(что-то).\n"
+        )
+    }
+    offers = completion.collect(DOCUMENT, RESERVED, imported)
+    by_name = {offer.name: offer for offer in offers}
+    member = by_name["член_списка"]
+    assert member.source == completion.IMPORTED, member
+    assert member.origin == "библиотека.pld", member
+    assert member.arity == 2, member
+    # Atoms of the imported file are not offered, and neither is a reserved name.
+    assert "красный" not in by_name, by_name.keys()
+    assert by_name["ВЫВОД"].source == completion.BUILTIN
+    # The document's own `член` is not replaced by anything from the import.
+    assert by_name["член"].source == completion.USER
+    # Ranked after the document's own name when both match: `член` first.
+    model = completion.CompletionModel(RESERVED)
+    model.set_imported(imported)
+    model.update(DOCUMENT)
+    assert model.labels("член") == ["член/2", "член_списка/2"], model.labels("член")
+    print("ok: an imported file offers its predicates, with the file they came from")
+
+
 def test_the_candidate_list_is_cached_until_the_text_changes() -> None:
     calls: list[str] = []
     original = completion.collect
 
-    def counting(text, keywords=None):
+    def counting(text, keywords=None, imported=None):
         calls.append(text)
-        return original(text, keywords)
+        return original(text, keywords, imported)
 
     completion.collect = counting  # type: ignore[assignment]
     try:
@@ -189,11 +223,19 @@ def test_the_candidate_list_is_cached_until_the_text_changes() -> None:
         model.update(DOCUMENT + "новое(1).\n")
         assert len(calls) == 2
         model.set_keywords(RESERVED)
-        model.update(DOCUMENT)
+        model.update(DOCUMENT + "новое(1).\n")
         assert len(calls) == 3, "new keywords invalidate the list"
+        # The imported texts are the third half of the list (task_102): a new set
+        # of them has to rebuild it too, and the same set must not.
+        model.set_imported({"/tmp/библиотека.pld": "библиотечное(1).\n"})
+        model.update(DOCUMENT + "новое(1).\n")
+        assert len(calls) == 4, "new imported files invalidate the list"
+        model.set_imported({"/tmp/библиотека.pld": "библиотечное(1).\n"})
+        model.update(DOCUMENT + "новое(1).\n")
+        assert len(calls) == 4, "the same imported files must not"
     finally:
         completion.collect = original  # type: ignore[assignment]
-    print("ok: the list is rebuilt only when the text or the keywords change")
+    print("ok: the list is rebuilt only when the text, the keywords or the imports change")
 
 
 # -- the popup --------------------------------------------------------------
@@ -363,6 +405,7 @@ def main() -> int:
     test_the_same_alphabet_sorts_first()
     test_completion_is_suppressed_inside_comments_and_strings()
     test_the_word_being_typed_is_read_from_the_caret()
+    test_an_imported_file_adds_its_predicates()
     test_the_candidate_list_is_cached_until_the_text_changes()
 
     try:

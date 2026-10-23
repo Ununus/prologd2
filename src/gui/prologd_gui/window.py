@@ -53,6 +53,7 @@ from . import (
     geometry,
     graphics,
     graphicswindow,
+    imports,
     panels,
     paths,
     reference,
@@ -138,6 +139,9 @@ class MainWindow(QMainWindow):
         #: window: the popup's detail label and `F1` read the same object, and a
         #: checkout without the file is an empty reference, not a failure.
         self._reference = reference.Reference.load()
+        #: The files a buffer's `ИМПОРТ` lines name, read once per version of the
+        #: file and handed to the popups (task_102).
+        self._imported_files = imports.ImportedFiles()
         #: The `Ctrl`+key insertions (task_31).  The table is *data*: it is kept
         #: in the settings file (`shortcuts/table`), so a symbol on another
         #: physical key — or a keyboard without that key — is remapped without a
@@ -2459,7 +2463,7 @@ class MainWindow(QMainWindow):
 
         The same request with `dialect` instead of `names`: the built-ins of one
         language printed in the other, and the signs each of them has a spelling
-        for (`РАВНО` ↔ `=`/`is`, `БОЛЬШЕ`/`МЕНЬШЕ` ↔ `>`/`<`, `НЕ` ↔ `\+`).  The
+        for (`РАВНО` ↔ `=`/`is`, `БОЛЬШЕ`/`МЕНЬШЕ` ↔ `>`/`<`, `НЕ` ↔ `\\+`).  The
         answer opens in a tab of its own, as a conversion should.
         """
         note = ("диалект переведён на английский" if language == "en"
@@ -3242,6 +3246,7 @@ class MainWindow(QMainWindow):
         buffer.set_fallback_variable_mode(self._default_variable_mode())
         buffer.set_reference(self._reference)
         buffer.set_shortcuts(self._shortcuts)
+        buffer.set_import_lookup(self._import_lookup_for(buffer))
         self._buffers.append(buffer)
         for pane in self._panes:
             pane.set_buffers(self._buffers)
@@ -3254,6 +3259,28 @@ class MainWindow(QMainWindow):
         """Turns a placeholder tab into the file that takes its place."""
         self._drop_buffer(buffer)
         return self._add_buffer(model)
+
+    def _import_lookup_for(self, buffer: Buffer):
+        """How one buffer's `«ИМПОРТ»` names become the texts its popup reads.
+
+        The window is the half that knows the search order — the folder of the file
+        itself, the `-I` directories and the interpreter's `stdlib` — so the popup
+        only names the files, and the reading (once per version of a file) happens
+        here (task_102).  A buffer without a path still resolves against the
+        directories, which is what the interpreter does for a program read from
+        standard input.
+        """
+
+        def lookup(names):
+            path = buffer.model.path
+            return self._imported_files.texts(
+                names,
+                source_dir=pathlib.Path(path).parent if path else None,
+                directories=self._import_directories(),
+                interpreter_path=self._interpreter_path(),
+            )
+
+        return lookup
 
     def _drop_buffer(self, buffer: Buffer) -> None:
         """Forgets a document everywhere.  No questions are asked here."""

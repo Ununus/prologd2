@@ -236,10 +236,11 @@ branch by branch — see `ai/task_34_builtin_branches.md`, which also lists what
 found.
 
 The front end has its own headless checks, run by hand (they need PySide6, so CI does not
-run them yet): 26 scripts in `src/gui/tests/` plus `protocol_smoke.py`.  They cover the
+run them yet): 27 scripts in `src/gui/tests/` plus `protocol_smoke.py`.  They cover the
 reserved names and the colouring rules (`test_keywords.py`, `test_tokens.py`,
 `test_highlighter.py`, `test_appearance.py`), the editor, its popup and its bars
-(`test_editor.py`, `test_completion.py`, `test_search.py`, `test_shortcuts.py`), files,
+(`test_editor.py`, `test_completion.py`, `test_search.py`, `test_shortcuts.py`), the files a
+program imports (`test_imports.py`), files,
 settings and the paths of a packaged build (`test_documents.py`, `test_settings.py`,
 `test_settingsdialog.py`, `test_icons.py`, `test_paths.py`, `test_engines.py`), the
 interpreter on the wire
@@ -6083,3 +6084,42 @@ of the package».  Отдельно: 25 оконных наборов и `protoc
 * **Осталось вне перевода.**  Вызов `equal/2` в позиции терма - уже не ISO
   (там ISO пишет `=(X, Y)`, а наш разборщик такой записи не знает), и это
   единственное место, где «максимально ISO» упирается в диалект.
+
+### 169. task_102: подсказки знают, что приносит `ИМПОРТ`
+
+* **Вопрос владельца.**  Как сейчас работает автодополнение самописных предикатов и
+  получится ли подхватить их из `:- ИМПОРТ(...)`.  Получилось: половина была уже
+  написана - `paths.resolve_import` (task_69, поиск для `F12`) и `collect_names`
+  (чистая функция от текста).
+* **Что сделано.**  Новый Qt-free модуль `prologd_gui/imports.py`:
+  `directive_names(text)` читает строки `ИМПОРТ`/`import` тем же токенайзером
+  (директива в комментарии или в строке не считается), а
+  `ImportedFiles.texts(names, ...)` разрешает имя как `F12`, читает файл и идёт
+  по его собственным импортам - с набором `seen` (движок переживает цикл, значит и
+  этот обход обязан) и с поиском, начинающимся в папке *своего* файла.  Файл
+  перечитывается только если изменились его размер или время.
+* **Подсказка.**  `completion.collect(text, keywords, imported)` - третий источник
+  `IMPORTED` (ранг: зарезервированное, своё, импортированное), у кандидата появился
+  `origin`.  Из импортированного файла берутся **только предикаты**: атомы
+  библиотеки - не то, чем набирают следующую цель, и они бы заслонили имена самого
+  документа.
+* **Шов.**  Окно знает каталоги поиска и интерпретатор, поэтому оно отдаёт
+  редактору `lookup`: имена директив -> `{path: text}`.  Редактор спрашивает его
+  **только когда список директив изменился** - на каждое нажатие остаётся один
+  тест подстроки на строку.  Автодополнение - это ещё и `Buffer.set_import_lookup`
+  и `window._import_lookup_for(buffer)`, так что новый таб получает то же самое.
+* **Строка под списком** теперь говорит «импорт: библиотека.pld» - у библиотечного
+  имени нет описания, но есть файл.
+* **Проверки.**  `src/gui/tests/test_imports.py` - пять случаев (обе записи и оба
+  вида аргумента; директива в комментарии и строке; рекурсия с циклом и пропавшим
+  файлом; поиск от папки своего файла; кэш чтения).  `test_completion.py` - «an
+  imported file adds its predicates» и расширенный случай кэша (новый набор
+  импортов сбрасывает список, тот же - нет).  `test_window.py` - настоящий шов:
+  заполнена строка «Дополнительные каталоги ИМПОРТ», набрана директива, попап
+  предлагает `член_списка/2` и называет файл.  27 скриптов окна и
+  `protocol_smoke.py` зелены; `ctest` не тронут - 422/422.
+* **Документация.**  `doc/gui.typ` §5 (третий источник и правило «только
+  предикаты») и §5.1 (строка про импорт).  ADR-040,
+  `ai/task_102_import_completion.md`.  PDF собраны, страница 14 `gui` посмотрена.
+* **Что осталось на потом.**  Файл, поправленный в соседнем табе, виден только
+  после сохранения: кэш считает версией файл на диске, а не текст буфера.

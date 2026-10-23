@@ -41,7 +41,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from . import completion, queries, search, shortcuts as shortcuts_module, theme, tokens
+from . import completion, imports, queries, search, shortcuts as shortcuts_module, theme, tokens
 from .settings import DEFAULT_FONT_SIZE, MAXIMUM_FONT_SIZE, MINIMUM_FONT_SIZE
 
 #: The comment character of the language: `%` to the end of the line.
@@ -306,6 +306,13 @@ class CodeEditor(ZoomablePlainTextEdit):
         #: settings file, so every view gets the one the window read.
         self._shortcuts: shortcuts_module.Shortcuts | None = None
         self._detail: QLabel | None = None
+        #: How the buffer's `ИМПОРТ` names become texts, handed in by the window
+        #: (task_102); `None` means «nothing is imported as far as the popup is
+        #: concerned», which is what a check of the editor without a window gets.
+        self._import_lookup = None
+        #: The directive list the imported texts were read for, so the scan and the
+        #: reads happen when that list changes and not on every keystroke.
+        self._import_names: list[str] | None = None
         #: The runnable questions of the text by line, for the margin's markers
         #: (task_36); the rule that fills this lives in `queries.py`.
         self._statements: dict[int, str] = {}
@@ -867,6 +874,17 @@ class CodeEditor(ZoomablePlainTextEdit):
         """The built-in descriptions (`doc/builtins.json`); may be absent."""
         self._reference = reference
 
+    def set_import_lookup(self, lookup) -> None:
+        """How the buffer's `ИМПОРТ` names become the texts the popup reads.
+
+        `lookup` takes the directive names of the buffer and answers `{path: text}`
+        — the window's business, because only it knows the search directories, the
+        interpreter and the folder the file lives in (task_102).  `None` (the
+        default) offers nothing from imports.
+        """
+        self._import_lookup = lookup
+        self._import_names = None
+
     def set_shortcuts(self, table) -> None:
         """The `Ctrl`+key insertions of task_31 (a `Shortcuts` table)."""
         self._shortcuts = table
@@ -927,8 +945,12 @@ class CodeEditor(ZoomablePlainTextEdit):
         than a label that says «нет описания» for every name of the document.
         The label is word-wrapped to a width of its own, so a long summary and
         the argument modes read as several lines, not as one line off the screen.
+
+        A name an imported file brings in has no record either, but it does have a
+        file (task_102): that line is the whole label, unless the name is also a
+        built-in, where the record comes after it.
         """
-        if self._completer is None or self._detail is None or self._reference is None:
+        if self._completer is None or self._detail is None:
             return
         popup = self._completer.popup()
         if not popup.isVisible():
@@ -937,7 +959,11 @@ class CodeEditor(ZoomablePlainTextEdit):
         offer = next((item for item in self._offers if item.label == label), None)
         if offer is None:
             offer = self._offer_at(popup.currentIndex().row())
-        lines = self._reference.detail_lines(offer.name) if offer is not None else []
+        lines: list[str] = []
+        if offer is not None and offer.origin:
+            lines.append(f"импорт: {offer.origin}")
+        if offer is not None and self._reference is not None:
+            lines += self._reference.detail_lines(offer.name)
         if not lines:
             self._detail.hide()
             return
@@ -964,6 +990,7 @@ class CodeEditor(ZoomablePlainTextEdit):
         if not force and len(prefix) < self._auto_complete_after:
             self._hide_completion()
             return
+        self._refresh_imports(text)
         self._completion.update(text)
         self._offers = self._completion.candidates(prefix)
         if not self._offers:
@@ -983,6 +1010,22 @@ class CodeEditor(ZoomablePlainTextEdit):
         # The description follows the row that is highlighted now, whether Qt
         # announced the change or not: the index was set here.
         self._update_detail()
+
+    def _refresh_imports(self, text: str) -> None:
+        """Asks the window what the buffer's `ИМПОРТ` lines bring in (task_102).
+
+        Only when the list of directive names differs from the one the texts were
+        read for: the popup is asked for on every keystroke, and tokenising (and
+        reading) the imported files for each of them is the one thing that would
+        make it stutter.
+        """
+        if self._import_lookup is None or self._completion is None:
+            return
+        names = imports.directive_names(text, self._keywords)
+        if names == self._import_names:
+            return
+        self._import_names = names
+        self._completion.set_imported(self._import_lookup(names))
 
     def _offer_at(self, row: int) -> completion.Candidate | None:
         if 0 <= row < len(self._offers):

@@ -39,6 +39,9 @@ class Buffer(QObject):
         self._reference = None
         #: The `Ctrl`+key insertions (task_31), shared by every view.
         self._shortcuts = None
+        #: How the `ИМПОРТ` lines become the texts the popups read (task_102):
+        #: the window answers, because only it knows the search directories.
+        self._import_lookup = None
 
         # The layout is not optional.  A `QPlainTextEdit` refuses a document that
         # does not use `QPlainTextDocumentLayout` — Qt prints one warning and the
@@ -91,6 +94,7 @@ class Buffer(QObject):
         editor.set_completion_keywords(self.highlighter.keywords)
         editor.set_reference(self._reference)
         editor.set_shortcuts(self._shortcuts)
+        editor.set_import_lookup(self._import_lookup)
         editor.set_wrap(self._settings.wrap)
         self._views.append(editor)
         return editor
@@ -193,6 +197,17 @@ class Buffer(QObject):
         self._reference = reference
         for view in self._views:
             view.set_reference(reference)
+
+    def set_import_lookup(self, lookup) -> None:
+        """How this document's `ИМПОРТ` names become texts the popups can read.
+
+        Completion offers the names a file *brings in* (task_102), and the files are
+        found the way the interpreter finds them — which is the window's knowledge
+        (the folder of this file, the `-I` rows, the interpreter), not the buffer's.
+        """
+        self._import_lookup = lookup
+        for view in self._views:
+            view.set_import_lookup(lookup)
 
     def set_shortcuts(self, table) -> None:
         """The `Ctrl`+key insertions (task_31); one table for every view."""

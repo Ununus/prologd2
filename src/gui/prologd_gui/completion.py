@@ -13,14 +13,17 @@ may not parse at all.
 
 from __future__ import annotations
 
+import pathlib
 from dataclasses import dataclass
 
 from . import tokens
 from .keywords import Keywords
 
-#: Where a candidate came from; at equal rank a reserved name wins.
+#: Where a candidate came from; at equal rank a reserved name wins, then the
+#: document's own, then a name an imported file brings in (task_102).
 BUILTIN = "builtin"
 USER = "user"
+IMPORTED = "imported"
 
 #: What a candidate is.  Names of both kinds are inserted the same way.
 PREDICATE = "predicate"
@@ -30,6 +33,10 @@ ATOM_NAME = "atom"
 #: it runs to the end of the line, so its last column is still inside it, and a
 #: `#…#` block is a run between two `#` tokens rather than one token.
 _SUPPRESSED = (tokens.STRING, tokens.QUOTED_ATOM)
+
+#: Where a candidate came from, best first: a reserved name wins a tie, then the
+#: document's own, and a name an imported file brings in comes last (task_102).
+_SOURCE_RANK = {BUILTIN: 0, USER: 1, IMPORTED: 2}
 
 _QUOTES = "'\""
 
@@ -49,6 +56,8 @@ class Candidate:
     source: str = USER
     quoted: bool = False
     variadic: bool = False
+    #: The file an imported name comes from, for the popup's label (task_102).
+    origin: str | None = None
 
     @property
     def label(self) -> str:
@@ -148,8 +157,16 @@ def collect_names(text: str, keywords: Keywords | None = None):
     return calls, atoms, quoted
 
 
-def collect(text: str, keywords: Keywords | None = None) -> list[Candidate]:
-    """Every candidate for a document: the reserved names, then its own."""
+def collect(text: str, keywords: Keywords | None = None, imported=None) -> list[Candidate]:
+    """Every candidate for a document: the reserved names, then its own, then the
+    ones its `ИМПОРТ` files bring in (task_102).
+
+    `imported` is `{path: text}`, exactly what `imports.ImportedFiles.texts`
+    answers; the file's name is kept so the popup can say where a name came from.
+    Only *predicates* are taken from there — a library's atoms (a colour, a kind of
+    friction) are not what the next goal is typed with, and they would bury the
+    names of the document itself.
+    """
     candidates: list[Candidate] = []
     reserved: set[str] = set()
     if keywords is not None:
@@ -179,6 +196,23 @@ def collect(text: str, keywords: Keywords | None = None) -> list[Candidate]:
         candidates.append(Candidate(name, None, ATOM_NAME, USER))
     for name in sorted(quoted):
         candidates.append(Candidate(name, None, ATOM_NAME, USER, quoted=True))
+    # What the imported files define.  A name the document itself has is offered
+    # once, as the document's own, and an imported file's atoms are left out: the
+    # point of the import is the predicates.
+    offered = set(calls) | atoms
+    for path, source in (imported or {}).items():
+        origin = pathlib.PurePath(path).name
+        file_calls, _atoms, _quoted = collect_names(source, keywords)
+        for name in sorted(file_calls):
+            if name in reserved or name in offered:
+                continue
+            offered.add(name)
+            for arity in sorted(
+                file_calls[name], key=lambda value: (value is None, value or 0)
+            ):
+                candidates.append(
+                    Candidate(name, arity, PREDICATE, IMPORTED, origin=origin)
+                )
     return candidates
 
 
@@ -197,6 +231,20 @@ class CompletionModel:
         self._case_sensitive = case_sensitive
         self._text: str | None = None
         self._candidates: list[Candidate] = []
+        self._imported: dict[str, str] = {}
+
+    def set_imported(self, texts) -> None:
+        """The texts the document's `ИМПОРТ` lines bring in (task_102).
+
+        Handed over by the window (it alone knows the search directories), so the
+        model stays a function of texts.  Rebuilding the list is what the next
+        `update` does; asking twice with the same texts does nothing.
+        """
+        texts = dict(texts or {})
+        if texts == self._imported:
+            return
+        self._imported = texts
+        self._text = None  # the imported half of the list changed
 
     def set_keywords(self, keywords: Keywords | None) -> None:
         self._keywords = keywords
@@ -209,7 +257,7 @@ class CompletionModel:
     def update(self, text: str) -> None:
         if text != self._text:
             self._text = text
-            self._candidates = collect(text, self._keywords)
+            self._candidates = collect(text, self._keywords, self._imported)
 
     def candidates(self, prefix: str) -> list[Candidate]:
         folded = self._fold(prefix)
@@ -229,12 +277,13 @@ class CompletionModel:
             # Same case as typed, then a match at all (a case-insensitive model
             # can offer more than the prefix matches literally), then the same
             # alphabet as the prefix — a Cyrillic prefix should not put Latin
-            # names first — then reserved names, predicates, and finally the
+            # names first — then reserved names, the document's own and the
+            # imported ones, then predicates before atoms, and finally the
             # alphabet so the order stays stable between keystrokes.
             not candidate.match_text.startswith(prefix),
             not name.startswith(folded),
             tokens.alphabet_of(prefix) != tokens.alphabet_of(candidate.match_text),
-            candidate.source != BUILTIN,
+            _SOURCE_RANK.get(candidate.source, len(_SOURCE_RANK)),
             candidate.kind != PREDICATE,
             name,
         )

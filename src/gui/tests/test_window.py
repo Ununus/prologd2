@@ -3545,6 +3545,42 @@ def test_the_reserved_names_are_there_before_the_first_run(executable: str) -> N
     print("ok: the reserved names are there before the first run")
 
 
+def test_an_imported_file_reaches_the_popup(executable: str, files: pathlib.Path) -> None:
+    """task_102: the predicates an `ИМПОРТ` line names are offered while typing.
+
+    The names live in another file, and only the window knows how the interpreter
+    would find it (the «Дополнительные каталоги ИМПОРТ» row and `stdlib`).  This is
+    the check of that seam: the row is filled, the directive is typed, and the popup
+    offers the library's predicate and says which file it came from.
+    """
+    library = files / "библиотека.pld"
+    library.write_text("член_списка(X, [X|_]).\n", encoding="utf-8")
+    window = empty_window(executable)
+    try:
+        window._settings.import_paths = [str(files)]
+        view = window.editor()
+        view.setPlainText(':- ИМПОРТ("библиотека.pld").\nчлен_с')
+        cursor = view.textCursor()
+        cursor.movePosition(QTextCursor.MoveOperation.End)
+        view.setTextCursor(cursor)
+        view._maybe_complete(force=True)
+        try:
+            labels = view.completion_labels()
+            # The word being typed is in the buffer, so the document offers it too;
+            # the library's predicate is the one only the import could know.
+            assert "член_списка/2" in labels, labels
+            row = labels.index("член_списка/2")
+            view._completer.popup().setCurrentIndex(view._offer_list.index(row, 0))
+            view._update_detail()
+            detail = view.completion_detail()
+            assert detail.startswith("импорт: библиотека.pld"), detail
+        finally:
+            view._hide_completion()
+    finally:
+        discard_changes(window)
+    print("ok: the popup offers what an imported file defines, and names the file")
+
+
 def test_running_programs_without_questions_finishes(executable: str) -> None:
     """A run is over when the *load* is: `result` only arrives for questions."""
     window = empty_window(executable)
@@ -5113,6 +5149,7 @@ def main(argv: list[str]) -> int:
         test_the_conversion_opens_in_a_tab_of_its_own(executable)
         test_the_mode_control_stands_beside_the_command_it_changes(executable)
         test_the_reserved_names_are_there_before_the_first_run(executable)
+        test_an_imported_file_reaches_the_popup(executable, files)
         test_running_programs_without_questions_finishes(executable)
         test_f1_shows_the_record_of_the_word_under_the_caret(executable)
         test_the_cheat_sheet_lists_the_insert_table(executable)
