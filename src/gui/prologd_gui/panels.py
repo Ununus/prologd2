@@ -20,9 +20,12 @@ from dataclasses import dataclass
 
 from PySide6.QtCore import QSize, Qt, QTimer, Signal
 from PySide6.QtGui import (
+    QAction,
     QColor,
     QFont,
     QFontMetrics,
+    QGuiApplication,
+    QKeySequence,
     QPainter,
     QPen,
     QTextCharFormat,
@@ -519,6 +522,14 @@ class ProblemsPane(ZoomableTable):
         # A double-click and the keyboard's own activation are the same act here.
         self.itemDoubleClicked.connect(self._on_activated)
         self.itemActivated.connect(self._on_activated)
+        # A right click on a row offers «Копировать»: a diagnostic is pasted into a
+        # letter or an issue far more often than it is recited, and the message is
+        # the one thing a reader cannot retype without a typo.
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.ActionsContextMenu)
+        self.copy_action = QAction("Копировать", self)
+        self.copy_action.setShortcut(QKeySequence.StandardKey.Copy)
+        self.copy_action.triggered.connect(self.copy_current_problem)
+        self.addAction(self.copy_action)
         self.set_font_size(font_size)
 
     # -- what the window drives --------------------------------------------
@@ -604,6 +615,37 @@ class ProblemsPane(ZoomableTable):
     def problems(self) -> list[tuple[str, str, str, object]]:
         """The rows as records (what a test reads instead of the widget)."""
         return list(self._problems)
+
+    def problem_text(self, row: int) -> str:
+        """One diagnostic as the text «Копировать» puts on the clipboard.
+
+        `файл:строка:столбец: сообщение` when the diagnostic knows its place — the
+        shape a compiler prints and a reader can paste anywhere — and the message
+        alone when it does not (a line of the window's own log, or a goal typed in
+        the question field).
+        """
+        if not 0 <= row < len(self._problems):
+            return ""
+        _kind, _severity, message, position = self._problems[row]
+        if position is None:
+            return message
+        name = getattr(position, "file", "")
+        line = int(getattr(position, "line", 0) or 0)
+        column = int(getattr(position, "column", 0) or 0)
+        if not name or not line:
+            return message
+        place = f"{name}:{line}"
+        if column:
+            place += f":{column}"
+        return f"{place}: {message}"
+
+    def copy_current_problem(self) -> bool:
+        """Puts the selected row on the clipboard; False when nothing is selected."""
+        text = self.problem_text(self.currentRow())
+        if not text:
+            return False
+        QGuiApplication.clipboard().setText(text)
+        return True
 
     def text(self) -> str:
         """The table as the log the pane used to be: one line per diagnostic.

@@ -72,8 +72,37 @@ TEST_CASE("an unclosed bracket is reported at the opening bracket") {
   REQUIRE(error.message == "непарные скобки: '(' открыта в строке 1");
 }
 
-TEST_CASE("a missing final dot is reported at the end of the clause") {
-  const std::vector<PrologError> diagnostics = diagnosticsOf("факт(1)\n");
+TEST_CASE("a value where a functor belongs is not called an unpaired bracket") {
+  // `атом(Переменная("текст")).` is bracketed correctly, and the fault is the
+  // variable used as a name.  The argument list used to report the outer `(` as
+  // unpaired, which sent the reader looking for a missing bracket that is there.
+  const std::vector<PrologError> diagnostics = diagnosticsOf("атом(Переменная(\"текст\")).\n");
+  REQUIRE(diagnostics.size() == 1);
+  const PrologError& error = diagnostics.front();
+  REQUIRE(error.code == ErrorCode::InvalidFunction);
+  REQUIRE(error.message.find("Переменная не может быть именем функции") != std::string::npos);
+  REQUIRE(error.message.find("непарные") == std::string::npos);
+  // The complaint sits on the bracket the value put in front of: byte 29 ends the
+  // name, so its `(` is column 30.
+  REQUIRE(error.location.column == 30);
+}
+
+TEST_CASE("a string where a functor belongs says so, and the head rule keeps its own") {
+  // The dialect's naming mode reads a capitalised word as a string, and a string is
+  // a value: the same message, worded for a string.
+  const std::vector<PrologError> diagnostics = diagnosticsOf(
+      ":- ИМЕНА(1).\nатом(Переменная(\"текст\")).\n");
+  REQUIRE(diagnostics.size() == 1);
+  REQUIRE(diagnostics.front().message.find("Строка не может быть именем функции") !=
+          std::string::npos);
+  // At the head of a clause the old message is the right one, and it stays: there
+  // the fault is the variable in head position, not a call of it.
+  const std::vector<PrologError> head = diagnosticsOf("Переменная(\"текст\").\n");
+  REQUIRE(head.size() == 1);
+  REQUIRE(head.front().message == "Голова предложения не может быть списком или переменной");
+}
+
+TEST_CASE("a missing final dot is reported at the end of the clause") {  const std::vector<PrologError> diagnostics = diagnosticsOf("факт(1)\n");
   REQUIRE(diagnostics.size() == 1);
   const PrologError& error = diagnostics.front();
   REQUIRE(error.code == ErrorCode::InvalidSentence);

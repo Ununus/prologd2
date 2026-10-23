@@ -27,7 +27,7 @@ from test_session import find_executable, pump  # noqa: E402
 from test_paths import make_package, packaged  # noqa: E402
 
 try:
-    from PySide6.QtGui import QTextCursor
+    from PySide6.QtGui import QGuiApplication, QTextCursor
     from PySide6.QtWidgets import QApplication
 except ImportError:  # pragma: no cover - main() reports it
     QApplication = None  # type: ignore[assignment]
@@ -2855,6 +2855,29 @@ def test_the_problems_are_a_table_a_double_click_opens_the_line(
         assert window._problems.rowHeight(1) > one * 2, (
             window._problems.rowHeight(1),
             one,
+        )
+
+        # A right click on a row offers «Копировать» (`Ctrl+C` works too), and what
+        # lands on the clipboard is the diagnostic in the shape a bug report wants:
+        # `файл:строка:столбец: сообщение`, not just the words.
+        window._problems.selectRow(0)
+        assert window._problems.copy_action.text() == "Копировать", "no copy entry"
+        window._problems.copy_action.trigger()
+        copied = QGuiApplication.clipboard().text()
+        assert "непарные скобки" in copied, ascii(copied)
+        assert ":2:" in copied, ascii(copied)
+        assert "модуль.pld" in copied, ascii(copied)
+        # A row without a place is copied as its message, and nothing selected
+        # means nothing copied.
+        window._problems.selectRow(1)
+        window._problems.copy_action.trigger()
+        assert QGuiApplication.clipboard().text().startswith("длинное сообщение"), (
+            ascii(QGuiApplication.clipboard().text())
+        )
+        window._problems.clearSelection()
+        window._problems.copy_action.trigger()
+        assert QGuiApplication.clipboard().text().startswith("длинное сообщение"), (
+            "a trigger without a selected row must not empty the clipboard"
         )
     finally:
         discard_changes(window)

@@ -621,6 +621,27 @@ Term Parser::parseArguments(const Token& name) {
     break;
   }
   if (!match(TokenKind::RParen)) {
+    if (failed_) {
+      // The argument already failed to parse.  The bracket of *this* call is fine,
+      // and a second complaint about it would send the reader looking for the wrong
+      // fault.
+      return makeCompound(name.text, std::move(arguments));
+    }
+    if (check(TokenKind::LParen) && !arguments.empty()) {
+      // A value where a functor belongs: `атом(Переменная("текст"))`.  In the ISO
+      // naming mode the word is a variable, in the dialect's own mode a capitalised
+      // name is a string — neither can be a functor — and the outer bracket is
+      // paired, so reporting it as unpaired hid the real fault.
+      const TermKind previous = arguments.back().kind;
+      const bool variable = previous == TermKind::Var;
+      report(ErrorCode::InvalidFunction, peek().location,
+             variable
+                 ? "Переменная не может быть именем функции: имя — это атом; "
+                   "если это имя, заключите его в кавычки: 'Имя'(X)"
+                 : "Строка не может быть именем функции: имя — это атом; "
+                   "запишите его в одинарных кавычках: 'имя'(X)");
+      return makeCompound(name.text, std::move(arguments));
+    }
     if (check(TokenKind::Semicolon)) {
       report(ErrorCode::InvalidFunction, peek().location,
              "«;» — дизъюнкция; заключите её в скобки: (A ; B)");
