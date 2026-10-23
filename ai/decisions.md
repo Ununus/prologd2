@@ -1288,3 +1288,48 @@ Protocol 15 is written down in four places (`protocol.cpp`, `protocol.py`,
 
 **Status.** Accepted 2026-10-23 (task_99); the rule about one-letter atoms and the
 renaming of the two menu entries are part of it (part 167).
+
+## ADR-039: the dialect conversion trades a call for the sign it already is
+
+**Context.**  The dialect answers to two sets of names — the Russian built-ins and
+their English aliases (task_39) — and to two spellings of four of them: `=`, `is`,
+`<`, `>` and `\+` are sugar the parser melts into `РАВНО`, `МЕНЬШЕ`, `БОЛЬШЕ` and
+`НЕ` (tasks 52, 55, 92).  A program written in Russian therefore has an
+ISO-looking twin, and the owner asked for a conversion in both directions, beside
+the naming one (task_99) that already rides the formatter's request.
+
+**Decision.**  One more *print* option of the same request:
+`FormatOptions::dialect_out` and a pass that runs **before** the naming pass and
+the layout, so a single request can ask for all three.  The pass rewrites the
+token list and copies every byte outside a rewritten span as it was written; the
+answer is lexed and parsed again before it is returned, so a conversion cannot
+turn a working file into a broken one.
+
+- The names come from `builtinAliases()` (one place lists a pair, so no name can
+  be invented) plus `ВЫП`/`call` and `ИМПОРТ`/`import`, which are answered outside
+  that table.
+- A call becomes a sign because the two are *the same term*, not because they
+  look alike: `=` is `РАВНО/2`, `>` is `БОЛЬШЕ/2`, `\+` is `НЕ/1`, and `is` builds
+  `РАВНО(X, ЭКСПР(Y))` — which is exactly `РАВНО(X, #Y#)`, since `#…#` is the
+  expression wrapper.  That is why `РАВНО(X, #Y#)` → `X is Y` and not `X = Y`.
+- A call keeps its name where a sign cannot stand: a nested operator call
+  (`РАВНО(РАВНО(X, Y), Z)` has no spelling — `X = Y = Z` is a chain the language
+  refuses), a comment inside the arguments (a rewrite would lose it), a wrong
+  arity.  The rename still happens (`equal`, `greater`), so nothing is lost —
+  only spelled out.  `ИЛИ` has no English name at all (task_83) and stays.
+- The marker line `:- ИМЕНА(N).` is copied as it is: `variables(0)` would not be
+  read as a marker, and the file is read by that line.
+- A fragment (`selection_only`) is not converted: its structure is cut in the
+  middle, and the rewrite needs whole terms.
+
+**Consequences.**  A Russian program can be printed as an ISO one and back, and
+the round trip settles: `en → ru → en` is word for word the first text.  The two
+axes are independent and composable (`--dialect en --names 0 --format=hard`), and
+the window lists both in one submenu — «Имена: …» and «Диалект: …» — so the user
+sees which of the two rewrites is meant before clicking.  Protocol 16 carries the
+new field; a front end that does not send `dialect` behaves as before.  What the
+conversion cannot say, it leaves in the other language — `equal(X, Y)` is still
+this dialect's name, not ISO's (ISO writes `=(X, Y)`, which our parser does not
+read), and that is the one place where "as ISO as possible" stops.
+
+**Status.** Accepted 2026-10-23 (task_101).

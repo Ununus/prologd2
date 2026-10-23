@@ -584,8 +584,7 @@ TEST_CASE("the way back keeps the names it can and marks the rest") {
   REQUIRE(back.text == ":- ИМЕНА(1).\nпример(X_1',Y,\"Str\",_Пер).\n");
 }
 
-TEST_CASE("a one-letter atom takes quotes for the old dialect, which reads it as a variable") {
-  // In ISO `?одно(а, а).` asks about a *constant*, while the old dialect reads one
+TEST_CASE("a one-letter atom takes quotes for the old dialect, which reads it as a variable") {  // In ISO `?одно(а, а).` asks about a *constant*, while the old dialect reads one
   // letter as a variable: without the quotes the question would change its meaning
   // and answer `а=_1` instead of ДА (the owner's example, part 167).  A letter with
   // a trailing `_` is one of the old dialect's variables too, so it takes quotes as
@@ -606,4 +605,160 @@ TEST_CASE("a one-letter atom takes quotes for the old dialect, which reads it as
           "?одно('а', 'а').\n"
           "смесь(Э, 'а_', а1, атом, 'а').\n"
           "'а'(1).\n");
+}
+
+// ---------------------------------------------------------------------------
+// The dialect conversion (task_101)
+// ---------------------------------------------------------------------------
+
+namespace {
+
+/// «Print the built-ins in `target` language», the way `--dialect` asks for it.
+FormatOptions toDialect(Dialect target) {
+  FormatOptions options;
+  options.dialect_out = target;
+  return options;
+}
+
+}  // namespace
+
+TEST_CASE("a Russian program is printed in the English names and signs") {
+  // Every rule of the direction, in one program.  `ВЫВОД`/`ВЫВОДПС`/`ПС`/`НАЙТИВСЕ`
+  // come from the alias table; `РАВНО` is `=` (and `is` when its right operand is a
+  // marked expression — the two are one term, `is` differs only by that wrapper),
+  // `БОЛЬШЕ`/`МЕНЬШЕ` are the signs, and `НЕ` is ISO's `\+`.  `ИМПОРТ` and `ВЫП` are
+  // answered outside the alias table and are listed beside it.  `ИЛИ` has no
+  // English name, so it stays; a user's own `вывод_свой` is not a built-in either.
+  const std::string source =
+      ":- ИМЕНА(0).\n"
+      ":- ИМПОРТ(\"библиотека.pld\").\n"
+      "свой :- ВЫВОД(1), ВЫВОДПС(2), ПС.\n"
+      "вывод_свой :- ВЫВОД(3).\n"
+      "оба :- ИЛИ(ИСТИНА, ЛОЖЬ).\n"
+      "вызов(G) :- ВЫП(G).\n"
+      "больше(X, Y) :- БОЛЬШЕ(X, Y).\n"
+      "меньше(X, Y) :- МЕНЬШЕ(X, Y).\n"
+      "равно(X, Y) :- РАВНО(X, Y).\n"
+      "сумма(X, Y) :- РАВНО(X, #Y + 1#).\n"
+      "нет(X) :- НЕ(РАВНО(X, 1)).\n"
+      "?НАЙТИВСЕ(X, (число(X), БОЛЬШЕ(X, 2)), L).\n";
+  const FormatResult result = format(source, toDialect(Dialect::English));
+  REQUIRE(result.ok());
+  REQUIRE(result.text ==
+          ":- ИМЕНА(0).\n"
+          ":- import(\"библиотека.pld\").\n"
+          "свой:-write(1), writeln(2), nl.\n"
+          "вывод_свой:-write(3).\n"
+          "оба:-ИЛИ(true, fail).\n"
+          "вызов(G):-call(G).\n"
+          "больше(X, Y):-X > Y.\n"
+          "меньше(X, Y):-X < Y.\n"
+          "равно(X, Y):-X = Y.\n"
+          "сумма(X, Y):-X is Y + 1.\n"
+          "нет(X):-\\+ X = 1.\n"
+          "?findall(X, (число(X), X > 2), L).\n");
+}
+
+TEST_CASE("an English program is printed in the Russian names and signs") {
+  // The way back: the signs become the calls this dialect spells them with, and
+  // `is` puts its operand back inside `#…#`, where the expression wrapper lives.
+  const std::string source =
+      ":- ИМЕНА(0).\n"
+      ":- import(\"библиотека.pld\").\n"
+      "свой :- write(1), writeln(2), nl.\n"
+      "вызов(G) :- call(G).\n"
+      "равно(X, Y) :- X = Y.\n"
+      "сумма(X, Y) :- X is Y + 1.\n"
+      "нет(X) :- \\+ X = 1.\n"
+      "?findall(X, (число(X), X > 2), L).\n";
+  const FormatResult result = format(source, toDialect(Dialect::Russian));
+  REQUIRE(result.ok());
+  REQUIRE(result.text ==
+          ":- ИМЕНА(0).\n"
+          ":- ИМПОРТ(\"библиотека.pld\").\n"
+          "свой:-ВЫВОД(1), ВЫВОДПС(2), ПС.\n"
+          "вызов(G):-ВЫП(G).\n"
+          "равно(X, Y):-РАВНО(X, Y).\n"
+          "сумма(X, Y):-РАВНО(X, #Y + 1#).\n"
+          "нет(X):-НЕ(РАВНО(X, 1)).\n"
+          "?НАЙТИВСЕ(X, (число(X), БОЛЬШЕ(X, 2)), L).\n");
+}
+
+TEST_CASE("a dialect conversion says nothing it cannot say, and keeps every comment") {
+  // A call the target language cannot write as a sign keeps its name: a comment
+  // stands inside it, its arity is not the sign's, or one of its operands is not
+  // an operand.  Renaming is still exact — `equal/2` is `РАВНО/2` — so nothing is
+  // ever lost, only left spelled out.
+  const std::string source =
+      ":- ИМЕНА(0).\n"
+      "коммент(X, Y) :- РАВНО(X, % почему\n"
+      "                        Y).\n"
+      "странно(X) :- БОЛЬШЕ(X).\n"
+      "цепочка(X, Y) :- РАВНО(РАВНО(X, Y), Z).\n";
+  const FormatResult result = format(source, toDialect(Dialect::English));
+  REQUIRE(result.ok());
+  // The comment's own line keeps the indentation its author gave it, so the three
+  // statements are looked up one by one rather than as one text.
+  REQUIRE(result.text.find("equal(X, % почему") != std::string::npos);
+  REQUIRE(result.text.find('%') == result.text.find("% почему"));
+  REQUIRE(result.text.find("странно(X):-greater(X).") != std::string::npos);
+  REQUIRE(result.text.find("цепочка(X, Y):-equal(X = Y, Z).") != std::string::npos);
+}
+
+TEST_CASE("the two dialect directions are each other's way back") {
+  // A conversion is also a layout (soft, the default), so the program comes back in
+  // the standard shape — and not one word of it is lost.
+  const std::string source =
+      ":- ИМЕНА(0).\n"
+      "вывод :- ВЫВОД(1), ВЫВОДПС(2).\n"
+      "проверка(X) :- БОЛЬШЕ(X, 1), НЕ(РАВНО(X, #2 + 0#)).\n";
+  const FormatResult english = format(source, toDialect(Dialect::English));
+  REQUIRE(english.ok());
+  const FormatResult back = format(english.text, toDialect(Dialect::Russian));
+  REQUIRE(back.ok());
+  REQUIRE(back.text ==
+          ":- ИМЕНА(0).\n"
+          "вывод:-ВЫВОД(1), ВЫВОДПС(2).\n"
+          "проверка(X):-БОЛЬШЕ(X, 1), НЕ(РАВНО(X, #2 + 0#)).\n");
+}
+
+TEST_CASE("a dialect conversion leaves the marker line and a fragment alone") {
+  // The marker is this dialect's own word, and `variables(0)` would not be read as
+  // one, so the first line is copied as it is written.  A fragment is not
+  // converted at all: its names would be renamed without the numbering a
+  // conversion of the whole program needs.
+  FormatOptions options = toDialect(Dialect::English);
+  options.variables = VariableMode::Old;
+  const FormatResult marked = format(":- ИМЕНА(1).\nцель(а).\n", options);
+  REQUIRE(marked.ok());
+  REQUIRE(marked.text == ":- ИМЕНА(1).\nцель(а).\n");
+
+  FormatOptions fragment = toDialect(Dialect::English);
+  fragment.selection_only = true;
+  const FormatResult kept = format("ВЫВОД(1), ВЫВОД", fragment);
+  REQUIRE(kept.ok());
+  REQUIRE(kept.text == "ВЫВОД(1), ВЫВОД");
+}
+
+TEST_CASE("a dialect conversion composes with the layout and the names") {
+  // One request asks for all three: the words, the variables and the shape.  The
+  // order is fixed — dialect first, then the names, then the layout — so the
+  // answer is a program that can be read and run straight away.
+  FormatOptions options;
+  options.mode = FormatMode::Hard;
+  options.dialect_out = Dialect::English;
+  options.names_out = VariableMode::Iso;
+  options.variables = VariableMode::Old;
+  const std::string source =
+      ":- ИМЕНА(1).\n"
+      "пример(Х) :- ВЫВОД(Х), БОЛЬШЕ(Х, 1).\n";
+  const FormatResult result = format(source, options);
+  REQUIRE(result.ok());
+  // `Х` is one variable with no shared base, so its ISO spelling is `Х` itself:
+  // the regex of the naming conversion has nothing to number here.
+  REQUIRE(result.text ==
+          ":- ИМЕНА(0).\n"
+          "пример(Х):-\n"
+          "\twrite(Х),\n"
+          "\tХ > 1.\n");
 }

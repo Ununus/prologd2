@@ -90,6 +90,9 @@ int main(int argc, char** argv) {
   // `--names` converts while it prints (task_99): the answer is the same program
   // spelled in the other naming mode.  -1 means «print the names as they are».
   int namesOut = -1;
+  // `--dialect` prints the built-in names of one language in the other (task_101):
+  // empty means «as they are written».
+  std::string dialectOut;
   // Left unset on purpose: the engine's own defaults are the ones to use, and a
   // flag that repeats them would become a second place to change them.
   std::optional<std::size_t> maxDepth;
@@ -139,6 +142,11 @@ int main(int argc, char** argv) {
                  "1 the old dialect (2 is a spelling of 1); the first line of the "
                  "answer says which")
       ->check(CLI::Range(0, 2));
+  app.add_option("--dialect", dialectOut,
+                 "Print the source with its built-in names in another language and "
+                 "exit: en (write, findall, =, is, >, \\+) or ru (ВЫВОД, НАЙТИВСЕ, "
+                 "РАВНО, БОЛЬШЕ, НЕ)")
+      ->check(CLI::IsMember({"ru", "en"}));
   app.add_option("files", positional, "Source files");
 
   try {
@@ -180,9 +188,10 @@ int main(int argc, char** argv) {
   // answer is the text — no interpreter, no engine.  Unparsable input exits 2
   // with the usual diagnostics, so a script can tell «formatted» from «not
   // formatted» without reading the output.
-  if ((formatOption != nullptr && formatOption->count() > 0) || namesOut >= 0) {
+  if ((formatOption != nullptr && formatOption->count() > 0) || namesOut >= 0 ||
+      !dialectOut.empty()) {
     if (protocol == "json") {
-      std::cerr << "error: --format and --names write the source to stdout; "
+      std::cerr << "error: --format, --names and --dialect write the source to stdout; "
                    "drop --protocol json\n";
       return 1;
     }
@@ -207,6 +216,10 @@ int main(int argc, char** argv) {
         return 1;
       }
       formatOptions.names_out = *target;
+    }
+    if (!dialectOut.empty()) {
+      formatOptions.dialect_out =
+          dialectOut == "en" ? prologd::Dialect::English : prologd::Dialect::Russian;
     }
     formatOptions.width = formatWidth;
     formatOptions.indent_steps = formatIndent;

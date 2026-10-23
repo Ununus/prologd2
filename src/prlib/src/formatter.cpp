@@ -12,6 +12,7 @@
 
 #include "prlib/lexer.hpp"
 #include "prlib/parser.hpp"
+#include "prlib/engine.hpp"
 #include "prlib/utf8.hpp"
 
 namespace prologd {
@@ -887,6 +888,533 @@ std::vector<std::size_t> tokenBegins(const TokenList& tokens, std::string_view s
   return begins;
 }
 
+// ---------------------------------------------------------------------------
+// The dialect conversion (task_101)
+// ---------------------------------------------------------------------------
+
+/// The pairs of built-in names in the two languages.  The alias table is the one
+/// source of truth (task_39), so the conversion cannot invent a name the engine
+/// does not answer to.  Two names are answered outside that table and are added
+/// here: `ВЫП`/`call` (the solver) and `ИМПОРТ`/`import` (the parser).
+const std::vector<BuiltinAlias>& dialectPairs() {
+  static const std::vector<BuiltinAlias> pairs = [] {
+    std::vector<BuiltinAlias> out;
+    const std::span<const BuiltinAlias> aliases = builtinAliases();
+    out.insert(out.end(), aliases.begin(), aliases.end());
+    out.emplace_back("ВЫП", "call");
+    out.emplace_back("ИМПОРТ", "import");
+    return out;
+  }();
+  return pairs;
+}
+
+/// What a call of a built-in that has a sign spelling means.
+enum class SignCall : std::uint8_t { None, Equal, Greater, Less, Not };
+
+/// True when a token is a comparison sign — the group an operand of `=` never
+/// contains unparenthesised, so a span holding one is not "one operand".
+bool isComparisonSign(TokenKind kind) {
+  switch (kind) {
+    case TokenKind::Equal:
+    case TokenKind::Less:
+    case TokenKind::Greater:
+    case TokenKind::LessEqual:
+    case TokenKind::GreaterEqual:
+    case TokenKind::NotEqual:
+    case TokenKind::ArithEqual:
+    case TokenKind::ArithNotEqual:
+    case TokenKind::AtLess:
+    case TokenKind::AtLessEqual:
+    case TokenKind::AtGreater:
+    case TokenKind::AtGreaterEqual:
+    case TokenKind::NotGoal:
+      return true;
+    default:
+      return false;
+  }
+}
+
+/// A word that ends an operand: a term never contains one of these unparenthesised.
+bool isOperandBoundary(TokenKind kind) {
+  return isComparisonSign(kind) || kind == TokenKind::Comma || kind == TokenKind::Semicolon ||
+         kind == TokenKind::IfThen || kind == TokenKind::Arrow ||
+         kind == TokenKind::ColonDash || kind == TokenKind::Question ||
+         kind == TokenKind::Dot || kind == TokenKind::Bar;
+}
+
+/// A word that ends a *term*: a comma, a disjunction, an arrow and the like.  A
+/// term reaches across its comparison signs, so those are not separators here.
+bool isSeparator(TokenKind kind) {
+  return kind == TokenKind::Comma || kind == TokenKind::Semicolon ||
+         kind == TokenKind::IfThen || kind == TokenKind::Arrow ||
+         kind == TokenKind::ColonDash || kind == TokenKind::Question ||
+         kind == TokenKind::Dot || kind == TokenKind::Bar;
+}
+
+/// What a call of a built-in means when it is also a sign, whichever of the two
+/// languages its name is spelled in.
+SignCall signCallOf(std::string_view name) {
+  if (name == "РАВНО" || name == "equal") {
+    return SignCall::Equal;
+  }
+  if (name == "БОЛЬШЕ" || name == "greater") {
+    return SignCall::Greater;
+  }
+  if (name == "МЕНЬШЕ" || name == "less") {
+    return SignCall::Less;
+  }
+  if (name == "НЕ" || name == "not") {
+    return SignCall::Not;
+  }
+  return SignCall::None;
+}
+
+/// One direction of the dialect conversion, over a text whose tokens are known.
+///
+/// The rules are read off the parser's own spelling: `X = Y` *is* the term
+/// `РАВНО(X, Y)`, `X > Y` is `БОЛЬШЕ(X, Y)`, and `X is Y` is `РАВНО(X, ЭКСПР(Y))`
+/// — `is` differs from `=` only by the expression wrapper on its right operand,
+/// which in this dialect is what `#…#` is.  So every call form and its sign are
+/// two spellings of one term, and the conversion may trade one for the other
+/// wherever the text parses.
+class DialectConverter {
+ public:
+  DialectConverter(std::string_view source, const TokenList& tokens, Dialect target)
+      : source_(source), tokens_(tokens), target_(target) {
+    begin_.resize(tokens.size());
+    end_.resize(tokens.size());
+    const LineStarts lines = LineStarts::of(source);
+    for (std::size_t i = 0; i < tokens.size(); ++i) {
+      begin_[i] = lines.offset(tokens[i].location);
+      end_[i] = begin_[i] + rawLength(source_, begin_[i], tokens[i]);
+    }
+    for (const BuiltinAlias& pair : dialectPairs()) {
+      if (target == Dialect::English) {
+        names_.emplace(pair.first, pair.second);
+      } else {
+        names_.emplace(pair.second, pair.first);
+      }
+    }
+  }
+
+  /// One past the last token that carries bytes: the `EndOfFile` token does not.
+  std::size_t last() const {
+    return !tokens_.empty() && tokens_.back().kind == TokenKind::EndOfFile ? tokens_.size() - 1
+                                                                         : tokens_.size();
+  }
+
+  /// The index of the first token that starts at or after `offset` bytes.
+  std::size_t firstTokenAt(std::size_t offset) const {
+    std::size_t i = 0;
+    while (i < last() && begin_[i] < offset) {
+      ++i;
+    }
+    return i;
+  }
+
+  std::size_t beginOf(std::size_t index) const { return begin_[index]; }
+
+  /// Where the bytes after the last token start.
+  std::size_t endOfLast() const { return last() == 0 ? source_.size() : end_[last() - 1]; }
+
+  /// The tokens `[from, to)` in the target dialect, with every byte outside the
+  /// rewritten spans copied as it was written.
+  std::string convert(std::size_t from, std::size_t to) const {
+    if (from >= to) {
+      return {};
+    }
+    std::string out;
+    std::size_t cursor = begin_[from];
+    std::size_t i = from;
+    while (i < to) {
+      // A prefix negation stands in front of the operand it applies to, and the
+      // operand of `\+` reaches as far as the next `,`, `;` or `->` — its
+      // precedence is looser than a comparison (task_55).
+      if (target_ == Dialect::Russian && tokens_[i].kind == TokenKind::NotGoal) {
+        const std::size_t end = termEnd(i + 1, to);
+        if (i + 2 <= end) {
+          out += source_.substr(cursor, begin_[i] - cursor);
+          out += "НЕ(";
+          out += convert(i + 1, end);
+          out += ')';
+          cursor = end_[end - 1];
+          i = end;
+          continue;
+        }
+      }
+      // An infix sign ends the operand that starts here: `X = Y` is the term
+      // `РАВНО(X, Y)`, and its two operands are the spans around the sign.
+      if (target_ == Dialect::Russian) {
+        const std::size_t at = firstSign(i, to);
+        if (at != kNone && at > i) {
+          const std::size_t end = rightOperandEnd(at, to);
+          if (at + 1 < end) {
+            const std::string call = signCall(i, at, end);
+            if (!call.empty()) {
+              out += source_.substr(cursor, begin_[i] - cursor);
+              out += call;
+              cursor = end_[end - 1];
+              i = end;
+              continue;
+            }
+          }
+        }
+      }
+      // A call the target dialect writes as a sign.
+      if (target_ == Dialect::English && tokens_[i].kind == TokenKind::Identifier) {
+        const SignCall kind = signCallOf(tokens_[i].text);
+        if (kind != SignCall::None) {
+          std::size_t close = kNone;
+          const std::string call = convertCall(i, to, kind, close);
+          if (!call.empty()) {
+            out += source_.substr(cursor, begin_[i] - cursor);
+            out += call;
+            cursor = end_[close];
+            i = close + 1;
+            continue;
+          }
+        }
+      }
+      out += source_.substr(cursor, begin_[i] - cursor);
+      out += tokenText(i);
+      cursor = end_[i];
+      ++i;
+    }
+    out += source_.substr(cursor, end_[to - 1] - cursor);
+    return out;
+  }
+
+ private:
+  /// The token's text, renamed when it is a built-in of the other language.
+  std::string tokenText(std::size_t i) const {
+    if (tokens_[i].kind == TokenKind::Identifier) {
+      const auto found = names_.find(tokens_[i].text);
+      if (found != names_.end()) {
+        return std::string(found->second);
+      }
+    }
+    return std::string(source_.substr(begin_[i], end_[i] - begin_[i]));
+  }
+
+  /// `is` is a sign, not a name, unless it is called: `X is 1 + 1` and `is(X, Y)`
+  /// are told apart by the bracket that follows.
+  bool isIsSign(std::size_t index, std::size_t to) const {
+    return tokens_[index].kind == TokenKind::Identifier && tokens_[index].text == "is" &&
+           (index + 1 >= to || tokens_[index + 1].kind != TokenKind::LParen);
+  }
+
+  /// The index of the sign that ends the operand starting at `from`; `kNone` when
+  /// the operand ends first — at a separator, at the bracket that closes an
+  /// enclosing group, or at the end of the range.
+  std::size_t firstSign(std::size_t from, std::size_t to) const {
+    std::size_t depth = 0;
+    for (std::size_t j = from + 1; j < to; ++j) {
+      const TokenKind kind = tokens_[j].kind;
+      if (kind == TokenKind::LParen || kind == TokenKind::LBracket) {
+        ++depth;
+        continue;
+      }
+      if (kind == TokenKind::RParen || kind == TokenKind::RBracket) {
+        if (depth == 0) {
+          return kNone;
+        }
+        --depth;
+        continue;
+      }
+      if (depth != 0) {
+        continue;
+      }
+      if (kind == TokenKind::Equal || kind == TokenKind::Greater ||
+          kind == TokenKind::Less || isIsSign(j, to)) {
+        return j;
+      }
+      if (isOperandBoundary(kind)) {
+        return kNone;
+      }
+    }
+    return kNone;
+  }
+
+  /// One past the last token of the operand that follows the sign at `at`.
+  std::size_t rightOperandEnd(std::size_t at, std::size_t to) const {
+    std::size_t depth = 0;
+    for (std::size_t j = at + 1; j < to; ++j) {
+      const TokenKind kind = tokens_[j].kind;
+      if (kind == TokenKind::LParen || kind == TokenKind::LBracket) {
+        ++depth;
+        continue;
+      }
+      if (kind == TokenKind::RParen || kind == TokenKind::RBracket) {
+        if (depth == 0) {
+          return j;
+        }
+        --depth;
+        continue;
+      }
+      if (depth == 0 && isSeparator(kind)) {
+        return j;
+      }
+    }
+    return to;
+  }
+
+  /// One past the last token of the *term* that starts at `from`: a term reaches
+  /// across the comparison signs, so only a separator or the end of the range
+  /// stops it (the operand of `\+` is a whole term).
+  std::size_t termEnd(std::size_t from, std::size_t to) const {
+    std::size_t depth = 0;
+    for (std::size_t j = from; j < to; ++j) {
+      const TokenKind kind = tokens_[j].kind;
+      if (kind == TokenKind::LParen || kind == TokenKind::LBracket) {
+        ++depth;
+        continue;
+      }
+      if (kind == TokenKind::RParen || kind == TokenKind::RBracket) {
+        if (depth == 0) {
+          return j;
+        }
+        --depth;
+        continue;
+      }
+      if (depth == 0 && isSeparator(kind)) {
+        return j;
+      }
+    }
+    return to;
+  }
+
+  /// The text of `РАВНО(A, B)` — or of `>` and `<` — written with the sign the
+  /// target dialect spells it with, or empty when the call is not one of those.
+  std::string convertCall(std::size_t i, std::size_t to, SignCall kind,
+                          std::size_t& close) const {
+    close = kNone;
+    if (i + 1 >= to || tokens_[i + 1].kind != TokenKind::LParen) {
+      return {};
+    }
+    if (!cleanGap(i, i + 1)) {
+      return {};
+    }
+    close = matchingParen(i + 1, to);
+    if (close == kNone || !cleanSpan(i, close)) {
+      return {};
+    }
+    const std::vector<std::pair<std::size_t, std::size_t>> args = splitArguments(i + 1, close);
+    const std::size_t wanted = kind == SignCall::Not ? 1 : 2;
+    if (args.size() != wanted) {
+      return {};
+    }
+    for (const auto& [first, last] : args) {
+      if (first >= last) {
+        return {};
+      }
+    }
+    const auto [a0, a1] = args[0];
+    if (kind == SignCall::Not) {
+      return "\\+ " + convert(a0, a1);
+    }
+    const auto [b0, b1] = args[1];
+    // `is` is `=` with the expression wrapper around its right operand, and the
+    // wrapper is what `#…#` is here: exactly one marked side is `is`.
+    const std::pair<std::size_t, std::size_t> a_inside = hashInside(a0, a1);
+    const std::pair<std::size_t, std::size_t> b_inside = hashInside(b0, b1);
+    const bool a_marked = a_inside.second > a_inside.first;
+    const bool b_marked = b_inside.second > b_inside.first;
+    if (kind == SignCall::Equal) {
+      if (b_marked && !a_marked && simple(a0, a1)) {
+        return convert(a0, a1) + " is " + convert(b_inside.first, b_inside.second);
+      }
+      if (a_marked && !b_marked && simple(b0, b1)) {
+        return convert(b0, b1) + " is " + convert(a_inside.first, a_inside.second);
+      }
+    }
+    if (!simple(a0, a1) || !simple(b0, b1)) {
+      return {};
+    }
+    const char* const sign = kind == SignCall::Equal ? " = "
+                             : kind == SignCall::Greater ? " > "
+                                                         : " < ";
+    return convert(a0, a1) + sign + convert(b0, b1);
+  }
+
+  /// The call the sign at `at` becomes in the Russian dialect, with `start` as the
+  /// first token of its left operand and `end` one past its right one.
+  std::string signCall(std::size_t start, std::size_t at, std::size_t end) const {
+    if (!simple(start, at) || !simple(at + 1, end)) {
+      return {};
+    }
+    const std::string left = convert(start, at);
+    const std::string right = convert(at + 1, end);
+    if (isIsSign(at, end)) {
+      const std::pair<std::size_t, std::size_t> inside = hashInside(at + 1, end);
+      if (inside.second > inside.first) {
+        return "РАВНО(" + left + ", #" + convert(inside.first, inside.second) + "#)";
+      }
+      return "РАВНО(" + left + ", #" + right + "#)";
+    }
+    if (tokens_[at].kind == TokenKind::Greater) {
+      return "БОЛЬШЕ(" + left + ", " + right + ")";
+    }
+    if (tokens_[at].kind == TokenKind::Less) {
+      return "МЕНЬШЕ(" + left + ", " + right + ")";
+    }
+    return "РАВНО(" + left + ", " + right + ")";
+  }
+
+  /// The tokens between the two `#` of a marked expression, when the range is
+  /// exactly one marked expression; an empty pair otherwise.
+  std::pair<std::size_t, std::size_t> hashInside(std::size_t from,
+                                                 std::size_t to) const {
+    if (to < from + 2 || tokens_[from].kind != TokenKind::Hash ||
+        tokens_[to - 1].kind != TokenKind::Hash) {
+      return {0, 0};
+    }
+    std::size_t depth = 0;
+    for (std::size_t j = from + 1; j < to - 1; ++j) {
+      if (tokens_[j].kind == TokenKind::LParen || tokens_[j].kind == TokenKind::LBracket) {
+        ++depth;
+      } else if (tokens_[j].kind == TokenKind::RParen || tokens_[j].kind == TokenKind::RBracket) {
+        depth = depth > 0 ? depth - 1 : 0;
+      } else if (depth == 0 && tokens_[j].kind == TokenKind::Hash) {
+        return {0, 0};
+      }
+    }
+    return {from + 1, to - 1};
+  }
+
+  /// True when the span is one operand: no separator and no comparison sign of
+  /// its own stands at its top level, so it can be moved into a sign form.  `is`
+  /// counts as a sign, and a span that opens with a call of its own would become
+  /// a comparison when it is converted — `РАВНО(РАВНО(X, Y), Z)` has no spelling
+  /// as `X = Y = Z`, and a chain is not a term.
+  bool simple(std::size_t from, std::size_t to) const {
+    if (from >= to) {
+      return false;
+    }
+    if (tokens_[from].kind == TokenKind::Identifier &&
+        signCallOf(tokens_[from].text) != SignCall::None && from + 1 < to &&
+        tokens_[from + 1].kind == TokenKind::LParen) {
+      return false;
+    }
+    std::size_t depth = 0;
+    for (std::size_t j = from; j < to; ++j) {
+      const TokenKind kind = tokens_[j].kind;
+      if (kind == TokenKind::LParen || kind == TokenKind::LBracket) {
+        ++depth;
+      } else if (kind == TokenKind::RParen || kind == TokenKind::RBracket) {
+        depth = depth > 0 ? depth - 1 : 0;
+      } else if (depth == 0 && (isSeparator(kind) || isComparisonSign(kind) ||
+                                isIsSign(j, to))) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /// The `)` that closes the `(` at `open`, or `kNone` when the range ends first.
+  std::size_t matchingParen(std::size_t open, std::size_t to) const {
+    std::size_t depth = 0;
+    for (std::size_t j = open; j < to; ++j) {
+      const TokenKind kind = tokens_[j].kind;
+      if (kind == TokenKind::LParen || kind == TokenKind::LBracket) {
+        ++depth;
+      } else if (kind == TokenKind::RParen || kind == TokenKind::RBracket) {
+        --depth;
+        if (depth == 0) {
+          return j;
+        }
+      }
+    }
+    return kNone;
+  }
+
+  /// The top-level arguments of the call whose brackets are `open` and `close`.
+  std::vector<std::pair<std::size_t, std::size_t>> splitArguments(std::size_t open,
+                                                                  std::size_t close) const {
+    std::vector<std::pair<std::size_t, std::size_t>> args;
+    std::size_t start = open + 1;
+    std::size_t depth = 0;
+    for (std::size_t j = open + 1; j < close; ++j) {
+      const TokenKind kind = tokens_[j].kind;
+      if (kind == TokenKind::LParen || kind == TokenKind::LBracket) {
+        ++depth;
+      } else if (kind == TokenKind::RParen || kind == TokenKind::RBracket) {
+        depth = depth > 0 ? depth - 1 : 0;
+      } else if (depth == 0 && kind == TokenKind::Comma) {
+        args.emplace_back(start, j);
+        start = j + 1;
+      }
+    }
+    args.emplace_back(start, close);
+    return args;
+  }
+
+  /// True when nothing but whitespace stands between two neighbouring tokens: a
+  /// comment inside a rewritten span would be lost, so such a call keeps its form.
+  bool cleanGap(std::size_t left, std::size_t right) const {
+    const std::string_view gap =
+        source_.substr(end_[left], begin_[right] - end_[left]);
+    return gap.find('%') == std::string_view::npos &&
+           gap.find("/*") == std::string_view::npos;
+  }
+
+  /// True when no comment stands anywhere inside the tokens `[from, to]`.
+  bool cleanSpan(std::size_t from, std::size_t to) const {
+    for (std::size_t j = from; j < to; ++j) {
+      if (!cleanGap(j, j + 1)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  std::string_view source_;
+  const TokenList& tokens_;
+  Dialect target_ = Dialect::English;
+  std::vector<std::size_t> begin_;
+  std::vector<std::size_t> end_;
+  /// The names of the language the text is written in, mapped to the target's.
+  std::unordered_map<std::string, std::string_view> names_;
+};
+
+/// What the dialect conversion made of a text.
+struct DialectConversion {
+  std::string text;
+  std::vector<PrologError> diagnostics;
+  bool ok = false;
+};
+
+/// The `dialect` pass of `formatSource`: the words of one language printed in the
+/// other, with everything else left as it is written (task_101).
+///
+/// The text is lexed and parsed first — a conversion of a program that does not
+/// parse would be a guess — and the answer is parsed again before it is handed
+/// back, so a rewrite can never turn a working file into a broken one.  The
+/// marker line of a file (`:- ИМЕНА(0|1).`) is left exactly as it is: it is our
+/// dialect's own word, and `variables(0)` would not be read as a marker.
+DialectConversion convertDialect(std::string_view text, const FormatOptions& options) {
+  DialectConversion out;
+  out.text = std::string(text);
+  const std::string_view source = stripByteOrderMark(text);
+  VariableMode mode = options.variables;
+  const std::optional<std::pair<VariableMode, std::size_t>> marker =
+      readVariableMarker(source);
+  if (marker.has_value()) {
+    mode = marker->first;
+  }
+  Lexed lexed = lexAndParse(source, options.source_name, mode);
+  out.diagnostics = lexed.sink.diagnostics();
+  if (!lexed.parses) {
+    return out;
+  }
+  DialectConverter converter(source, lexed.tokens, *options.dialect_out);
+  const std::size_t first = marker.has_value() ? converter.firstTokenAt(marker->second) : 0;
+  const std::size_t head_end = first < converter.last() ? converter.beginOf(first) : source.size();
+  out.text = std::string(source.substr(0, head_end)) +
+             converter.convert(first, converter.last()) + std::string(source.substr(converter.endOfLast()));
+  out.ok = true;
+  return out;
+}
+
 }  // namespace
 
 /// The marker line of a converted answer (task_99).
@@ -907,8 +1435,23 @@ std::string withModeMarker(std::string text, VariableMode mode, bool had_marker)
 
 FormatResult formatSource(std::string_view text, const FormatOptions& options) {
   FormatResult result;
-  result.text = std::string(text);
+  const std::string original(text);
+  result.text = original;
+  // The dialect conversion (task_101) is a rewrite of words, not of layout, so it
+  // runs first: the names and the layout then work on the text it produced.
+  std::string converted;
+  if (options.dialect_out.has_value() && !options.selection_only && !text.empty()) {
+    DialectConversion dialect = convertDialect(text, options);
+    result.diagnostics = dialect.diagnostics;
+    if (!dialect.ok) {
+      return result;  // byte for byte, with the diagnostics
+    }
+    converted = std::move(dialect.text);
+    text = converted;
+    result.text = converted;
+  }
   if (options.mode == FormatMode::None || text.empty()) {
+    result.changed = result.text != original;
     return result;
   }
   // A block comment can sit in the middle of a goal, where the layout pass
@@ -940,7 +1483,7 @@ FormatResult formatSource(std::string_view text, const FormatOptions& options) {
     if (options.names_out.has_value() && !options.selection_only) {
       result.text = withModeMarker(result.text, *options.names_out, marker.has_value());
     }
-    result.changed = result.text != std::string(text);
+    result.changed = result.text != original;
     return result;
   }
 
@@ -994,7 +1537,7 @@ FormatResult formatSource(std::string_view text, const FormatOptions& options) {
     std::string formatted = formatter.run(prefix.tokens, cut);
     formatted += source.substr(cut);
     result.text = stripLineEnds(std::move(formatted));
-    result.changed = result.text != std::string(text);
+    result.changed = result.text != original;
     // The fragment's own parse errors were about the part that is deliberately
     // left alone: a front-end must not report «не удалось разобрать» for a cut
     // it just handled.

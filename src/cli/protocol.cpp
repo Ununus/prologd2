@@ -53,7 +53,9 @@ using Json = nlohmann::json;
 //    `:- ХОЛСТ(Высота, Ширина).` (ADR-035).
 // 15: `format` takes `names`: the mode to *print* the names in, so the same
 //    request converts a program between the two dialects (task_99).
-constexpr int kProtocolVersion = 15;
+// 16: `format` takes `dialect`: the language to print the built-in names and
+//    their sign spellings in, `en` or `ru` (task_101).
+constexpr int kProtocolVersion = 16;
 
 /// The screen a front-end may ask for: small enough to stay cheap both in memory
 /// and on the wire (a snapshot is `width × height × 4` bytes), large enough for a
@@ -556,6 +558,19 @@ class Session {
         return;
       }
       options.names_out = *printed;
+    }
+    // The language to print the built-in names in (task_101): absent keeps them as
+    // they are written.
+    if (request.contains("dialect")) {
+      const std::string language = request.at("dialect").get<std::string>();
+      if (language == "en") {
+        options.dialect_out = Dialect::English;
+      } else if (language == "ru") {
+        options.dialect_out = Dialect::Russian;
+      } else {
+        fail("format", "format: диалект должен быть ru или en, не " + language);
+        return;
+      }
     }
     const FormatResult formatted =
         formatSource(request.at("text").get<std::string>(), options);

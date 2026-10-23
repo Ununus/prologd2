@@ -1469,15 +1469,17 @@ def test_the_menus_come_from_the_action_table(executable: str) -> None:
                 else:
                     expected.append(actions.BY_KEY[key].title)
             assert [entry.text() for entry in menus[title].actions()] == expected, title
-            # The naming conversion is a submenu of its own: both conversions are
-            # inside it, as actions the window knows (task_99).
+            # The conversions are a submenu of its own: both axes of rewriting are
+            # inside it, as actions the window knows (task_99, task_101).
             if actions.NAMES_SUBMENU in entries:
                 submenu = [entry for entry in menus[title].actions()
                            if entry.text() == actions.NAMES_MENU_TITLE][0].menu()
                 assert [entry.text() for entry in submenu.actions()] == [
-                    actions.BY_KEY[key].title for key in actions.NAMES_CONVERSIONS
+                    "" if key == actions.SEPARATOR else actions.BY_KEY[key].title
+                    for key in actions.CONVERSIONS
                 ], actions.NAMES_MENU_TITLE
-                assert all(entry.isEnabled() for entry in submenu.actions())
+                assert all(entry.isEnabled() for entry in submenu.actions()
+                           if not entry.isSeparator())
         assert set(window._actions) == set(actions.BY_KEY), "the window has stray actions"
 
         # What is not implemented yet says so instead of doing nothing quietly.
@@ -3441,6 +3443,17 @@ def test_the_conversion_opens_in_a_tab_of_its_own(executable: str) -> None:
         assert pump(
             window, lambda: window.editor().toPlainText() == ":- ИМЕНА(1).\nпример(Х_1',Х_2'):-функ(\"Str\").\n"
         ), ascii(window.editor().toPlainText())
+
+        # The other axis (task_101): the same tab read as a Russian program and
+        # printed with the English names and signs, again in a tab of its own.
+        window.editor().setPlainText(":- ИМЕНА(0).\nцель(X):-ВЫВОД(X),БОЛЬШЕ(X,1).\n")
+        window._actions["dialect_en"].trigger()
+        assert pump(window, lambda: len(window.buffers()) == before + 3), window.status_text()
+        assert pump(
+            window,
+            lambda: window.editor().toPlainText() == ":- ИМЕНА(0).\nцель(X):-write(X), X > 1.\n",
+        ), ascii(window.editor().toPlainText())
+        assert "английский" in window.status_text(), window.status_text()
     finally:
         discard_changes(window)
     print("ok: the conversion opens in a tab of its own and the source stays untouched")
