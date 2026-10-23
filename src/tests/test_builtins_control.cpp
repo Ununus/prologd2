@@ -31,6 +31,50 @@ TEST_CASE("the old dialect reads apostrophe names, and `2` says the same") {
   REQUIRE(two.output == "Сумма'=5\n");
 }
 
+TEST_CASE("quoted atoms and underscore names read the way the original reads them") {
+  // task_100: the pinned original learned `'атом'` and `_имя`, and ours follows it.
+  // A quoted constant is the *same* constant as the bare name — the quotes are not
+  // part of it — so a fact written one way answers a question written the other.
+  {
+    const auto result = runProgram(
+        ":- ИМЕНА(1).\n"
+        "пункт(атом).\n"
+        "?пункт('атом').\n"
+        "?пункт(атом).\n");
+    REQUIRE(result.loaded);
+    REQUIRE(result.output == "ДА\nДА\n");
+  }
+  // `_Пер'` is the same variable as `_Пер`: one variable on both sides, so the
+  // goal about one argument holds and the one about two different ones does not.
+  {
+    const auto result = runProgram(
+        ":- ИМЕНА(1).\n"
+        "одинаковые(_Пер, _Пер').\n"
+        "?одинаковые(1, 1).\n"
+        "?одинаковые(1, 2).\n");
+    REQUIRE(result.loaded);
+    REQUIRE(result.output == "ДА\nНЕТ\n");
+  }
+  // `_` stays the anonymous variable, and two of them are two variables.
+  {
+    const auto result = runProgram(":- ИМЕНА(1).\n?РАВНО(_, _).\n");
+    REQUIRE(result.loaded);
+    REQUIRE(result.output == "ДА\n");
+  }
+  // A quoted name is a predicate name as well (`?'пункт'(1).` — ISO's spelling),
+  // and an atom with a space inside is one constant, printed without the quotes
+  // the way the original prints it.
+  {
+    const auto result = runProgram(
+        ":- ИМЕНА(1).\n"
+        "пункт(атом).\n"
+        "?'пункт'(атом).\n"
+        "?ВЫВОД('Тоже атом').\n");
+    REQUIRE(result.loaded);
+    REQUIRE(result.output == "ДА\nТоже атом\nДА\n");
+  }
+}
+
 TEST_CASE("a marker off the first line says where it belongs") {
   // A comment above the marker makes it a plain directive — and a directive cannot
   // set a mode the text above it was already read in.  The load itself succeeds, so

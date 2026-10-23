@@ -189,14 +189,21 @@ if(BUILD_WITH_PROLOGD)
   # ours does not (ours follows the standard order, task_90).  Bumped in part 143 to
   # 823a9d1, which moved the built-in reference into the engine (`doc/builtins.json`)
   # and generated its manual in Typst (`doc/help.typ`, `doc/style.typ`): a package
-  # that ships only this engine takes both from here instead of ours (part 143).
-  #
+  # that ships only this engine takes both from here instead of ours (part 143).  # Bumped in part 164 to daf6b1b — «Атомы в кавычках и переменные с
+  # подчёркиванием»: the old dialect reads `'атом'` (the quotes are not part of the
+  # name, so `'атом'` and `атом` are one constant, and an unclosed quote is its
+  # error 45) and `_имя` (a variable, with `_Пер'` the same variable as `_Пер`).
+  # That is the half of the naming gap that made task_99's reverse direction turn
+  # atoms into strings; ours follows the same rules since task_100.  #
   # Not a cache variable on purpose: a cache entry is written once, by the first
   # configure, and every later bump of the pin would then be invisible in a tree
   # that has already been built.  To build against another commit, point
   # `PROLOGD_ENGINE_SOURCE` at a clone of it — that is the override this file
-  # documents.
-  set(PROLOGD_ENGINE_COMMIT "823a9d18212a26c64672b7812be56268d4e91206")
+  # documents.  A tree configured before this rule may still carry
+  # `PROLOGD_ENGINE_COMMIT` in `CMakeCache.txt` (7b7f46f here, for instance): the
+  # ordinary `set()` below shadows that entry, so the number in the cache means
+  # nothing and is not the pin.
+  set(PROLOGD_ENGINE_COMMIT "daf6b1bf60a68200268adc81f8e7e4cb9ce65603")
   set(PROLOGD_ENGINE_SOURCE ""
       CACHE PATH "An existing clone of the original engine; skips the download")
 

@@ -42,16 +42,21 @@ with the answer in a new unnamed tab.
 | `_`, `_Имя` | Variable | unchanged |
 | `ЛОЖЬ`, `И`, `ПЕРВОЕ` | Identifier — a reserved name wins in both modes | unchanged |
 
-The reverse direction is not symmetric, and that is where the losses are:
+The reverse direction is not symmetric, and that is where the losses are — though
+task_100 removes most of them: once the pinned original reads `'атом'` and `_имя`
+(task_100), an ISO atom gets a spelling in the old naming (`x` → `'x'`, a quoted
+`'a b'` → `'a b'`) instead of being turned into a string.
 
 - an ISO variable keeps its name if it is one letter or a letter plus `_` (`X`,
   `X_`) and otherwise gets an apostrophe: `Сумма'`, `Var1'`, `X_1'` — the old
   lexer accepts any name followed by `'`;
-- an ISO **atom of one letter** (`x`, `Б`) has no old spelling at all — only
-  `"x"`, which is a string;
-- a quoted atom (`'a b'`, `'X_3'`) has none either — only `"a b"`;
+- an ISO atom that is not a plain lower-case name is quoted: `'x'`, `'a b'`,
+  `'X_3'` — readable by the original since task_100 (before that pin the only
+  spelling was `"x"`, a string, and the meaning changed);
 - a string that happens to be a bare capitalised name loses its quotes:
-  `"Str"` → `Str`.
+  `"Str"` → `Str`;
+- what stays lost: an atom containing a `'` — the old dialect reads `'…'` up to the
+  first closing quote and has no doubled-quote escape.
 
 ## Numbering (proposed, to be confirmed)
 
@@ -63,8 +68,10 @@ appearance — the owner's example.  A base that is a reserved name gets a suffi
 
 ## To settle before starting
 
-- an atom with no old spelling: replace it by a string and report a warning in
-  «Проблемы», or refuse and open no tab?  (Proposed: replace and warn.)
+- ~~an atom with no old spelling~~ — settled by task_100: the new pin reads
+  `'атом'` and `_имя`, so the conversion quotes instead of turning the atom into a
+  string.  Only an atom containing `'` has no spelling at all; refuse that one with
+  a message.
 - `--names 0|1` on the command line beside `--format` — at once, or the protocol
   first and the CLI later?
 - the protocol's `format` request gains a target mode, so the version goes up by

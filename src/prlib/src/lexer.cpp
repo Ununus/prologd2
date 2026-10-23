@@ -232,6 +232,14 @@ Token Lexer::lexIdentifier(DiagnosticSink* sink) {
   }
   std::string text(source_.substr(begin, offset_ - begin));
   if (text.empty() || text.front() == '_') {
+    // The old dialect's underscore names take the apostrophe suffix too, and the
+    // apostrophe is *not* part of the name: `_Пер'` and `_Пер` are one variable
+    // (task_100), so a head that says `_Арг` and a body that says `_Арг'` cannot
+    // disagree in silence.  A lone `_` keeps its meaning and takes no suffix —
+    // there is no second spelling to tell apart.
+    if (options_.variables == VariableMode::Old && text.size() > 1 && peek() == '\'') {
+      advanceByte(1);
+    }
     return makeToken(TokenKind::Variable, std::move(text), start);
   }
   // A reserved name is a predicate whatever its case is, in every mode: the table

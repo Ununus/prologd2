@@ -1187,7 +1187,7 @@ alone, since a file is imported and a directive would act on the importer
 (ADR-034).  The text is broken the way `prologu --format soft` breaks it, and the
 same suite pins that, so «Форматировать» on a fresh tab is a no-op.  A packaged
 build has no `tools/` beside it, and the entry says so instead of running nothing (a
-shipped copy of the converter is a separate question, task_100 if it is ever wanted).
+shipped copy of the converter is a separate question, not a task yet).
 
 **Status.** Accepted 2026-10-23 (task_99).
 

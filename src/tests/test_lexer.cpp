@@ -112,6 +112,44 @@ TEST_CASE("the old dialect reads apostrophe names, and a leading apostrophe stay
   REQUIRE(tokens[3].text == "Молоко");
 }
 
+TEST_CASE("an underscore name takes the apostrophe and drops it") {
+  // task_100: the original reads `_Пер'` as the very same variable as `_Пер` and
+  // cuts the apostrophe out of the name — otherwise a head saying `_Арг` and a
+  // body saying `_Арг'` would be two variables, and nothing would say so.
+  {
+    DiagnosticSink sink;
+    const auto tokens = lexWith("_Пер _Пер' _ _пер", VariableMode::Old, sink);
+    REQUIRE_FALSE(sink.hasErrors());
+    REQUIRE(tokens[0].kind == TokenKind::Variable);
+    REQUIRE(tokens[0].text == "_Пер");
+    REQUIRE(tokens[1].kind == TokenKind::Variable);
+    REQUIRE(tokens[1].text == "_Пер");  // the apostrophe is not part of the name
+    REQUIRE(tokens[2].kind == TokenKind::Variable);
+    REQUIRE(tokens[2].text == "_");
+    REQUIRE(tokens[3].kind == TokenKind::Variable);
+    REQUIRE(tokens[3].text == "_пер");  // case still matters: another variable
+  }
+  // A lone `_` is the anonymous variable, and a quote after it stays a quote.
+  {
+    DiagnosticSink sink;
+    const auto tokens = lexWith("_'x'", VariableMode::Old, sink);
+    REQUIRE(tokens[0].kind == TokenKind::Variable);
+    REQUIRE(tokens[0].text == "_");
+    REQUIRE(tokens[1].kind == TokenKind::QuotedAtom);
+    REQUIRE(tokens[1].text == "x");
+  }
+  // The ISO reading is untouched: `'` there opens a quoted atom, and swallowing
+  // it after a name would hide a typo instead of reporting it.
+  {
+    DiagnosticSink sink;
+    const auto tokens = lex("_Пер'x'", sink);
+    REQUIRE(tokens[0].kind == TokenKind::Variable);
+    REQUIRE(tokens[0].text == "_Пер");
+    REQUIRE(tokens[1].kind == TokenKind::QuotedAtom);
+    REQUIRE(tokens[1].text == "x");
+  }
+}
+
 TEST_CASE("`2` is a spelling of the old dialect, not a mode of its own") {
   // task_77: the original reads `число'` in a file that declares nothing, so what
   // the port shipped as modes 1 and 2 was one dialect all along.  `2` is still

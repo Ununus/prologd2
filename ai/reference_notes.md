@@ -14,10 +14,15 @@ specification for the rewrite. Source of truth: the previous implementation,
 * Arithmetic expression: `#` … `#` with infix `+ - * / mod div` and `( )`.
 * List: `[a,b|T]`, `[]`, `[a,b,c]`.
 * String: `"…"` (UTF-8 / CP1251 bytes; length limit 128 in the original docs).
+* Quoted constant: `'…'` read up to the closing quote, spaces and separators
+  included; the quotes are not part of the name, so `'атом'` and `атом` are one
+  constant (added upstream in `daf6b1b`, task_100; an unclosed quote is its error
+  45).  A quoted name works as a predicate name too.
 * Symbolic constant ("словосочетание"): letter followed by letters/digits/`_`.
 * Variable (original!): **a single letter** (Latin or Cyrillic, any case),
-  optionally followed by `'`; also `Name'` (name followed by apostrophe); `_`
-  is anonymous.
+  optionally followed by `'`; also `Name'` (name followed by apostrophe); since
+  `daf6b1b` also a name starting with `_` (`_Пер`, and `_Пер'` is the same
+  variable — the apostrophe is cut out); `_` is anonymous.
 * Names are case-sensitive.
 
 ## 2. Data types
