@@ -87,6 +87,9 @@ int main(int argc, char** argv) {
   std::size_t formatWidth = 80;
   std::size_t formatIndent = 1;
   std::string formatUnit = "tab";
+  // `--names` converts while it prints (task_99): the answer is the same program
+  // spelled in the other naming mode.  -1 means «print the names as they are».
+  int namesOut = -1;
   // Left unset on purpose: the engine's own defaults are the ones to use, and a
   // flag that repeats them would become a second place to change them.
   std::optional<std::size_t> maxDepth;
@@ -131,6 +134,11 @@ int main(int argc, char** argv) {
                  "Continuation indent in units (default 1)");
   app.add_option("--format-unit", formatUnit, "Indent unit: tab (default) or spaces")
       ->check(CLI::IsMember({"tab", "spaces"}));
+  app.add_option("--names", namesOut,
+                 "Print the source with its names in another mode and exit: 0 ISO, "
+                 "1 the old dialect (2 is a spelling of 1); the first line of the "
+                 "answer says which")
+      ->check(CLI::Range(0, 2));
   app.add_option("files", positional, "Source files");
 
   try {
@@ -172,9 +180,10 @@ int main(int argc, char** argv) {
   // answer is the text — no interpreter, no engine.  Unparsable input exits 2
   // with the usual diagnostics, so a script can tell «formatted» from «not
   // formatted» without reading the output.
-  if (formatOption != nullptr && formatOption->count() > 0) {
+  if ((formatOption != nullptr && formatOption->count() > 0) || namesOut >= 0) {
     if (protocol == "json") {
-      std::cerr << "error: --format writes the source to stdout; drop --protocol json\n";
+      std::cerr << "error: --format and --names write the source to stdout; "
+                   "drop --protocol json\n";
       return 1;
     }
     prologd::FormatOptions formatOptions;
@@ -190,6 +199,15 @@ int main(int argc, char** argv) {
     }
     // The mode of the run (task_67) — a file's own `:- ИМЕНА(N).` wins over it.
     formatOptions.variables = *runMode;
+    if (namesOut >= 0) {
+      const std::optional<prologd::VariableMode> target =
+          prologd::variableModeFromNumber(namesOut);
+      if (!target.has_value()) {
+        std::cerr << "error: --names expects 0, 1 or 2, not " << namesOut << '\n';
+        return 1;
+      }
+      formatOptions.names_out = *target;
+    }
     formatOptions.width = formatWidth;
     formatOptions.indent_steps = formatIndent;
     formatOptions.indent_unit =

@@ -114,6 +114,13 @@ STATE_ICONS: tuple[str, ...] = tuple(state.icon for state in STATES)
 SEPARATOR = "-"
 RECENT = "recent"
 
+#: «Скрипты → Сконвертировать исходник» (task_99): the two directions of the
+#: naming conversion.  A submenu rather than two entries, because the two are one
+#: command with a direction and the menu has room for more sources later.
+NAMES_SUBMENU = "#names-submenu"
+NAMES_MENU_TITLE = "Сконвертировать исходник"
+NAMES_CONVERSIONS: tuple[str, ...] = ("names_iso", "names_pld")
+
 #: The formatter's mode (task_30, moved back to the toolbar in task_47): a
 #: control of the toolbar, right after «Форматировать» — it carries the mode and
 #: the «только выделенное» switch the action reads.  It lived in the «Правка»
@@ -300,6 +307,11 @@ ACTIONS: tuple[Action, ...] = (
     # `tools/image_to_pld.py` and puts what it printed into a new tab.  It is not
     # part of running a program, so it gets a menu of its own.
     Action("script_image", "Сконвертировать картинку…", None),
+    # The other conversion: the same text with its names spelled the other way
+    # (task_99).  It rides the formatter's request, so it needs what
+    # «Форматировать» needs — our engine and not the original one.
+    Action("names_iso", "PLD в ISO", None, needs=engines.FORMAT),
+    Action("names_pld", "ISO в PLD", None, needs=engines.FORMAT),
     # -- help
     # The reference of a predicate (task_37): the same help picture, because it
     # is the same «справка» — only the answer comes from `doc/builtins.json`
@@ -416,7 +428,7 @@ MENUS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ),
     (
         "Скрипты",
-        ("script_image",),
+        ("script_image", SEPARATOR, NAMES_SUBMENU),
     ),
     (
         "Справка",

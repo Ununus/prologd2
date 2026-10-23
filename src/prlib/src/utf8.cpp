@@ -211,4 +211,20 @@ bool isNameCharacter(CodePoint code_point) {
   return isLetter(code_point) || isAsciiDigit(code_point) || code_point == U'_';
 }
 
+std::string upperCaseFirst(std::string_view name) {
+  const DecodeResult first = decodeCodePoint(name, 0);
+  if (!first.valid || !isLowerCaseLetter(first.code_point)) {
+    return std::string(name);
+  }
+  CodePoint upper = first.code_point;
+  if (upper >= U'a' && upper <= U'z') {
+    upper = upper - U'a' + U'A';
+  } else if (upper == kCyrillicSmallYo) {
+    upper = kCyrillicCapitalYo;
+  } else {
+    upper = upper - kCyrillicSmallA + kCyrillicCapitalA;
+  }
+  return utf8Encode(upper) + std::string(name.substr(first.length));
+}
+
 }  // namespace prologd

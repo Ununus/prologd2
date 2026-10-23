@@ -1464,9 +1464,20 @@ def test_the_menus_come_from_the_action_table(executable: str) -> None:
                     expected.append("Формат")
                 elif key == actions.THEME_MODE:
                     expected.append("Оформление")
+                elif key == actions.NAMES_SUBMENU:
+                    expected.append(actions.NAMES_MENU_TITLE)
                 else:
                     expected.append(actions.BY_KEY[key].title)
             assert [entry.text() for entry in menus[title].actions()] == expected, title
+            # The naming conversion is a submenu of its own: both conversions are
+            # inside it, as actions the window knows (task_99).
+            if actions.NAMES_SUBMENU in entries:
+                submenu = [entry for entry in menus[title].actions()
+                           if entry.text() == actions.NAMES_MENU_TITLE][0].menu()
+                assert [entry.text() for entry in submenu.actions()] == [
+                    actions.BY_KEY[key].title for key in actions.NAMES_CONVERSIONS
+                ], actions.NAMES_MENU_TITLE
+                assert all(entry.isEnabled() for entry in submenu.actions())
         assert set(window._actions) == set(actions.BY_KEY), "the window has stray actions"
 
         # What is not implemented yet says so instead of doing nothing quietly.
@@ -3396,6 +3407,45 @@ def test_a_broken_program_is_reported_and_not_rewritten(executable: str) -> None
     print("ok: a broken program keeps its text and its line is marked")
 
 
+def test_the_conversion_opens_in_a_tab_of_its_own(executable: str) -> None:
+    """«Сконвертировать исходник»: the same program, the other spelling, a new tab.
+
+    The conversion is the formatter's token pass, so what the window owes is the
+    *around* of it: the buffer in front of the user is not rewritten, the answer
+    arrives as a document of its own, and the status says which mode it is in
+    (task_99).
+    """
+    old = ":- ИМЕНА(1).\nпример(Х,х):-функ(Str).\n"
+    iso = ":- ИМЕНА(0).\nпример(Х_1,Х_2):-функ(\"Str\").\n"
+    window = empty_window(executable)
+    try:
+        window.editor().setPlainText(old)
+        before = len(window.buffers())
+
+        window._actions["names_iso"].trigger()
+        assert pump(window, lambda: len(window.buffers()) == before + 1), (
+            window.status_text(),
+            len(window.buffers()),
+        )
+        assert pump(window, lambda: window.editor().toPlainText() == iso), ascii(
+            window.editor().toPlainText()
+        )
+        assert "ISO" in window.status_text(), window.status_text()
+        # The source stays as its author wrote it, in the tab he wrote it in.
+        assert window.buffers()[0].text() == old, ascii(window.buffers()[0].text())
+
+        # And back from the tab the conversion just made: `X_` is a variable in
+        # both dialects, so only the plain Cyrillic name takes the apostrophe.
+        window._actions["names_pld"].trigger()
+        assert pump(window, lambda: len(window.buffers()) == before + 2), window.status_text()
+        assert pump(
+            window, lambda: window.editor().toPlainText() == ":- ИМЕНА(1).\nпример(Х_1',Х_2'):-функ(\"Str\").\n"
+        ), ascii(window.editor().toPlainText())
+    finally:
+        discard_changes(window)
+    print("ok: the conversion opens in a tab of its own and the source stays untouched")
+
+
 def test_the_mode_control_stands_beside_the_command_it_changes(
     executable: str,
 ) -> None:
@@ -5047,6 +5097,7 @@ def main(argv: list[str]) -> int:
         test_formatting_lays_the_buffer_out_and_stays_one_undo_step(executable)
         test_formatting_only_the_selection(executable)
         test_a_broken_program_is_reported_and_not_rewritten(executable)
+        test_the_conversion_opens_in_a_tab_of_its_own(executable)
         test_the_mode_control_stands_beside_the_command_it_changes(executable)
         test_the_reserved_names_are_there_before_the_first_run(executable)
         test_running_programs_without_questions_finishes(executable)

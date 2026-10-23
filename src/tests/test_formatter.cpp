@@ -494,3 +494,116 @@ TEST_CASE("none mode touches nothing at all") {
   REQUIRE(result.text == source);
   REQUIRE_FALSE(result.changed);
 }
+
+// ---------------------------------------------------------------------------
+// The naming conversion (task_99)
+// ---------------------------------------------------------------------------
+
+namespace {
+
+/// «Print the names in `target` mode», the way `--names` and the window ask for it.
+FormatOptions toNames(VariableMode target) {
+  FormatOptions options;
+  options.names_out = target;
+  return options;
+}
+
+}  // namespace
+
+TEST_CASE("an old-dialect program is printed in the ISO spelling") {
+  // The rules of the old dialect, read backwards: `Х` and `х` are variables and
+  // `Str` is a string constant there, so ISO gets numbered variables and the
+  // constant in quotes; `var1'` loses its apostrophe, and `_Пер'` is `_Пер` already.
+  const std::string source =
+      ":- ИМЕНА(1).\n"
+      "пример(Х,у):-функ(Str, \"Str\", атом, var1', Var2').\n"
+      "конфликты(Х,х,Х',х', X_3).\n"
+      "подчёркивание(_Пер, _Пер').\n";
+  const FormatResult result = format(source, toNames(VariableMode::Iso));
+  REQUIRE(result.ok());
+  REQUIRE(result.text ==
+          ":- ИМЕНА(0).\n"
+          "пример(Х_1,У):-функ(\"Str\", \"Str\", атом, Var1, Var2).\n"
+          "конфликты(Х_1,Х_2,Х_3,Х_4, \"X_3\").\n"
+          "подчёркивание(_Пер, _Пер).\n");
+  REQUIRE(result.changed);
+}
+
+TEST_CASE("variables that share a base are numbered in the order they are written") {
+  // `Х` and `х` would both be `X`, so a shared base is numbered; a base of its own
+  // is printed bare (`Var1`).
+  const std::string source =
+      ":- ИМЕНА(1).\n"
+      "пара(Х,х,Х',х').\n"
+      "своё(var1',Var2').\n";
+  const FormatResult result = format(source, toNames(VariableMode::Iso));
+  REQUIRE(result.ok());
+  REQUIRE(result.text == ":- ИМЕНА(0).\nпара(Х_1,Х_2,Х_3,Х_4).\nсвоё(Var1,Var2).\n");
+}
+
+TEST_CASE("an ISO program is printed in the old dialect's spelling") {
+  // One letter and a letter with a trailing `_` are variables in both dialects, so
+  // they stay; everything else gets the apostrophe that makes it a variable there.
+  // A string is a string in both, and a quoted atom needs no change either.
+  const std::string source =
+      ":- ИМЕНА(0).\n"
+      "пример(X,Y):-функ(\"Str\", атом, Var1).\n"
+      "счёт(Сумма,X_):-сумма(Сумма).\n"
+      "кавычки(_Пер,'Тоже атом').\n";
+  const FormatResult result = format(source, toNames(VariableMode::Old));
+  REQUIRE(result.ok());
+  REQUIRE(result.text ==
+          ":- ИМЕНА(1).\n"
+          "пример(X,Y):-функ(\"Str\", атом, Var1').\n"
+          "счёт(Сумма',X_):-сумма(Сумма').\n"
+          "кавычки(_Пер,'Тоже атом').\n");
+}
+
+TEST_CASE("a converted answer says which mode it is in, marker or not") {
+  // A file read by `--vars 1` has no marker of its own; the answer gets one, so a
+  // converted program does not depend on how its reader was started.  The single
+  // letter is a *variable* in the old dialect, so it comes back capitalised.
+  FormatOptions options = toNames(VariableMode::Iso);
+  options.variables = VariableMode::Old;
+  const FormatResult added = format("пример(а).\n", options);
+  REQUIRE(added.ok());
+  REQUIRE(added.text == ":- ИМЕНА(0).\nпример(А).\n");
+
+  const FormatResult back = format(added.text, toNames(VariableMode::Old));
+  REQUIRE(back.ok());
+  REQUIRE(back.text == ":- ИМЕНА(1).\nпример(А).\n");
+}
+
+TEST_CASE("the way back keeps the names it can and marks the rest") {
+  // A round trip cannot give back `Х`/`х`: they were numbered, and ISO has no way
+  // to say that one name was two variables.  What it does keep is every name that
+  // was already an old-dialect variable, and the string constant.
+  const std::string iso = ":- ИМЕНА(0).\nпример(X_1,Y,\"Str\",_Пер).\n";
+  const FormatResult back = format(iso, toNames(VariableMode::Old));
+  REQUIRE(back.ok());
+  REQUIRE(back.text == ":- ИМЕНА(1).\nпример(X_1',Y,\"Str\",_Пер).\n");
+}
+
+TEST_CASE("a one-letter atom takes quotes for the old dialect, which reads it as a variable") {
+  // In ISO `?одно(а, а).` asks about a *constant*, while the old dialect reads one
+  // letter as a variable: without the quotes the question would change its meaning
+  // and answer `а=_1` instead of ДА (the owner's example, part 167).  A letter with
+  // a trailing `_` is one of the old dialect's variables too, so it takes quotes as
+  // well; `а1` and `атом` are names in both dialects and stay bare, a quoted atom
+  // already carries its quotes, and a variable keeps the apostrophe it gets.  A
+  // one-letter *functor* is quoted the same way — the original reads `'а'(1)`.
+  const std::string source =
+      ":- ИМЕНА(0).\n"
+      "одно(Значение, Значение).\n"
+      "?одно(а, а).\n"
+      "смесь(Э, а_, а1, атом, 'а').\n"
+      "а(1).\n";
+  const FormatResult result = format(source, toNames(VariableMode::Old));
+  REQUIRE(result.ok());
+  REQUIRE(result.text ==
+          ":- ИМЕНА(1).\n"
+          "одно(Значение', Значение').\n"
+          "?одно('а', 'а').\n"
+          "смесь(Э, 'а_', а1, атом, 'а').\n"
+          "'а'(1).\n");
+}

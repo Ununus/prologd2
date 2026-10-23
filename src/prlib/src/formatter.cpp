@@ -1,8 +1,12 @@
 #include "prlib/formatter.hpp"
 
+#include <algorithm>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -237,13 +241,105 @@ struct Statement {
 };
 
 // ---------------------------------------------------------------------------
+// Renaming for the other naming mode (task_99)
+// ---------------------------------------------------------------------------
+
+/// True when the old dialect would read this *atom* as a variable rather than as
+/// a name: its variables are one letter, or a letter with a trailing `_` (`д`,
+/// `Б`, `A_`), which is exactly the shape of a one-letter atom in ISO — `?одно(а,
+/// а).` asks about a constant, while the old dialect would ask about a variable
+/// and answer `а=_1`.  A reserved name is a predicate in every mode, so it is
+/// never one of these.
+bool oldReadsAsVariableName(std::string_view name) {
+  if (isReservedBuiltinName(name)) {
+    return false;
+  }
+  const std::size_t codepoints = utf8Length(name);
+  return codepoints == 1 || (codepoints == 2 && name.back() == '_');
+}
+
+/// The ISO spelling of every old-dialect variable, or the old spelling of every
+/// ISO one — the map `planNames` feeds the printer with.
+///
+/// The rules are the lexer's, read backwards.  Into ISO: the base of a name is it
+/// with the first letter up and the apostrophe off (`X'` → `X`, `var1'` → `Var1`),
+/// while a name that starts with `_` is an ISO variable as it stands.  A base that
+/// one variable has is printed bare; a base that several share (`X`, `x`, `X'`,
+/// `x'`) is numbered in the order the variables are first written (`X_1`…`X_4`),
+/// and so is a base that is a reserved name — a reserved word is a predicate, not
+/// a variable, in ISO.  Back into the old dialect is simpler: one letter, a letter with
+/// a trailing `_` and `_имя` are variables in both, and everything else gets the
+/// apostrophe that makes it one there.
+std::unordered_map<std::string, std::string> variableNames(const TokenList& tokens,
+                                                           VariableMode from,
+                                                           VariableMode to) {
+  std::unordered_map<std::string, std::string> names;
+  if (from == to) {
+    return names;
+  }
+  std::vector<std::string> written;  // the distinct names, in order of appearance
+  for (const Token& token : tokens) {
+    if (token.kind != TokenKind::Variable) {
+      continue;
+    }
+    if (std::find(written.begin(), written.end(), token.text) == written.end()) {
+      written.push_back(token.text);
+    }
+  }
+  if (to == VariableMode::Old) {
+    for (const std::string& name : written) {
+      const bool old_spelling = name == "_" || name.front() == '_' ||
+                                utf8Length(name) == 1 ||
+                                (utf8Length(name) == 2 && name.back() == '_');
+      names.emplace(name, old_spelling ? name : name + "'");
+    }
+    return names;
+  }
+  std::vector<std::string> bases;
+  bases.reserve(written.size());
+  std::unordered_map<std::string, std::size_t> shared;
+  for (const std::string& name : written) {
+    std::string base = name;
+    if (!base.empty() && base.back() == '\'') {
+      base.pop_back();
+    }
+    if (base.empty() || base.front() == '_') {
+      // `_` stays anonymous, and `_имя` is a variable in ISO as it is written.
+    } else {
+      base = upperCaseFirst(base);
+    }
+    ++shared[base];
+    bases.push_back(std::move(base));
+  }
+  std::unordered_map<std::string, std::size_t> used;  // base -> the next number
+  std::unordered_set<std::string> taken;              // every name already handed out
+  for (std::size_t i = 0; i < written.size(); ++i) {
+    const std::string& base = bases[i];
+    const bool anonymous_or_underscore = base.empty() || base.front() == '_';
+    if (anonymous_or_underscore) {
+      // `_` stays anonymous, and `_имя` is a variable in ISO as it is written.
+      names.emplace(written[i], base);
+      continue;
+    }
+    const bool alone = shared[base] == 1 && !isReservedBuiltinName(base);
+    std::string name = alone ? base : base + "_" + std::to_string(++used[base]);
+    while (!taken.insert(name).second) {
+      // `X_1` may be the base of a variable of its own; the next number is free.
+      name = base + "_" + std::to_string(++used[base]);
+    }
+    names.emplace(written[i], std::move(name));
+  }
+  return names;
+}
+
+// ---------------------------------------------------------------------------
 // The formatter proper
 // ---------------------------------------------------------------------------
 
 class Formatter {
  public:
-  Formatter(std::string_view source, const FormatOptions& options)
-      : source_(source), options_(options) {
+  Formatter(std::string_view source, const FormatOptions& options, VariableMode source_mode)
+      : source_(source), options_(options), source_mode_(source_mode) {
     const std::string unit = options.indent_unit == IndentUnit::Tab ? "\t" : "    ";
     for (std::size_t i = 0; i < options.indent_steps; ++i) {
       indent_ += unit;
@@ -262,7 +358,15 @@ class Formatter {
     for (std::size_t i = 0; i < tokens.size(); ++i) {
       begin_[i] = lines.offset(tokens[i].location);
       end_[i] = begin_[i] + rawLength(source_, begin_[i], tokens[i]);
+      // The old dialect's underscore names may carry an apostrophe that the name
+      // itself does not include (task_100).  It belongs to the token, or a rename
+      // would leave it behind in the gap; printing an unconverted name keeps it.
+      if (source_mode_ == VariableMode::Old && tokens[i].kind == TokenKind::Variable &&
+          end_[i] < source_.size() && source_[end_[i]] == '\'') {
+        ++end_[i];
+      }
     }
+    planNames(tokens);
     statements_ = buildStatements();
     for (std::size_t s = 0; s < statements_.size(); ++s) {
       const Statement& statement = statements_[s];
@@ -284,7 +388,44 @@ class Formatter {
 
  private:
   [[nodiscard]] std::string_view tokenText(std::size_t index) const {
+    const auto replaced = replacements_.find(index);
+    if (replaced != replacements_.end()) {
+      return replaced->second;
+    }
     return source_.substr(begin_[index], end_[index] - begin_[index]);
+  }
+
+  /// Fills `replacements_` when the caller asked for the other naming mode: the
+  /// variables get their other spelling, an old-dialect string constant that is a
+  /// bare capitalised name gets the quotes ISO needs (`Str` → `"Str"`), and an ISO
+  /// atom the old dialect would read as a variable gets quotes too (`а` → `'а'`).
+  /// Every other byte of the program is still copied as it is written (task_99).
+  void planNames(const TokenList& tokens) {
+    if (!options_.names_out.has_value() || *options_.names_out == source_mode_ ||
+        options_.selection_only) {
+      return;
+    }
+    const auto names = variableNames(tokens, source_mode_, *options_.names_out);
+    for (std::size_t i = 0; i < tokens.size(); ++i) {
+      if (tokens[i].kind == TokenKind::Variable) {
+        const auto renamed = names.find(tokens[i].text);
+        if (renamed != names.end()) {
+          replacements_.emplace(i, renamed->second);
+        }
+      } else if (source_mode_ == VariableMode::Old && tokens[i].kind == TokenKind::String &&
+                 (begin_[i] >= source_.size() || source_[begin_[i]] != '"')) {
+        // A bare capitalised name is the old dialect's string constant (task_67);
+        // ISO spells the same thing in quotes.
+        replacements_.emplace(i, "\"" + tokens[i].text + "\"");
+      } else if (source_mode_ == VariableMode::Iso && tokens[i].kind == TokenKind::Identifier &&
+                 (begin_[i] >= source_.size() || source_[begin_[i]] != '\'') &&
+                 oldReadsAsVariableName(tokens[i].text)) {
+        // `?одно(а, а).` asks about one-letter *atoms* in ISO, and the old dialect
+        // reads a one-letter name as a variable: without the quotes the question
+        // would change its meaning (and answer `а=_1`).
+        replacements_.emplace(i, "'" + tokens[i].text + "'");
+      }
+    }
   }
 
   /// The bytes between two adjacent tokens: whitespace, and comments.
@@ -700,10 +841,14 @@ class Formatter {
 
   std::string_view source_;
   FormatOptions options_;
+  VariableMode source_mode_ = VariableMode::Iso;
   std::string indent_;
   const TokenList* tokens_ = nullptr;
   std::vector<std::size_t> begin_;
   std::vector<std::size_t> end_;
+  /// Token index -> the text to print in its place (task_99); empty when the
+  /// names are printed as they are read.
+  std::unordered_map<std::size_t, std::string> replacements_;
   std::vector<Statement> statements_;
   Builder builder_;
 };
@@ -744,6 +889,22 @@ std::vector<std::size_t> tokenBegins(const TokenList& tokens, std::string_view s
 
 }  // namespace
 
+/// The marker line of a converted answer (task_99).
+///
+/// A converted file always says which mode its names are written in — even an ISO
+/// one, whose marker is otherwise the default it gets for free.  A source that had
+/// no marker (it was read by `--vars`) gets one added above everything else, so the
+/// answer does not depend on how the reader was started.
+std::string withModeMarker(std::string text, VariableMode mode, bool had_marker) {
+  const std::string line =
+      std::string(":- ИМЕНА(") + (mode == VariableMode::Iso ? "0" : "1") + ").";
+  if (!had_marker) {
+    return line + "\n" + text;
+  }
+  const std::size_t eol = text.find('\n');
+  return eol == std::string::npos ? line : line + text.substr(eol);
+}
+
 FormatResult formatSource(std::string_view text, const FormatOptions& options) {
   FormatResult result;
   result.text = std::string(text);
@@ -763,7 +924,9 @@ FormatResult formatSource(std::string_view text, const FormatOptions& options) {
   // marker stays in the text: it is an ordinary statement, and the file keeps it
   // as its first line.
   VariableMode mode = options.variables;
-  if (const auto marker = readVariableMarker(source)) {
+  const std::optional<std::pair<VariableMode, std::size_t>> marker =
+      readVariableMarker(source);
+  if (marker.has_value()) {
     mode = marker->first;
   }
   Lexed lexed = lexAndParse(source, options.source_name, mode);
@@ -772,8 +935,11 @@ FormatResult formatSource(std::string_view text, const FormatOptions& options) {
     return result;  // byte for byte, with the diagnostics
   }
   if (lexed.parses) {
-    Formatter formatter(source, options);
+    Formatter formatter(source, options, mode);
     result.text = tidyUp(formatter.run(lexed.tokens, source.size()));
+    if (options.names_out.has_value() && !options.selection_only) {
+      result.text = withModeMarker(result.text, *options.names_out, marker.has_value());
+    }
     result.changed = result.text != std::string(text);
     return result;
   }
@@ -824,7 +990,7 @@ FormatResult formatSource(std::string_view text, const FormatOptions& options) {
       continue;
     }
     Lexed prefix = lexAndParse(source.substr(0, cut), options.source_name, mode);
-    Formatter formatter(source, options);
+    Formatter formatter(source, options, mode);
     std::string formatted = formatter.run(prefix.tokens, cut);
     formatted += source.substr(cut);
     result.text = stripLineEnds(std::move(formatted));

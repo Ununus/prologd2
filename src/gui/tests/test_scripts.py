@@ -22,7 +22,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 from PySide6.QtGui import QColor, QImage  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
-from prologd_gui import actions, scriptdialog, scripts  # noqa: E402
+from prologd_gui import actions, engines, scriptdialog, scripts  # noqa: E402
 
 
 def draw_picture(path: pathlib.Path) -> None:
@@ -56,10 +56,14 @@ def test_the_menu_holds_the_converter_before_the_help() -> None:
     assert "Скрипты" in titles, titles
     assert titles.index("Скрипты") + 1 == titles.index("Справка"), titles
     entries = dict(actions.MENUS)["Скрипты"]
-    assert entries == ("script_image",), entries
+    # The picture converter, and then the submenu of the naming conversions (task_99).
+    assert entries == ("script_image", actions.SEPARATOR, actions.NAMES_SUBMENU), entries
     action = actions.BY_KEY["script_image"]
     assert action.title == "Сконвертировать картинку…", action.title
-    print("ok: «Скрипты» стоит перед «Справкой» и держит конвертер")
+    conversions = [actions.BY_KEY[key] for key in actions.NAMES_CONVERSIONS]
+    assert [entry.title for entry in conversions] == ["PLD в ISO", "ISO в PLD"], conversions
+    assert all(entry.needs == engines.FORMAT for entry in conversions), conversions
+    print("ok: «Скрипты» стоит перед «Справкой» и держит конвертер и перевод имён")
 
 
 def test_the_dialog_turns_its_fields_into_the_tool_s_arguments(directory: pathlib.Path) -> None:

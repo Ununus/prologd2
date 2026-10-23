@@ -54,4 +54,10 @@ bool isUpperCaseLetter(CodePoint code_point);
 bool isLowerCaseLetter(CodePoint code_point);
 bool isNameCharacter(CodePoint code_point);
 
+/// `name` with its first code point in upper case and the rest untouched: `д` →
+/// `Д`, `ё` → `Ё`, `a` → `A`.  A name that does not start with a lower-case
+/// letter comes back as it is.  (task_99: an old-dialect variable becomes an ISO
+/// name, and ISO's variables start with a capital.)
+std::string upperCaseFirst(std::string_view name);
+
 }  // namespace prologd

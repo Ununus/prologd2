@@ -1225,3 +1225,66 @@ tool and comparing the dialog's promise with the `:- ХОЛСТ` it prints.  The
 prints LF rather than the platform's CRLF, because the answer lands in a tab.
 
 **Status.** Accepted 2026-10-23 (task_97).
+
+## ADR-038: the naming conversion is the formatter's token pass, and it names its mode
+
+**Context.**  The dialect reads names two ways (`--vars 0|1`, the file's own
+`:- ИМЕНА(N).`) but prints them as written, so a program written for the original
+engine stays unreadable to the ISO reader and back.  A Python port
+(`ai/tools/port_lessons.py`) knows neither `:- ИМЕНА`, nor `'атом'`, nor `#…#`, nor
+`A_`, nor `\"` inside a string, and renames keywords as a side effect — a second
+lexer would be a second source of truth, drifting on the first unusual file.  The
+formatter already walks the tokens of a source and rewrites only what it is told to.
+
+**Decision.**  The conversion is a *print mode of the formatter*, not a separate
+pass: `FormatOptions::names_out` says which mode to print, and the printer reads
+each name from a map instead of from the source.  The map comes from
+`variableNames(tokens, from, to)`, which reverses the lexer's own rules — the lexer
+says what a name *is*, the map says how to spell it in the other mode.  The window
+sends the formatter request it already sends with `names` added (protocol 15), so
+there is no new command, no new response and no second text pipeline.
+
+- Into ISO: the base is the name with its first letter up and its apostrophe off
+  (`X'` → `X`, `var1'` → `Var1`); `_` and `_имя` are ISO variables as written.  A
+  base one variable has is printed bare; a base several share (`Х`, `х`, `Х'`, `х'`)
+  is numbered `Х_1…Х_n` in the order the variables are first written, and a base
+  that is a reserved name is numbered too (a reserved word is a predicate in
+  every mode and cannot be a variable).  Numbering is
+  global per file, because one old name has to become one ISO name everywhere it
+  appears.  An old-mode string (a bare capitalised name) gets quotes: `Str` →
+  `"Str"`.
+- Into the old dialect: `_`, `_имя`, a single code point and a letter with a
+  trailing `_` are variables in both modes and stay; everything else gets the
+  apostrophe that makes it one (`Сумма'`, `X_1'`).  A string stays a string —
+  `"Str"` is a string in both modes, so unquoting it would buy nothing.  An *atom*
+  of one letter or of a letter plus `_` takes single quotes, because the old
+  dialect reads exactly that shape as a variable: `?одно(а, а).` asks about a
+  constant in ISO and would answer `а=_1` in the old spelling, so it becomes
+  `?одно('а', 'а').`; a one-letter functor becomes `'а'(1)` the same way.  Both
+  spellings are checked against the pinned original, which answers ДА.
+- The answer's first line is always the marker (`:- ИМЕНА(0).` or
+  `:- ИМЕНА(1).`), replacing one that was there and being added when there was
+  none: a converted file has to be read in the mode it is written in, and a reader
+  that trusts the settings would otherwise read it in the wrong one.
+- A fragment (`selection_only`) is never renamed: the numbering needs the whole
+  program, and a fragment renamed on its own would number differently from the file
+  it comes from.  `--format` and `--names` may be asked for together — one pass
+  lays the text out *and* renames it.
+- In the window the answer opens in a new unnamed tab («Скрипты →
+  Сконвертировать исходник → PLD в ISO / ISO в PLD»), the source keeps what its
+  author wrote, and the mode is forced to `soft`: a converted program is read
+  afterwards, and a one-line answer is not.  The entry needs `engines.FORMAT`, so
+  the original engine has it disabled.
+
+**Consequences.**  Round trips settle: `Х,х,Х'` → `Х_1,Х_2,Х_3` → `Х_1',Х_2',Х_3'`
+→ `Х_1,Х_2,Х_3`, and the second ISO pass is word for word the first.  One spelling
+has no old-dialect form at all — an atom containing `'` — and it is left as it is
+rather than refused: the conversion quotes what it can and never turns an atom into
+a string.  The mode the source is *read* in still comes from its own marker, so a
+file converted to ISO and saved can be opened and run without touching the row.
+Protocol 15 is written down in four places (`protocol.cpp`, `protocol.py`,
+`protocol_session.cmake`, `test_formatter.py`); a front end that does not send
+`names` behaves exactly as before.
+
+**Status.** Accepted 2026-10-23 (task_99); the rule about one-letter atoms and the
+renaming of the two menu entries are part of it (part 167).

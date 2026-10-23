@@ -805,6 +805,10 @@ class MainWindow(QMainWindow):
         return {
             "new": lambda: self.new_buffer(),
             "script_image": self.convert_image,
+            # «PLD to ISO» and «ISO to PLD» (task_99): the answer is a new text, so
+            # it opens in a tab of its own rather than replacing the buffer.
+            "names_iso": lambda: self.convert_names(0),
+            "names_pld": lambda: self.convert_names(1),
             "reveal": self._reveal_in_file_manager,
             "open_import": self._open_import_under_cursor,
             "open": self._open_file,
@@ -1232,6 +1236,11 @@ class MainWindow(QMainWindow):
                     continue
                 elif key == actions.THEME_MODE:
                     menu.addMenu(self._build_theme_menu("Оформление"))
+                elif key == actions.NAMES_SUBMENU:
+                    submenu = menu.addMenu(actions.NAMES_MENU_TITLE)
+                    submenu.setToolTipsVisible(True)
+                    for name in actions.NAMES_CONVERSIONS:
+                        submenu.addAction(self._actions[name])
                 else:
                     menu.addAction(self._actions[key])
 
@@ -2393,6 +2402,7 @@ class MainWindow(QMainWindow):
         if not text:
             return
         self._format_pending = {
+            "kind": "format",
             "view": view,
             "old": old,
             "region": region,
@@ -2417,11 +2427,69 @@ class MainWindow(QMainWindow):
             variable_mode=self._variable_mode(),
         )
 
+    def _show_converted(self, text: str, target: int) -> None:
+        """A converted program in a tab of its own (task_99)."""
+        self.new_buffer()
+        self.editor().setPlainText(text)
+        mode = "ISO" if target == 0 else "PLD"
+        lines = len(text.splitlines())
+        self._status.setText(f"имена переведены в режим {mode}: {lines} строк в новом табе")
+
+    def convert_names(self, target: int) -> bool:
+        """«Скрипты → Сконвертировать исходник → …» (task_99).
+
+        The conversion is the formatter's own token pass, so the request is the one
+        «Форматировать» sends with the *target* naming mode added — the buffer is
+        read in its own mode (`_variable_mode()`), and the answer is the same program
+        spelled the other way, marker line and all.  It opens in a new unnamed tab:
+        a conversion produces a new text, and the tab in front of the user stays as
+        it was written.
+
+        `target` is the mode to print: 0 is ISO, 1 the old dialect.
+        """
+        view = self.active_pane().current_view()
+        if view is None or self._format_pending is not None:
+            return False
+        text = view.toPlainText()
+        if not text.strip():
+            self._status.setText("конвертировать нечего: таб пуст")
+            return False
+        # `soft` whatever the «Форматировать» control says: a converted program is
+        # read afterwards, and a one-line answer («в одну строку») is not.
+        self._format_pending = {
+            "kind": "names",
+            "target": target,
+            "view": view,
+            "old": text,
+            "region": None,
+        }
+        if not self._session.is_running():
+            if not self._start_session():
+                self._format_pending = None
+                return False
+        self._status.setText("перевожу имена…")
+        self._session.format_text(
+            text,
+            mode="soft",
+            width=self._settings.format_width,
+            indent=self._settings.format_indent,
+            unit=self._settings.format_unit,
+            name="<buffer>",
+            variable_mode=self._variable_mode(),
+            names=target,
+        )
+        return True
+
     def _on_formatted(self, text: str, changed: bool) -> None:
         """Puts the laid-out text back — or says why it was not put back."""
         pending = self._format_pending
         self._format_pending = None
         if pending is None:
+            return
+        if pending.get("kind") == "names":
+            # A conversion is a new text, not a rewrite: it opens in a tab of its
+            # own and the buffer keeps what its author wrote (task_99).
+            self._show_converted(text, pending["target"])
             return
         view = pending["view"]
         if self._buffer_of_view(view) is None:
@@ -4343,14 +4411,16 @@ class MainWindow(QMainWindow):
             # selection is a fragment, and its line numbers are not the buffer's.
             pending = self._format_pending
             self._format_pending = None
+            converting = pending is not None and pending.get("kind") == "names"
             if (
                 position is not None
                 and pending is not None
-                and pending["region"] is None
+                and pending.get("region") is None
                 and self._buffer_of_view(pending["view"]) is self.current_buffer()
             ):
                 self._mark_error_line(position)
-            self._status.setText(f"форматирование: не удалось разобрать — {message}")
+            what = "конвертация" if converting else "форматирование"
+            self._status.setText(f"{what}: не удалось разобрать — {message}")
             return
         if self._stopping and self._session.is_running() and severity != "warning":
             # This is the error of the query *we* stopped: the run is over — the

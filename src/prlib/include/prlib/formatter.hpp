@@ -44,6 +44,15 @@ struct FormatOptions {
   /// may end in the middle of a body — it is then formatted up to its last
   /// complete goal and the rest is copied as it stands.
   bool selection_only = false;
+  /// The mode to *print* names in (task_99); empty prints them as the file reads
+  /// them.  `Iso` writes an old-dialect program in the ISO spelling — numbered
+  /// variables, `"…"` for the bare capitalised constants — and `Old` writes an ISO
+  /// one back (`Сумма'`, while `X` and `X_` stay as they are, and a one-letter atom
+  /// takes the quotes the old dialect needs: `а` → `'а'`).  The marker line of
+  /// the answer always says which mode it is in, whether the source had one or not.
+  /// A fragment (`selection_only`) keeps its names: the numbering needs the whole
+  /// program.
+  std::optional<VariableMode> names_out;
 };
 
 /// What `formatSource` made of the input.
