@@ -1,4 +1,4 @@
-# task_22 — the maze example: BFS and DFS with a picture
+# task_97 — the maze example: BFS and DFS with a picture
 
 **Status:** done (2026-10-23)
 **Depends on:** task_15 (graphics), task_21 (the window that shows the picture)
@@ -46,8 +46,21 @@ The example (`examples/problems/maze/`):
 
 ## Measurements
 
-* The sample maze: BFS finds 9 cells, DFS 11 — both paths printed and checked
-  against a hand trace; the wall set is 30 cells, exactly the `#` of the input.
+* The first sample maze, 7×7, used while the example was written: BFS finds 9
+  cells, DFS 11 — both paths printed and checked against a hand trace; the wall
+  set is 30 cells, exactly the `#` of the input.
+* The shipped maze (the owner's, 14×14, mouse `(9, 2)`, cheese `(13, 13)`): BFS
+  finds a path of 52 cells and DFS of 64.  The question of the file reads the
+  input with `ЧТЕНИЕ_ИЗ`, whose path is relative to the working directory — the
+  window runs from the example's folder, the CLI takes `-i`.
+* Timings of the two searches on that maze: BFS 2.49 s and DFS 1.82 s at first —
+  neither kept a shared set of visited cells.  Now both do (a cell is expanded
+  once): `поиск/8` puts new paths at the **back** of the queue and `спуск/8` puts
+  them at the **front** of the stack, the rest of the shape is the same.  BFS
+  takes **0.12 s** on the 14×14 maze and still returns the shortest path, 52;
+  DFS takes **0.06 s** and returns 64.  On the 7×7 sample: BFS 30 ms / 9 cells,
+  DFS 19 ms / 15 cells — the depth-first path is longer there than the 11 of the
+  old backtracking version, which is the point: it is not the shortest one.
 * The picture was checked apart from the logic: the same maze drawn on a black
   field without the cheese, the snapshot cut into cells by a script — the grid
   matches the input line for line.  The first "mismatch" was the script printing

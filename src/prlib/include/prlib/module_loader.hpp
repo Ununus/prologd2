@@ -60,8 +60,11 @@ class ModuleLoader {
     SearchOutcome outcome = SearchOutcome::Missing;
   };
 
-  /// Load `path` and everything it imports.  Returns false on error.
-  bool loadFile(const std::filesystem::path& path, std::string* error = nullptr);
+  /// Load `path` and everything it imports.  Returns false on error.  `run_questions`
+  /// decides whether this file's own `?`-lines are executed; imports reached from
+  /// it carry their own answer (ADR-034).
+  bool loadFile(const std::filesystem::path& path, std::string* error = nullptr,
+                bool run_questions = true);
 
   /// Load an in-memory source (REPL, tests, stdin).
   bool loadSource(std::string_view source, const std::string& virtual_name,
@@ -75,7 +78,7 @@ class ModuleLoader {
 
  private:
   bool process(const ParsedProgram& program, const std::filesystem::path& file,
-               std::string* error);
+               std::string* error, bool run_questions);
   std::optional<std::filesystem::path> resolve(const std::string& name,
                                                const std::filesystem::path& importer,
                                                std::vector<SearchStep>* steps) const;

@@ -144,7 +144,7 @@ PINNED: dict[str, int] = {
     "problems/knapsack.pld": 2,
     "problems/maze/maze.graphics.pld": 0,
     "problems/maze/maze.images.pld": 0,
-    "problems/maze/maze.pld": 3,
+    "problems/maze/maze.pld": 2,
     "sort.pld": 12,
     "sorting.pld": 8,
     "stdlib.pld": 73,

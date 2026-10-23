@@ -21,6 +21,11 @@ namespace prologd {
 struct ImportDirective {
   std::string path;
   SourceLocation location;
+  /// True for `?ИМПОРТ("файл").` — the spelling of PrologD 2.x, where the file was
+  /// spliced in where the line stood, questions and all.  `:- ИМПОРТ(...)` is the
+  /// directive of 2.x: it brings the definitions and leaves the questions of the
+  /// imported file alone (ADR-034).
+  bool run_questions = false;
 };
 
 /// A parsed query (`?Goal, Goal.`) together with its named variables in the

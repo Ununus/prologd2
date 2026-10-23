@@ -132,7 +132,8 @@ std::optional<std::filesystem::path> ModuleLoader::resolve(
   return std::nullopt;
 }
 
-bool ModuleLoader::loadFile(const std::filesystem::path& path, std::string* error) {
+bool ModuleLoader::loadFile(const std::filesystem::path& path, std::string* error,
+                            bool run_questions) {
   std::error_code code;
   const auto canonical = std::filesystem::weakly_canonical(path, code);
   const std::string key = toUtf8PathGeneric(code ? path : canonical);
@@ -175,7 +176,7 @@ bool ModuleLoader::loadFile(const std::filesystem::path& path, std::string* erro
     return false;
   }
   loading_stack_.push_back(key);
-  const bool ok = process(program, file_path, error);
+  const bool ok = process(program, file_path, error, run_questions);
   loading_stack_.pop_back();
   if (!ok) {
     return false;
@@ -199,18 +200,18 @@ bool ModuleLoader::loadSource(std::string_view source, const std::string& virtua
     }
     return false;
   }
-  return process(program, fromUtf8Path(virtual_name), error);
+  return process(program, fromUtf8Path(virtual_name), error, true);
 }
 
 bool ModuleLoader::process(const ParsedProgram& program, const std::filesystem::path& file,
-                           std::string* error) {
+                           std::string* error, bool run_questions) {
   for (const StatementRef& statement : program.order) {
     switch (statement.kind) {
       case StatementRef::Kind::Clause:
         engine_.database().addClause(program.clauses[statement.index]);
         break;
       case StatementRef::Kind::Query:
-        if (query_runner_) {
+        if (query_runner_ && run_questions) {
           query_runner_(program.queries[statement.index]);
         }
         break;
@@ -229,7 +230,7 @@ bool ModuleLoader::process(const ParsedProgram& program, const std::filesystem::
           }
           return false;
         }
-        if (!loadFile(*resolved, error)) {
+        if (!loadFile(*resolved, error, directive.run_questions)) {
           return false;
         }
         break;

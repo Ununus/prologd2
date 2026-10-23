@@ -108,6 +108,38 @@ TEST_CASE("import loads a module once") {  TempDir dir;
   REQUIRE(outcome.output == "N=2\nX=1\nX=2\n");
 }
 
+TEST_CASE("a directive import brings the definitions and leaves the questions alone") {
+  // `:- ИМПОРТ(...)` names a library: the file's `?`-lines stay unrun, so a module
+  // cannot print, read the input or abort the load it is part of (ADR-034).
+  TempDir dir;
+  dir.write("lib.pld",
+            "пометка(да).\n"
+            "?ВЫВОДПС(\"из библиотеки\").\n");
+  dir.write("main.pld",
+            ":- ИМПОРТ(\"lib.pld\").\n"
+            "?пометка(X).\n");
+  const LoadOutcome outcome = load(dir.path() / "main.pld");
+  REQUIRE(outcome.ok);
+  REQUIRE(outcome.output == "X=да\n");
+}
+
+TEST_CASE("the question form of the import keeps the splice of PrologD 2.x") {
+  // `?ИМПОРТ("lib.pld").` is how the previous version wrote an import: the file
+  // was spliced in where the line stood, questions and all.  Old programs keep
+  // that behaviour, and a program that wants a quiet library writes `:-` instead.
+  TempDir dir;
+  dir.write("lib.pld",
+            "пометка(да).\n"
+            "?ВЫВОДПС(\"из библиотеки\").\n");
+  dir.write("main.pld",
+            "?ИМПОРТ(\"lib.pld\").\n"
+            "?пометка(X).\n");
+  const LoadOutcome outcome = load(dir.path() / "main.pld");
+  REQUIRE(outcome.ok);
+  // The spliced question prints its answer too, as a question of the main file does.
+  REQUIRE(outcome.output == "из библиотеки\nДА\nX=да\n");
+}
+
 TEST_CASE("import resolves relative to the importing file") {
   TempDir dir;
   fs::create_directories(dir.path() / "sub");

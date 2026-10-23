@@ -1059,7 +1059,7 @@ manual's appendix 17 gains the pair `ИСТИНА`/`true` by itself, because the
 is generated from `builtins.json`.  `test_builtins_control.cpp` pins the behaviour
 (`?ИСТИНА.`, `?true.`, the empty branch, `?НЕ(ИСТИНА)`, a conjunction).
 
-**Status.** Accepted 2026-10-23 (task_22).
+**Status.** Accepted 2026-10-23 (task_97).
 
 ## ADR-033: A raster picture may be converted, but a 16-pixel mouse is drawn
 
@@ -1088,4 +1088,38 @@ what both routes draw with, and it emits one `horizontal` per scan line, so a fu
 112×112 maze is about 3400 operations — cheap enough for the snapshot in
 `tools/render_graphics.py`.
 
-**Status.** Accepted 2026-10-23 (task_22).
+**Status.** Accepted 2026-10-23 (task_97).
+
+## ADR-034: the directive imports definitions, the question imports a program
+
+**Context.**  The loader ran the `?`-lines of every file it processed, imported
+ones included.  That is a leftover of the previous version, where `?ИМПОРТ("f").`
+was a preprocessor splice: `preprocessor.cpp` matched the line with a regexp and
+substituted the file's text in its place, so the questions came along.  Nothing
+shipped depends on it (75 files of `examples/` and `stdlib/`, not one import of a
+file with questions), no test pinned it, and the manual never said it out loud.
+The cost showed up on `examples/problems/maze/maze.pld`: importing it ran its
+animation, ate the input file and could abort the importer's load.  A question
+also runs against a half-built database — the importer's clauses after the
+directive are not in yet — and the protocol's `questions: false` (task_36) can
+only silence a whole load, not one import.
+
+**Decision.**  The two spellings mean two things, and the parser records which one
+was written (`ImportDirective::run_questions`, set from the `?`/`:-` marker).
+`:- ИМПОРТ("f").` is the directive: the file contributes definitions, its
+`?`-lines are parsed and statically checked but not run.  `?ИМПОРТ("f").` keeps
+the splice of 2.0 and runs them, in the order they stand.  `loadFile`/`process`
+carry the flag; `loadSource` (the window's `load`, and `-s`) still runs the
+questions of the file it was given, and `questions: false` silences everything as
+before.
+
+**Consequences.**  A library is quiet: no output, no input consumed, no failed
+question aborting the import — `maze.pld` can be imported while it still ends with
+its own `?`-question, which is exactly what the example needs.  A program written
+for 2.0 keeps its behaviour as long as it writes `?ИМПОРТ`, the spelling it
+already used.  The rule is one line in the manual (§8) and one sentence in the
+diff; «never run imported questions» was rejected because it would silently change
+what an old program prints.  Two cases in `test_module_loader.cpp` pin both
+halves, including the answer the spliced question prints for itself.
+
+**Status.** Accepted 2026-10-23 (task_97).

@@ -944,14 +944,16 @@ bool Parser::parseQueryOrDirective(ParsedProgram& out) {
     return false;
   }
 
-  // `ИМПОРТ("file")` is a directive, not a runtime goal.
+  // `ИМПОРТ("file")` is a directive, not a runtime goal.  Where it was written as a
+  // question (`?ИМПОРТ(...)`) it also carries that file's own questions, which is
+  // what PrologD 2.x did by splicing the file in; a `:-` directive does not.
   if (goals.size() == 1 && goals[0].kind == TermKind::Compound &&
       goals[0].compound != nullptr && isImportName(goals[0].compound->name) &&
       goals[0].compound->args.size() == 1) {
     const Term& argument = goals[0].compound->args[0];
     if (argument.kind == TermKind::String || argument.kind == TermKind::Atom) {
       out.order.push_back(StatementRef{StatementRef::Kind::Import, out.imports.size()});
-      out.imports.push_back(ImportDirective{argument.text, location});
+      out.imports.push_back(ImportDirective{argument.text, location, is_query});
       return true;
     }
     report(ErrorCode::ImportError, location, "ИМПОРТ ожидает имя файла в кавычках");
