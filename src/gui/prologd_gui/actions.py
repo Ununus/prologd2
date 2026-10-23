@@ -295,6 +295,11 @@ ACTIONS: tuple[Action, ...] = (
     # visibility, and both survive a restart (`view/graphics_visible`).
     Action("graphics", "Графическое окно", "view-graphics", checkable=True,
            needs=engines.GRAPHICS),
+    # -- scripts
+    # The window's own tools (ADR-036): «Сконвертировать картинку…» runs
+    # `tools/image_to_pld.py` and puts what it printed into a new tab.  It is not
+    # part of running a program, so it gets a menu of its own.
+    Action("script_image", "Сконвертировать картинку…", None),
     # -- help
     # The reference of a predicate (task_37): the same help picture, because it
     # is the same «справка» — only the answer comes from `doc/builtins.json`
@@ -408,6 +413,10 @@ MENUS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "clear_output",
             "graphics",
         ),
+    ),
+    (
+        "Скрипты",
+        ("script_image",),
     ),
     (
         "Справка",

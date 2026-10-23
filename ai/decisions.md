@@ -1154,3 +1154,74 @@ The name is `ХОЛСТ` rather than `ЭКРАН`, which would read as the *wind
 canvas is what a program draws on, and `canvas` is the English word for it.
 
 **Status.** Accepted 2026-10-23 (task_98).
+
+## ADR-036: the converter is a menu entry, and its answer is a tab
+
+**Context.**  `tools/image_to_pld.py` turns a picture into `картинка/6` facts, and
+the maze example was written with it (ADR-033): background detection, ink-only
+averaging, a median-cut palette, rectangle merging — ten flags that a student will
+not type.  The window already knows the picture story (the graphics canvas), and a
+converted picture is the one thing a reader wants *beside* a program rather than in
+a terminal.
+
+**Decision.**  A menu of its own, «Скрипты», before «Справка»: one entry,
+«Сконвертировать картинку…», opens a dialog of the tool's own settings (picture,
+name, grid, colours, background threshold, ink share, background), the window runs
+the tool in *its own* interpreter (the tool imports PySide6 for the image), and the
+facts it prints land in a new unnamed tab.  The tool gained a mode without `--out`
+that prints the program and sends its summary to stderr, so the window needs no
+temporary file and the answer is the text itself.  Cancel and a tool error are two
+different answers: a cancellation is silent, a failure is a box with the tool's own
+words.  Nothing is loaded into the interpreter — a conversion is text, not a run, so
+it cannot disturb a session or a live database.
+
+**Consequences.**  The dialog's fields are exactly the tool's keys (`scripts.py`
+builds the command line, `scriptdialog.py` collects it), so one place decides what a
+setting means; `test_scripts.py` checks the seam without a window — the menu is where
+it belongs, the arguments are right, a generated picture becomes a program, and a
+missing picture or a missing tool is an error with words.  That program is now the
+whole answer and not just facts — `:- ХОЛСТ` the size of the picture, the facts, a
+`нарисовать_картинку/1` that turns a cell into a rectangle and a closing question —
+because the point of a tab is that it can be run; the file form keeps to facts
+alone, since a file is imported and a directive would act on the importer
+(ADR-034).  The text is broken the way `prologu --format soft` breaks it, and the
+same suite pins that, so «Форматировать» on a fresh tab is a no-op.  A packaged
+build has no `tools/` beside it, and the entry says so instead of running nothing (a
+shipped copy of the converter is a separate question, task_99 if it is ever wanted).
+
+**Status.** Accepted 2026-10-23 (task_99).
+
+## ADR-037: the grid follows the picture, and a cell has two sizes
+
+**Context.**  The converter squeezed every picture into a square `--size` grid, so a
+600x800 portrait came out as 512x512 and its shape was lost.  The one number was also
+doing two jobs: `--size 16` meant «16 cells across» and «16 dots per cell» at once,
+and the cells it cut were 18 or 19 source pixels wide depending on where the column
+fell (600/32 is not an integer) — three different sizes pretending to be one.
+
+**Decision.**  Two numbers, each with one meaning.  `--cell` is the size of a cell
+**in pixels of the picture** (1..64, 16 by default) and the grid follows from it:
+`cols = width / cell`, `rows = height / cell`, the remainder trimmed evenly from both
+sides — 600 px at a cell of 16 is 37 cells and 4 px off each edge.  `--canvas-cell` is
+the same cell **on the canvas**, in dots (1..32, `auto` by default); `auto` takes the
+largest cell that keeps the longer side near the engine's default canvas (600 dots)
+and the shorter side at least 16, the `ХОЛСТ` minimum.  So 600x800 is 37x50 cells,
+148x200 dots at a cell of 4, and its proportions are the picture's.  The facts stay in
+cell coordinates and do not depend on `--canvas-cell` — only the printed drawing
+predicate and `:- ХОЛСТ` do, and the directive takes the height first.  `--size` is
+gone: a sprite that must fill exactly one cell of a program says so with its own
+`--cell` (the maze's 228-pixel cheese is `--cell 14`, which is 16 cells), and `--cell`
+takes a comma list, one value per `--image`, because pictures differ in size.
+
+**Consequences.**  `maze.images.pld` was regenerated with `--cell 14,4 --colors 4`;
+the maze's own drawing did not change (`Слева + X1`), and the two renders differ in
+224 pixels of 200704 — the cheese's edges, nothing else.  A canvas outside the
+engine's 16..2048 is refused with both the numbers and what to change, as is a
+picture smaller than its cell; nothing is clamped silently.  The dialog lost
+«Сетка» and gained «Клетка картинки», «Клетка холста» and a live line «Сетка 37×50
+клеток, холст 148×200 точек», so the `auto` rule now lives in two places — the tool
+must work without a window — and `test_scripts.py` keeps them honest by running the
+tool and comparing the dialog's promise with the `:- ХОЛСТ` it prints.  The tool
+prints LF rather than the platform's CRLF, because the answer lands in a tab.
+
+**Status.** Accepted 2026-10-23 (task_97).

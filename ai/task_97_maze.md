@@ -26,15 +26,22 @@ Built-ins and tools:
       `graphics{snapshot}` and writes a PNG with no dependencies; decodes the
       snapshot's colour number (four little-endian bytes), not raw RGBA.
 - [x] `tools/image_to_pld.py` — PNG → `картинка/6` facts via `ЗАКРАСКА/5`; ink-only
-      averaging, median-cut palette, greedy rectangle merge, preview PNG, `--size`,
-      `--colors`, `--coverage`, `--tolerance`, `--background`.
+      averaging, median-cut palette, greedy rectangle merge, preview PNG, `--cell`,
+      `--canvas-cell`, `--colors`, `--coverage`, `--tolerance`, `--background`.
+      The grid follows the picture (`width / cell` by `height / cell`, remainder
+      trimmed from both sides), so a portrait stays a portrait (ADR-037); without
+      `--out` it prints a whole program — `:- ХОЛСТ`, the facts,
+      `нарисовать_картинку/1` and a question.
 
 The example (`examples/problems/maze/`):
 
 - [x] `maze.input.txt` — the format is size, mouse, cheese, then the rows (`#` wall,
       `.` passage).
 - [x] `maze.images.pld` — generated: the wall (76 rectangles, 4 colours) and the
-      cheese (45, 4); the header names the tool.
+      cheese (49, 4).  Both are 16×16 cells, which is what the maze's drawing
+      predicate adds: `--cell 14` for the 228-pixel cheese and `--cell 4` for the
+      64-pixel wall, in one run (`--cell 14,4 --colors 4`); the header names the
+      tool and the settings.
 - [x] `maze.graphics.pld` — cell of 16 pixels, `слева/2`, `сверху/3`,
       `очистить_поле/2`, `стереть_клетку/3`, `нарисовать_картинку/4` (draw every
       fact, then fail into a catch-all), `нарисовать_стенку/3`, `нарисовать_сыр/3`,

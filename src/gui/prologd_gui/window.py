@@ -23,6 +23,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QApplication,
+    QDialog,
     QDockWidget,
     QFileDialog,
     QInputDialog,
@@ -55,6 +56,8 @@ from . import (
     panels,
     paths,
     reference,
+    scriptdialog,
+    scripts,
     search,
     settings,
     settingsdialog,
@@ -801,6 +804,7 @@ class MainWindow(QMainWindow):
         """The method an action runs — one place, so nothing is wired twice."""
         return {
             "new": lambda: self.new_buffer(),
+            "script_image": self.convert_image,
             "reveal": self._reveal_in_file_manager,
             "open_import": self._open_import_under_cursor,
             "open": self._open_file,
@@ -2736,6 +2740,33 @@ class MainWindow(QMainWindow):
         return self._add_buffer(
             documents.Document.untitled(name or documents.untitled_name(used))
         )
+
+    def convert_image(self) -> bool:
+        """«Скрипты → Сконвертировать картинку…» (ADR-036).
+
+        The dialog collects the converter's arguments (`scriptdialog`), the tool runs
+        in this very interpreter (`scripts`), and the facts it prints land in a new
+        unnamed tab — the user decides whether they are worth a file.  The tab is
+        text, not a run: nothing is loaded into the interpreter, so a conversion
+        cannot disturb a session.
+
+        Returns False when the dialog was cancelled or the tool refused; the reason
+        is said in a box, because a silent no-op after «ОК» reads as a broken menu.
+        """
+        dialog = scriptdialog.ImageToPldDialog(self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return False
+        try:
+            text = scripts.run(dialog.arguments())
+        except scripts.ScriptError as error:
+            QMessageBox.warning(self, "Сконвертировать картинку", str(error))
+            return False
+        buffer = self.new_buffer()
+        self.editor().setPlainText(text)
+        self._status.setText(
+            f"картинка {dialog.name()}: {len(text.splitlines())} строк в новом табе"
+        )
+        return True
 
     def open_path(self, path: str, encoding: str | None = None) -> bool:
         """Opens a file in its own tab — and *only* into the editor.
