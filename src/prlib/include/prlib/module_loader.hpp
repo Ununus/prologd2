@@ -72,14 +72,20 @@ class ModuleLoader {
 
   void setQueryRunner(QueryRunner runner) { query_runner_ = std::move(runner); }
 
+  /// Told when `:- ХОЛСТ(Высота, Ширина).` gives the program a canvas (ADR-035).
+  /// A front-end needs it *before* the first picture: the size of the canvas it
+  /// shows is otherwise known only from a snapshot, which arrives when the run is
+  /// over.
+  using CanvasListener = std::function<void(int width, int height)>;
+  void setCanvasListener(CanvasListener listener) { canvas_listener_ = std::move(listener); }
+
   [[nodiscard]] const std::vector<std::filesystem::path>& loadedFiles() const noexcept {
     return loaded_paths_;
   }
 
  private:
   bool process(const ParsedProgram& program, const std::filesystem::path& file,
-               std::string* error, bool run_questions);
-  std::optional<std::filesystem::path> resolve(const std::string& name,
+               std::string* error, bool run_questions);  std::optional<std::filesystem::path> resolve(const std::string& name,
                                                const std::filesystem::path& importer,
                                                std::vector<SearchStep>* steps) const;
   bool withinRoot(const std::filesystem::path& candidate) const;
@@ -106,6 +112,7 @@ class ModuleLoader {
   std::unordered_map<std::string, std::unordered_set<std::string>> imports_;
   std::unordered_set<std::string> reported_collisions_;
   QueryRunner query_runner_;
+  CanvasListener canvas_listener_;
 };
 
 }  // namespace prologd

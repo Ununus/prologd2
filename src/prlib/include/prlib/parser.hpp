@@ -28,6 +28,15 @@ struct ImportDirective {
   bool run_questions = false;
 };
 
+/// A canvas request found in the source: `:- ХОЛСТ(Высота, Ширина).`  It names the
+/// size of the picture the program draws on, and it is applied at load — after a
+/// front-end has offered its own size, so the program wins (ADR-035).
+struct CanvasDirective {
+  long long height = 0;
+  long long width = 0;
+  SourceLocation location;
+};
+
 /// A parsed query (`?Goal, Goal.`) together with its named variables in the
 /// order of first occurrence.
 struct Query {
@@ -42,7 +51,7 @@ struct Query {
 
 /// Position of a statement in a parsed unit, preserving source order.
 struct StatementRef {
-  enum class Kind { Clause, Query, Import };
+  enum class Kind { Clause, Query, Import, Canvas };
   Kind kind = Kind::Clause;
   std::size_t index = 0;
 };
@@ -52,6 +61,7 @@ struct ParsedProgram {
   std::vector<Clause> clauses;
   std::vector<Query> queries;
   std::vector<ImportDirective> imports;
+  std::vector<CanvasDirective> canvases;
   /// Source order of the statements above.
   std::vector<StatementRef> order;
   bool ok = true;

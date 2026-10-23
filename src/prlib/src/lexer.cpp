@@ -58,6 +58,8 @@ const std::unordered_set<std::string> kReservedBuiltins = {
     "СРАВНЕНИЕ", "compare",
     // Newcomers
     "НАЙТИВСЕ", "ИМПОРТ", "findall", "import",
+    // The canvas of a program (ADR-035): `:- ХОЛСТ(Высота, Ширина).`
+    "ХОЛСТ", "canvas",
     // Collecting by groups (task_91): `ВСЕРЕШ`/`МНОРЕШ` are the dialect's names,
     // `bagof`/`setof` the English ones.
     "ВСЕРЕШ", "МНОРЕШ", "bagof", "setof",

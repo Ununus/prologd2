@@ -9,6 +9,9 @@
 % Запуск:  prologu -s examples/problems/hanoi_play.pld
 % В дереве исходников, где папки stdlib рядом с интерпретатором нет, - с ключом
 % -I:  prologu -I stdlib -s examples/problems/hanoi_play.pld
+
+:- ХОЛСТ(380, 620).
+
 :- ИМПОРТ("graphics.pld").
 
 hanoi(N):-begin(N,A,B,C), move(A,B,C).

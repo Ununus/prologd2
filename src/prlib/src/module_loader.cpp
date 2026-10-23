@@ -215,6 +215,29 @@ bool ModuleLoader::process(const ParsedProgram& program, const std::filesystem::
           query_runner_(program.queries[statement.index]);
         }
         break;
+      case StatementRef::Kind::Canvas: {
+        // `:- ХОЛСТ(Высота, Ширина).` — the size the program draws on. It arrives
+        // after a front-end has named its own screen for the run, so it overrides
+        // it; the last directive of a program wins, and a library's one counts
+        // too, because the database is one for the whole program (ADR-035).
+        const CanvasDirective& canvas = program.canvases[statement.index];
+        if (canvas.height < kMinScreen || canvas.height > kMaxScreen ||
+            canvas.width < kMinScreen || canvas.width > kMaxScreen) {
+          if (error != nullptr) {
+            *error = "ХОЛСТ: размер холста должен быть от " + std::to_string(kMinScreen) +
+                     " до " + std::to_string(kMaxScreen) + " точек, а названо " +
+                     std::to_string(canvas.height) + " на " +
+                     std::to_string(canvas.width) + " (" + canvas.location.toString() + ")";
+          }
+          return false;
+        }
+        engine_.graphics().reset(static_cast<int>(canvas.width),
+                                 static_cast<int>(canvas.height));
+        if (canvas_listener_) {
+          canvas_listener_(static_cast<int>(canvas.width), static_cast<int>(canvas.height));
+        }
+        break;
+      }
       case StatementRef::Kind::Import: {
         const ImportDirective& directive = program.imports[statement.index];
         std::vector<SearchStep> search;

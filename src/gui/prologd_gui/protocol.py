@@ -36,11 +36,14 @@ from typing import Any, Iterator
 #: 12: `load`, `query` and `format` carry the naming mode (`vars`, task_67).
 #: 13: `load` and `query` take the `screen` the picture is drawn on (`width` and
 #:    `height`), and `ready` carries the engine's own screen (task_73).
-PROTOCOL_VERSION = 13
+#: 14: `screen` is also an *event*: the canvas a program names with
+#:    `:- ХОЛСТ(Высота, Ширина).`, sent as soon as the directive is applied, so a
+#:    window can take the size before the first primitive (ADR-035).
+PROTOCOL_VERSION = 14
 
 #: Event names the interpreter emits.
 EVENTS = ("ready", "output", "result", "input_request", "step", "trace", "graphics",
-          "bitmap", "error", "bye")
+          "bitmap", "screen", "error", "bye")
 
 #: What the solver was doing at a step point, as the `step` event spells it.
 STEP_ACTIONS = ("call", "exit", "redo", "fail")

@@ -16,6 +16,12 @@ namespace prologd {
 inline constexpr int kMaxGrX = 600;
 inline constexpr int kMaxGrY = 600;
 
+/// The smallest and the largest side of a canvas: `:- ХОЛСТ(...)` and a front-end's
+/// screen request are held to the same pair, so a program and a window cannot
+/// disagree about what a canvas is (ADR-035).
+inline constexpr int kMinScreen = 16;
+inline constexpr int kMaxScreen = 2048;
+
 /// How far outside the screen a coordinate may be before it is pulled back.
 ///
 /// A program may ask for `ЛИНИЯ(0, 0, 10**18, 10**18, 1)`, and arithmetic on
@@ -60,6 +66,10 @@ class GraphicsBackend {
 
   [[nodiscard]] virtual int width() const { return kMaxGrX; }
   [[nodiscard]] virtual int height() const { return kMaxGrY; }
+  /// Becomes `width × height` and forgets the picture.  A backend that owns no
+  /// buffer (the console's) has nothing to resize; the size a program asks for
+  /// through `:- ХОЛСТ(H, W).` reaches it and stops there.
+  virtual void reset(int width, int height) {(void)width; (void)height; }
 };
 
 /// Does nothing; the default for the console build.
@@ -181,7 +191,9 @@ class BitmapGraphicsBackend final : public GraphicsBackend {
   /// bytes on the wire.  The pixels are *thrown away*: a picture belongs to the
   /// run that drew it, and a snapshot of the previous one would be a lie.  A
   /// size of zero or less keeps the default, the way the constructor treats it.
-  void reset(int width, int height);
+  /// `:- ХОЛСТ(Высота, Ширина).` arrives here too, after the front-end's request
+  /// and therefore over it (ADR-035).
+  void reset(int width, int height) override;
 
   void setSink(Sink sink);
 

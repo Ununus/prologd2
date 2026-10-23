@@ -10,6 +10,34 @@
 using namespace prologd;
 using prologd::test::runProgram;
 
+TEST_CASE("the canvas directive names the screen the program draws on") {
+  // A front-end offers its own size (100x100 here, the way a window does for a
+  // run); `:- ХОЛСТ(30, 40).` wins over it, because the directive is applied while
+  // the program loads, after the offer (ADR-035).
+  auto backend = std::make_shared<BitmapGraphicsBackend>(100, 100);
+  const auto result = runProgram(":- ХОЛСТ(30, 40).\n?ТОЧКА(39, 29, 255).\n", "", backend);
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "ДА\n");
+  REQUIRE(backend->width() == 40);  // Ширина
+  REQUIRE(backend->height() == 30);  // Высота
+}
+
+TEST_CASE("the canvas directive refuses a size outside the limits") {
+  auto backend = std::make_shared<BitmapGraphicsBackend>();
+  const auto result = runProgram(":- ХОЛСТ(5, 4000).\n?ТОЧКА(1, 1, 1).\n", "", backend);
+  REQUIRE_FALSE(result.loaded);
+  REQUIRE(result.error.find("ХОЛСТ") != std::string::npos);
+  REQUIRE(result.error.find(std::to_string(kMinScreen)) != std::string::npos);
+  REQUIRE(result.error.find(std::to_string(kMaxScreen)) != std::string::npos);
+}
+
+TEST_CASE("the canvas directive wants two integer literals") {
+  auto backend = std::make_shared<BitmapGraphicsBackend>();
+  const auto result = runProgram(":- ХОЛСТ(A, 40).\n", "", backend);
+  REQUIRE_FALSE(result.loaded);
+  REQUIRE(result.error.find("ХОЛСТ") != std::string::npos);
+}
+
 TEST_CASE("graphics predicates call the backend") {
   auto backend = std::make_shared<RecordingGraphicsBackend>();
   const auto result = runProgram(

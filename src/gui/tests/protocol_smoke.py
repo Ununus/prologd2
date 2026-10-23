@@ -161,6 +161,26 @@ def main(argv: list[str]) -> int:
     assert named.get("line") == 1, named
     print("ok: a runtime error carries the place it happened in")
 
+    # ADR-035: the program's own canvas is a fact, and the size a front-end names is
+    # a preference.  A window sends its `screen` with every request, margin queries
+    # included, so the second request must not shrink the picture the first one set
+    # up — the canvas stays what `:- ХОЛСТ(30, 40).` asked for.
+    code, events = run_session(
+        executable,
+        [
+            protocol.encode_request(cmd="load", text=":- ХОЛСТ(30, 40).\nклетка(1).\n",
+                                    questions=False, screen={"width": 600, "height": 600}),
+            protocol.encode_request(cmd="query", text="?клетка(X).",
+                                    screen={"width": 600, "height": 600}),
+            protocol.graphics_snapshot(),
+        ],
+    )
+    assert code == 0, f"exit code {code}"
+    assert find(events, "screen", width=40, height=30), event_names(events)
+    picture = find(events, "bitmap")
+    assert (picture["width"], picture["height"]) == (40, 30), picture
+    print("ok: the canvas a program names outlives the screen a query carries")
+
     print("all protocol checks passed")
     return 0
 

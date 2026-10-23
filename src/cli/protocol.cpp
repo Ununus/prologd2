@@ -49,13 +49,16 @@ using Json = nlohmann::json;
 //     2 gets exactly what it got before.
 // 13: `load` and `query` take the `screen` the picture is drawn on (`width`
 //    and `height`), and `ready` carries the engine's own screen (task_73).
-constexpr int kProtocolVersion = 13;
+// 14: `screen` is also an *event*: the canvas a program names with
+//    `:- ХОЛСТ(Высота, Ширина).` (ADR-035).
+constexpr int kProtocolVersion = 14;
 
 /// The screen a front-end may ask for: small enough to stay cheap both in memory
 /// and on the wire (a snapshot is `width × height × 4` bytes), large enough for a
-/// lesson's picture.
-constexpr int kMinScreen = 16;
-constexpr int kMaxScreen = 2048;
+/// lesson's picture.  The same pair `:- ХОЛСТ(Высота, Ширина).` is held to — one
+/// canvas, whether a window or a program names it (ADR-035).
+constexpr int kMinScreen = prologd::kMinScreen;
+constexpr int kMaxScreen = prologd::kMaxScreen;
 
 [[nodiscard]] std::string graphicsOpName(GraphicsOp op) {
   switch (op) {
@@ -240,6 +243,15 @@ class Session {
       reportDiagnostic(diagnostic, "parse");
     });
     loader_.setQueryRunner([this](const Query& query) { runQuery(query); });
+    // `:- ХОЛСТ(Высота, Ширина).` gives the program a canvas of its own, and the
+    // front-end has to hear about it at once: the size otherwise rides only with a
+    // snapshot, which is asked for after the run — an animation would be laid out
+    // at the size the settings name until its very last frame (ADR-035).
+    loader_.setCanvasListener([this](int width, int height) {
+      canvas_named_by_program_ = true;
+      emit(Json{{"event", "screen"}, {"width", width}, {"height", height}});
+      flush();
+    });
     // The pixels live *here*, inside the session (task_45): `ТОЧКА(X, Y, Ц)`
     // reads a cell and `ЗАКРАСКА` reads what it has just written, and a front-end
     // on the other side of a pipe is asked nothing in the middle of a built-in.
@@ -358,10 +370,19 @@ class Session {
       return;
     }
     engine_.options().variableMode = *mode;
+    // A load starts a run, and a run starts on the canvas the front-end names; the
+    // program may replace that choice with `:- ХОЛСТ(Высота, Ширина).`, and from
+    // then on it is the program's (ADR-035).
+    if (command == "load") {
+      canvas_named_by_program_ = false;
+    }
     // The screen the picture is drawn on (task_73).  A front-end names the size it
     // shows, and the buffer becomes that size — cleared, because a picture belongs
     // to the run that drew it.  A request without `screen` keeps the engine's own
-    // default, and `ready` says which one that is.
+    // default, and `ready` says which one that is.  Once the program has named its
+    // own canvas, this field is ignored: it is a preference for a run, and the
+    // program's need is a fact (ADR-035) — a window asks for a size with every
+    // margin query, and honouring it would shrink the picture after the last one.
     if (request.contains("screen")) {
       const Json& screen = request.at("screen");
       if (!screen.is_object()) {
@@ -377,7 +398,9 @@ class Session {
                                  std::to_string(kMaxScreen) + " точек");
         return;
       }
-      graphics_->reset(width, height);
+      if (!canvas_named_by_program_) {
+        graphics_->reset(width, height);
+      }
     }
     const bool stepping = request.value("step", false);
     if (stepping) {
@@ -632,6 +655,14 @@ class Session {
         pause_at_step_ = false;
         return StepDecision::Stop;
       }
+      // A window may ask for the picture whenever it likes, a pause included: a
+      // snapshot only reads the buffer, so it changes nothing the engine is waiting
+      // for.  Asking was an error before protocol 14, and a window that opened on
+      // the first primitive of a program that also reads input hit it.
+      if (command == "graphics") {
+        snapshot(request);
+        continue;
+      }
       fail("protocol", "ожидался ответ step, получено: " + command);
     }
     return StepDecision::Stop;  // the stream is over: nothing more will arrive
@@ -668,6 +699,12 @@ class Session {
       if (command == "interrupt" || command == "quit") {
         engine_.requestStop();
         return std::nullopt;  // end of input: the pending read fails
+      }
+      // The picture may be asked for while the program waits for a line of input:
+      // the window opened mid-run does exactly that, and a snapshot disturbs nothing.
+      if (command == "graphics") {
+        snapshot(request);
+        continue;
       }
       fail("protocol", "ожидался ответ input, получено: " + command);
     }
@@ -750,6 +787,10 @@ class Session {
 
   /// The pixels of this session (task_45).
   std::shared_ptr<BitmapGraphicsBackend> graphics_;
+
+  /// True once the loaded program named its canvas with `:- ХОЛСТ(...)`: from then
+  /// on a front-end's `screen` is not applied (ADR-035).
+  bool canvas_named_by_program_ = false;
 
   /// True once a diagnostic was emitted for the current request, so the loader's
   /// summary is not printed on top of the diagnostics themselves.

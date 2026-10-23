@@ -19,6 +19,18 @@ bool isImportName(std::string_view name) {
   return false;
 }
 
+/// The canvas directive: the dialect's name and its English spelling (ADR-035).
+constexpr std::string_view kCanvasNames[] = {"ХОЛСТ", "canvas"};
+
+bool isCanvasName(std::string_view name) {
+  for (const std::string_view candidate : kCanvasNames) {
+    if (candidate == name) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /// Folds a comma-separated list of goals into the compound `,`/2, left-nested.
 /// The parser and the solver both treat a `,`/2 goal as a conjunction, so the
 /// nesting only affects how the term prints.
@@ -959,6 +971,25 @@ bool Parser::parseQueryOrDirective(ParsedProgram& out) {
     report(ErrorCode::ImportError, location, "ИМПОРТ ожидает имя файла в кавычках");
     out.ok = false;
     return false;
+  }
+
+  // `ХОЛСТ(Высота, Ширина)` names the canvas the program draws on.  The size has to
+  // be known before a pixel is drawn, so the two arguments are integer literals,
+  // not expressions; the range is checked when the directive is applied.
+  if (goals.size() == 1 && goals[0].kind == TermKind::Compound &&
+      goals[0].compound != nullptr && isCanvasName(goals[0].compound->name)) {
+    const CompoundTerm& canvas = *goals[0].compound;
+    if (canvas.args.size() != 2 || canvas.args[0].kind != TermKind::Int ||
+        canvas.args[1].kind != TermKind::Int) {
+      report(ErrorCode::InvalidSentence, location,
+             "ХОЛСТ ожидает два целых числа: ХОЛСТ(Высота, Ширина)");
+      out.ok = false;
+      return false;
+    }
+    out.order.push_back(StatementRef{StatementRef::Kind::Canvas, out.canvases.size()});
+    out.canvases.push_back(CanvasDirective{canvas.args[0].integer.toInt64(),
+                                          canvas.args[1].integer.toInt64(), location});
+    return true;
   }
 
   Query query;

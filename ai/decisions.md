@@ -1123,3 +1123,34 @@ what an old program prints.  Two cases in `test_module_loader.cpp` pin both
 halves, including the answer the spliced question prints for itself.
 
 **Status.** Accepted 2026-10-23 (task_97).
+
+## ADR-035: the program may name its canvas, and it wins over the front-end
+
+**Context.**  The size of the screen was the front-end's to name: the protocol's
+`load.screen` (task_73), the window's settings, and the engine's own 600 × 600
+(the original dialect drew on 1024 × 768).  A program that draws a picture of a
+known size — the maze is 14 cells of 16 pixels — had no way to say so and had to
+be started with an extra setting that a reader of the source would not see.  The
+window's choice is a *preference*; the program's need is a *fact*, and a fact
+should travel with the file.
+
+**Decision.**  `:- ХОЛСТ(Высота, Ширина).` (English `canvas`) is a directive the
+loader applies while it loads the file: it therefore arrives after the front-end's
+`screen` request and overrides it, exactly as `ИМЕНА` overrides the naming row of
+the settings.  Both arguments are integer literals — the size must be known before
+the first pixel, and an expression is evaluated only when a goal runs — and each
+side must be 16…2048, the pair the protocol already enforced: `kMinScreen` and
+`kMaxScreen` now live in `graphics.hpp` and both places use them.  The buffer is
+cleared whenever the size is set, and the last directive of a program wins.
+`GraphicsBackend` gains a virtual `reset(width, height)` — a no-op for the console
+backend — so the loader resizes a canvas without knowing which backend it holds.
+
+**Consequences.**  A program carries its canvas: `:- ХОЛСТ(224, 224).` above a
+14 × 14 maze is enough, no flag and no settings row.  A library's directive counts
+too, because the database is one for the whole program, and the last one wins —
+said in the manual.  A front-end has to accept a bitmap of a size it did not ask
+for; the snapshot carries `width` and `height`, so the window needed no change.
+The name is `ХОЛСТ` rather than `ЭКРАН`, which would read as the *window*: the
+canvas is what a program draws on, and `canvas` is the English word for it.
+
+**Status.** Accepted 2026-10-23 (task_98).

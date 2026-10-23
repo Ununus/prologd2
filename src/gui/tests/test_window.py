@@ -1324,6 +1324,32 @@ def test_escape_closes_the_picture_then_the_bar_then_the_docks(executable: str) 
     print("ok: Escape closes the picture, the bar and the two docks, in that order")
 
 
+def test_the_picture_takes_the_canvas_the_program_names(executable: str) -> None:
+    """ADR-035: `:- ХОЛСТ(Высота, Ширина).` beats the size in the settings.
+
+    The window names its screen before a run and draws on that canvas, but a
+    program may name its own — and only the interpreter knows it.  The size rides
+    with the picture, and the first primitive of a run asks for one, so the canvas
+    becomes the program's size and the picture is not a corner of a bigger sheet.
+    """
+    window = empty_window(executable)
+    try:
+        window._settings.screen_size = (600, 600)
+        window.editor().setPlainText(":- ХОЛСТ(30, 40).\n?ТОЧКА(4, 5, 7).\n")
+        window._actions["run"].trigger()
+        assert pump(window, lambda: window.canvas().pixel(4, 5) == 7), window.output_text()
+        # The size is known before the first primitive — the `screen` event carries it
+        # (protocol 14) — so the very first picture is laid out at its own size.
+        assert (window.canvas().width, window.canvas().height) == (40, 30), (
+            f"холст программы 40×30, а окно нарисовало "
+            f"{window.canvas().width}×{window.canvas().height}"
+        )
+        window.stop_program()
+    finally:
+        discard_changes(window)
+    print("ok: the picture takes the canvas the program names, not the setting")
+
+
 def test_a_run_that_draws_opens_the_picture_by_itself(executable: str) -> None:
     """task_48: the first primitive of a run brings the window up — once per run.
 
@@ -4950,6 +4976,7 @@ def main(argv: list[str]) -> int:
         test_the_goal_field_hides_and_a_run_shows_the_output_panel(executable)
         test_the_graphics_window_follows_the_program(executable)
         test_a_run_that_draws_opens_the_picture_by_itself(executable)
+        test_the_picture_takes_the_canvas_the_program_names(executable)
         test_escape_closes_the_picture_then_the_bar_then_the_docks(executable)
         test_the_menus_come_from_the_action_table(executable)
         test_the_toolbar_reuses_the_actions(executable)

@@ -99,6 +99,10 @@ class PrologSession(QObject):
     #: The whole picture, for a window that was not open while it was drawn:
     #: width, height and the raw little-endian colour values.
     bitmap = Signal(int, int, bytes)
+    #: The canvas the *program* named with `:- ХОЛСТ(Высота, Ширина).` (protocol
+    #: 14, ADR-035).  It arrives before the first primitive, so the picture a run
+    #: draws is laid out at its own size from the first frame.
+    screen = Signal(int, int)
     #: The session ended; carries the process exit code.
     ended = Signal(int)
     #: A program wrote more events in one second than a window can show; carries
@@ -304,6 +308,15 @@ class PrologSession(QObject):
         """True while the interpreter waits at a step point."""
         return self._paused
 
+    def awaiting_input(self) -> bool:
+        """True while the interpreter waits for an answer to a read.
+
+        The session takes one answer at a time: a request sent now has to be that
+        answer, or the interpreter says it expected `input` and got something else.
+        A window that wants the picture asks when this is false (ADR-035).
+        """
+        return self._awaiting_input
+
     def interrupt(self) -> None:
         self._send(protocol.interrupt())
 
@@ -470,6 +483,10 @@ class PrologSession(QObject):
                 self.failed.emit("protocol", "error", str(broken), None)
                 return
             self.bitmap.emit(width, height, data)
+        elif name == "screen":
+            # The program named its own canvas (protocol 14, ADR-035): the size
+            # arrives before the first primitive, so a window can take it in time.
+            self.screen.emit(int(event.get("width", 0)), int(event.get("height", 0)))
         elif name == "error":
             # An error ends the query it belongs to, so a step point cannot still
             # be pending — and this is the event a user's «Стоп» arrives as while

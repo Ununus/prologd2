@@ -173,8 +173,8 @@ def test_ready_names_the_new_version(executable: str) -> None:
     code, events = run_session(executable, [])
     assert code == 0, f"exit code {code}"
     ready = find(events, "ready")
-    assert ready["protocol"] == protocol.PROTOCOL_VERSION == 13
-    print("ok: ready announces protocol 13")
+    assert ready["protocol"] == protocol.PROTOCOL_VERSION == 14
+    print("ok: ready announces protocol 14")
 
 
 def test_the_caret_carries_over_from_the_old_text_to_the_new() -> None:

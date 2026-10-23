@@ -169,6 +169,7 @@ class MainWindow(QMainWindow):
         self._session.formatted.connect(self._on_formatted)
         self._session.drawn.connect(self._on_drawn)
         self._session.bitmap.connect(self._on_bitmap)
+        self._session.screen.connect(self._on_screen)
         self._session.flooded.connect(self._on_flooded)
         self._session.ended.connect(self._on_ended)
 
@@ -218,6 +219,11 @@ class MainWindow(QMainWindow):
         #: How many output events the run in flight has produced (task_66): the
         #: counter behind «Предел вывода», reset when a run starts.
         self._output_events = 0
+        #: Has the run in flight asked for its picture yet?  The canvas a program
+        #: names with `:- ХОЛСТ(Высота, Ширина).` is known only to the interpreter,
+        #: and the size travels with a snapshot and with nothing else, so the first
+        #: primitive of a run asks for one (ADR-035).
+        self._picture_asked = False
         #: The deadline of a polite stop: the interpreter is asked to end its
         #: query first, and the process goes only if it does not (`stop_program`).
         self._stop_grace = QTimer(self)
@@ -2026,6 +2032,7 @@ class MainWindow(QMainWindow):
         if note:
             self._append_note(note)
         self._output_events = 0
+        self._picture_asked = False
         self._arm_timeout()
         # A canvas that is already there follows the setting too (task_73): the
         # engine draws on the new screen, and the window must not keep clipping the
@@ -2114,8 +2121,7 @@ class MainWindow(QMainWindow):
             window.restore_geometry(self._settings.graphics_geometry)
             window.show()
             window.raise_()
-            if self._session.is_running():
-                self._session.request_graphics_snapshot()
+            self._ask_for_picture()
         else:
             window.hide()
         self._settings.graphics_visible = visible
@@ -2196,12 +2202,67 @@ class MainWindow(QMainWindow):
                 self.show_graphics_window(True)
         if self._canvas is None:
             return  # the snapshot is on its way; the next primitive draws
+        # The first primitive of a run is the first moment there is something the
+        # window may have missed; `_ask_for_picture` says the rest.
+        self._ask_for_picture()
         self._canvas.draw(event)
         if self._graphics_window is not None:
             self._graphics_window.refresh()
 
+    def _picture_may_be_asked(self) -> bool:
+        """May the picture be asked for right now?
+
+        Only when the interpreter is running and is not waiting for an answer: while
+        an `input_request` or a step point is pending, the session takes one answer
+        and nothing else, so a snapshot request would be refused as «ожидался ответ
+        input, получено: graphics».  The engine tolerates one now (protocol 14), but
+        a window has no reason to send what it knows is out of turn (ADR-035).
+        """
+        return (
+            self._session.is_running()
+            and not self._session.awaiting_input()
+            and not self._session.paused()
+        )
+
+    def _ask_for_picture(self) -> None:
+        """Asks for the pixels drawn so far — once per run, and only in turn.
+
+        This is not about the *size* of the canvas: a program's own
+        `:- ХОЛСТ(Высота, Ширина).` reaches the window as a `screen` event of its own.
+        It is about the picture a window missed — one that was not open yet, or was
+        closed while the program drew.  Asked once per run because every ask costs a
+        whole bitmap on the wire, and a second answer would say the same thing.
+        """
+        if self._picture_asked or self._canvas is None:
+            return
+        if not self._picture_may_be_asked():
+            return
+        self._picture_asked = True
+        self._session.request_graphics_snapshot()
+
+    def _on_screen(self, width: int, height: int) -> None:
+        """The program named its own canvas (protocol 14, ADR-035).
+
+        `:- ХОЛСТ(Высота, Ширина).` is applied while the program loads, so this
+        arrives *before* the first primitive: the window's canvas takes the size
+        the program asks for and the animation is laid out right from the first
+        frame, instead of being a corner of a bigger sheet until a snapshot comes.
+        A size outside the limits is refused by the engine, which reports it.
+        """
+        if width <= 0 or height <= 0:
+            return
+        self.canvas().reset(width, height)
+        if self._graphics_window is not None:
+            self._graphics_window.refresh()
+
     def _on_bitmap(self, width: int, height: int, data: bytes) -> None:
-        """The whole screen arrived: what a window opened mid-run starts from."""
+        """The whole screen arrived: what a window opened mid-run starts from.
+
+        It is also how a program's own canvas size reaches the window — the size
+        travels with the picture, so a run whose `screen` event was missed still
+        ends with the canvas the program named (ADR-035).
+        """
+        self._picture_asked = True
         self.canvas().apply_bitmap(width, height, data)
         if self._graphics_window is not None:
             self._graphics_window.refresh()
@@ -4221,6 +4282,9 @@ class MainWindow(QMainWindow):
                 self._send_pending_query()
             return
         self._busy = False
+        # The run is over and the session is idle: whatever the window missed while
+        # it was closed is still in the interpreter.
+        self._ask_for_picture()
         if not self._failed_in_load:
             # The whole file ran to the end (protocol 8): one system line says how
             # long the load took, measured by the window's own clock (task_50).
