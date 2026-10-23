@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <optional>
 
 #include "builtins_internal.hpp"
@@ -87,7 +88,10 @@ BuiltinResult builtinPoint(Engine& engine, std::span<const Term> args) {
     return BuiltinResult::Continue;
   }
   if (free_x && !free_y && !free_color) {
-    graphics.horizontal(0, coordinate(engine, args, 1, "ТОЧКА"), graphics.width(),
+    // A horizontal line across the whole screen at height `Y`.  The arguments
+    // used to be passed as `(0, Y, width, …)`, i.e. a two-pixel line at row
+    // `width` — off the screen, so nothing was drawn at all (part 158).
+    graphics.horizontal(0, graphics.width(), coordinate(engine, args, 1, "ТОЧКА"),
                         static_cast<unsigned>(colour(engine, args, 2, "ТОЧКА")));
     return BuiltinResult::Continue;
   }
@@ -174,6 +178,37 @@ BuiltinResult builtinFill(Engine& engine, std::span<const Term> args) {
   engine.graphics().floodFill(coordinate(engine, args, 0, "ЗАКРАСКА"),
                               coordinate(engine, args, 1, "ЗАКРАСКА"),
                               static_cast<unsigned>(colour(engine, args, 2, "ЗАКРАСКА")));
+  return BuiltinResult::Continue;
+}
+
+BuiltinResult builtinFillRect(Engine& engine, std::span<const Term> args) {
+  for (const Term& argument : args) {
+    if (isFree(engine, argument)) {
+      // Filling a rectangle has nothing to read back, so a free argument is a
+      // mistake — the same rule as `ЗАКРАСКА/3`.
+      badArguments(engine, "ЗАКРАСКА");
+    }
+  }
+  const long long first_x = coordinate(engine, args, 0, "ЗАКРАСКА");
+  const long long first_y = coordinate(engine, args, 1, "ЗАКРАСКА");
+  const long long second_x = coordinate(engine, args, 2, "ЗАКРАСКА");
+  const long long second_y = coordinate(engine, args, 3, "ЗАКРАСКА");
+  const unsigned color = static_cast<unsigned>(colour(engine, args, 4, "ЗАКРАСКА"));
+  GraphicsBackend& graphics = engine.graphics();
+  // One `horizontal` per scanline: the front-ends already draw that op, so a
+  // filled rectangle needs no new primitive on the wire (part 158).  Rows off the
+  // screen are skipped — a rectangle ten thousand lines tall must not cost ten
+  // thousand events — and the columns are clipped by the backend.
+  const long long top = std::min(first_y, second_y);
+  const long long bottom = std::max(first_y, second_y);
+  const long long left = std::min(first_x, second_x);
+  const long long right = std::max(first_x, second_x);
+  for (long long y = top; y <= bottom; ++y) {
+    if (y < 0 || y >= graphics.height()) {
+      continue;
+    }
+    graphics.horizontal(left, right, y, color);
+  }
   return BuiltinResult::Continue;
 }
 

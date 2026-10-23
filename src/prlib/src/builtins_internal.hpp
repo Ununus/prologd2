@@ -87,6 +87,7 @@ namespace prologd {
 
 // ---- control and logic ----
 BuiltinResult builtinFalse(Engine&, std::span<const Term>);
+BuiltinResult builtinTrue(Engine&, std::span<const Term>);
 BuiltinResult builtinTrace(Engine&, std::span<const Term>);
 BuiltinResult builtinNoTrace(Engine&, std::span<const Term>);
 BuiltinResult builtinQuiet(Engine&, std::span<const Term>);
@@ -179,5 +180,9 @@ BuiltinResult builtinPoint(Engine&, std::span<const Term>);
 BuiltinResult builtinLine(Engine&, std::span<const Term>);
 BuiltinResult builtinCircle(Engine&, std::span<const Term>);
 BuiltinResult builtinFill(Engine&, std::span<const Term>);
+/// `ЗАКРАСКА(X1, Y1, X2, Y2, Цвет)` (part 158): the rectangle is filled, borders
+/// included, one `horizontal` per scanline — a filled shape on the wire is the
+/// front-ends' line, so no new primitive is needed.
+BuiltinResult builtinFillRect(Engine&, std::span<const Term>);
 
 }  // namespace prologd

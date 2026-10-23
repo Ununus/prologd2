@@ -61,6 +61,9 @@ const std::unordered_set<std::string> kReservedBuiltins = {
     // Collecting by groups (task_91): `ВСЕРЕШ`/`МНОРЕШ` are the dialect's names,
     // `bagof`/`setof` the English ones.
     "ВСЕРЕШ", "МНОРЕШ", "bagof", "setof",
+    // The identity goal (part 158): `(A -> B ; ИСТИНА)` is the ISO reading of
+    // «если — то», and the word `true` is its English spelling.
+    "ИСТИНА", "true",
 };
 
 /// Spellings the dialect has retired.  They stay reserved so that a call to

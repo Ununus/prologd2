@@ -60,6 +60,16 @@ TEST_CASE("free arguments choose the mode of the point predicate") {
   REQUIRE(backend->calls().size() == 3);
   REQUIRE(backend->calls()[0].op == GraphicsOp::ClearView);
   REQUIRE(backend->calls()[1].op == GraphicsOp::Vertical);
+  // A vertical line at `X` covers the whole height; a horizontal one covers the
+  // whole width *at the row given*.  The horizontal line used to pass its row as
+  // the second endpoint, i.e. it landed at row `width` — outside the screen, so
+  // `ТОЧКА(X, 2, Ц)` drew nothing at all (part 158).
+  REQUIRE(backend->calls()[1].x1 == 1);
+  REQUIRE(backend->calls()[1].y1 == 0);
+  REQUIRE(backend->calls()[1].y2 == 600);
+  REQUIRE(backend->calls()[2].x1 == 0);
+  REQUIRE(backend->calls()[2].x2 == 600);
+  REQUIRE(backend->calls()[2].y1 == 2);
   REQUIRE(backend->calls()[2].op == GraphicsOp::Horizontal);
 
   // Three free arguments are not a mode at all.
@@ -67,6 +77,40 @@ TEST_CASE("free arguments choose the mode of the point predicate") {
   REQUIRE(allFree.loaded);
   REQUIRE(allFree.runtimeError);
   REQUIRE(allFree.error.find("ТОЧКА: Недопустимый тип аргументов") != std::string::npos);
+}
+
+TEST_CASE("the rectangle form of the fill draws one line per row") {
+  auto backend = std::make_shared<RecordingGraphicsBackend>();
+  const auto result = runProgram(
+      "?ЗАКРАСКА(10, 20, 30, 24, 7).\n"    // five rows, borders included
+      "?ЗАКРАСКА(30, 24, 10, 20, 7).\n"    // the corners may come in any order
+      "?ЗАКРАСКА(-5, -5, 700, 2, 7).\n",   // rows off the screen are dropped
+      "", backend);
+  REQUIRE(result.loaded);
+  REQUIRE(backend->calls().size() == 5 + 5 + 3);
+  REQUIRE(backend->calls()[0].op == GraphicsOp::Horizontal);
+  REQUIRE(backend->calls()[0].x1 == 10);
+  REQUIRE(backend->calls()[0].x2 == 30);
+  REQUIRE(backend->calls()[0].y1 == 20);
+  REQUIRE(backend->calls()[4].y1 == 24);
+  // Swapped corners give the same picture, row for row.
+  REQUIRE(backend->calls()[5].x1 == 10);
+  REQUIRE(backend->calls()[5].y1 == 20);
+  REQUIRE(backend->calls()[9].y1 == 24);
+  // The third call reaches the screen at rows 0, 1 and 2 only.
+  REQUIRE(backend->calls()[10].y1 == 0);
+  REQUIRE(backend->calls()[10].x1 == -5);
+  REQUIRE(backend->calls()[10].x2 == 700);
+  REQUIRE(backend->calls()[12].y1 == 2);
+}
+
+TEST_CASE("the rectangle form of the fill refuses a free argument") {
+  auto backend = std::make_shared<RecordingGraphicsBackend>();
+  const auto result = runProgram("?ЗАКРАСКА(X, 1, 2, 3, 4).\n", "", backend);
+  REQUIRE(result.loaded);
+  REQUIRE(result.runtimeError);
+  REQUIRE(result.error.find("ЗАКРАСКА: Недопустимый тип аргументов") != std::string::npos);
+  REQUIRE(backend->calls().empty());
 }
 
 TEST_CASE("free arguments choose the mode of the line and circle predicates") {

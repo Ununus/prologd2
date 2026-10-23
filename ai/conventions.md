@@ -255,6 +255,10 @@ Tests are written **together with** the feature, never after.
   символ»), although it reads UTF-8 like we do.  Write `-` and `...`.  `#…#`
   expressions and `/* */` comments are ours and need rewriting anyway before a
   file can be run by the original (part 142).
+* `prologu --format` prints **CRLF** on Windows while the repository keeps **LF**,
+  so comparing its output with a file byte for byte says «changed» every time.
+  Normalise the line ends before comparing, and write the result back with `\n`:
+  otherwise a formatter loop never converges (part 159).
 * Update `ai/status.md` and the task file status after every work session.
 * Any deviation from this plan is recorded in `ai/decisions.md`.
 
@@ -269,6 +273,10 @@ Tests are written **together with** the feature, never after.
 * After editing a document, build the PDFs (`--target docs`) *and look* at the
   pages that carry the change — Typst reports syntax errors, not a table that
   overflows the margin or a paragraph that lost its spacing.
+* Emphasis in Typst is `*strong*` and `_emphasis_`.  Markdown's `**strong**` is
+  **not** a thing: it produces two `no text within stars` warnings and prints the
+  stars literally, so a paragraph keeps its asterisks and nothing is bold.  The
+  PDFs build fine — only the warning and the page show it.
 
 ## The original material
 

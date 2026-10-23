@@ -23,7 +23,7 @@ prologu -s examples/first.pld
 | `ground.pld` | `ПОЛНЫЙ` — замкнутый терм и защита перед `ДОБ` |
 | `forall.pld` | `ДЛЯВСЕХ` — проверка всех решений сразу |
 | `stdlib.pld` | стандартная библиотека `stdlib/`: списки, множества, строки, целые числа, имена ISO (ввод — в `stdlib.input.txt`) |
-| `problems/` | задачи: `factorial`, `hanoi` (Ханойская башня), `hanoi_play` (её же, но ходы вводит человек), `knapsack` |
+| `problems/` | задачи: `factorial`, `hanoi` (Ханойская башня), `hanoi_play` (её же, но ходы вводит человек), `knapsack`, `maze` (лабиринт: мышь ищет сыр в ширину и в глубину, с картинкой) |
 | `lessons/` | курс: двенадцать уроков и приложение, индекс — `lessons/README.md` |
 | `lib/` | библиотека для урока 11 |
 | `diamond/` | ромбовидный импорт: один модуль, достижимый тремя путями |
@@ -49,3 +49,11 @@ promise` и `the example programs print what their comments promise`), поэт�
 Два примера проверяются только разбором: `hanoi.pld` рисует (а в консоли графика
 молчит и остаются одни паузы `ЖДИ`), `hanoi_play.pld` читает ходы с клавиатуры.
 `findall.pld` проверяют командные тесты (`src/tests/CMakeLists.txt`).
+
+`problems/maze/maze.pld` — тот же случай, что `hanoi.pld`: он рисует лабиринт и
+идёт мышью по найденному пути, поэтому в списке разбираемых файлов
+`src/tests/test_lessons.cpp` стоит без обещаний о выводе. Запуск:
+
+```sh
+prologu -I stdlib -i examples/problems/maze/maze.input.txt -s examples/problems/maze/maze.pld
+```

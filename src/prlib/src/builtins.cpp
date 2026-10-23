@@ -233,6 +233,8 @@ using detail::unifyText;
 
 BuiltinResult builtinFalse(Engine&, std::span<const Term>) { return BuiltinResult::Fail; }
 
+BuiltinResult builtinTrue(Engine&, std::span<const Term>) { return BuiltinResult::Continue; }
+
 BuiltinResult builtinTrace(Engine& engine, std::span<const Term>) {
   engine.setTrace(true);
   return BuiltinResult::Continue;
@@ -515,7 +517,8 @@ BuiltinResult builtinVariablesMarker(Engine& engine, std::span<const Term> args)
 /// and the English way to say the same thing is `first`, the alias of `ПЕРВОЕ`
 /// (`test_aliases.cpp` allows the exception by name).
 constexpr std::pair<std::string_view, std::string_view> kEnglishNames[] = {
-    {"ЛОЖЬ", "fail"},         {"ТРАССА", "trace"},
+    {"ЛОЖЬ", "fail"},         {"ИСТИНА", "true"},
+    {"ТРАССА", "trace"},
     {"НЕТ_ТРАССЫ", "no_trace"}, {"ТИХО", "quiet"},
     {"ВЕРСИЯ", "version"},      {"НЕ", "not"},
     {"ДЛЯВСЕХ", "forall"},      {"ПЕРВОЕ", "first"},
@@ -612,6 +615,10 @@ const BuiltinTable& builtinTable() {
 
     // Control and logic.
     add("ЛОЖЬ", 0, builtinFalse);
+    // The identity goal (part 158): without it the ISO idiom «если — то — иначе без
+    // иначе», `(A -> B ; ИСТИНА)`, has nothing to fall back on — the maze example
+    // needed exactly that.
+    add("ИСТИНА", 0, builtinTrue);
     add("ТРАССА", 0, builtinTrace);
     add("НЕТ_ТРАССЫ", 0, builtinNoTrace);
     add("ТИХО", 0, builtinQuiet);
@@ -713,6 +720,7 @@ const BuiltinTable& builtinTable() {
     add("ЛИНИЯ", 5, builtinLine);
     add("ОКРУЖНОСТЬ", 4, builtinCircle);
     add("ЗАКРАСКА", 3, builtinFill);
+    add("ЗАКРАСКА", 5, builtinFillRect);
     return result;
   }();
   return table;

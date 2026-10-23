@@ -88,7 +88,9 @@ const std::vector<std::string>& checkedLessons() {
 /// `examples/iso` of programs written with ISO names and signs (task_92: the
 /// arithmetic signs, the library, a family tree, the standard order, `->` and
 /// `sub_string/5`); `problems/hanoi.pld` draws and `problems/hanoi_play.pld` reads
-/// input, so those two are only parsed (see the test below).
+/// input, so those two are only parsed (see the test below), and so is
+/// `problems/maze/maze.pld` with its two modules: it draws a maze and walks a
+/// mouse along the found path.
 const std::vector<std::string>& checkedExamples() {
   static const std::vector<std::string> names = {
       "first.pld",
@@ -169,6 +171,8 @@ std::string withoutQueries(const std::string& source) {
 TEST_CASE("ported example programs parse cleanly") {
   const std::vector<std::string> files = {
       "problems/factorial.pld", "problems/hanoi.pld", "problems/hanoi_play.pld",
+      "problems/maze/maze.pld", "problems/maze/maze.graphics.pld",
+      "problems/maze/maze.images.pld",
       "file_io.pld", "drawing.pld", "findall.pld", "import.pld", "lib/library.pld",
   };
   // `lib/old_lib*.pld` are not here: `withoutQueries` strips every `:` line, and

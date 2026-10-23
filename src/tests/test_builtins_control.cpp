@@ -47,6 +47,19 @@ TEST_CASE("the always-false goal fails and negation turns it round") {
   REQUIRE(result.output == "НЕТ\nНЕТ\nДА\n");
 }
 
+TEST_CASE("the always-true goal succeeds and fills an empty branch") {
+  // The empty branch of if-then-else has to be written as a goal, and ИСТИНА is
+  // that goal: (Условие -> Дело ; ИСТИНА).  Both spellings are the same predicate.
+  const auto result = runProgram(
+      "?ИСТИНА.\n"
+      "?true.\n"
+      "?( ЛОЖЬ -> ЛОЖЬ ; ИСТИНА ).\n"
+      "?НЕ(ИСТИНА).\n"
+      "?ИСТИНА, ИСТИНА.\n");
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "ДА\nДА\nДА\nНЕТ\nДА\n");
+}
+
 TEST_CASE("negation undoes the bindings of the goal it checks") {
   const auto result = runProgram(
       "?НЕ(ЛОЖЬ).\n"
