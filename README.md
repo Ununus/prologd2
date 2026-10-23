@@ -250,7 +250,7 @@ src/3rdparty/         FetchContent dependencies (gitignored)
 doc/                  Typst documentation (Russian)
 examples/             example PrologD programs (demo, problems, lessons, lib)
 stdlib/               standard library, shipped beside the executable
-.github/workflows/    CI (Linux GCC/Clang, Windows MSVC)
+.github/workflows/    CI (Linux GCC, Windows MSVC)
 ai/                   plan, task breakdown and notes for the AI agent
 ```
 
@@ -277,6 +277,6 @@ Documentation is in `doc/` (`help.typ`, `library.typ`, `gui.typ`, `technical.typ
 `prologd-diff.typ`, `lessons.typ`); `cmake --build build --target docs` writes the
 PDFs into the same directory when Typst is installed.
 
-CI builds and tests on Linux (GCC and Clang) and Windows (MSVC); see
+CI builds and tests on Linux (GCC) and Windows (MSVC); see
 `.github/workflows/ci.yml` and `CMakePresets.json`. Current status and the task
 board are kept in `ai/status.md`.

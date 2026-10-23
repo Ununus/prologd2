@@ -1,31 +1,42 @@
 name: ci
 
+# A push to `main` and a pull request are the two events that matter: an
+# unfiltered `push` also ran for every branch, so a PR from a branch of this
+# repository was built twice for the same commit.
 on:
   push:
+    branches: [main]
   pull_request:
+
+# A newer push to the same branch or PR cancels the run it supersedes — the older
+# answer is about code nobody is looking at any more.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   linux:
-    name: Linux (${{ matrix.compiler }})
+    name: Linux (GCC)
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        compiler: [gcc, clang]
     steps:
       - uses: actions/checkout@v4
-      - name: Install build tools
-        run: sudo apt-get update && sudo apt-get install -y ninja-build
-      - name: Cache FetchContent dependencies
+      # Only the fetched *sources* are cached, never a build tree: a FetchContent
+      # build directory carries absolute paths and its own CMake cache, and a stale
+      # one is a failure that looks like a source problem.  Ninja needs no install
+      # step — the image already has it.
+      - name: Cache FetchContent sources
         uses: actions/cache@v4
         with:
-          path: src/3rdparty
-          key: 3rdparty-${{ runner.os }}-${{ hashFiles('CMakeLists.txt') }}
+          path: |
+            src/3rdparty/catch2-src
+            src/3rdparty/cli11-src
+            src/3rdparty/json-*
+          key: fetchcontent-${{ runner.os }}-${{ hashFiles('CMakeLists.txt') }}
       - name: Configure
-        run: >
-          cmake -S . -B build -G Ninja
-          -DCMAKE_BUILD_TYPE=Release
-          -DCMAKE_CXX_COMPILER=${{ matrix.compiler == 'gcc' && 'g++' || 'clang++' }}
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
       - name: Build
         run: cmake --build build
       - name: Test
@@ -36,13 +47,29 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Cache FetchContent dependencies
+      - name: Cache FetchContent sources
         uses: actions/cache@v4
         with:
-          path: src/3rdparty
-          key: 3rdparty-${{ runner.os }}-${{ hashFiles('CMakeLists.txt') }}
+          path: |
+            src/3rdparty/catch2-src
+            src/3rdparty/cli11-src
+            src/3rdparty/json-*
+          key: fetchcontent-${{ runner.os }}-${{ hashFiles('CMakeLists.txt') }}
+      # ADR-013 targets MSVC 19.51 (Visual Studio 2026), and CMakePresets.json pins
+      # that generator for a local build.  The runner image is another matter:
+      # naming a generator it does not carry fails with «could not create named
+      # generator» before a single file is compiled.  So the newest Visual Studio
+      # the image has is taken, and the log says which one it was.
       - name: Configure
-        run: cmake -S . -B build -G "Visual Studio 18 2026" -A x64
+        shell: pwsh
+        run: |
+          $help = cmake --help | Out-String
+          $generator = @('Visual Studio 18 2026', 'Visual Studio 17 2022') |
+            Where-Object { $help -match [regex]::Escape($_) } |
+            Select-Object -First 1
+          if (-not $generator) { throw 'no Visual Studio generator on this runner' }
+          Write-Host "generator: $generator"
+          cmake -S . -B build -G $generator -A x64
       - name: Build
         run: cmake --build build --config Release
       - name: Test

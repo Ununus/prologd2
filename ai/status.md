@@ -248,8 +248,12 @@ interpreter on the wire
 
 ## Known gaps / next steps
 
-1. The GitHub Actions Windows job still has to run on an image that provides VS 2026;
-   locally the MSVC 2026 build and the whole suite are green.
+1. The GitHub Actions Windows job has not had a green run yet: it takes the newest
+   Visual Studio generator the runner carries and prints which one (part 157), so an
+   image without VS 2026 builds with an older MSVC instead of dying on the generator
+   name — but MSVC 19.51 stays the *target* (ADR-013), and only the log of a real run
+   can say which compiler the image gave.  Locally the MSVC 2026 build and the whole
+   suite are green.
 2. `--dump-ast` and `--dump-clauses` (task_16) are dropped: the parser produces a
    `ParsedProgram`, not a tree worth printing, and no workflow asked for them.
 3. Catch2 test discovery decodes the test executable's stdout with the console code page,
@@ -5423,3 +5427,31 @@ of the package».  Отдельно: 25 оконных наборов и `protoc
   проверялась — это единственное, что не подтверждено перед тегом.  Следующая
   возможность, которая просится первой, — `sub_string/5` с перебором вхождений
   (task_84): кадр уже есть.
+
+### 157. CI: одна джоба Linux (GCC), генератор по образу, в кэше — источники
+
+* **Откуда.**  Замечания к `.github/workflows/ci.yml` (2026-10-23): `push` без фильтра
+  гонял каждую ветку и дублировал `pull_request`; `-G "Visual Studio 18 2026"` падает
+  на образе, где такого генератора нет; в кэш попадало дерево сборки; `apt-get` за
+  `ninja-build` в `ubuntu-latest` не нужен.  Плюс решение владельца: оставить только
+  GCC.
+* **Что стало.**
+  - триггеры: `push` только для `main` (наша ветка — `main`, а не `master`), плюс
+    `pull_request`; `concurrency` с `cancel-in-progress` снимает устаревший прогон
+    той же ветки;
+  - Linux — **одна** джоба с GCC (matrix с `clang` убран), шаг `apt-get` убран,
+    `-G Ninja` остался — ninja есть в образе;
+  - Windows — генератор выбирается из того, что образ дал (`Visual Studio 18 2026`,
+    иначе `17 2022`), имя печатается в лог.  Так джоба не умирает на «could not create
+    named generator», а ADR-013 (цель — MSVC 19.51) остаётся намерением, а не
+    требованием к образу;
+  - кэш — только исходники (`catch2-src`, `cli11-src`, `json-*`), без `*-build` и
+    `*-subbuild`: абсолютные пути и CMakeCache в дереве сборки — источник ошибок,
+    похожих на ошибки в исходниках;
+  - `permissions: contents: read`.
+* **Как проверено.**  YAML разобран `yaml.safe_load` (триггеры, две джобы, шаги, пути
+  кэша — всё как задумано); фрагмент PowerShell выбора генератора прогнан локально —
+  выбирает `Visual Studio 18 2026`, хотя в списке есть и `17 2022`.  Сам прогон
+  GitHub не выполнялся: сети в сессии нет.
+* **Осталось.**  Первый реальный прогон — единственное, что скажет, какой генератор
+  даёт образ; строка `generator: …` в логе шага «Configure» и есть ответ.

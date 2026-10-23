@@ -4,7 +4,11 @@
 
 * C++23 (`CMAKE_CXX_STANDARD 23`, no compiler extensions).
 * Target compilers: GCC ≥ 13, Clang ≥ 17, MSVC ≥ 19.51 (Visual Studio 2026).
-  Visual Studio 2022 is no longer supported (ADR-013).
+  Visual Studio 2022 is no longer supported (ADR-013).  **CI** builds **GCC** and
+  **MSVC** only (2026-10-23): the Clang job was dropped so that a push is two runs
+  instead of four, and the Windows job takes the newest Visual Studio generator the
+  runner carries (it logs which), so an image without VS 2026 still builds instead
+  of failing on the generator name.
 * Use the standard library; avoid raw `new`/`delete`, raw owning pointers and
   C-style casts. `reinterpret_cast` is forbidden in new code.
 * Prefer `std::string`, `std::string_view`, `std::vector`, `std::optional`,
