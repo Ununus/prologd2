@@ -52,8 +52,13 @@ promise` и `the example programs print what their comments promise`), поэт�
 
 `problems/maze/maze.pld` — тот же случай, что `hanoi.pld`: он рисует лабиринт и
 идёт мышью по найденному пути, поэтому в списке разбираемых файлов
-`src/tests/test_lessons.cpp` стоит без обещаний о выводе. Запуск:
+`src/tests/test_lessons.cpp` стоит без обещаний о выводе.  Ввод он читает сам,
+своим вопросом `?ЧТЕНИЕ_ИЗ("maze.input.txt")`, а путь в вопросе считается от
+текущей папки — поэтому запускать надо **из папки примера**.  Из корня
+репозитория он загрузится и честно ответит `НЕТ`: файл ввода не найден, лабиринта
+нет.  Ключ `-i` ему больше не нужен (он был нужен, пока ввод шёл через консоль):
 
 ```sh
-prologu -I stdlib -i examples/problems/maze/maze.input.txt -s examples/problems/maze/maze.pld
+cd examples/problems/maze
+prologu -I ../../../stdlib -s maze.pld
 ```
