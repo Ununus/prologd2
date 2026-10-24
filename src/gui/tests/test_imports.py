@@ -43,6 +43,28 @@ def test_a_directive_in_a_comment_or_a_string_names_nothing() -> None:
     print("ok: a commented or a quoted directive names nothing")
 
 
+def test_a_directive_is_found_whatever_kind_its_name_arrives_as() -> None:
+    """task_111: the same line, read by the two tables the window has.
+
+    `--list-keywords` carries no kinds, so `ИМПОРТ` is a plain keyword; the `ready`
+    event says `directive`.  Both have to read as a directive, or the popup loses
+    every imported name the moment the window has run the interpreter once — which
+    is exactly what the owner hit: before the first `F5` the library's `length`
+    was offered, after it it was not.
+    """
+    from prologd_gui.keywords import Keywords
+
+    text = ':- ИМПОРТ("iso.pld").\n?length([1, 2, 3], Д).\n'
+    plain = Keywords([{"name": "ИМПОРТ", "arities": []}])
+    with_kinds = Keywords([{"name": "ИМПОРТ", "kind": "directive", "arities": []}])
+    assert imports.directive_names(text, plain) == ["iso.pld"]
+    assert imports.directive_names(text, with_kinds) == ["iso.pld"]
+    # The file name inside the brackets is offered by the same rule.
+    position = text.index("iso.pld") + len("iso")
+    assert imports.import_argument_at(text, position, with_kinds) == ("", "iso")
+    print("ok: the directive is recognised with the kinds and without them")
+
+
 def test_the_walk_is_recursive_and_survives_a_cycle() -> None:
     disk = {
         "a.pld": ":- ИМПОРТ(\"b.pld\").\nа(1).\n",
@@ -112,6 +134,7 @@ def test_a_file_is_read_again_only_when_it_changed() -> None:
 def main(argv: list[str]) -> int:
     test_a_directive_names_its_file_in_both_spellings()
     test_a_directive_in_a_comment_or_a_string_names_nothing()
+    test_a_directive_is_found_whatever_kind_its_name_arrives_as()
     test_the_walk_is_recursive_and_survives_a_cycle()
     test_the_files_are_found_through_the_engine_s_order()
     test_a_file_is_read_again_only_when_it_changed()

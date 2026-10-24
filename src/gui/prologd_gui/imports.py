@@ -28,6 +28,20 @@ from . import paths, tokens
 #: The two spellings of the directive — the Russian name and its English alias.
 DIRECTIVE_NAMES = ("ИМПОРТ", "import")
 
+#: How the directive's own name can arrive from the tokenizer (task_111).  The
+#: `ready` event brings kinds, and `ИМПОРТ` is then `DIRECTIVE`; a table read from
+#: `--list-keywords` has no kinds, so the name is a `KEYWORD`; and a window whose
+#: interpreter has not started knows neither — a capitalised `ИМПОРТ` is then a
+#: variable and the English `import` an atom.  All four mean «the directive is
+#: here», and forgetting `DIRECTIVE` cost the popup every imported name after the
+#: first run, when the table with kinds arrived.
+_DIRECTIVE_KINDS = (tokens.DIRECTIVE, tokens.KEYWORD, tokens.ATOM, tokens.VARIABLE)
+
+
+def is_directive_name(token) -> bool:
+    """Whether the token is the name of an `ИМПОРТ` directive."""
+    return token.text in DIRECTIVE_NAMES and token.kind in _DIRECTIVE_KINDS
+
 
 def directive_names(
     text: str, keywords=None, mode: int = tokens.MODE_ISO
@@ -49,14 +63,8 @@ def directive_names(
         inside = False
         for token in tokens.tokenize(line, keywords, mode):
             # The name of the directive is a reserved word, so it arrives as a
-            # `KEYWORD` when the table is known; without a table (a window that has
-            # not run the interpreter yet) a capitalised `ИМПОРТ` is a *variable*
-            # and the English `import` an atom, so all three kinds count.
-            if token.text in DIRECTIVE_NAMES and token.kind in (
-                tokens.KEYWORD,
-                tokens.ATOM,
-                tokens.VARIABLE,
-            ):
+            # `KEYWORD` or, once the kinds are known, a `DIRECTIVE` (task_111).
+            if is_directive_name(token):
                 inside = True
             elif inside and token.kind in (tokens.STRING, tokens.QUOTED_ATOM):
                 # The parser takes a string or an atom, and the tokenizer hands a
@@ -204,11 +212,7 @@ def import_argument_at(
     column = position - line_start
     directive = False
     for token in tokens.tokenize(line, keywords, mode):
-        if token.text in DIRECTIVE_NAMES and token.kind in (
-            tokens.KEYWORD,
-            tokens.ATOM,
-            tokens.VARIABLE,
-        ):
+        if is_directive_name(token):
             directive = True
             continue
         if not directive:

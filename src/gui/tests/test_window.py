@@ -32,6 +32,9 @@ try:
 except ImportError:  # pragma: no cover - main() reports it
     QApplication = None  # type: ignore[assignment]
 
+#: The repository's standard library — what the welcome program imports.
+STDLIB = pathlib.Path(__file__).resolve().parents[3] / "stdlib"
+
 EXAMPLE = pathlib.Path(__file__).resolve().parents[3] / "examples" / "problems" / "factorial.pld"
 ANSWER = "Ф=720\n"
 
@@ -2156,6 +2159,11 @@ def test_the_settings_dialog_changes_the_window_without_a_restart(executable: st
     """
     from prologd_gui import settings as settings_module
 
+    # The row is typed the way a user types it; the session has to hear of it as a
+    # real folder — the window hands the interpreter absolute paths (task_111), so
+    # the comparison is by path and not by spelling.
+    shared_import = os.path.abspath("C:/общие")
+
     window = empty_window(executable)
     try:
         def drive(dialog) -> bool:
@@ -2179,7 +2187,7 @@ def test_the_settings_dialog_changes_the_window_without_a_restart(executable: st
             assert window.editor().font_size == 14.0, "«Применить» did not reach the editor"
             assert window.editor().line_numbers() is False
             assert window.output().font_size == 20.0
-            assert "C:/общие" in window.session._includes
+            assert shared_import in window.session._includes, window.session._includes
             return False  # «Применить», then «Отмена»: what was applied stays
 
         window._run_settings_dialog = drive
@@ -2193,7 +2201,7 @@ def test_the_settings_dialog_changes_the_window_without_a_restart(executable: st
         assert window.output().line_limit() == 1000
         assert window.output_position() == "bottom"
         assert window._actions["zoom_in"].isEnabled(), "the size commands are live"
-        assert "C:/общие" in window.session._includes
+        assert shared_import in window.session._includes, window.session._includes
         assert window.session is window._session
         print("ok: «Применить» reaches the editor, the output and the session at once")
     finally:
@@ -3560,6 +3568,9 @@ def test_an_imported_file_reaches_the_popup(executable: str, files: pathlib.Path
     window = empty_window(executable)
     try:
         window._settings.import_paths = [str(files)]
+        # The same door the dialog uses: the session has to be told about the
+        # folder before a run, or the interpreter never hears of `-I` (task_61).
+        window.apply_settings()
         view = window.editor()
         view.setPlainText(':- ИМПОРТ("библиотека.pld").\nчлен_с')
         cursor = view.textCursor()
@@ -3579,6 +3590,26 @@ def test_an_imported_file_reaches_the_popup(executable: str, files: pathlib.Path
             # And the comment above the clause is read from the file into the label
             # (task_103): the note a library keeps for its predicates.
             assert "Принадлежность элемента списку" in detail, detail
+        finally:
+            view._hide_completion()
+
+        # The same offer has to survive a run (task_111): the `ready` event brings
+        # the *kinds* of the reserved names, and `ИМПОРТ` becomes a `directive`
+        # instead of a plain keyword.  Once the directive stopped being recognised
+        # there, the popup lost every imported name — the owner saw `length` vanish
+        # from it after the first `F5`.
+        view.setPlainText(':- ИМПОРТ("библиотека.pld").\n?член_списка(1, [1]).\n')
+        assert window.run_program() is True
+        wait_for_result(window)
+        assert window.problems_text() == "", window.problems_text()
+        view.setPlainText(':- ИМПОРТ("библиотека.pld").\nчлен_с')
+        cursor = view.textCursor()
+        cursor.movePosition(QTextCursor.MoveOperation.End)
+        view.setTextCursor(cursor)
+        view._maybe_complete(force=True)
+        try:
+            labels = view.completion_labels()
+            assert "член_списка/2" in labels, labels
         finally:
             view._hide_completion()
     finally:
@@ -4094,12 +4125,12 @@ def test_an_untouched_unnamed_tab_comes_back_clean(executable: str) -> None:
     """
     from prologd_gui import documents
     from prologd_gui.settings import Settings
-    from prologd_gui.window import MainWindow, WELCOME
+    from prologd_gui.window import MainWindow, welcome_text
 
     window = make_window(executable)
     settings_path = window._settings.path
     try:
-        assert window.buffers()[0].text() == WELCOME, "the welcome tab"
+        assert window.buffers()[0].text() == welcome_text(True), "the welcome tab"
         assert window.buffers()[0].is_modified() is False
         window.new_buffer()
         assert window.tab_count() == 2, window.tab_count()
@@ -4111,13 +4142,13 @@ def test_an_untouched_unnamed_tab_comes_back_clean(executable: str) -> None:
     settings = Settings(settings_path)
     stored = documents.decode_tabs(settings.session_tabs)
     assert [record.name for record in stored] == ["Без имени"], stored
-    assert stored[0].text == WELCOME
+    assert stored[0].text == welcome_text(True)
     assert stored[0].modified is False, "nobody edited the welcome program"
 
     reopened = MainWindow(executable, [], settings)
     try:
         assert reopened.tab_count() == 1, [b.model.name for b in reopened.buffers()]
-        assert reopened.buffers()[0].text() == WELCOME
+        assert reopened.buffers()[0].text() == welcome_text(True)
         assert reopened.buffers()[0].is_modified() is False, (
             "the restored tab carries a star it never earned"
         )
@@ -4952,14 +4983,18 @@ def test_the_welcome_program_runs_on_both_engines(
     same way.  Measured, not assumed: the output of the two runs is compared.
     """
     from prologd_gui import engines
-    from prologd_gui.window import WELCOME
+    from prologd_gui.window import welcome_text
 
     folder = both_engines(directory, executable)
     answers: dict[str, str] = {}
     for engine in engines.ENGINES:
         window = make_window(str(folder / engine.file_name), ready=False)
         try:
-            assert window.buffers()[0].text() == WELCOME, "the first tab holds it"
+            # Both engines are in this folder, so the window shows the whole map;
+            # the program inside it is the common one, and that is what has to
+            # answer the same on both.
+            assert window.buffers()[0].text() == welcome_text(True), "the first tab holds it"
+            window.editor().setPlainText(welcome_text(False))
             window.run_program()
             wait_for_result(window)
             assert not window.problems_text().strip(), ascii(window.problems_text())
@@ -4973,7 +5008,51 @@ def test_the_welcome_program_runs_on_both_engines(
     assert answers[engines.OURS.key] == "И=вова\nФ=корчагин\nИ=данил\nФ=ахмеров\n", ascii(
         answers[engines.OURS.key]
     )
+
+    # The whole map — the part only our engine can run — runs there too.  The
+    # standard library has to be on the import path: a build tree has no `stdlib`
+    # beside the executable (the package does), which is why the row is filled here.
+    window = make_window(executable, ready=False)
+    try:
+        window._settings.import_paths = [str(STDLIB)]
+        window.apply_settings()
+        window.editor().setPlainText(welcome_text(True))
+        window.run_program()
+        wait_for_result(window)
+        assert not window.problems_text().strip(), ascii(window.problems_text())
+        assert window.output_text().startswith("Д=3\n"), ascii(window.output_text())
+    finally:
+        discard_changes(window)
     print("ok: the welcome program answers the same on both engines")
+
+
+def test_a_build_with_the_original_alone_shows_the_shorter_welcome(
+    executable: str, directory: pathlib.Path
+) -> None:
+    """task_112: the package `d` cannot run `ИМПОРТ`, so its welcome does not show it.
+
+    The text is chosen by what the build carries — `paths.engine_present` — and not
+    by a flag in the packaging script: a folder with our engine shows the whole map,
+    one with the original alone shows the common half.  The first thing a welcome
+    must do is run.
+    """
+    from prologd_gui import engines
+    from prologd_gui.window import welcome_text
+
+    alone = directory / "только_д"
+    alone.mkdir()
+    original = engines.ORIGINAL.file_name
+    shutil.copy2(str(pathlib.Path(executable).parent / original), str(alone / original))
+
+    window = make_window(str(alone / original), ready=False)
+    try:
+        text = window.buffers()[0].text()
+        assert text == welcome_text(False), ascii(text)
+        assert "ИМПОРТ" not in text, "the original dialect has no such statement"
+        assert "Ctrl+Space" in text, "the window's own hints stay"
+    finally:
+        discard_changes(window)
+    print("ok: a build with the original engine alone shows the common welcome")
 
 
 def test_the_state_control_duplicates_the_names_row(
@@ -5557,6 +5636,7 @@ def main(argv: list[str]) -> int:
         test_the_other_engine_gets_only_what_it_answers(executable, files)
         test_the_other_engine_reads_names_its_own_way(executable, files)
         test_the_welcome_program_runs_on_both_engines(executable, files)
+        test_a_build_with_the_original_alone_shows_the_shorter_welcome(executable, files)
         test_the_state_control_duplicates_the_names_row(executable, files)
         test_the_settings_dialog_follows_the_engine_that_runs(executable, files)
         test_the_process_directory_is_where_files_go(executable, files)

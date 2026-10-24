@@ -14,8 +14,10 @@ from dataclasses import dataclass, fields, replace
 
 from . import tokens
 
-#: Kinds that must not be italicised or bolded away from the rest.
-_BOLD_KINDS = frozenset({tokens.KEYWORD})
+#: Kinds that must not be italicised or bolded away from the rest.  A directive
+#: is a reserved word too: `ИМПОРТ` was bold until the kinds arrived from the
+#: `ready` event, and then quietly stopped being (task_111).
+_BOLD_KINDS = frozenset({tokens.KEYWORD, tokens.DIRECTIVE})
 
 
 @dataclass(frozen=True)

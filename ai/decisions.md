@@ -1552,3 +1552,58 @@ its text instead of a save question — a generated program is scratch work unti
 user gives it a name.
 
 **Status.** Accepted 2026-10-24 (task_108).
+
+## ADR-047: what the window reads twice must read the same thing twice
+
+**Context.**  Two defects of one shape, both found by the owner after the first
+`F5`.  (1) The reserved names reach the window from two places: `--list-keywords`
+before the first run (no kinds — `ИМПОРТ` is a `KEYWORD`) and the `ready` event
+from then on (`"kind": "directive"`).  `imports.directive_names`,
+`imports.import_argument_at` and `theme._BOLD_KINDS` each knew one half: after the
+first run the directive named no file (the popup lost every imported name, `F12` on
+one said «не найдено», the file name inside the brackets stopped completing) and
+stopped being bold.  (2) The «Дополнительные каталоги ИМПОРТ» list was handed over
+as typed, and its two readers resolve a relative folder differently — the window
+against its own working directory, the interpreter against the running program's
+folder — so a row of `stdlib` meant one folder to the popup and another to the run.
+
+**Decision.**  One predicate for «this token is the directive's name»
+(`imports.is_directive_name`), accepting every kind that name can arrive as —
+`DIRECTIVE`, `KEYWORD`, `ATOM`, `VARIABLE` — and used by both functions that look
+for it; `DIRECTIVE` counts as bold, because the two tables describe one word.  The
+`-I` list is handed over as absolute paths (`os.path.abspath`: a spelling rewrite,
+no disk, and it is asked on every keystroke).
+
+**Consequences.**  The popup, `F12` and the colours no longer depend on whether a
+run has happened yet.  A relative row is resolved once, by the window, and both
+readers see the same folder.  What is *not* fixed, and is not a defect: in a build
+tree the engine's own `stdlib` search looks beside `prologu.exe`, which is deep in
+`build/…`, so `ИМПОРТ("iso.pld")` needs `-I <repo>/stdlib` there; in the portable
+package `stdlib` sits beside the executable and no `-I` is needed.
+
+**Status.** Accepted 2026-10-24 (task_111).
+
+## ADR-048: the welcome follows the engines the build carries
+
+**Context.**  The first tab used to hold a bare example program written in the
+intersection of the dialects (task_79).  The owner turned it into a map of the
+window — commands, a completion hint, a program whose questions show the answer
+table — and wanted a build with the original engine alone to show less: `ИМПОРТ`
+and `length` are not its words, and the first thing a welcome must do is run.
+
+**Decision.**  Two texts: `WELCOME_COMMON` (the window's own hints and the program
+both engines read) and `WELCOME_OURS` (four lines our engine adds above it).
+`welcome_text(ours_present)` chooses, and the answer comes from
+`paths.engine_present(engines.OURS, folder=self._engine_folder)` — the same fact the
+window uses for `--exe` and for the «only engine this build has» message.  No flag
+in `tools/build_portable.ps1`: the packaging script describes what it ships, and the
+window sees it.
+
+**Consequences.**  `both` and `u` show the whole map, `d` the commons.  The text
+lives in two spellings of one program, so the promise «answers on either engine» is
+checked twice: the common text on both engines, the whole text on ours (with the
+repository's `stdlib` on the import path — a build tree has none beside the
+executable, the package does).  The manual does not quote the program any more: it
+describes the features the text demonstrates, and a copy in two places would drift.
+
+**Status.** Accepted 2026-10-24 (task_112).

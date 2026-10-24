@@ -8,6 +8,7 @@ the right shows another, and both views edit the same text.
 
 from __future__ import annotations
 
+import os
 import pathlib
 
 from PySide6.QtCore import QElapsedTimer, QPoint, QSize, Qt, QTimer, QUrl
@@ -76,26 +77,64 @@ from .settings import OUTPUT_FONT_SIZE, Settings
 #: before the process is taken down (`stop_program`).
 STOP_GRACE_MS = 500
 
-#: The program the first tab holds: the one text that runs on **both** engines
-#: (task_79 fixed it, part 111).  It is written in the intersection of the two
-#: dialects, so the welcome tab answers whoever is running:
+#: The first tab's program: a short map of the window, then a tiny program to try
+#: (task_112).  The owner wrote it as a cheat sheet — the most useful commands, one
+#: line each, and a program whose every line shows something.
+#:
+#: It lives in the intersection of the two dialects, so it answers **whoever** is
+#: running (task_79):
 #:
 #: * atoms are lower-case and *unquoted* — the old dialect has no quoted atoms at
 #:   all (`студент('Вова', …)` is a parse error there), and in the ISO reading a
 #:   lower-case name is an atom either way;
 #: * the variables are **single** capital letters — `Имя` is a variable in the ISO
 #:   reading and a string constant in the old one, while a one-letter name is a
-#:   variable in both (one letter of either register is a variable by the old rule).
-#:
-#: The same program is quoted with its answer in `doc/gui.typ`, section 2, and the
-#: promise «answers on either engine» is a check rather than a hope: the test runs it
-#: on both and compares the output (`test_window.py`).
-WELCOME = """% пример программы
+#:   variable in both (one letter of either register is a variable by the old rule);
+#: * no `—`, `…` or `№` anywhere, comments included: the original dialect refuses
+#:   them, and the text is a program a reader may save as `.pld`.
+WELCOME_COMMON = """\
+% F5 или Ctrl+R - запуск; Shift+F5 - остановить счёт (красная кнопка)
+%   или выгрузить базу из памяти (синяя кнопка)
+% Ctrl+N или двойной клик по пустому месту вкладок - новая вкладка
+% Ctrl+E - показать в проводнике (у «Без имени» файла ещё нет)
+% Ctrl+\\ и Ctrl+Shift+\\ - вторая панель и обратно
+% Подсказка появляется со второй буквы, Ctrl+Space - в любой момент
+
+% Студенты группы. Этот комментарий виден в подсказке при наборе «ст»
 студент(вова, корчагин).
 студент(данил, ахмеров).
 
+% Щелчок по метке у вопроса выполнит только его, ответ попадёт в «Таблицу»
 ?студент(И, Ф).
 """
+
+#: What a build with **our** engine adds above it: the standard library and the two
+#: things only that engine has — `ИМПОРТ` and the ISO `length` (task_112).  A build
+#: with the original one alone shows `WELCOME_COMMON`: `ИМПОРТ` there is not a
+#: statement of the language, and the first thing a welcome must do is run.
+#:
+#: The chosen engine sees no marker line, so `Д` is read the way the window's
+#: «Имена переменных» says — and it is a variable in both readings, which is why the
+#: text needs no `:- ИМЕНА(0).`.
+WELCOME_OURS = (
+    ':- ИМПОРТ("iso.pld"). % подключает стандартные предикаты ISO\n'
+    "% F12 над ИМПОРТ откроет файл\n"
+    "% F12 над символом откроет первое определение\n"
+    "?length([1, 2, 3], Д).\n"
+    "\n" + WELCOME_COMMON
+)
+
+
+def welcome_text(ours_present: bool) -> str:
+    """The program the first tab holds, chosen by what the build carries (task_112).
+
+    `ours_present` is `paths.engine_present(engines.OURS)` — the window knows it
+    before the first buffer exists, so the choice is a fact about this build and not
+    a guess.  The package `d` has the original engine alone and gets the common
+    text; `both` and `u` get the whole map.
+    """
+    return WELCOME_OURS if ours_present else WELCOME_COMMON
+
 
 #: The three answers to "save before closing?".
 SAVE = "save"
@@ -330,9 +369,12 @@ class MainWindow(QMainWindow):
             self._restore_session()
         if not self._buffers:
             # The welcome program goes into the first tab and is *not* unsaved work
-            # — the flag is left clear, so closing it asks nothing.
+            # — the flag is left clear, so closing it asks nothing.  Which text it
+            # is depends on the engines this build carries (task_112).
             welcome = documents.Document.untitled(documents.untitled_name([]))
-            welcome.text = WELCOME
+            welcome.text = welcome_text(
+                paths.engine_present(engines.OURS, folder=self._engine_folder)
+            )
             self._add_buffer(welcome)
         # No interpreter yet: it is started by the first run (or by a query typed
         # into the query line).  A window that has been opened but not used has
@@ -4474,10 +4516,21 @@ class MainWindow(QMainWindow):
         added (2026-10-03): lesson 11 asks the student to add that folder by hand, so
         the row they see is the whole truth, and a folder copied to another machine
         cannot leave a remembered path behind.
+
+        The answers are **absolute** (task_111): two readers share this list, and
+        they resolve a relative folder differently — the window's own lookup against
+        the window's working directory, the interpreter against the running
+        program's folder.  A row of `stdlib` therefore meant one folder to the popup
+        and another to the run: `iso.pld` was offered and «не найден» on `F5`.
+        `abspath` and not `resolve`: it only rewrites the spelling, without asking
+        the disk, and this is asked on every keystroke of the popup.
         """
-        return paths.import_directories(
-            [*self._command_line_includes, *self._settings.import_paths]
-        )
+        return [
+            os.path.abspath(directory)
+            for directory in paths.import_directories(
+                [*self._command_line_includes, *self._settings.import_paths]
+            )
+        ]
 
     def _trim_recent(self) -> None:
         """Applies a new «Помнить недавних файлов» to the list already stored."""

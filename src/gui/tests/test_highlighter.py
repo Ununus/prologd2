@@ -111,6 +111,22 @@ def test_colours_by_kind() -> None:
     print("ok: every kind gets its colour, and names are told from variables")
 
 
+def test_a_directive_is_bold_like_any_reserved_name() -> None:
+    """task_111: `ИМПОРТ` keeps its weight when the kinds arrive.
+
+    Two tables reach the window: `--list-keywords` has no kinds, so the name is a
+    plain keyword, and the `ready` event says `directive`.  The colour was the same
+    either way, but the bold mark was not — it disappeared after the first run.
+    """
+    line = ':- ИМПОРТ("файл.pld").'
+    with_kinds = Coloured(line, keywords=TABLE)
+    without = Coloured(line, keywords=Keywords([{"name": "ИМПОРТ", "arities": []}]))
+    bold = int(QFont.Weight.Bold)
+    assert with_kinds.at("ИМПОРТ") == (THEME.keyword, bold), with_kinds.at("ИМПОРТ")
+    assert without.at("ИМПОРТ")[1] == bold, without.at("ИМПОРТ")
+    print("ok: a directive is bold whether its kind is known or not")
+
+
 def test_colours_on_a_query_line() -> None:
     coloured = Coloured('?цель("строка", 12, 1.5, #Н-1#)')
 
@@ -277,6 +293,7 @@ def test_a_block_comment_is_coloured_on_every_line() -> None:
 def main() -> int:
     application = QApplication(sys.argv[:1])
     test_colours_by_kind()
+    test_a_directive_is_bold_like_any_reserved_name()
     test_colours_on_a_query_line()
     test_the_comment_is_not_tokenized_further()
     test_a_parked_question_is_coloured_as_a_question()
