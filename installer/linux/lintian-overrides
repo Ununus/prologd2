@@ -1,0 +1,28 @@
+# /opt keeps the engines, the window and their data in one folder: the window
+# looks for the engines beside itself and the engine searches stdlib beside
+# itself (task_118, ADR-050).  This is a deliberate departure from Debian policy.
+prologd: dir-or-file-in-opt [opt/prologd/*]
+
+# The frozen window carries the Python runtime and the Qt libraries PyInstaller
+# bundled: that is what "frozen" means here, and the Windows package does the same.
+prologd: embedded-library bzip2 [opt/prologd/_internal/libbz2.so.1.0]
+prologd: embedded-library expat [opt/prologd/_internal/libexpat.so.1]
+prologd: embedded-library expat [opt/prologd/_internal/libpython3.14.so.1.0]
+prologd: embedded-library freetype [opt/prologd/_internal/libfreetype.so.6]
+prologd: embedded-library freetype [opt/prologd/_internal/PySide6/Qt/lib/libQt6Pdf.so.6]
+prologd: embedded-library lcms2 [opt/prologd/_internal/liblcms2.so.2]
+prologd: embedded-library lcms2 [opt/prologd/_internal/PySide6/Qt/lib/libQt6Pdf.so.6]
+prologd: embedded-library libjpeg [opt/prologd/_internal/PySide6/Qt/plugins/imageformats/libqjpeg.so]
+prologd: embedded-library libjpeg [opt/prologd/_internal/PySide6/Qt/plugins/imageformats/libqtiff.so]
+prologd: embedded-library libzstd [opt/prologd/_internal/libzstd.so.1]
+prologd: embedded-library openjpeg [opt/prologd/_internal/PySide6/Qt/lib/libQt6Pdf.so.6]
+prologd: embedded-library tiff [opt/prologd/_internal/PySide6/Qt/plugins/imageformats/libqtiff.so]
+prologd: shared-library-lacks-prerequisites [opt/prologd/_internal/*]
+prologd: unstripped-binary-or-object [opt/prologd/*]
+
+# The bootloader comes from PyInstaller and the engines are built by this
+# repository's CMake; neither is rebuilt with distribution hardening flags here.
+prologd: hardening-no-pie [opt/prologd/prologd-gui]
+
+# The manuals are PDFs under /opt/prologd/doc; the package ships no man pages.
+prologd: no-manual-page [usr/bin/prologd-gui]

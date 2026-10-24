@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Пролог-Д
+Comment=Учебная система логического программирования
+Comment[en]=Educational logic programming system
+Exec=prologd-gui %f
+Icon=prologd
+Terminal=false
+Categories=Education;
+MimeType=application/x-prologd;
+Keywords=prolog;logic;education;
+StartupWMClass=PrologD

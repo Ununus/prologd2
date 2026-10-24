@@ -150,6 +150,22 @@ def test_an_installed_copy_keeps_its_settings_in_appdata() -> None:
     print("ok: an installed copy answers AppData, and a copy taken elsewhere is portable")
 
 
+def test_an_installed_copy_under_opt_keeps_its_settings_in_xdg() -> None:
+    """task_118: `/opt` and the system prefixes are install locations on Linux.
+
+    The `.deb` installs into `/opt/prologd`, which is root-owned, so the settings
+    must go to XDG — and they have to do so because the folder *is* an install
+    location, not because a write happened to fail.
+    """
+    if os.name == "nt":
+        print("ok: skipped on Windows, which has no /opt")
+        return
+    for folder in ("/opt/prologd", "/usr/lib/prologd", "/usr/local/lib/prologd"):
+        with packaged(pathlib.Path(folder)):
+            assert paths.settings_path() is None, folder
+    print("ok: /opt and the system prefixes count as install locations on Linux")
+
+
 def test_a_settings_file_that_is_already_there_is_kept() -> None:
     """The file decides before the folder does: an upgrade must not move settings.
 
@@ -370,6 +386,7 @@ def main(argv: list[str]) -> int:
     test_a_package_finds_everything_beside_itself()
     test_a_package_without_the_interpreter_names_the_expected_place()
     test_an_installed_copy_keeps_its_settings_in_appdata()
+    test_an_installed_copy_under_opt_keeps_its_settings_in_xdg()
     test_a_settings_file_that_is_already_there_is_kept()
     test_a_folder_that_cannot_be_written_falls_back_to_appdata()
     test_the_icons_come_from_the_same_answer()

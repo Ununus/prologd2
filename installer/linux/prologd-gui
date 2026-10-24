@@ -1,0 +1,5 @@
+#!/bin/sh
+# The command the desktop entry and the shell use (task_118).  The frozen window
+# lives in /opt/prologd, where the engines, doc, examples and stdlib sit beside it:
+# `paths.data_root()` is that folder, so the wrapper only forwards the arguments.
+exec /opt/prologd/prologd-gui "$@"

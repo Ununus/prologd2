@@ -1,0 +1,14 @@
+#!/bin/sh
+# Refresh the system's MIME and desktop caches after install (task_118).  Both
+# tools are optional: a minimal system may not carry them, and their absence must
+# not fail the install.
+set -e
+
+if command -v update-mime-database >/dev/null 2>&1; then
+    update-mime-database /usr/share/mime || true
+fi
+if command -v update-desktop-database >/dev/null 2>&1; then
+    update-desktop-database -q /usr/share/applications || true
+fi
+
+exit 0

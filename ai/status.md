@@ -6860,3 +6860,33 @@ of the package».  Отдельно: 25 оконных наборов и `protoc
   offscreen-плагина Qt, по одному на окно, безвредно.
 * **Дальше.**  Шаги 3-7 task_118: установленное дерево, XDG-настройки, иконки,
   `build_deb.sh`, проверка установки и удаления.
+
+### 196. task_118, шаги 3-7: `.deb` собран, lintian чист
+
+* **Просьба владельца.**  Сделать шаги 3-7: установленное дерево, XDG-настройки,
+  иконки, `build_deb.sh` и проверки.
+* **Что сделано.**
+  * `installer/linux/`: `control` (шаблон), `postinst`/`postrm` (обновляют MIME и
+    desktop-кэши, обработчик по умолчанию не трогают), обёртка `prologd-gui`
+    (`exec /opt/prologd/prologd-gui "$@"`), `.desktop`, `prologd.xml`, `copyright`
+    (MIT; `LICENSE` в корне), `lintian-overrides`, иконки hicolor 16-256.
+  * `paths.install_roots()`: на не-Windows добавлены `/opt`, `/usr`, `/usr/local`;
+    `test_paths.py` проверяет замороженную копию в каждом.  `default_path()` даёт
+    `$XDG_CONFIG_HOME/PrologD/gui/gui.ini`.
+  * `tools/make_png_icons.py`: 14 PNG из двух исходников 64x64.
+  * `tools/build_deb.sh`: проверка инструментов, `linux-release` с обоими
+    движками, ctest, docs, PyInstaller, дерево `build/deb-tree`, проверки,
+    `DEBIAN/`, `dpkg-deb --build`; опции `--skip-tests/--skip-docs/--skip-freeze`.
+* **Пакет.**  `dist/prologd_2.6.0_amd64.deb`, 57 735 990 байт (56 МиБ),
+  Installed-Size 185 908 КиБ, 528 записей; зависимости `libc6 (>= 2.43), libgl1,
+  libxkbcommon-x11-0, libxcb-cursor0, libfontconfig1, libdbus-1-3`,
+  `Recommends: xdg-utils`; `apt-get -s install` разрешается без добора пакетов.
+* **Проверки.**  Извлечённое дерево: `md5sum -c`, оба движка, урок 1, замороженное
+  окно offscreen; `desktop-file-validate` и `xmllint` чисто; `xdg-mime query
+  filetype` для `.pld` - `application/x-prologd`; `lintian` чист (оверрайды
+  документируют `/opt` и встроенные Qt/Python); под bwrap с подменённым `/opt`
+  окно стартует и пишет настройки в XDG, а не рядом с собой.
+* **Осталось человеку.**  `sudo apt install`, пункт меню, «Открыть с помощью»,
+  свежий пользователь, `sudo apt remove` и пустой `dpkg -L`.
+* **Лицензия.**  По слову владельца проект под MIT: `LICENSE` в корне,
+  `installer/linux/copyright` - Expat (MIT), README дополнен.

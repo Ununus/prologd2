@@ -1,7 +1,7 @@
 # task_118 — a `.deb` package of the window and both engines
 
-**Status:** in progress (2026-10-24) — steps 1 and 2 done on the owner's Ubuntu
-machine; steps 3–7 open
+**Status:** in progress (2026-10-25) — steps 1–6 done and the package is built;
+step 7's install/remove round trip is left for a person
 **Depends on:** task_61 (the portable layout), task_116 (installer, the settings rule),
 task_117 (the window as it is today)
 **Milestone:** 2.7.0 or later
@@ -39,6 +39,12 @@ Record: the glibc version (it is the floor for everyone who installs this `.deb`
 Python version and whether PySide6 has a wheel for it, and whether the distro's own
 `python3-pyside6` exists.  `requirements.txt` asks for `PySide6>=6.6`.
 
+Measured on 2026-10-24 (Ubuntu 26.04.1 LTS "resolute", x86_64): glibc 2.43,
+Python 3.14.4, PySide6 6.12.0 in `.venv` (the distro's `python3-pyside6.qtcore`
+is 6.10.2), CMake 4.2.3, Ninja 1.13.2, Typst 0.15.1, PyInstaller 6.22.3,
+`dpkg-deb`, `lintian`, `desktop-file-validate` and `xmllint` present.  The wheel
+supports Python 3.14, so the freeze works; the distro's older PySide6 is not used.
+
 ## Steps
 
 ### 1. Engine and CLI on Linux
@@ -58,7 +64,7 @@ The CI job `Linux (GCC)` already builds this and runs the same tests on `ubuntu-
 so failures here are about *this* release, not about the code.  Record the test count
 (424 on Windows) and any test that turns out to be Windows-only.
 
-### 2. The window on Linux — never run before
+### 2. The window on Linux
 
 ```sh
 python3 -m venv .venv
@@ -182,13 +188,23 @@ decided against code signing for Windows for now).
 
 ```sh
 sudo apt install ./dist/prologd_<version>_amd64.deb
-prologu --version                      # the packaged engine answers
+/opt/prologd/prologu --version         # the packaged engine answers (not on PATH)
 prologd-gui                            # menu entry, icon, window
 prologd-gui ~/проба.pld                # opens on the file, runs nothing
 xdg-mime query filetype ~/проба.pld    # application/x-prologd
 ls ~/.config/PrologD/gui/gui.ini       # settings where they belong
-sudo apt remove prologd && dpkg -L prologd | wc -l    # nothing left
+sudo apt remove prologd
+ls /opt/prologd /usr/bin/prologd-gui 2>&1       # both gone
+dpkg -l prologd | grep '^rc'                    # removed; dpkg keeps the rc state
+sudo apt purge prologd                          # clears that state
 ```
+
+`apt remove` leaves the package in `rc` even though it has no conffiles, so
+`dpkg -L prologd | wc -l` answers with the line «does not contain any files (!)»
+rather than 0; `apt purge` is what makes the package disappear from `dpkg -l`.
+The settings file in `~/.config/PrologD/gui/gui.ini` is user data, not a package
+file: it stays through both remove and purge, on purpose (put it aside by hand to
+test a fresh user).
 
 Also try a **fresh** user (or a container of the same release) — a package that only
 works because the developer's venv is on `PATH` is not a package.  Record the `.deb`
@@ -216,8 +232,42 @@ size, the dependency list `apt` pulled in, and anything that needed a manual ste
 - `This plugin does not support propagateSizeHints()` is the offscreen platform
   plugin's own warning, once per window: harmless, and silenceable only by muting
   every default-category Qt warning.
-- [ ] Steps 3–7: the installed tree, XDG settings, icons, `build_deb.sh`, and the
-      install/remove round trip.
+- [x] Step 3: `installer/linux/` carries `control`, `postinst`, `postrm`, the
+      `prologd-gui` wrapper, the desktop entry, the MIME XML, `copyright` (MIT,
+      also in the root `LICENSE`), `lintian-overrides` and the hicolor PNGs.
+      The desktop entry uses one main category (`Education;Development;` made
+      `desktop-file-validate` hint at a duplicate menu entry).
+- [x] Step 4: `paths.install_roots()` adds `/opt`, `/usr`, `/usr/local` on
+      non-Windows; `test_paths.py` checks a frozen copy under each.  `Settings.
+      default_path()` answers `$XDG_CONFIG_HOME/PrologD/gui/gui.ini`, checked
+      with a temporary `XDG_CONFIG_HOME`.
+- [x] Step 5: `tools/make_png_icons.py` regenerates 16/24/32/48/64/128/256 for the
+      application and the `.pld` type from the two 64 px sources; the PNGs live in
+      `installer/linux/icons/hicolor/` and are committed.
+- [x] Step 6: `tools/build_deb.sh` checks the tools, configures `linux-release`
+      with both engines, runs ctest, builds the docs, freezes the window with
+      PyInstaller, assembles `build/deb-tree` (mode-normalised), checks the
+      payload, writes `DEBIAN/` with the version from `prologu --version` and the
+      measured glibc floor, and builds `dist/prologd_<version>_<arch>.deb`.
+      `--skip-tests`, `--skip-docs` and `--skip-freeze` allow a quick repack.
+- [x] Step 7, without root: the extracted payload passes `md5sum -c`, both engines
+      run, lesson 1 loads, the frozen window stays up offscreen,
+      `desktop-file-validate` and `xmllint` are clean, the type resolves to
+      `application/x-prologd` in a temporary XDG tree, and `lintian` is clean with
+      the documented overrides.
+- [x] Step 7, installed by the owner: `sudo apt install` (the `_apt` sandbox
+      notice is harmless — the file lies under a home folder `_apt` cannot
+      traverse), the MIME type resolves to `application/x-prologd`, and
+      `apt remove` leaves `/opt/prologd` and `/usr/bin/prologd-gui` gone.  The
+      package stays in `rc` until `apt purge`; `~/.config/PrologD/gui/gui.ini` is
+      user data and stays through both, on purpose.
+- [ ] Step 7, still for a person: the menu entry, «Открыть с помощью», a fresh
+      user, and the visual pass with a display (step 2's list).
+
+Built: `dist/prologd_2.6.0_amd64.deb`, 57,735,990 bytes (56 MiB), Installed-Size
+185,908 KiB, 528 entries.  `Depends: libc6 (>= 2.43), libgl1,
+libxkbcommon-x11-0, libxcb-cursor0, libfontconfig1, libdbus-1-3`;
+`Recommends: xdg-utils`.
 
 ## Rules that carry over from the Windows work
 
@@ -233,15 +283,18 @@ size, the dependency list `apt` pulled in, and anything that needed a manual ste
   with English where the desktop needs it (`Comment` in the `.desktop`, `comment
   xml:lang="en"` in the MIME file).
 
-## Open questions for the owner
+## Choices taken (the old open questions)
 
-1. `Section:` — `education` (the audience) or `devel`?  `education` reads better in a
-   university image.
-2. A wrapper in `/usr/bin` or a symlink to the frozen binary?
-3. Freeze the window with PyInstaller (what Windows does, keeps parity) or use the
-   distro's `python3-pyside6` if Ubuntu 26.04 has it (leaner, but Linux-only path)?
-4. Should the `.deb` depend on `typst`?  No — the PDFs are built at packaging time, as
-   on Windows.
+1. `Section:` is `education`; the desktop entry names one main category, so
+   `desktop-file-validate` stays quiet.
+2. `/usr/bin/prologd-gui` is a two-line wrapper (`exec /opt/prologd/prologd-gui
+   "$@"`), not a symlink: it leaves room for a `--settings` argument later.
+3. The window is frozen with PyInstaller on Linux too.  The distro's
+   `python3-pyside6` exists (6.10.2) but is older than the 6.12 the sources use,
+   and freezing keeps the Windows and Linux packages the same shape.
+4. The `.deb` does not depend on `typst`: the PDFs are built at packaging time.
+
+The install root and the wrapper are recorded in ADR-050.
 
 ## What to record when it is done
 

@@ -1,0 +1,8 @@
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/x-prologd">
+    <comment>Программа Пролог-Д</comment>
+    <comment xml:lang="en">PrologD program</comment>
+    <sub-class-of type="text/plain"/>
+    <glob pattern="*.pld" weight="60"/>
+  </mime-type>
+</mime-info>

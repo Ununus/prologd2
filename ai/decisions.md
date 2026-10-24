@@ -1629,3 +1629,34 @@ change; a future change to the mapping is a behaviour change and must update tha
 test.
 
 **Status.** Accepted 2026-10-24.
+
+## ADR-050: the Debian package is one frozen folder under `/opt`
+
+**Context.**  The portable Windows package works because the window, both engines
+and their data sit in one folder: the window looks for the engines beside itself
+and the engine searches `stdlib` beside itself.  A Debian package must not keep
+the settings there — `/opt` is root-owned — and Debian policy dislikes `/opt`
+altogether.  The task asked where the Linux install lives, whether to freeze the
+window or use the distribution's PySide6, and how `/usr/bin` should point at it.
+
+**Decision.**  `/opt/prologd` is that one folder: the frozen window, `prologu`,
+`prologd`, the PDFs and `builtins.json`, `examples` and `stdlib`.
+`/usr/bin/prologd-gui` is a two-line wrapper that `exec`s the frozen window; the
+desktop entry, the MIME type, the hicolor icons and the package's copyright live
+in `/usr`.  `paths.install_roots()` treats `/opt`, `/usr` and `/usr/local` as
+install locations on non-Windows, so the settings go to XDG by rule rather than
+by a failed writability probe.  The window is frozen with PyInstaller on Linux
+too: the distro's PySide6 is older than the version the sources use, and the
+Windows package already takes this route.  The desktop/MIME entries declare the
+type but never set a default handler.  The deliberate departures from policy —
+`/opt`, bundled Qt/Python, the unhardened PyInstaller bootloader, no man page —
+are recorded in `installer/linux/lintian-overrides`.
+
+**Consequences.**  `dpkg` owns every installed file, so `apt remove` leaves
+`/opt` and `/usr` clean.  Copying the installed folder elsewhere still behaves as
+a portable copy, because it is no longer under an install root.  `lintian` is
+clean only with the overrides; the package is not archive-ready, which is the
+price of keeping one folder.  The wrapper leaves room for a `--settings`
+argument later; the settings rule itself does not depend on it.
+
+**Status.** Accepted 2026-10-25 (task_118).

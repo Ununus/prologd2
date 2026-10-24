@@ -126,6 +126,11 @@ def install_roots() -> list[pathlib.Path]:
 
     Read from the environment every time rather than once at import: a check that
     fakes an install puts these in place itself, and nothing here is worth a cache.
+
+    Windows answers from `%LOCALAPPDATA%`, `%ProgramFiles%` and
+    `%ProgramFiles(x86)%`.  A Debian package installs into `/opt` (task_118), and
+    the system prefixes are install locations as well; on Windows these POSIX
+    paths cannot match a real `data_root()`.
     """
     roots: list[pathlib.Path] = []
     local = os.environ.get("LOCALAPPDATA")
@@ -137,6 +142,8 @@ def install_roots() -> list[pathlib.Path]:
         value = os.environ.get(name)
         if value:
             roots.append(pathlib.Path(value))
+    if os.name != "nt":
+        roots.extend(pathlib.Path(name) for name in ("/opt", "/usr", "/usr/local"))
     return roots
 
 
