@@ -243,6 +243,39 @@ def test_a_comment_above_the_first_clause_is_carried_with_the_name() -> None:
     print("ok: a comment above the first clause travels with the name")
 
 
+def test_a_directive_is_offered_as_the_whole_statement() -> None:
+    """`ИМ` gives `:- ИМПОРТ("").` with the caret inside the quotes (task_105).
+
+    A directive is not a goal: the skeleton is the statement, and the string it
+    opens is the one that completes to a file name (task_104).
+    """
+    directives = Keywords.from_event(
+        {
+            "keywords": [
+                {"name": "ИМПОРТ", "kind": "directive", "arities": []},
+                {"name": "import", "kind": "directive", "arities": []},
+            ]
+        }
+    )
+    model = completion.CompletionModel(directives)
+    model.update("")
+    offers = model.candidates("ИМ")
+    assert [offer.label for offer in offers] == [':- ИМПОРТ("").'], offers
+    assert offers[0].call_form == (':- ИМПОРТ("").', 11), offers[0].call_form
+    assert offers[0].directive is True
+    # The English spelling has a skeleton of its own.
+    assert [offer.label for offer in model.candidates("im")] == [':- import("").'], (
+        model.candidates("im")
+    )
+    # Where the statement can start — the rule the editor applies, which has to
+    # look at what stands *before* the word being typed.
+    line = "  ИМ"
+    assert completion.at_statement_start(line, len(line), "ИМ") is True
+    body = "цель :- ИМ"
+    assert completion.at_statement_start(body, len(body), "ИМ") is False
+    print("ok: a directive is offered as its whole statement, only at a line start")
+
+
 def test_the_candidate_list_is_cached_until_the_text_changes() -> None:
     calls: list[str] = []
     original = completion.collect
@@ -446,6 +479,7 @@ def main() -> int:
     test_the_word_being_typed_is_read_from_the_caret()
     test_an_imported_file_adds_its_predicates()
     test_a_comment_above_the_first_clause_is_carried_with_the_name()
+    test_a_directive_is_offered_as_the_whole_statement()
     test_the_candidate_list_is_cached_until_the_text_changes()
 
     try:

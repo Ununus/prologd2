@@ -42,6 +42,9 @@ class Buffer(QObject):
         #: How the `ИМПОРТ` lines become the texts the popups read (task_102):
         #: the window answers, because only it knows the search directories.
         self._import_lookup = None
+        #: Where an `ИМПОРТ` name is looked for, for the string's own completion
+        #: (task_104); also the window's answer.
+        self._import_folders = None
 
         # The layout is not optional.  A `QPlainTextEdit` refuses a document that
         # does not use `QPlainTextDocumentLayout` — Qt prints one warning and the
@@ -95,6 +98,7 @@ class Buffer(QObject):
         editor.set_reference(self._reference)
         editor.set_shortcuts(self._shortcuts)
         editor.set_import_lookup(self._import_lookup)
+        editor.set_import_folders(self._import_folders)
         editor.set_wrap(self._settings.wrap)
         self._views.append(editor)
         return editor
@@ -208,6 +212,17 @@ class Buffer(QObject):
         self._import_lookup = lookup
         for view in self._views:
             view.set_import_lookup(lookup)
+
+    def set_import_folders(self, lookup) -> None:
+        """Where an `ИМПОРТ` name is looked for, for the directive's own string.
+
+        The editor offers the files and folders the directive may name (task_104),
+        and finding them is the same search the run does — the window's knowledge,
+        handed down the way `set_import_lookup` hands down the texts.
+        """
+        self._import_folders = lookup
+        for view in self._views:
+            view.set_import_folders(lookup)
 
     def set_shortcuts(self, table) -> None:
         """The `Ctrl`+key insertions (task_31); one table for every view."""

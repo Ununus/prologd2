@@ -1402,3 +1402,57 @@ is not a definition, a goal is not a head, and an operator-style head is not
 recognised — the price of working in a buffer that does not parse.
 
 **Status.** Accepted 2026-10-23 (task_103).
+
+## ADR-042: one string in the language is a path, and only that one completes
+
+**Context.**  The popup says nothing inside a string, and that rule is deliberate:
+a string is not code, and `ВЫВОД("при|")` has nothing to offer.  But one string in
+the language *is* a path — the argument of `:- ИМПОРТ("…").` — and a mistyped file
+name is found only when the program runs (the message then lists every path tried,
+which is honest but late).
+
+**Decision.**  A narrow exception, expressed as a question about the text and the
+caret rather than as a mode of the editor: `imports.import_argument_at` recognises
+the directive and the caret *inside its literal*, and answers what is typed — the
+folder part and the name part.  Inside that one string the popup offers files and
+folders from the folders the run would search (`search_folders`: the file's own,
+the `-I` rows, `stdlib`), one letter is enough, `/` opens a folder, and accepting
+replaces only the name part so a hand-typed `lib/` stays.  Every other string keeps
+the old silence, and the entry inserts a bare name — no brackets, no arity.
+
+**Consequences.**  The completion now has a second *kind* of candidate (a file name)
+with the same plumbing: `Candidate` with no arity inserts the name and nothing else,
+`_insert_completion` takes the prefix from the mode instead of `word_before` (a
+path may contain `-`).  The folders are listed on demand and never cached beyond the
+call: a folder listing is cheap, and a stale cache in a popup is worse than none.
+A missing folder is silent — a half-typed path is the normal state while typing.
+What was *not* built is any index of the disk: the popup lists the folders the
+engine would try, one level at a time, and nothing else.
+
+**Status.** Accepted 2026-10-24 (task_104).
+
+## ADR-043: a directive is completed as the statement it has to be
+
+**Context.**  `ИМПОРТ` arrives in the keyword table as a *directive* — a name with
+no arities — and the popup offered it like an operator: the bare word.  Accepting
+it wrote `ИМПОРТ` where the language wants `:- ИМПОРТ("файл.pld").`, so the answer
+was a sentence that does not parse.  The owner asked for the whole statement on
+`ИМ|`.
+
+**Decision.**  A directive candidate carries its own skeleton: a small table names
+the text and where the caret goes (`:- ИМПОРТ("").`, after the opening quote), and
+`Candidate` learned three things — `display` (the whole statement is what the popup
+shows), `skeleton` (what accepting inserts) and `directive` (that it is one).
+Matching stays by name, so `ИМ` finds it and the ranking is untouched.  The editor
+offers it only where a statement can start — nothing but whitespace before the
+typed word on its line — because a directive in a body is a syntax error, and a
+popup that offers one is offering the error.
+
+**Consequences.**  The chain `ИМ` → `:- ИМПОРТ("")` → `iso` → `iso.pld` is one
+flow: the skeleton leaves the caret where the string completion of task_104 works,
+so the two features meet without either knowing about the other.  A future
+directive with a shape of its own (`ХОЛСТ`) is one line in the table.  What is not
+built: a template inserts no newline and no trailing text — the line belongs to the
+user.
+
+**Status.** Accepted 2026-10-24 (task_105).

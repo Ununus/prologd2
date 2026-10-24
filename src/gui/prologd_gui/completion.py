@@ -44,6 +44,15 @@ _QUOTES = "'\""
 #: for a sentence or two, not a wall of text over the code.
 SUMMARY_LIMIT = 400
 
+#: The directives a program writes as a statement of its own, with the text they
+#: are typed as and where the caret goes (task_105).  `ИМПОРТ` is the one whose
+#: argument is a file name, so its skeleton opens the quotes and leaves the caret
+#: inside them — the string then completes to a file (task_104).
+DIRECTIVE_TEMPLATES = {
+    "ИМПОРТ": (':- ИМПОРТ("").', 11),
+    "import": (':- import("").', 11),
+}
+
 
 @dataclass(frozen=True)
 class Candidate:
@@ -65,10 +74,20 @@ class Candidate:
     #: The comment written above the name's first clause, for the same label
     #: (task_103) — the note a library keeps for its predicates.
     summary: str | None = None
+    #: What the popup shows when the name is not the answer: a directive is offered
+    #: as the whole statement it has to be (task_105).
+    display: str | None = None
+    #: `(text, caret)` to insert instead of the call form — the same task.
+    skeleton: tuple[str, int] | None = None
+    #: True for a directive: a statement of its own, so it is offered only where a
+    #: statement can start, never inside a body.
+    directive: bool = False
 
     @property
     def label(self) -> str:
         """What the popup shows: `НАЙТИВСЕ/3`, `ВЫВОД/+` or the bare name."""
+        if self.display is not None:
+            return self.display
         if self.variadic:
             return f"{self.name}/+"
         if self.arity is None:
@@ -98,6 +117,8 @@ class Candidate:
         one argument (nobody knows how many it takes), and a zero-arity name or
         a bare atom inserts only the name with the caret at the end.
         """
+        if self.skeleton is not None:
+            return self.skeleton
         if self.variadic:
             return self.name + "()", len(self.name) + 1
         if self.arity is None or self.arity == 0:
@@ -227,7 +248,25 @@ def collect(text: str, keywords: Keywords | None = None, imported=None) -> list[
             for arity in sorted(keyword.arities):
                 candidates.append(Candidate(keyword.name, arity, PREDICATE, BUILTIN))
             if not keyword.arities:
-                # An operator or a directive: the name alone is what is typed.
+                template = DIRECTIVE_TEMPLATES.get(keyword.name)
+                if template is not None:
+                    # A directive is a statement of its own, so it is offered as
+                    # one: `:- ИМПОРТ("").` with the caret inside the quotes, and
+                    # the string that follows completes to a file name (task_104).
+                    text, caret = template
+                    candidates.append(
+                        Candidate(
+                            keyword.name,
+                            None,
+                            PREDICATE,
+                            BUILTIN,
+                            display=text,
+                            skeleton=(text, caret),
+                            directive=True,
+                        )
+                    )
+                    continue
+                # An operator: the name alone is what is typed.
                 candidates.append(Candidate(keyword.name, None, PREDICATE, BUILTIN))
 
     calls, atoms, quoted, summaries = collect_names(text, keywords)
@@ -345,6 +384,21 @@ class CompletionModel:
             candidate.kind != PREDICATE,
             name,
         )
+
+
+def at_statement_start(text: str, position: int, prefix: str = "") -> bool:
+    """True when only whitespace stands between the line start and the typed word.
+
+    What a directive needs (task_105): `:- ИМПОРТ("…").` is a statement of its own,
+    and offering it in the middle of a body would be offering a syntax error.
+    `prefix` is the word being typed — the caret stands after it, so the question is
+    about what comes *before* the word.
+    """
+    line_start = text.rfind("\n", 0, position) + 1
+    before = text[line_start:position]
+    if prefix and before.endswith(prefix):
+        before = before[: len(before) - len(prefix)]
+    return before.strip() == ""
 
 
 def word_before(text: str, position: int) -> str:

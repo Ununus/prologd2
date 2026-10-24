@@ -3333,6 +3333,7 @@ class MainWindow(QMainWindow):
         buffer.set_reference(self._reference)
         buffer.set_shortcuts(self._shortcuts)
         buffer.set_import_lookup(self._import_lookup_for(buffer))
+        buffer.set_import_folders(self._import_folders_for(buffer))
         self._buffers.append(buffer)
         for pane in self._panes:
             pane.set_buffers(self._buffers)
@@ -3367,6 +3368,24 @@ class MainWindow(QMainWindow):
             )
 
         return lookup
+
+    def _import_folders_for(self, buffer: Buffer):
+        """Where an `ИМПОРТ` name is looked for, for the directive's own string.
+
+        The same order the run uses (task_104): the folder of the file, the `-I`
+        rows, then `stdlib` — and only folders that exist, because a popup lists
+        what it can.
+        """
+
+        def folders():
+            path = buffer.model.path
+            return imports.search_folders(
+                pathlib.Path(path).parent if path else None,
+                self._import_directories(),
+                self._interpreter_path(),
+            )
+
+        return folders
 
     def _drop_buffer(self, buffer: Buffer) -> None:
         """Forgets a document everywhere.  No questions are asked here."""

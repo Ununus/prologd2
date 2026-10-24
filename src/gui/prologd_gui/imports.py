@@ -74,7 +74,6 @@ def directive_names(
 
 class ImportedFiles:
     """The texts a buffer's imports bring in, each read once per version of the file.
-
     The result is `{path: text}` in the order the directives are written, with the
     files an imported file imports of its own added after it — the order the engine
     loads them in.  `resolve` and `read` are seams: the check of this module needs
@@ -174,3 +173,131 @@ class ImportedFiles:
             return None
         self._read[path] = (stamp[0], stamp[1], content)
         return content
+
+
+# ---------------------------------------------------------------------------
+# Typing a file name inside the directive (task_104)
+# ---------------------------------------------------------------------------
+
+#: The separator the directive's argument is completed with — the one the
+#: examples and the library use.  `\` is accepted as typed, never offered.
+SEPARATOR = "/"
+
+
+def import_argument_at(
+    text: str, position: int, keywords=None, mode: int = tokens.MODE_ISO
+) -> tuple[str, str] | None:
+    """What is typed inside the file name of an `ИМПОРТ` directive, at `position`.
+
+    Answers `(folder, name)`: the folder part as typed (`lib/`, or empty when the
+    name stands alone) and the name part — the text after the last separator up to
+    the caret.  `None` when the caret is anywhere else: in a comment, in the code
+    around the directive, or in a string of another predicate, where a file name
+    would be an odd thing to suggest.
+
+    The line is read with the editor's tokenizer, so the directive and its string
+    are recognised the same way `directive_names` recognises them.
+    """
+    line_start = text.rfind("\n", 0, position) + 1
+    line_end = text.find("\n", position)
+    line = text[line_start:] if line_end < 0 else text[line_start:line_end]
+    column = position - line_start
+    directive = False
+    for token in tokens.tokenize(line, keywords, mode):
+        if token.text in DIRECTIVE_NAMES and token.kind in (
+            tokens.KEYWORD,
+            tokens.ATOM,
+            tokens.VARIABLE,
+        ):
+            directive = True
+            continue
+        if not directive:
+            if token.start > column:
+                break
+            continue
+        if token.kind not in (tokens.STRING, tokens.QUOTED_ATOM):
+            continue
+        if not token.start < column <= token.end:
+            # The caret is past this literal (or before it): not our business.
+            return None
+        raw = line[token.start : token.end]
+        closed = len(raw) >= 2 and raw[-1] == raw[0]
+        if closed and column > token.end - 1:
+            return None  # at the closing quote or after it
+        typed = line[token.start + 1 : column]
+        cut = max(typed.rfind("/"), typed.rfind("\\"))
+        return (typed[: cut + 1], typed[cut + 1 :]) if cut >= 0 else ("", typed)
+    return None
+
+
+def directory_entries(directory: pathlib.Path) -> list[tuple[str, bool]]:
+    """The entries of a folder as `(name, is_a_folder)`, sorted, or empty if absent.
+
+    A folder that is not there is not an error: a half-typed path is the normal
+    case while the user types, and a popup has no place for a complaint.
+    """
+    try:
+        with os.scandir(directory) as scanned:
+            entries = [
+                (entry.name, entry.is_dir())
+                for entry in scanned
+                if not entry.name.startswith(".")
+            ]
+    except OSError:
+        return []
+    entries.sort(key=lambda item: (not item[1], item[0].lower()))
+    return entries
+
+
+def search_folders(
+    source_dir: pathlib.Path | None, directories=(), interpreter_path: str | None = None
+) -> list[pathlib.Path]:
+    """Where an `ИМПОРТ` name is looked for, in the engine's order (`resolve_import`).
+
+    The folder of the importing file first, then the `-I` directories, then
+    `stdlib` beside the interpreter — and only the folders that exist, because a
+    popup lists what it can.
+    """
+    candidates: list[pathlib.Path] = []
+    if source_dir is not None:
+        candidates.append(pathlib.Path(source_dir))
+    candidates += [pathlib.Path(directory) for directory in directories]
+    if interpreter_path:
+        candidates.append(pathlib.Path(interpreter_path).parent / "stdlib")
+    unique: list[pathlib.Path] = []
+    for candidate in candidates:
+        if candidate not in unique and candidate.is_dir():
+            unique.append(candidate)
+    return unique
+
+
+def complete_names(
+    folders, typed: str, *, pattern: str = ".pld", lister=None
+) -> list[str]:
+    """What the half-typed `typed` can become: the entries of its folder, filtered.
+
+    `typed` is the whole argument as far as the caret (`lib/is`): its folder part
+    chooses the folder to list (inside every one of `folders`), its name part
+    filters the entries.  Folders come first with a trailing `/`, then the files of
+    `pattern`; both are compared without case, because Windows is.
+    """
+    lister = lister if lister is not None else directory_entries
+    cut = max(typed.rfind("/"), typed.rfind("\\"))
+    folder = typed[: cut + 1]
+    prefix = typed[cut + 1 :].lower()
+    names: list[str] = []
+    for root in folders:
+        directory = pathlib.Path(root) / folder if folder else pathlib.Path(root)
+        for name, is_folder in lister(directory):
+            if not name.lower().startswith(prefix):
+                continue
+            if is_folder:
+                names.append(name + SEPARATOR)
+            elif name.lower().endswith(pattern):
+                names.append(name)
+    unique: list[str] = []
+    for name in names:
+        if name not in unique:
+            unique.append(name)
+    unique.sort(key=lambda item: (not item.endswith(SEPARATOR), item.lower()))
+    return unique

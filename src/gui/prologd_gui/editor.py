@@ -313,6 +313,11 @@ class CodeEditor(ZoomablePlainTextEdit):
         #: The directive list the imported texts were read for, so the scan and the
         #: reads happen when that list changes and not on every keystroke.
         self._import_names: list[str] | None = None
+        #: The folders an `ИМПОРТ` name is looked for in, handed in by the window;
+        #: `None` offers no file names at all (task_104).
+        self._import_folders = None
+        #: What a file entry replaces when it is accepted (`iso.pld` in `lib/is`).
+        self._file_prefix: str | None = None
         #: The runnable questions of the text by line, for the margin's markers
         #: (task_36); the rule that fills this lives in `queries.py`.
         self._statements: dict[int, str] = {}
@@ -885,6 +890,15 @@ class CodeEditor(ZoomablePlainTextEdit):
         self._import_lookup = lookup
         self._import_names = None
 
+    def set_import_folders(self, lookup) -> None:
+        """Where an `ИМПОРТ` name is looked for, so the string can complete (task_104).
+
+        `lookup` answers the folders in the engine's order — the window knows them,
+        the editor does not.  `None` (the default) keeps the popup out of the
+        directive's string, which is what a check without a window gets.
+        """
+        self._import_folders = lookup
+
     def set_shortcuts(self, table) -> None:
         """The `Ctrl`+key insertions of task_31 (a `Shortcuts` table)."""
         self._shortcuts = table
@@ -987,6 +1001,13 @@ class CodeEditor(ZoomablePlainTextEdit):
             return
         text = self.toPlainText()
         position = cursor.position()
+        self._file_prefix = None
+        # Inside the file name of an `ИМПОРТ` directive the popup offers files
+        # instead of names (task_104): that one string is a path, not text.
+        typed = imports.import_argument_at(text, position, self._keywords)
+        if typed is not None:
+            self._complete_file(typed, force)
+            return
         if not completion.is_code_position(text, position, self._keywords):
             self._hide_completion()
             return
@@ -997,9 +1018,42 @@ class CodeEditor(ZoomablePlainTextEdit):
         self._refresh_imports(text)
         self._completion.update(text)
         self._offers = self._completion.candidates(prefix)
+        if not completion.at_statement_start(text, position, prefix):
+            # A directive is a statement of its own (task_105): inside a body the
+            # popup offers names, not `:- ИМПОРТ("…").`.
+            self._offers = [offer for offer in self._offers if not offer.directive]
         if not self._offers:
             self._hide_completion()
             return
+        self._show_offers()
+
+    def _complete_file(self, typed: tuple[str, str], force: bool) -> None:
+        """Offers the files an `ИМПОРТ` name may become (task_104).
+
+        The folders come from the window (it alone knows the search order), the
+        entries from the disk; a name is offered after one letter — a file name is
+        not a word, and waiting for two would hide `iso.pld` — and after a `/` the
+        whole folder is shown.
+        """
+        folder, name = typed
+        if not force and not name and not folder:
+            self._hide_completion()
+            return
+        folders = self._import_folders() if self._import_folders is not None else []
+        names = imports.complete_names(folders, folder + name)
+        if not names:
+            self._hide_completion()
+            return
+        self._offers = [
+            completion.Candidate(entry, None, completion.ATOM_NAME, completion.IMPORTED)
+            for entry in names
+        ]
+        # What the entry replaces is the name part only: `lib/` stays as typed.
+        self._file_prefix = name
+        self._show_offers()
+
+    def _show_offers(self) -> None:
+        """Puts `self._offers` in front of the user and opens the popup on them."""
         self._offer_list.setStringList([offer.label for offer in self._offers])
         popup = self._completer.popup()
         rect = self.cursorRect()
@@ -1063,7 +1117,11 @@ class CodeEditor(ZoomablePlainTextEdit):
         the first argument at once (the arity in the label is never typed).
         """
         cursor = self.textCursor()
-        prefix = completion.word_before(self.toPlainText(), cursor.position())
+        if self._file_prefix is not None:
+            # A file name replaces the name part of the path only (task_104).
+            prefix = self._file_prefix
+        else:
+            prefix = completion.word_before(self.toPlainText(), cursor.position())
         start = cursor.position() - len(prefix) if prefix else cursor.position()
         cursor.beginEditBlock()
         if prefix:

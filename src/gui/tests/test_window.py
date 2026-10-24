@@ -3665,6 +3665,102 @@ def test_f12_goes_to_the_first_clause_of_a_name(
     print("ok: F12 goes to the first clause, in this file or in an import")
 
 
+def test_the_import_string_completes_to_a_file_name(
+    executable: str, files: pathlib.Path
+) -> None:
+    """Inside `ИМПОРТ("…")` the popup offers files, not predicates (task_104).
+
+    The one string in the language that is a path: the folders are the ones the
+    run would search, a name is offered after one letter, and accepting writes the
+    name into the quotes — the folder part typed before it stays.
+    """
+    from PySide6.QtGui import QTextCursor
+
+    (files / "iso.pld").write_text("member(X, [X|_]).\n", encoding="utf-8")
+    (files / "иное.pld").write_text("факт(1).\n", encoding="utf-8")
+    window = empty_window(executable)
+    try:
+        window._settings.import_paths = [str(files)]
+        view = window.editor()
+        view.setPlainText(':- ИМПОРТ("is").\n')
+        cursor = view.textCursor()
+        cursor.setPosition(view.toPlainText().index("is") + 2)
+        view.setTextCursor(cursor)
+        # One letter is enough here: a file name is not a word.
+        view._maybe_complete()
+        try:
+            labels = view.completion_labels()
+            assert "iso.pld" in labels, labels
+            assert "иное.pld" not in labels, labels
+            assert view._accept_completion() is True
+            assert view.toPlainText() == ':- ИМПОРТ("iso.pld").\n', ascii(view.toPlainText())
+            # The caret stays inside the quotes, right after the name.
+            assert view.textCursor().position() == view.toPlainText().index('").'), (
+                view.textCursor().position()
+            )
+        finally:
+            view._hide_completion()
+
+        # An ordinary string gets nothing, as before — the exception is one string.
+        view.setPlainText(':- ВЫВОД("is").\n')
+        cursor = view.textCursor()
+        cursor.setPosition(view.toPlainText().index("is") + 2)
+        view.setTextCursor(cursor)
+        view._maybe_complete()
+        assert view.completion_labels() == [], view.completion_labels()
+    finally:
+        discard_changes(window)
+    print("ok: the ИМПОРТ string completes to a file name, and only that string does")
+
+
+def test_the_directive_is_inserted_as_a_whole_statement(executable: str) -> None:
+    """`ИМ` on a line of its own gives `:- ИМПОРТ("").` (task_105).
+
+    A directive is a statement, not a goal: the popup offers the text that has to
+    be written, with the caret between the quotes — where the file name goes, and
+    where the string's own completion takes over (task_104).  Inside a body it is
+    not offered at all: a directive there is a syntax error.
+    """
+    from PySide6.QtGui import QTextCursor
+
+    window = empty_window(executable)
+    try:
+        view = window.editor()
+        view.setPlainText("ИМ")
+        cursor = view.textCursor()
+        cursor.movePosition(QTextCursor.MoveOperation.End)
+        view.setTextCursor(cursor)
+        view._maybe_complete(force=True)
+        try:
+            labels = view.completion_labels()
+            row = next(
+                (index for index, label in enumerate(labels) if label.startswith(":- ИМПОРТ(")),
+                None,
+            )
+            assert row is not None, labels
+            view._completer.popup().setCurrentIndex(view._offer_list.index(row, 0))
+            assert view._accept_completion() is True
+            assert view.toPlainText() == ':- ИМПОРТ("").', ascii(view.toPlainText())
+            assert view.textCursor().position() == len(':- ИМПОРТ("'), (
+                view.textCursor().position()
+            )
+        finally:
+            view._hide_completion()
+
+        # The same word inside a body: ordinary names are still offered, but the
+        # directive itself is not — a statement cannot start here.
+        view.setPlainText("цель :- ИМ")
+        cursor = view.textCursor()
+        cursor.movePosition(QTextCursor.MoveOperation.End)
+        view.setTextCursor(cursor)
+        view._maybe_complete(force=True)
+        labels = view.completion_labels()
+        assert not any(label.startswith(":- ") for label in labels), labels
+    finally:
+        discard_changes(window)
+    print("ok: a directive comes as its whole statement, and only where one can start")
+
+
 def test_running_programs_without_questions_finishes(executable: str) -> None:
     """A run is over when the *load* is: `result` only arrives for questions."""
     window = empty_window(executable)
@@ -5235,6 +5331,8 @@ def main(argv: list[str]) -> int:
         test_the_reserved_names_are_there_before_the_first_run(executable)
         test_an_imported_file_reaches_the_popup(executable, files)
         test_f12_goes_to_the_first_clause_of_a_name(executable, files)
+        test_the_import_string_completes_to_a_file_name(executable, files)
+        test_the_directive_is_inserted_as_a_whole_statement(executable)
         test_running_programs_without_questions_finishes(executable)
         test_f1_shows_the_record_of_the_word_under_the_caret(executable)
         test_the_cheat_sheet_lists_the_insert_table(executable)
