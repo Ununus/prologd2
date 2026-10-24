@@ -269,6 +269,46 @@ def test_the_folder_rows_and_the_insert_page(directory: pathlib.Path) -> None:
     print("ok: the folder rows work, and the insert page lists and restores the table")
 
 
+def test_the_insert_page_shows_the_settings_file_where_it_lies(
+    directory: pathlib.Path,
+) -> None:
+    """task_116: «Показать в проводнике» stands beside «Открыть файл настроек».
+
+    Two ways to reach the same ini: open it, or show the folder the user has to
+    find himself.  The button goes through `paths.reveal` — the platform-aware call
+    the window makes for a document (task_68, task_109) — so the check replaces that
+    one function and reads what it was handed.  A store that has not written its
+    file yet gets its *folder* revealed, not a name nobody can see.
+    """
+    from PySide6.QtWidgets import QPushButton
+
+    from prologd_gui import paths
+
+    path = directory / "reveal.ini"
+    path.write_text("[files]\n", encoding="utf-8")
+    dialog = dialog_for(directory, "reveal.ini")
+    try:
+        dialog.show_section("Вставки")
+        buttons = {button.text(): button for button in dialog.findChildren(QPushButton)}
+        assert "Открыть файл настроек" in buttons, sorted(buttons)
+        assert "Показать в проводнике" in buttons, sorted(buttons)
+
+        seen: list[str] = []
+        saved = paths.reveal
+        paths.reveal = seen.append
+        try:
+            buttons["Показать в проводнике"].click()
+            assert seen == [str(path)], seen
+            path.unlink()
+            buttons["Показать в проводнике"].click()
+            assert seen[-1] == str(directory), seen
+        finally:
+            paths.reveal = saved
+    finally:
+        dialog.reject()
+    print("ok: the settings file can be revealed as well as opened")
+
+
 def test_the_process_directory_rows(directory: pathlib.Path) -> None:
     """The rows of task_46 that are left: a three-way choice each way round.
 
@@ -457,6 +497,7 @@ def main(argv: list[str]) -> int:
         test_import_stages_a_file_and_carries_unknown_keys(directory)
         test_export_writes_a_file_another_store_can_read(directory)
         test_the_folder_rows_and_the_insert_page(directory)
+        test_the_insert_page_shows_the_settings_file_where_it_lies(directory)
         test_the_process_directory_rows(directory)
         test_the_engine_rows_are_gated_by_the_engine(directory)
         test_the_process_directory_path_follows_its_choice(directory)

@@ -609,14 +609,28 @@ class SettingsDialog(QDialog):
         path_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         path_label.setWordWrap(True)
         open_button = QPushButton("Открыть файл настроек", page)
+        open_button.setToolTip("Открыть ini в программе, которая его показывает")
         open_button.clicked.connect(lambda: self._open_settings_file())
+        reveal_button = QPushButton("Показать в проводнике", page)
+        reveal_button.setToolTip("Открыть папку с файлом настроек и выделить его")
+        reveal_button.clicked.connect(self._reveal_settings_file)
         revert_button = QPushButton("Вернуть встроенную таблицу", page)
         revert_button.clicked.connect(self.restore_shortcuts)
+        # All three are secondary actions of this page, so they share one row under
+        # the path (task_117): a full-width «Вернуть встроенную таблицу» read as the
+        # dialog's main action, and stretching the two long titles to half the dialog
+        # each turned a quiet row into a heavy block.  The file pair comes first, the
+        # table action last — the order is the object each acts on.
+        action_row = QWidget(page)
+        action_layout = QHBoxLayout(action_row)
+        action_layout.setContentsMargins(0, 0, 0, 0)
+        for button in (open_button, reveal_button, revert_button):
+            action_layout.addWidget(button)
+        action_layout.addStretch(1)
         layout.addWidget(note)
         layout.addWidget(self._inserts, 1)
         layout.addWidget(path_label)
-        layout.addWidget(open_button)
-        layout.addWidget(revert_button)
+        layout.addWidget(action_row)
         self._sections[INSERTS_PAGE] = self._pages.addWidget(page)
         self._nav.addItem(INSERTS_PAGE)
 
@@ -946,4 +960,17 @@ class SettingsDialog(QDialog):
         """Hands the ini to the desktop: it is a text file, and it is the last
         word on everything this dialog shows."""
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(self._settings.path)))
+        self._message(f"файл настроек: {self._settings.path}")
+
+    def _reveal_settings_file(self) -> None:
+        """Shows the settings file where it lies (task_116).
+
+        The same call the window makes for a document (`paths.reveal`, task_68):
+        the file manager is asked to show the file selected, and a platform
+        without that gets its folder.  A store that has not written its file yet
+        — a dialog opened before anything was changed — reveals the folder rather
+        than naming a file nobody can see.
+        """
+        target = pathlib.Path(self._settings.path)
+        paths.reveal(str(target if target.is_file() else target.parent))
         self._message(f"файл настроек: {self._settings.path}")

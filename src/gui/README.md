@@ -999,6 +999,11 @@ keeps, not choices the user made in this dialog.
 a key this version does not know travels with the rest); **Экспорт…** applies
 first and writes the whole configuration, unknown keys included, so one ini file
 can be handed out to a class.
+* The **Вставки** page names the settings file and gives two ways to reach it:
+«Открыть файл настроек» hands the ini to the desktop, «Показать в проводнике» shows
+the folder with the file selected (`paths.reveal`, the call the window makes for a
+document).  A store that has not written its file yet reveals the folder — a name
+nobody can see would be no answer at all.
 * Values live in `%LOCALAPPDATA%\PrologD\gui\gui.ini` (or `--settings FILE`; a
 portable copy reads `gui.ini` beside the window instead), and
 a value that cannot be read falls back to its default instead of taking the
