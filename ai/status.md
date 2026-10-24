@@ -6971,3 +6971,18 @@ of the package».  Отдельно: 25 оконных наборов и `protoc
 * **Проверка.**  `ctest` - 425/425; `tools/build_deb.sh --skip-tests
   --skip-docs --skip-freeze` собрал `dist/prologd_2.6.1_amd64.deb` (56 МиБ).
 * **Не менялось.**  Историю в `ai/` (записи о 2.6.0) не переписывал.
+
+### 201. macOS CI зелёный; пакет `.app`/`.dmg` в workflow
+
+* **Прогоны.**  `40135784912` - macOS test job зелёный (39 с) после явного
+  `<algorithm>` в `test_lexer.cpp`; `40135784935` - Linux и Windows зелёные.
+  Правка версии 2.6.1 и канонического пути Windows-теста подтверждена CI.
+* **Упаковка.**  В `.github/workflows/macos.yml` добавлен job `package`:
+  `macos-15`, `-DBUILD_WITH_PROLOGD=ON`, docs, PyInstaller, `.icns` через
+  `sips`/`iconutil`, `Info.plist` через `tools/macos_plist.py`, ad-hoc
+  `codesign`, `.dmg` через `hdiutil`, artifact и прикрепление к релизу по тегу.
+  Запускается по тегу `v*` или вручную (`workflow_dispatch`).
+* **Проверено локально.**  `tools/macos_plist.py` на тестовом plist; YAML
+  разбирается; `ctest` 425/425.
+* **Осталось.**  Первый прогон `package`; сборка оригинального `prologd` на
+  AppleClang; проверка `.dmg` на настоящем Mac и Gatekeeper.
