@@ -112,15 +112,22 @@ jobs:
           app=dist/PrologD.app/Contents/MacOS
           test -d "$app"
           cp build/macos-release/src/cli/prologu "$app/"
-          if [ -x build/macos-release/src/cli/prologd ]; then
-            cp build/macos-release/src/cli/prologd "$app/"
-          fi
+          test -x build/macos-release/src/cli/prologd
+          cp build/macos-release/src/cli/prologd "$app/"
           mkdir -p "$app/doc"
           cp doc/*.pdf doc/builtins.json "$app/doc/"
           cp -R examples stdlib "$app/"
           rm -rf "$app/examples/lessons/_old"
           python3 tools/macos_plist.py dist/PrologD.app/Contents/Info.plist "$version"
           plutil -lint dist/PrologD.app/Contents/Info.plist
+          test "$(plutil -extract CFBundleShortVersionString raw dist/PrologD.app/Contents/Info.plist)" = "$version"
+          for engine in prologu prologd; do
+            test -x "$app/$engine"
+            if otool -L "$app/$engine" | grep -q "$PWD/build/"; then
+              echo "::error::$engine links the build tree"
+              exit 1
+            fi
+          done
       - name: Sign and check
         run: |
           set -e

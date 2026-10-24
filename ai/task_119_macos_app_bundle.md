@@ -125,9 +125,9 @@ Two more facts from the current runners and wheels:
   deployment target and plist to 14.4, or pin PySide6 6.8 (Qt 6.8) and keep a
   12.0 floor.  The C++ engine itself has no macOS-specific link requirements.
 * Whether the original `prologd` builds with AppleClang is unverified.  Its own
-  `src/CMakeLists.txt` sets `CMAKE_OSX_ARCHITECTURES "x86_64;arm64"`; try
-  `-DBUILD_WITH_PROLOGD=ON` in CI and fall back to a `prologu`-only bundle for the
-  first release if it does not.
+  `src/CMakeLists.txt` sets `CMAKE_OSX_ARCHITECTURES "x86_64;arm64"`;
+  `-DBUILD_WITH_PROLOGD=ON` built it on AppleClang in run `40136493860` (warnings
+  `-Winvalid-source-encoding` on CP1251 strings only).
 
 ## Progress (2026-10-25)
 
@@ -145,8 +145,10 @@ Two more facts from the current runners and wheels:
       and `ctest` on every push/PR and by hand.
 - [ ] The insert table still matches Windows scan codes; macOS needs
       `nativeVirtualKey` and ⌘ labels (see the findings above).
-- [ ] Packaging: `.icns`, PyInstaller `.app`, `Info.plist`, ad-hoc signing, `.dmg`,
-      and the real-Mac checks.
+- [x] Packaging job: `.icns`, PyInstaller `.app`, `Info.plist`
+      (`tools/macos_plist.py`), ad-hoc signing, `.dmg`, artifact and release attach.
+      Run `40136493860` built `PrologD-2.6.1-arm64.dmg` with both engines; the
+      real-Mac checks are still open.
 
 ## The bundle
 
@@ -170,7 +172,7 @@ users expect anyway.
 or `PlistBuddy`):
 
 ```xml
-<key>LSMinimumSystemVersion</key><string>12.0</string>
+<key>LSMinimumSystemVersion</key><string>14.4</string>
 <key>NSHighResolutionCapable</key><true/>
 <key>UTExportedTypeDeclarations</key>
 <array><dict>
@@ -215,7 +217,7 @@ jobs:
       - plutil -replace … (version, document types, minimum system)
       - codesign --force --deep --sign - PrologD.app      (ad-hoc; see below)
       - hdiutil create -volname PrologD -srcfolder dist/PrologD.app \
-          -ov -format UDZO dist/PrologD-<version>.dmg
+          -ov -format UDZO dist/PrologD-<version>-arm64.dmg
       - actions/upload-artifact
 ```
 

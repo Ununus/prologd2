@@ -6984,5 +6984,22 @@ of the package».  Отдельно: 25 оконных наборов и `protoc
   Запускается по тегу `v*` или вручную (`workflow_dispatch`).
 * **Проверено локально.**  `tools/macos_plist.py` на тестовом plist; YAML
   разбирается; `ctest` 425/425.
-* **Осталось.**  Первый прогон `package`; сборка оригинального `prologd` на
-  AppleClang; проверка `.dmg` на настоящем Mac и Gatekeeper.
+* **Осталось.**  Проверка `.dmg` на настоящем Mac и Gatekeeper.
+
+### 202. macOS: `.app`/`.dmg` собирается, оба движка внутри
+
+* **Прогон.**  Ручной запуск `macos.yml` `40136493860` от `8d24337`: test job
+  34 с, package job 1 м 17 с, оба зелёные.  Собран
+  `dist/PrologD-2.6.1-arm64.dmg` (43 238 437 байт), artifact
+  `PrologD-2.6.1-arm64`.
+* **Движки.**  `-DBUILD_WITH_PROLOGD=ON` не помешал: AppleClang собрал
+  оригинальный `prologd` (`[17/17] Linking .../src/cli/prologd`, universal
+  `x86_64;arm64`) и наш `prologu` (`[172/174] Linking .../src/cli/prologu`).
+  У оригинального есть только предупреждения `-Winvalid-source-encoding`
+  на CP1251-строках, ошибок нет.  Оба лежат в `PrologD.app/Contents/MacOS`.
+* **Проверки в job.**  `Info.plist` проходит `plutil -lint`, версия
+  `2.6.1`; `test -x` требует оба движка; `otool -L` не должен ссылаться на
+  `build/`; ad-hoc `codesign --verify --deep --strict` зелёный; `prologu -s
+  examples/lessons/lesson_01.pld` внутри бандла отработал.
+* **Осталось.**  Запуск `.dmg` на настоящем Mac: Finder, Gatekeeper,
+  меню, ⌘-сочетания, Retina, «Открыть с помощью» для `.pld`, окно графики.
