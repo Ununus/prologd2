@@ -59,6 +59,7 @@ SYSTEM_DLLS = {
     "mfplat.dll",
     "mfreadwrite.dll",
     "mpr.dll",
+    "mscms.dll",
     "msimg32.dll",
     "mswsock.dll",
     "ncrypt.dll",
