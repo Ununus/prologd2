@@ -389,7 +389,49 @@ def test_the_file_manager_is_called_the_way_its_platform_wants() -> None:
     else:
         assert command[:1] == ["xdg-open"], command
         assert command[1] == str(pathlib.Path(native).parent)
+        with tempfile.TemporaryDirectory(prefix="prologd_reveal_") as folder:
+            assert paths.reveal_command(folder) == ["xdg-open", folder]
     print("ok: the file manager is called the way its platform wants")
+
+
+def test_the_file_manager_does_not_inherit_the_frozen_qt_environment() -> None:
+    """task_118: a frozen window must not hand its bundled Qt to Dolphin.
+
+    PyInstaller puts its own libraries first through `LD_LIBRARY_PATH` (and its
+    plugins through `QT_PLUGIN_PATH`).  A child file manager inherits them and
+    fails to start, so `reveal` builds a copy of the environment without them.
+    """
+    names = paths.BUNDLED_ENVIRONMENT_VARIABLES
+    saved = {name: os.environ.get(name) for name in names}
+    calls: list[tuple[list[str], dict[str, str] | None]] = []
+
+    class FakePopen:
+        def __init__(self, command: list[str], env: dict[str, str] | None = None) -> None:
+            calls.append((command, env))
+
+    saved_popen = paths.subprocess.Popen
+    try:
+        for name in names:
+            os.environ[name] = "/bundle"
+        paths.subprocess.Popen = FakePopen
+        paths.reveal("/tmp/reveal.pld")
+        environment = paths.external_environment()
+        assert all(name not in environment for name in names), environment
+        assert "PATH" in environment, environment
+        with paths.without_bundled_environment():
+            assert all(name not in os.environ for name in names), os.environ
+        assert all(os.environ.get(name) == "/bundle" for name in names), os.environ
+    finally:
+        paths.subprocess.Popen = saved_popen
+        for name, value in saved.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+    assert len(calls) == 1, calls
+    assert calls[0][1] is not None, calls
+    assert all(name not in calls[0][1] for name in names), calls
+    print("ok: the desktop program gets an environment without the bundled paths")
 
 
 def test_the_import_name_is_resolved_the_way_the_interpreter_resolves_it() -> None:
@@ -451,6 +493,7 @@ def main(argv: list[str]) -> int:
     test_a_package_searches_only_what_the_student_added()
     test_the_import_list_is_trimmed_and_deduplicated()
     test_the_file_manager_is_called_the_way_its_platform_wants()
+    test_the_file_manager_does_not_inherit_the_frozen_qt_environment()
     test_the_import_name_is_resolved_the_way_the_interpreter_resolves_it()
     print("all path checks passed")
     return 0

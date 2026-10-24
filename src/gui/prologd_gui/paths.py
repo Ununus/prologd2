@@ -18,6 +18,7 @@ Nothing here imports Qt, so a check of this module needs no display and no PySid
 
 from __future__ import annotations
 
+import contextlib
 import os
 import pathlib
 import subprocess
@@ -25,6 +26,44 @@ import sys
 from collections.abc import Iterable
 
 from . import engines
+
+#: Variables PyInstaller and PySide set for the frozen window.  A desktop program
+#: started with them loads the bundled Qt instead of its own and fails with a
+#: plugin error, so they are removed for anything outside this process.
+BUNDLED_ENVIRONMENT_VARIABLES = (
+    "LD_LIBRARY_PATH",
+    "DYLD_LIBRARY_PATH",
+    "DYLD_FALLBACK_LIBRARY_PATH",
+    "QT_PLUGIN_PATH",
+    "QML2_IMPORT_PATH",
+    "QT_QPA_PLATFORM",
+    "QT_QPA_PLATFORM_PLUGIN_PATH",
+    "PYTHONHOME",
+    "PYTHONPATH",
+)
+
+
+def external_environment() -> dict[str, str]:
+    """The environment a program of the desktop should see, not the frozen one."""
+    environment = dict(os.environ)
+    for name in BUNDLED_ENVIRONMENT_VARIABLES:
+        environment.pop(name, None)
+    return environment
+
+
+@contextlib.contextmanager
+def without_bundled_environment():
+    """Runs a Qt helper that starts another program without the bundled paths."""
+    saved = {name: os.environ.pop(name, None) for name in BUNDLED_ENVIRONMENT_VARIABLES}
+    try:
+        yield
+    finally:
+        for name, value in saved.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+
 
 def reveal_command(path: str) -> list[str]:
     """The command that shows a file where it lives (task_68).
@@ -40,12 +79,15 @@ def reveal_command(path: str) -> list[str]:
         return ["explorer", f"/select,{path}"]
     if sys.platform == "darwin":
         return ["open", "-R", path]
-    return ["xdg-open", str(pathlib.Path(path).parent)]
+    target = pathlib.Path(path)
+    if target.is_dir():
+        return ["xdg-open", str(target)]
+    return ["xdg-open", str(target.parent)]
 
 
 def reveal(path: str) -> None:
     """Shows `path` in the system's file manager."""
-    subprocess.Popen(reveal_command(path))
+    subprocess.Popen(reveal_command(path), env=external_environment())
 
 
 #: The engine of this repository inside a `data_root()`: «Пролог-У» (task_75).

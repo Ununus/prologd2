@@ -7016,3 +7016,39 @@ of the package».  Отдельно: 25 оконных наборов и `protoc
   возврата, в раскладке проекта и описании CI упомянут macOS.
 * Верх README прогнан через GitHub Markdown API: картинка и нумерованный
   список отрисовываются.
+
+### 204. Общий release.yml и сухой прогон
+
+* **Workflow.**  Один `.github/workflows/release.yml` по тегу `v*` (и вручную)
+  собирает `.deb`, Windows portable zip + installer и macOS `.dmg`; финальный
+  job складывает их в **черновик** релиза.  Ручной запуск без тега собирает
+  только артефакты.  Упаковочная macOS-джоба переехала сюда, `macos.yml` снова
+  только тесты.
+* **Сухой прогон.**  `40141282850` от `9086fb2`: Linux, Windows и macOS
+  зелёные, `Draft release` пропущен (тега нет).  Собраны
+  `prologd_2.6.1_amd64.deb`, `prologd-2.6.1-win64.zip`,
+  `prologd-2.6.1-setup.exe` и `PrologD-2.6.1-arm64.dmg`.
+* **Что чинил прогон.**  URL Typst нужен с тегом `v0.15.1`; `mscms.dll` -
+  системная библиотека Windows; Inno Setup 6 не понимает `--define`, общий для
+  6 и 7 синтаксис - `-DAppVersion=...`; `ctest -j` запускает каждый TEST_CASE
+  отдельным процессом, поэтому `TempDir` в тестах модулей теперь содержит
+  случайное число и время.
+* **Осталось.**  Поставить тег `v2.6.1`, проверить черновик и нажать Publish.
+
+### 205. Linux: «Показать в проводнике» и окружение PyInstaller
+
+* **Сообщение владельца.**  Установленное окно на Linux показывает
+  `Could not read file file:///home/ununus/.config/PrologD/gui.` после
+  «Показать в проводнике».  В запуске из исходников ошибки нет.
+* **Причина.**  PyInstaller выставляет `LD_LIBRARY_PATH` (и Qt-переменные) на
+  `_internal`; `subprocess` передаёт их `xdg-open`, а Dolphin/KIO загружает
+  bundled Qt вместо системной и падает.  Воспроизведено: с таким
+  `LD_LIBRARY_PATH` `xdg-open` не находит платформенный плагин.
+* **Исправление.**  `paths.external_environment()` и
+  `paths.without_bundled_environment()` убирают `LD_LIBRARY_PATH`,
+  `DYLD_*`, `QT_*`, `QML2_IMPORT_PATH`, `PYTHONHOME/PYTHONPATH` для внешних
+  программ.  `reveal` запускает файловый менеджер с чистым окружением;
+  `QDesktopServices` для ini и PDF обёрнут тем же контекстом.  На Linux папка
+  теперь открывается напрямую, а не через `parent`.
+* **Проверки.**  `test_paths.py` (включая новый тест окружения),
+  `test_settingsdialog.py`, `test_window.py` - зелёные.

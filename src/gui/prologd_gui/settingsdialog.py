@@ -959,7 +959,8 @@ class SettingsDialog(QDialog):
     def _open_settings_file(self) -> None:
         """Hands the ini to the desktop: it is a text file, and it is the last
         word on everything this dialog shows."""
-        QDesktopServices.openUrl(QUrl.fromLocalFile(str(self._settings.path)))
+        with paths.without_bundled_environment():
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(self._settings.path)))
         self._message(f"файл настроек: {self._settings.path}")
 
     def _reveal_settings_file(self) -> None:

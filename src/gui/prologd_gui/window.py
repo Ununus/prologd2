@@ -1696,7 +1696,8 @@ class MainWindow(QMainWindow):
         """
         pdf = paths.document(name)
         if pdf.is_file():
-            QDesktopServices.openUrl(QUrl.fromLocalFile(str(pdf)))
+            with paths.without_bundled_environment():
+                QDesktopServices.openUrl(QUrl.fromLocalFile(str(pdf)))
             return
         if paths.frozen():
             QMessageBox.information(
