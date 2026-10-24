@@ -186,10 +186,12 @@ ACTIONS: tuple[Action, ...] = (
     Action("save_as", "Сохранить как…", "file-save-as", ("Ctrl+Shift+S",)),
     Action("save_all", "Сохранить все", "file-save-all"),
     Action("reload", "Перечитать с диска", "file-reload", ("Ctrl+Shift+R",)),
-    # The `ИМПОРТ` directive under the caret, opened in a tab: the one navigation
-    # command the editor has, and the reason the engine's search order lives in
-    # `paths.resolve_import` — the window must open what the run would load.
-    Action("open_import", "Открыть файл ИМПОРТ", "file-open", ("F12",)),
+    # The one navigation command the editor has, and the reason the engine's search
+    # order lives in `paths.resolve_import` — the window must open what the run would
+    # load.  On an `ИМПОРТ` line it opens the file the directive names (task_69); on
+    # any other name it goes to the first clause of that name, in this file or in an
+    # import (task_103).  One key for one question: «где это».
+    Action("open_import", "Перейти к определению", "file-open", ("F12",)),
     # The output pane as a file: a log of the run, written as plain text.
     Action("save_output", "Сохранить вывод…", "file-save-as"),
     Action("close", "Закрыть вкладку", "file-close", ("Ctrl+W",)),

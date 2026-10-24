@@ -1369,3 +1369,36 @@ wiring every buffer into the popup.  A name that cannot be found is not reported
 the interpreter says so when the program runs.
 
 **Status.** Accepted 2026-10-23 (task_102).
+
+## ADR-041: the popup reads the comment the author wrote, and F12 reads the clause
+
+**Context.**  A library documents its predicates the way a Prolog file always has —
+with `%` lines right above the clause (`stdlib/iso.pld` does it for every name) —
+and both the popup and the keyboard were blind to that text: the label under the
+popup knew only `doc/builtins.json`, and `F12` knew only the `ИМПОРТ` directive
+(task_69).  The user has to open the file to see either.
+
+**Decision.**  Two small readers, both line-based like the completion scan, because
+the text may be mid-edit and not parse at all.
+
+- **The comment**: `collect_names` returns it with the name — the `%` block written
+  *directly above* the first clause head, joined into one paragraph.  The block
+  ends at a blank line, which is what keeps a file's header off its first
+  predicate.  `Candidate.summary` carries it and the label under the popup shows,
+  in order: the imported file, the comment, the built-in record.
+- **The definition**: `definitions.py` finds the first clause head of a name by the
+  shape every program has — the name is the line's first token, the next one opens
+  its arguments, ends the sentence or starts the body.  `F12` asks it for the name
+  under the caret, first in the buffer and then in the files its imports bring in
+  (the popup's own list), and moves the caret or opens the tab.
+
+**Consequences.**  The popup now says something about a user's own predicate, and
+the answer comes from the file rather than from a documentation table that would
+have to be kept in step — a library can document itself.  `F12` gained a second
+duty on the same key and lost its narrow title («Перейти к определению» covers
+both, and the entry is offered wherever there is a name, with the search done on
+the key press).  The scan is deliberately line-based: a name mentioned in a comment
+is not a definition, a goal is not a head, and an operator-style head is not
+recognised — the price of working in a buffer that does not parse.
+
+**Status.** Accepted 2026-10-23 (task_103).

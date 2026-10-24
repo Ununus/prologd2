@@ -3554,7 +3554,9 @@ def test_an_imported_file_reaches_the_popup(executable: str, files: pathlib.Path
     offers the library's predicate and says which file it came from.
     """
     library = files / "библиотека.pld"
-    library.write_text("член_списка(X, [X|_]).\n", encoding="utf-8")
+    library.write_text(
+        "% Принадлежность элемента списку\nчлен_списка(X, [X|_]).\n", encoding="utf-8"
+    )
     window = empty_window(executable)
     try:
         window._settings.import_paths = [str(files)]
@@ -3574,11 +3576,93 @@ def test_an_imported_file_reaches_the_popup(executable: str, files: pathlib.Path
             view._update_detail()
             detail = view.completion_detail()
             assert detail.startswith("импорт: библиотека.pld"), detail
+            # And the comment above the clause is read from the file into the label
+            # (task_103): the note a library keeps for its predicates.
+            assert "Принадлежность элемента списку" in detail, detail
         finally:
             view._hide_completion()
     finally:
         discard_changes(window)
-    print("ok: the popup offers what an imported file defines, and names the file")
+    print("ok: the popup offers what an imported file defines, with its comment and file")
+
+
+def test_f12_goes_to_the_first_clause_of_a_name(
+    executable: str, directory: pathlib.Path
+) -> None:
+    """`F12` on a name opens where it starts — here or in an import (task_103).
+
+    The caret goes to the first clause head: the buffer in front of the user is
+    searched first, then the files its `ИМПОРТ` lines bring in — the same list the
+    popup reads.  On an `ИМПОРТ` line the directive still wins (task_69), and a name
+    that is nowhere says so instead of moving the caret at random.
+    """
+    from PySide6.QtGui import QTextCursor
+
+    library = directory / "библиотека.pld"
+    library.write_text("член(1, [1]).\nчлен(X, [_|Хвост]) :- член(X, Хвост).\n",
+                       encoding="utf-8", newline="\n")
+    window = empty_window(executable)
+    try:
+        program = directory / "программа.pld"
+        program.write_text(
+            ':- ИМПОРТ("библиотека.pld").\n'
+            "цель :- член(2, [1, 2]), правило(1).\n"
+            "\n"
+            "% Правило ниже определено в этом же файле\n"
+            "правило(X) :- ВЫВОД(X).\n"
+            "?нетакого(1).\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+        assert window.open_path(str(program))
+        program_buffer = window.current_buffer()
+        view = window.active_pane().current_view()
+        action = window._actions["open_import"]
+
+        def caret_on(line_number: int, needle: str) -> None:
+            """Puts the caret inside the first `needle` of that line."""
+            text = view.document().findBlockByNumber(line_number).text()
+            cursor = view.textCursor()
+            cursor.setPosition(
+                view.document().findBlockByNumber(line_number).position() + text.index(needle) + 1
+            )
+            view.setTextCursor(cursor)
+            window._update_details()
+
+        # A name of this file: the caret goes to its head, not to the call.
+        caret_on(1, "правило")
+        assert action.isEnabled(), "the caret is on a name"
+        action.trigger()
+        assert view.textCursor().blockNumber() == 4, view.textCursor().blockNumber()
+        assert "этом файле" in window.status_text(), window.status_text()
+
+        # A name the library defines: the library opens, and the caret lands on the
+        # first clause there.
+        caret_on(1, "член")
+        action.trigger()
+        opened = window.current_buffer()
+        assert opened is not None and opened.model.path == str(library), opened
+        assert opened.views()[0].textCursor().blockNumber() == 0, (
+            opened.views()[0].textCursor().blockNumber()
+        )
+        assert "библиотека.pld" in window.status_text(), window.status_text()
+
+        # Back to the program for the last two cases.
+        window.active_pane().set_current(program_buffer)
+        window._update_details()
+
+        # A built-in has no clause: the status points at the reference instead.
+        caret_on(4, "ВЫВОД")
+        action.trigger()
+        assert "встроенный" in window.status_text(), window.status_text()
+
+        # And a name nothing defines says so rather than moving the caret.
+        caret_on(5, "нетакого")
+        action.trigger()
+        assert "не найдено" in window.status_text(), window.status_text()
+    finally:
+        discard_changes(window)
+    print("ok: F12 goes to the first clause, in this file or in an import")
 
 
 def test_running_programs_without_questions_finishes(executable: str) -> None:
@@ -5150,6 +5234,7 @@ def main(argv: list[str]) -> int:
         test_the_mode_control_stands_beside_the_command_it_changes(executable)
         test_the_reserved_names_are_there_before_the_first_run(executable)
         test_an_imported_file_reaches_the_popup(executable, files)
+        test_f12_goes_to_the_first_clause_of_a_name(executable, files)
         test_running_programs_without_questions_finishes(executable)
         test_f1_shows_the_record_of_the_word_under_the_caret(executable)
         test_the_cheat_sheet_lists_the_insert_table(executable)

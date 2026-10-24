@@ -40,6 +40,10 @@ _SOURCE_RANK = {BUILTIN: 0, USER: 1, IMPORTED: 2}
 
 _QUOTES = "'\""
 
+#: How much of a predicate's comment the popup's label shows (task_103): enough
+#: for a sentence or two, not a wall of text over the code.
+SUMMARY_LIMIT = 400
+
 
 @dataclass(frozen=True)
 class Candidate:
@@ -58,6 +62,9 @@ class Candidate:
     variadic: bool = False
     #: The file an imported name comes from, for the popup's label (task_102).
     origin: str | None = None
+    #: The comment written above the name's first clause, for the same label
+    #: (task_103) — the note a library keeps for its predicates.
+    summary: str | None = None
 
     @property
     def label(self) -> str:
@@ -130,16 +137,45 @@ def _count_arguments(line_tokens: list[tokens.Token], start: int) -> int | None:
     return None
 
 
+def comment_above(lines: list[str], index: int) -> str:
+    """The `%` block written directly above line `index`, as one paragraph.
+
+    Only the lines that touch the clause count, so the header of a file (separated
+    from the first predicate by a blank line, as `stdlib/iso.pld` has it) is not
+    glued to it.  A comment *after* the clause on the same line is not read: the
+    label is about the name, and a trailing `%` may say anything at all.
+    """
+    collected: list[str] = []
+    number = index - 1
+    while number >= 0:
+        stripped = lines[number].strip()
+        if not stripped.startswith("%"):
+            break
+        collected.append(stripped[1:].strip())
+        number -= 1
+    collected.reverse()
+    joined = " ".join(part for part in collected if part)
+    if len(joined) > SUMMARY_LIMIT:
+        return joined[: SUMMARY_LIMIT - 1].rstrip() + "…"
+    return joined
+
+
 def collect_names(text: str, keywords: Keywords | None = None):
     """The document's own names.
 
     Returns `{name: {arity}}` for the names called with parentheses, a set of the
-    bare atoms and a set of the quoted atoms (kept with their quotes).
+    bare atoms, a set of the quoted atoms (kept with their quotes), and the
+    comment written above the first clause of each name (task_103) — the last one
+    only for a line whose *first* token is the name, because that is a clause head
+    and not a goal.  A predicate of no arguments is an atom here (`дождь.`,
+    `мокро :- дождь.`), and its head is recognised the same way.
     """
     calls: dict[str, set[int | None]] = {}
     atoms: set[str] = set()
     quoted: set[str] = set()
-    for line in text.splitlines():
+    summaries: dict[str, str] = {}
+    lines = text.splitlines()
+    for number, line in enumerate(lines):
         line_tokens = tokens.tokenize(line, keywords)
         for index, token in enumerate(line_tokens):
             if token.kind == tokens.ATOM:
@@ -152,9 +188,20 @@ def collect_names(text: str, keywords: Keywords | None = None):
                     )
                 else:
                     atoms.add(token.text)
+                # A head is the first token of its line; what follows it opens its
+                # arguments, ends the sentence or starts its body.
+                if (
+                    index == 0
+                    and token.text not in summaries
+                    and following is not None
+                    and following.text in ("(", ".", ":-")
+                ):
+                    note = comment_above(lines, number)
+                    if note:
+                        summaries[token.text] = note
             elif token.kind == tokens.QUOTED_ATOM:
                 quoted.add(token.text)
-    return calls, atoms, quoted
+    return calls, atoms, quoted, summaries
 
 
 def collect(text: str, keywords: Keywords | None = None, imported=None) -> list[Candidate]:
@@ -183,17 +230,21 @@ def collect(text: str, keywords: Keywords | None = None, imported=None) -> list[
                 # An operator or a directive: the name alone is what is typed.
                 candidates.append(Candidate(keyword.name, None, PREDICATE, BUILTIN))
 
-    calls, atoms, quoted = collect_names(text, keywords)
+    calls, atoms, quoted, summaries = collect_names(text, keywords)
     for name in sorted(calls):
         if name in reserved:
             continue
         # The named arities first, the unknown one (`None`) last.
         for arity in sorted(calls[name], key=lambda value: (value is None, value or 0)):
-            candidates.append(Candidate(name, arity, PREDICATE, USER))
+            candidates.append(
+                Candidate(name, arity, PREDICATE, USER, summary=summaries.get(name))
+            )
     for name in sorted(atoms):
         if name in reserved or name in calls:
             continue
-        candidates.append(Candidate(name, None, ATOM_NAME, USER))
+        candidates.append(
+            Candidate(name, None, ATOM_NAME, USER, summary=summaries.get(name))
+        )
     for name in sorted(quoted):
         candidates.append(Candidate(name, None, ATOM_NAME, USER, quoted=True))
     # What the imported files define.  A name the document itself has is offered
@@ -202,7 +253,7 @@ def collect(text: str, keywords: Keywords | None = None, imported=None) -> list[
     offered = set(calls) | atoms
     for path, source in (imported or {}).items():
         origin = pathlib.PurePath(path).name
-        file_calls, _atoms, _quoted = collect_names(source, keywords)
+        file_calls, _atoms, _quoted, file_notes = collect_names(source, keywords)
         for name in sorted(file_calls):
             if name in reserved or name in offered:
                 continue
@@ -211,7 +262,14 @@ def collect(text: str, keywords: Keywords | None = None, imported=None) -> list[
                 file_calls[name], key=lambda value: (value is None, value or 0)
             ):
                 candidates.append(
-                    Candidate(name, arity, PREDICATE, IMPORTED, origin=origin)
+                    Candidate(
+                        name,
+                        arity,
+                        PREDICATE,
+                        IMPORTED,
+                        origin=origin,
+                        summary=file_notes.get(name),
+                    )
                 )
     return candidates
 

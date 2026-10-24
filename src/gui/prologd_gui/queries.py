@@ -72,7 +72,7 @@ def statement_at(text: str, line: int, keywords: Keywords | None = None) -> str 
 
 def _document_names(text: str, keywords: Keywords | None) -> Names:
     """The bare words the document itself uses — its predicates and atoms."""
-    calls, atoms, _quoted = collect_names(text, keywords)
+    calls, atoms, _quoted, _notes = collect_names(text, keywords)
     return set(calls) | set(atoms)
 
 

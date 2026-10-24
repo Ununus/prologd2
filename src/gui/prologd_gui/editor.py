@@ -948,7 +948,9 @@ class CodeEditor(ZoomablePlainTextEdit):
 
         A name an imported file brings in has no record either, but it does have a
         file (task_102): that line is the whole label, unless the name is also a
-        built-in, where the record comes after it.
+        built-in, where the record comes after it.  A name of the document or of a
+        library says what its first clause says above itself — the comment is read
+        with the name (task_103).
         """
         if self._completer is None or self._detail is None:
             return
@@ -962,6 +964,8 @@ class CodeEditor(ZoomablePlainTextEdit):
         lines: list[str] = []
         if offer is not None and offer.origin:
             lines.append(f"импорт: {offer.origin}")
+        if offer is not None and offer.summary:
+            lines.append(offer.summary)
         if offer is not None and self._reference is not None:
             lines += self._reference.detail_lines(offer.name)
         if not lines:

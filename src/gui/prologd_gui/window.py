@@ -46,6 +46,7 @@ from . import (
     answers,
     appearance,
     assets,
+    definitions,
     documents,
     engines,
     findbar,
@@ -816,7 +817,7 @@ class MainWindow(QMainWindow):
             "dialect_en": lambda: self.convert_dialect("en"),
             "dialect_ru": lambda: self.convert_dialect("ru"),
             "reveal": self._reveal_in_file_manager,
-            "open_import": self._open_import_under_cursor,
+            "open_import": self._go_to,
             "open": self._open_file,
             "save": lambda: self.save_buffer(),
             "save_as": self._save_as,
@@ -1353,15 +1354,20 @@ class MainWindow(QMainWindow):
             )
 
     def _refresh_navigation_actions(self) -> None:
-        """Offers `F12` only where it does something: on the `ИМПОРТ` line of the caret.
+        """Offers `F12` only where it does something: on the `ИМПОРТ` line of the caret,
+        or on a name it can take somewhere (task_69, task_103).
 
         Called from `_update_details`, which every caret move and every tab switch
         reaches (task_69): an enabled state that is recomputed somewhere else is a
-        state that goes stale.
+        state that goes stale.  Only the *cheap* half is asked here — whether there
+        is a name at all; where it is defined is the search of the key press.
         """
         action = getattr(self, "_actions", {}).get("open_import")
-        if action is not None:
-            action.setEnabled(self._import_under_cursor() is not None)
+        if action is None:
+            return
+        action.setEnabled(
+            self._import_under_cursor() is not None or self._name_under_cursor() is not None
+        )
 
     def _stop_picture(self, in_flight: bool) -> None:
         """Puts the picture of the moment on «Остановить» (part 141).
@@ -2718,6 +2724,86 @@ class MainWindow(QMainWindow):
             if start <= cursor.positionInBlock() <= start + len(name):
                 return name
         return names[0][1]
+
+    def _go_to(self) -> None:
+        """`F12`: the file an `ИМПОРТ` line names, or the clause a name starts with.
+
+        The directive comes first — on such a line the import *is* what the name
+        means — and everywhere else the command reads the name under the caret
+        (task_103).  One command because one key: «где это определено» is the same
+        question in both cases.
+        """
+        if self._import_under_cursor() is not None:
+            self._open_import_under_cursor()
+            return
+        self._go_to_definition()
+
+    def _go_to_definition(self) -> None:
+        """Opens the first clause of the name under the caret (task_103).
+
+        The search goes through what the window already knows: the buffer in front
+        of the user, then the files its `ИМПОРТ` lines bring in — the same list the
+        popup reads, so a name can only be found where the program could see it.
+        A name that is nowhere says why: a built-in has no clause of its own (`F1`
+        is the help), anything else is simply not defined yet.
+        """
+        pane = self.active_pane() if self._panes else None
+        view = pane.current_view() if pane is not None else None
+        name = self._name_under_cursor()
+        if view is None or name is None:
+            return
+        found = definitions.first_definition(
+            view.toPlainText(), name, self._session.keywords
+        )
+        if found is not None:
+            self._put_caret(view, *found)
+            self._status.setText(f"{name}: первое предложение в этом файле")
+            return
+        buffer = self._buffer_of_view(view)
+        for path, source in self._imported_texts(buffer).items():
+            found = definitions.first_definition(source, name, self._session.keywords)
+            if found is None:
+                continue
+            if not self.open_path(path):
+                self._append_note(f"F12: не удалось открыть {path}")
+                return
+            target = self.active_pane().current_view()
+            if target is not None:
+                self._put_caret(target, *found)
+            self._status.setText(
+                f"{name}: первое предложение в {pathlib.Path(path).name}"
+            )
+            return
+        if self._session.keywords is not None and self._session.keywords.is_reserved(name):
+            self._status.setText(f"{name}: встроенный предикат — справка по F1")
+            return
+        self._status.setText(f"{name}: определение не найдено")
+
+    def _name_under_cursor(self) -> str | None:
+        """The name the caret touches, or `None` on a bracket, a space or a dot."""
+        pane = self.active_pane() if self._panes else None
+        view = pane.current_view() if pane is not None else None
+        if view is None:
+            return None
+        cursor = view.textCursor()
+        return definitions.name_at(cursor.block().text(), cursor.positionInBlock())
+
+    def _imported_texts(self, buffer: Buffer | None) -> dict[str, str]:
+        """What the buffer's `ИМПОРТ` lines bring in, read the way the popup does."""
+        if buffer is None:
+            return {}
+        names = imports.directive_names(buffer.text(), self._session.keywords)
+        return self._import_lookup_for(buffer)(names)
+
+    def _put_caret(self, view: CodeEditor, line: int, column: int) -> None:
+        """Puts the caret at a line and column of a view and shows that place."""
+        block = view.document().findBlockByNumber(line)
+        if not block.isValid():
+            return
+        cursor = view.textCursor()
+        cursor.setPosition(block.position() + min(column, max(0, block.length() - 1)))
+        view.setTextCursor(cursor)
+        view.centerCursor()
 
     def _open_import_under_cursor(self) -> None:
         """Opens the file the `ИМПОРТ` line under the caret names (task_69).

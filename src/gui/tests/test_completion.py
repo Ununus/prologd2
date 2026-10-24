@@ -69,12 +69,16 @@ def labels(prefix: str, text: str = DOCUMENT, keywords=RESERVED, **kwargs) -> li
 
 # -- the Qt-free model ------------------------------------------------------
 def test_the_document_is_scanned_for_names() -> None:
-    calls, atoms, quoted = completion.collect_names(DOCUMENT, RESERVED)
+    calls, atoms, quoted, notes = completion.collect_names(DOCUMENT, RESERVED)
     assert calls["член"] == {2}, calls
     assert {"дождь", "мокро", "пример"} <= atoms, atoms
     assert quoted == {"'Иван Петров'"}, quoted
     # A reserved name is not a document name, wherever it appears.
     assert "ВЫВОД" not in atoms and "ВЫВОД" not in calls
+    # `член` is documented by the comment above its first clause, and only then:
+    # the first mention of the name is inside that comment, which is not a clause.
+    assert notes["член"] == "член(Элемент, Список) — истина, если Элемент входит в Список", notes
+    assert "дождь" not in notes, "a name without a comment above it gets none"
     print(f"ok: the document gave {len(calls)} called names, {len(atoms)} atoms")
 
 
@@ -202,6 +206,41 @@ def test_an_imported_file_adds_its_predicates() -> None:
     model.update(DOCUMENT)
     assert model.labels("член") == ["член/2", "член_списка/2"], model.labels("член")
     print("ok: an imported file offers its predicates, with the file they came from")
+
+
+def test_a_comment_above_the_first_clause_is_carried_with_the_name() -> None:
+    """The popup says what the file says above the clause (task_103).
+
+    A wrapped comment is joined into one paragraph, a blank line ends the block (a
+    file's header is not a predicate's description), and a comment *after* the
+    clause on its own line — or on the same line — is not read.
+    """
+    text = (
+        "% Шапка файла, она к первому предикату не относится.\n"
+        "\n"
+        "% Принадлежность элемента списку: member(Элемент, Список),\n"
+        "% где Список — правильный список.\n"
+        "member(X, [X|_]).\n"
+        "member(X, [_|Хвост]) :- member(X, Хвост).\n"
+        "\n"
+        "дождь.\n"
+        "% это комментарий после дождя, к следующему предикату\n"
+        "мокро :- дождь.\n"
+    )
+    _calls, _atoms, _quoted, notes = completion.collect_names(text, RESERVED)
+    assert notes["member"] == (
+        "Принадлежность элемента списку: member(Элемент, Список), "
+        "где Список — правильный список."
+    ), notes["member"]
+    assert "дождь" not in notes, notes
+    assert notes["мокро"] == "это комментарий после дождя, к следующему предикату", notes
+    # And the candidate carries it — a predicate of no arguments is an atom in this
+    # scan, and it still says what its file says above it.
+    offers = {offer.name: offer for offer in completion.collect(text, RESERVED)}
+    assert offers["member"].summary == notes["member"], offers["member"]
+    assert offers["мокро"].summary == notes["мокро"], offers["мокро"]
+    assert offers["дождь"].summary is None, offers["дождь"]
+    print("ok: a comment above the first clause travels with the name")
 
 
 def test_the_candidate_list_is_cached_until_the_text_changes() -> None:
@@ -406,6 +445,7 @@ def main() -> int:
     test_completion_is_suppressed_inside_comments_and_strings()
     test_the_word_being_typed_is_read_from_the_caret()
     test_an_imported_file_adds_its_predicates()
+    test_a_comment_above_the_first_clause_is_carried_with_the_name()
     test_the_candidate_list_is_cached_until_the_text_changes()
 
     try:
