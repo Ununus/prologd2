@@ -1,7 +1,10 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include <chrono>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <random>
 #include <sstream>
 #include <string>
 
@@ -17,9 +20,14 @@ namespace {
 class TempDir {
  public:
   TempDir() {
+    static std::mt19937_64 engine{
+        std::random_device{}() ^
+        static_cast<std::uint64_t>(
+            std::chrono::steady_clock::now().time_since_epoch().count())};
     static int counter = 0;
     path_ = fs::temp_directory_path() /
-            ("prologd_import_test_" + std::to_string(++counter));
+            ("prologd_import_test_" + std::to_string(engine()) + "_" +
+             std::to_string(++counter));
     fs::create_directories(path_);
   }
   ~TempDir() {
