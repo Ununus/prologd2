@@ -89,8 +89,90 @@ def resource(name: str) -> pathlib.Path:
 
 
 def settings_path() -> pathlib.Path | None:
-    """The settings file of a package, or `None` to let Qt pick the usual place."""
-    return data_root() / SETTINGS_NAME if frozen() else None
+    """Where a *frozen* build keeps `gui.ini`; `None` lets Qt use AppData.
+
+    task_61 made every packaged build keep its settings beside itself, which is what
+    makes the folder portable.  An **installed** build (task_116, Inno Setup) must
+    not: `%LOCALAPPDATA%\\Programs` is writable, so «can I write here?» cannot be the
+    question, and a per-user settings file belongs in AppData where Qt puts it.  The
+    folder a build runs from is the whole answer, in this order:
+
+    * a folder that already holds a `gui.ini` keeps it — a portable copy the user
+      has been running, whose settings must not move on an upgrade;
+    * a build under `%LOCALAPPDATA%\\Programs`, `%ProgramFiles%` or
+      `%ProgramFiles(x86)%` is an installed one, and answers AppData;
+    * anything else — a flash drive, a network folder, or the installed folder
+      copied somewhere else — is portable: beside itself.  That last case is what
+      makes «скопировал установленную папку на флешку — она повела себя как
+      переносимая» need no marker file and no switch.
+
+    A folder it cannot write to at all (a CD, a share opened read-only) falls back to
+    AppData as well: a `gui.ini` that fails at every close is worse than one away
+    from the folder.
+    """
+    if not frozen():
+        return None
+    root = data_root()
+    beside = root / SETTINGS_NAME
+    if beside.is_file():
+        return beside
+    if any(inside(root, folder) for folder in install_roots()):
+        return None
+    return beside if writable(root) else None
+
+
+def install_roots() -> list[pathlib.Path]:
+    """The folders an *installed* copy can live in, empty ones left out.
+
+    Read from the environment every time rather than once at import: a check that
+    fakes an install puts these in place itself, and nothing here is worth a cache.
+    """
+    roots: list[pathlib.Path] = []
+    local = os.environ.get("LOCALAPPDATA")
+    if local:
+        # `Programs` and not the whole of `%LOCALAPPDATA%`: a portable copy unzipped
+        # into `%LOCALAPPDATA%\\Temp` is still a portable copy.
+        roots.append(pathlib.Path(local) / "Programs")
+    for name in ("ProgramFiles", "ProgramFiles(x86)"):
+        value = os.environ.get(name)
+        if value:
+            roots.append(pathlib.Path(value))
+    return roots
+
+
+def inside(path: pathlib.Path | str, folder: pathlib.Path | str) -> bool:
+    """Whether `path` is `folder` or lies under it, compared the Windows way.
+
+    Letters are folded the way Windows folds them, because `%LOCALAPPDATA%` may
+    arrive spelled either way and the folder below it is not the one to blame.
+    """
+    try:
+        path, folder = pathlib.Path(path).resolve(), pathlib.Path(folder).resolve()
+    except OSError:  # pragma: no cover - a path the system refuses to resolve
+        return False
+    one, other = os.path.normcase(str(path)), os.path.normcase(str(folder))
+    return one == other or one.startswith(other + os.sep)
+
+
+def writable(directory: pathlib.Path | str) -> bool:
+    """Whether a file can be written there.
+
+    A probe file and not `os.access`: on Windows that answers from the read-only
+    attribute of the *folder*, not from its permissions, so a shared folder that
+    refuses writes would pass and every close would then fail to remember the
+    session.  The file is removed at once; a process killed mid-probe leaves one
+    empty file behind, which is a smaller price than a wrong answer.
+    """
+    probe = pathlib.Path(directory) / f".prologd-write-test-{os.getpid()}"
+    try:
+        probe.write_bytes(b"")
+    except OSError:
+        return False
+    try:
+        probe.unlink()
+    except OSError:  # pragma: no cover - writing worked, removing may still not
+        pass
+    return True
 
 
 def interpreter(file_name: str = EXECUTABLE_NAME) -> str:

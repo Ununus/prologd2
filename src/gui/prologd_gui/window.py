@@ -148,6 +148,7 @@ class MainWindow(QMainWindow):
         executable: str,
         includes: list[str] | None = None,
         settings: Settings | None = None,
+        path: str | None = None,
     ):
         super().__init__()
         self.setWindowTitle("PrologD")
@@ -367,6 +368,16 @@ class MainWindow(QMainWindow):
         # the welcome program is for a window with no session to show.
         if self._settings.restore_tabs:
             self._restore_session()
+        if path:
+            # A file named on the command line is the document the window opens
+            # *on* (task_116): the shell passes one when a `.pld` is
+            # double-clicked, and that is the whole point of the association.
+            # Opened after the session, so a start with tabs restored gains one
+            # more instead of losing them; a file that is already among them
+            # comes to the front, because `open_path` looks for an open copy
+            # first.  A file that is not there leaves the note `open_path`
+            # writes and falls through to the welcome program below.
+            self.open_path(path)
         if not self._buffers:
             # The welcome program goes into the first tab and is *not* unsaved work
             # — the flag is left clear, so closing it asks nothing.  Which text it
@@ -1644,22 +1655,23 @@ class MainWindow(QMainWindow):
         """What «О программе» says.  Separate from the box so a test can read it
         without a modal window it cannot close.
 
-        The title names the shell, not the interpreter: the window is one of the
-        front-ends of Пролог-Д, and which interpreter answers is the line below it
-        (`ready`'s version, so it is the live one).  The names are the people who
-        wrote the previous implementation — «АБВГД» is their five initials — and
-        they are printed as they were given; the `--` column is padded with spaces,
-        which is as straight as a proportional font allows (task_58).
+        The first line names the system and what it is for; the shell and the
+        interpreter that answers are the two lines below it (`ready`'s version, so
+        it is the live one).  The credits are the people who wrote the previous
+        implementation — «АБВГД» is their five initials — with their roles, and a
+        role is followed by a tab so the column stays straight in a proportional
+        font (task_58; the wording is the owner's, 2026-10-24).
         """
         return (
-            "Графическая оболочка Пролог-Д 2.0\n"
-            f"Интерпретатор: {self._version or 'ещё не ответил'}\n\n"
-            "Эту реализацию Пролога-Д разработали АБВГД:\n"
-            "Алексеев Михаил Николаевич   – прораб,\n"
-            "Балдин Виктор Михайлович     – топкодер до 2008,\n"
-            "Воронин Алексей Вячеславович – топкодер с 2017,\n"
-            "Григорьев Сергей Георгиевич  – идеолог,\n"
-            "Данил Адисонович Ахмеров     – топкодер с 2023."
+            "Пролог-Д -\tучебная система\n\tлогического программирования\n"
+            f"Интерпретатор: {self._version or 'ещё не ответил'}\n"
+            "Графическая оболочка 2.0 (PySide6)\n\n"
+            "Над реализацией Пролога-Д трудились:\n"
+            "идеолог\tГригорьев Сергей Георгиевич,\n"
+            "прораб\tАлексеев Михаил Николаевич,\n"
+            "кодер\tБалдин Виктор Михайлович,\n"
+            "кодер\tВоронин Алексей Вячеславович,\n"
+            "кодер\tАхмеров Данил Адисонович."
         )
 
     def _about(self) -> None:

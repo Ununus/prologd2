@@ -63,6 +63,7 @@ def packaged(directory: pathlib.Path):
 
 def make_package(directory: pathlib.Path, *, with_executable: bool = True) -> pathlib.Path:
     """A package folder holding the four things the window looks for."""
+    directory.mkdir(parents=True, exist_ok=True)
     if with_executable:
         (directory / paths.EXECUTABLE_NAME).write_bytes(b"MZ")
     (directory / "examples" / "lib").mkdir(parents=True, exist_ok=True)
@@ -103,6 +104,85 @@ def test_a_package_finds_everything_beside_itself() -> None:
             assert paths.example_library() == package / "examples" / "lib"
             assert paths.resource("assets") == package / "_internal" / "assets"
     print("ok: a package finds its interpreter, settings, documents and icons beside itself")
+
+
+def test_an_installed_copy_keeps_its_settings_in_appdata() -> None:
+    """task_116: installed means AppData, and a copy taken elsewhere is portable.
+
+    Inno Setup puts a per-user install in `%LOCALAPPDATA%\\Programs\\PrologD`, and
+    that folder is writable — so "can I write here?" cannot be the question.  The
+    folder is: under a programs folder means an installed copy and AppData, anywhere
+    else means portable and `gui.ini` beside the window.  That is what makes a copy
+    of the installed folder on a flash drive behave as a portable one without a
+    marker file to look for.
+    """
+    names = ("LOCALAPPDATA", "ProgramFiles", "ProgramFiles(x86)")
+    saved = {name: os.environ.get(name) for name in names}
+    with tempfile.TemporaryDirectory(prefix="prologd_install_") as name:
+        base = pathlib.Path(name)
+        local = base / "LocalAppData"
+        installed = make_package(local / "Programs" / "PrologD")
+        os.environ["LOCALAPPDATA"] = str(local)
+        for other in names[1:]:
+            os.environ.pop(other, None)
+        try:
+            with packaged(installed):
+                assert paths.settings_path() is None, (
+                    "an installed copy keeps its settings in AppData"
+                )
+            # The same folder copied to a flash drive: no install location above
+            # it any more, so it is a portable copy and asks for the file again.
+            copied = make_package(base / "флешка" / "PrologD")
+            with packaged(copied):
+                assert paths.settings_path() == copied / "gui.ini", paths.settings_path()
+            # `%ProgramFiles%` is an install location as well, when a machine-wide
+            # install ever comes back.
+            machine = make_package(base / "Program Files" / "PrologD")
+            os.environ["ProgramFiles"] = str(base / "Program Files")
+            with packaged(machine):
+                assert paths.settings_path() is None, "Program Files is an install location"
+        finally:
+            for other, value in saved.items():
+                if value is None:
+                    os.environ.pop(other, None)
+                else:
+                    os.environ[other] = value
+    print("ok: an installed copy answers AppData, and a copy taken elsewhere is portable")
+
+
+def test_a_settings_file_that_is_already_there_is_kept() -> None:
+    """The file decides before the folder does: an upgrade must not move settings.
+
+    A `gui.ini` beside the window is a portable copy the user has been running, and
+    even inside an install location that file is the one to keep — the alternative
+    is a window that silently starts over in AppData on top of a settings file the
+    user can see.
+    """
+    saved = os.environ.get("LOCALAPPDATA")
+    with tempfile.TemporaryDirectory(prefix="prologd_install_") as name:
+        base = pathlib.Path(name)
+        package = make_package(base / "LocalAppData" / "Programs" / "PrologD")
+        (package / "gui.ini").write_text("[files]\n", encoding="utf-8")
+        os.environ["LOCALAPPDATA"] = str(base / "LocalAppData")
+        try:
+            with packaged(package):
+                assert paths.settings_path() == package / "gui.ini", paths.settings_path()
+        finally:
+            if saved is None:
+                os.environ.pop("LOCALAPPDATA", None)
+            else:
+                os.environ["LOCALAPPDATA"] = saved
+    print("ok: a gui.ini that is already beside the window is the one it keeps")
+
+
+def test_a_folder_that_cannot_be_written_falls_back_to_appdata() -> None:
+    """A CD or a read-only share: a `gui.ini` there would fail at every close."""
+    with tempfile.TemporaryDirectory(prefix="prologd_readonly_") as name:
+        missing = pathlib.Path(name) / "нет-такой-папки"
+        with packaged(missing):
+            assert paths.data_root() == missing
+            assert paths.settings_path() is None, "no folder to write to means AppData"
+    print("ok: a package in a folder it cannot write to falls back to AppData")
 
 
 def test_a_package_without_the_interpreter_names_the_expected_place() -> None:
@@ -289,6 +369,9 @@ def main(argv: list[str]) -> int:
     test_a_checkout_reads_its_own_tree()
     test_a_package_finds_everything_beside_itself()
     test_a_package_without_the_interpreter_names_the_expected_place()
+    test_an_installed_copy_keeps_its_settings_in_appdata()
+    test_a_settings_file_that_is_already_there_is_kept()
+    test_a_folder_that_cannot_be_written_falls_back_to_appdata()
     test_the_icons_come_from_the_same_answer()
     test_the_reference_reads_the_same_document()
     test_a_package_searches_only_what_the_student_added()

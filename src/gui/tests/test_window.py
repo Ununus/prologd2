@@ -982,23 +982,36 @@ def test_the_recent_menu_and_the_window_carry_the_pictures(
 
         assert window.windowIcon().isNull() is False, "the window has no application icon"
         text = window.about_text()
-        # task_58: the shell is named, the interpreter answers below it, and the
-        # people who wrote the previous implementation are listed.
-        assert text.startswith("Графическая оболочка Пролог-Д 2.0"), ascii(text)
+        # task_58: the box names the system, the shell and the interpreter that
+        # answers, and lists the people who wrote the previous implementation with
+        # their roles.  The owner rewrote the wording on 2026-10-24: a role is
+        # followed by a *tab*, which keeps the column straight where a run of
+        # spaces does not (a proportional font is what broke the earlier version).
+        assert text.startswith("Пролог-Д"), ascii(text)
+        assert "учебная система" in text, ascii(text)
+        assert "Графическая оболочка 2.0 (PySide6)" in text, ascii(text)
         assert "Интерпретатор: " in text, ascii(text)
+        credits = [
+            (role, name.rstrip(",."))
+            for role, name in (
+                line.split("\t")
+                for line in text.splitlines()
+                if "\t" in line and line.split("\t")[0] in ("идеолог", "прораб", "кодер")
+            )
+        ]
+        assert len(credits) == 5, credits
+        for role, name in credits:
+            assert name, credits
+            assert role in ("идеолог", "прораб", "кодер"), credits
+        listed = [name for _, name in credits]
         for name in (
+            "Григорьев Сергей Георгиевич",
             "Алексеев Михаил Николаевич",
             "Балдин Виктор Михайлович",
             "Воронин Алексей Вячеславович",
-            "Григорьев Сергей Георгиевич",
-            "Данил Адисонович Ахмеров",
+            "Ахмеров Данил Адисонович",
         ):
-            assert name in text, ascii(text)
-        # «прораб», «топкодер» и «идеолог» стоят в одном столбце: у каждой строки
-        # списка `--` на одном и том же месте (выравнивание пробелами — решение
-        # пользователя).
-        columns = {line.index("–") for line in text.splitlines() if "–" in line}
-        assert len(columns) == 1, columns
+            assert name in listed, (name, credits)
         assert "Панелей редактора" not in text and "Настройки:" not in text, ascii(text)
         print("ok: the recent menu and the window carry their pictures")
     finally:
@@ -3891,6 +3904,46 @@ def test_running_programs_without_questions_finishes(executable: str) -> None:
     print("ok: a program without questions finishes instead of hanging in «выполняется»")
 
 
+def test_a_file_named_on_the_command_line_opens(executable: str) -> None:
+    """task_116: a `.pld` handed to the window is the document it opens *on*.
+
+    The shell passes the path when a `.pld` is double-clicked, which is what the
+    installer's association is for.  The file must be the window's only document:
+    the welcome program is for a window with no session *and* no file to show, so
+    it must not stand beside the file as a second tab.  A file that has gone in the
+    meantime leaves the window as it always opens — welcome program and a note in
+    the pane — because a start must not come up empty.
+    """
+    from prologd_gui.settings import Settings
+    from prologd_gui.window import MainWindow
+
+    directory = tempfile.TemporaryDirectory(prefix="prologd_gui_start_")
+    _SETTINGS_DIRECTORIES.append(directory)
+    settings = Settings(pathlib.Path(directory.name) / "gui.ini")
+    program = pathlib.Path(directory.name) / "первый.pld"
+    program.write_text("снег.\n", encoding="utf-8")
+
+    window = MainWindow(executable, [], settings, path=str(program))
+    try:
+        assert window.tab_count() == 1, [b.model.name for b in window.buffers()]
+        assert window.current_buffer().model.path == str(program), window.current_buffer().model
+        assert window.editor().toPlainText() == "снег.\n"
+        assert "открыт" in window.status_text(), window.status_text()
+    finally:
+        window.stop_program()
+
+    gone = pathlib.Path(directory.name) / "нет-такого.pld"
+    window = MainWindow(executable, [], settings, path=str(gone))
+    try:
+        assert window.tab_count() == 1, "a start with no file must not come up empty"
+        # The window's own words go to «Система», not to «Вывод» (task_50).
+        assert "не могу открыть" in window.system_text(), ascii(window.system_text())
+        assert window.current_buffer().model.path is None, "the welcome program"
+    finally:
+        window.stop_program()
+    print("ok: a file named on the command line is the document the window opens on")
+
+
 def test_the_tabs_come_back_on_the_next_start(
     executable: str, directory: pathlib.Path
 ) -> None:
@@ -5700,6 +5753,7 @@ def main(argv: list[str]) -> int:
         test_the_process_directory_is_where_files_go(executable, files)
         test_autosave_writes_named_buffers_and_skips_the_rest(executable, files)
         test_saving_before_a_run_writes_the_file(executable, files)
+        test_a_file_named_on_the_command_line_opens(executable)
         test_the_tabs_come_back_on_the_next_start(executable, files)
         test_an_unnamed_tab_left_unsaved_is_forgotten(executable, files)
         test_the_window_close_asks_only_about_files(executable, files)

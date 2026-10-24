@@ -8,20 +8,18 @@
     -> zip.
 
     What the package is: `prologd-gui.exe` with its `_internal` folder beside
-    `prologu.exe`, the three Visual C++ DLLs our C++ needs, `doc` (six PDFs, their
-    `.typ` sources and `builtins.json`), `examples` (lessons, tasks, `lib`),
-    `stdlib` (the standard library, which the interpreter searches beside itself) and the
-    memo `tools\portable-readme.txt`, copied under its Russian name (`$memoName`
-    below, spelled in code points because of the ANSI reading).  The window finds the
-    interpreter next to itself and keeps its settings (`gui.ini`) there too, so the
-    folder can be copied anywhere.  `-Engine d` collects a different package — the
-    original's own examples, its manual and no standard library of ours; what each
-    kind carries is the `$kinds` table below.
+    `prologu.exe`, the three Visual C++ DLLs our C++ needs, `doc` (six PDFs and
+    `builtins.json` — the sources of the manuals stay in the repository), `examples`
+    (lessons, tasks, `lib`) and `stdlib` (the standard library, which the interpreter
+    searches beside itself).  The window finds the interpreter next to itself and
+    keeps its settings (`gui.ini`) there too, so the folder can be copied anywhere.
+    `-Engine d` collects a different package — the original's own examples, its manual
+    and no standard library of ours; what each kind carries is the `$kinds` table
+    below.
 
     Every message in this file is ASCII on purpose: PowerShell 5.1 reads a script
     without a byte-order mark as ANSI, so Cyrillic text written here would reach the
-    console as mojibake.  The one Cyrillic *name* the package needs is spelled out
-    in code points below, for the same reason.
+    console as mojibake.
 
     Checks that cannot be made here (a machine without Visual Studio, clicks in the
     window) are listed in `ai/task_61_portable_windows_build.md` section 7.
@@ -133,10 +131,6 @@ $trimmedFiles = @(
     '_internal\PySide6\plugins\generic\qtuiotouchplugin.dll'
 )
 
-#: CHITAY_MENYA.txt - spelled in code points below, see the header comment.
-$memoName = (-join (0x0427, 0x0418, 0x0422, 0x0410, 0x0419, 0x005F,
-                    0x041C, 0x0415, 0x041D, 0x042F | ForEach-Object { [char]$_ })) + '.txt'
-
 # Everything that differs between the three kinds of package, in one table (part 150),
 # so the steps below read their answers instead of asking `-Engine` in a dozen
 # branches.  The branches that remain are the ones whose *work* differs: our banner
@@ -146,7 +140,7 @@ $memoName = (-join (0x0427, 0x0418, 0x0422, 0x0410, 0x0419, 0x005F,
 # and `Programs` is the arguments of the programs the packaged interpreter must run
 # from the package's own folder.
 $oursNeeded = @(
-    'prologu.exe', 'doc\builtins.json', 'doc\prologd2.png', 'doc\csu.png',
+    'prologu.exe', 'doc\builtins.json',
     'examples\lib\library.pld', 'examples\lessons\lesson_01.pld',
     'examples\problems\knapsack.pld', 'examples\sorting.pld',
     'stdlib\lists.pld', 'stdlib\sets.pld', 'stdlib\iso.pld'
@@ -170,21 +164,21 @@ $kinds = @{
         Ours = $true; Legacy = $true
         Examples = 'examples'; ExamplesDrop = @('lessons\_old')
         StandardLibrary = $true; Documents = 'ours'
-        Memo = 'tools\portable-readme.txt'; Program = 'prologu.exe'
+        Program = 'prologu.exe'
         Needed = $oursNeeded + @('prologd.exe'); Programs = $oursPrograms
     }
     u = @{
         Ours = $true; Legacy = $false
         Examples = 'examples'; ExamplesDrop = @('lessons\_old')
         StandardLibrary = $true; Documents = 'ours'
-        Memo = 'tools\portable-readme.txt'; Program = 'prologu.exe'
+        Program = 'prologu.exe'
         Needed = $oursNeeded; Programs = $oursPrograms
     }
     d = @{
         Ours = $false; Legacy = $true
         Examples = 'examples\prologd'; ExamplesDrop = @('README.md')
         StandardLibrary = $false; Documents = 'engine'
-        Memo = 'tools\portable-readme-prologd.txt'; Program = 'prologd.exe'
+        Program = 'prologd.exe'
         Needed = $originalNeeded; Programs = $originalPrograms
     }
 }
@@ -213,17 +207,15 @@ function Format-Size([long]$Bytes) {
 function Copy-OurDocuments([string]$Target) {
     # By name, never "every .pdf": a stale PDF of a target that no longer exists has
     # slipped into a build before (task_61, section 6).
+    #
+    # PDFs only (task_116): the `.typ` sources, `style.typ` and the two logos they
+    # draw are sources of the manuals, and a reader cannot open them.  The logos and
+    # `style.typ` were here for one reason — so the shipped sources could be compiled
+    # from the package — and that reason went with them.
     foreach ($name in $documentNames) {
         Copy-Item "doc\$name.pdf" $Target -Force
-        Copy-Item "doc\$name.typ" $Target -Force
     }
-    Copy-Item 'doc\style.typ' $Target -Force
     Copy-Item 'doc\builtins.json' $Target -Force
-    # The two logos the documents put on their first page: without them the shipped
-    # `.typ` sources cannot be compiled from the package.
-    foreach ($image in 'prologd2.png', 'csu.png') {
-        Copy-Item (Join-Path 'doc' $image) $Target -Force
-    }
 }
 
 function Copy-EngineDocuments([string]$Target, [string]$EngineSource) {
@@ -241,9 +233,9 @@ function Copy-EngineDocuments([string]$Target, [string]$EngineSource) {
     & typst compile (Join-Path $engineDoc 'help.typ') (Join-Path $Target 'help.pdf')
     Assert-Exit 'typst on the help.typ of the original'
     Copy-Item (Join-Path $engineDoc 'builtins.json') $Target -Force
-    foreach ($name in 'gui.pdf', 'gui.typ', 'style.typ') {
-        Copy-Item (Join-Path 'doc' $name) $Target -Force
-    }
+    # The window's own manual as a PDF and nothing else: its `.typ` source and
+    # `style.typ` stayed behind with the rest of the sources (task_116).
+    Copy-Item 'doc\gui.pdf' $Target -Force
     Write-Host 'documents  : help.pdf (the original) and gui.pdf, with builtins.json'
 }
 
@@ -342,7 +334,7 @@ try {
     }
     if (-not (Test-Path 'doc\style.typ')) { Fail 'doc\style.typ is missing (the other documents import it)' }
     if (-not (Test-Path 'doc\builtins.json')) { Fail 'doc\builtins.json is missing (F1 and the completion summaries read it)' }
-    Write-Host "documents  : $($documentNames.Count) PDFs, their sources, style.typ, builtins.json"
+    Write-Host "documents  : $($documentNames.Count) PDFs and builtins.json"
 
     Write-Step '5/8 Freeze the window (PyInstaller, --onedir)'
     $guiDist = Join-Path $dist 'prologd-gui'
@@ -454,8 +446,6 @@ try {
         Copy-EngineDocuments $docTarget $engineSource
     }
 
-    Copy-Item $kind.Memo (Join-Path $package $memoName) -Force
-
     if (-not $NoTrim) {
         $freed = 0
         foreach ($relative in $trimmedFiles) {
@@ -478,8 +468,7 @@ try {
     $needed = @('prologd-gui.exe',
                 'msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll',
                 '_internal\base_library.zip',
-                'doc\help.pdf',
-                $memoName) + $kind.Needed
+                'doc\help.pdf') + $kind.Needed
     foreach ($wanted in $needed) {
         if (-not (Test-Path (Join-Path $package $wanted))) { Fail "the package is missing $wanted" }
     }

@@ -41,6 +41,14 @@ loader at another directory (the default is `src/gui/assets` in a checkout, the 
 inside its own folder in a package).  The status bar names the engine a run will
 start, and the file as well when the build folder was named by hand.
 
+A **file** may be named on the command line (task_116): `main.py lesson_1.pld`.  It
+is what the shell passes when a `.pld` is double-clicked in an install that took
+the file association, and the window opens **on** that file — the welcome program is
+not shown beside it.  The file is opened after the session is restored, so a start
+with remembered tabs gets one more tab rather than losing them, and a file that is
+already among them comes to the front instead of opening twice.  A path that is no
+longer there leaves the window as it always opens and says so in «Система».
+
 A **packaged** build (task_61) finds all of that beside itself — `prologu.exe` next
 to the window, the icons inside its folder, `doc/` and `examples/` next to the
 executable — and the settings file as well (`gui.ini`, below).  It adds **nothing** to
@@ -77,9 +85,14 @@ a theme — the widgets dark and the light syntax colours on top of them.
 `--settings FILE` chooses the settings file; by default it is
 `%LOCALAPPDATA%\PrologD\gui\gui.ini`, holding the font family and size, line
 numbers, the indent character and width, completion and its threshold, and the
-theme.  A **packaged** build keeps that file beside its own executable instead
-(`gui.ini`), so the folder stays portable — the place is decided by
-`prologd_gui.paths` (task_61).  A value that cannot be
+theme.  A **packaged** build decides by the folder it runs from
+(`prologd_gui.paths`, task_61 and task_116): a `gui.ini` that is already beside the
+window is kept; a build under `%LOCALAPPDATA%\Programs` or `%ProgramFiles%` is an
+**installed** one and uses AppData; anything else — a flash drive, a network folder,
+the installed folder copied somewhere else — is **portable** and keeps the file
+beside itself, so the folder stays self-contained.  A folder that cannot be written
+to (a CD, a read-only share) falls back to AppData instead of failing at every
+close.  A value that cannot be
 read falls back to the default instead of refusing to start, and keys this
 version does not know are left alone (task_29 adds the dialog).
 
@@ -987,7 +1000,7 @@ a key this version does not know travels with the rest); **Экспорт…** a
 first and writes the whole configuration, unknown keys included, so one ini file
 can be handed out to a class.
 * Values live in `%LOCALAPPDATA%\PrologD\gui\gui.ini` (or `--settings FILE`; a
-packaged build reads `gui.ini` beside the window instead), and
+portable copy reads `gui.ini` beside the window instead), and
 a value that cannot be read falls back to its default instead of taking the
 window down.
 * **The choosers open somewhere sensible** (task_80).  «Импорт…» and «Экспорт…» are

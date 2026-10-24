@@ -1,4 +1,4 @@
-"""Entry point: `python src/gui/main.py [--exe PATH] [--include DIR]`.
+"""Entry point: `python src/gui/main.py [--exe PATH] [--include DIR] [FILE]`.
 
 Where the engines, the icons, the documents and the settings file live is
 decided by `prologd_gui.paths`: a checkout keeps the layout it always had, a
@@ -75,8 +75,39 @@ def report_missing_interpreter(
     return 1
 
 
+class WindowParser(argparse.ArgumentParser):
+    """Says what is wrong in a box rather than exiting into nothing (task_116).
+
+    A packaged window is started by a double-click and has no console: `argparse`'s
+    own `error` prints to stderr and exits with code 2, which is exactly what a
+    broken file association looked like on 2026-10-24 — the right icon, no window,
+    no message.  A checkout keeps the plain behaviour: it is started from a terminal
+    and its stderr is read by a person.
+    """
+
+    def error(self, message: str) -> None:  # noqa: D401 - argparse's own name
+        if not paths.frozen():
+            super().error(message)
+            return
+        QApplication(sys.argv[:1])  # a box needs an application object first
+        QMessageBox.critical(
+            None,
+            "Пролог-Д 2.0",
+            f"Не понимаю аргументы командной строки:\n{message}",
+        )
+        raise SystemExit(2)
+
+
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="PrologD graphical front-end")
+    parser = WindowParser(description="PrologD graphical front-end")
+    parser.add_argument(
+        "file",
+        nargs="?",
+        default=None,
+        metavar="FILE",
+        help="a program to open in the window; the shell passes one when a .pld file "
+             "is double-clicked (task_116)",
+    )
     parser.add_argument(
         "--exe",
         default=None,
@@ -140,7 +171,12 @@ def main(argv: list[str] | None = None) -> int:
     if arguments.theme:
         # An explicit choice sticks for the next start.
         preferences.theme = arguments.theme
-    window = MainWindow(launch, arguments.include, preferences)
+    # The shell hands over an absolute path, one typed into a terminal need not
+    # be; the tab, the recent list and the session all want the file named one
+    # way (task_116).  A path that is not there still becomes absolute — the
+    # note the window writes reads better with a full name.
+    start = str(pathlib.Path(arguments.file).resolve()) if arguments.file else None
+    window = MainWindow(launch, arguments.include, preferences, path=start)
     window.show()
     return application.exec()
 
