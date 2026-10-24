@@ -5,7 +5,7 @@
 ; примеры, — плюс, если попросят, связь файлов .pld с окном.
 ;
 ; Собирается из tools\build_installer.ps1, который передаёт версию:
-;   ISCC.exe --define=AppVersion=2.6.1 installer\prologd.iss
+;   ISCC.exe -DAppVersion=2.6.1 installer\prologd.iss
 ; Версия ниже — только значение по умолчанию для ручного запуска.
 ;
 ; Файл сохранён в UTF-8 **с BOM**: без BOM Inno Setup читает .iss как ANSI и

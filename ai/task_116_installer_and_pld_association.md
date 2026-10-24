@@ -115,7 +115,7 @@ page with its folded corner is legible.
 
 `installer/prologd.iss` (UTF-8 **with BOM** — without one Inno reads it as ANSI and the
 Cyrillic turns to rubbish; LF) plus `tools/build_installer.ps1`, which calls
-`build_portable.ps1 -Engine <engine>` and then `ISCC.exe --define=AppVersion=<version>
+`build_portable.ps1 -Engine <engine>` and then `ISCC.exe -DAppVersion=<version>
 installer\prologd.iss`.
 
 What the script says, and why:
@@ -134,10 +134,10 @@ What the script says, and why:
   file says the settings live beside the exe, which is true of the portable copy and
   not of an installed one.  `pld.ico` is installed beside the window for the registry
   entry only.
-* the version is read from the **package folder name** and passed with `--define=`:
+* the version is read from the **package folder name** and passed with `-D`:
   one rule for both engines (the original one has no `--version` at all) and no way
-  for the file name and the payload to disagree.  ISCC 7 takes `--define=name=value`;
-  the `/Dname=value` of Inno 6 is gone.
+  for the file name and the payload to disagree.  `-Dname=value` is accepted by both
+  Inno 6 and 7; `--define=name=value` is 7-only.
 
 ISCC 7.1.0 compiles it in 11 s to 28.4 MiB; the version resource of the result says
 `Пролог-Д 2.0`, `2.6.0`.

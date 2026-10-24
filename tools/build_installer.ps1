@@ -129,7 +129,7 @@ if (-not (Test-Path $script)) { Fail "no installer script at $script" }
 $out = Join-Path $env:TEMP "prologd-iscc-out.txt"
 $err = Join-Path $env:TEMP "prologd-iscc-err.txt"
 $process = Start-Process -FilePath $compiler `
-    -ArgumentList "--define=AppVersion=$version", $script `
+    -ArgumentList "-DAppVersion=$version", $script `
     -NoNewWindow -Wait -PassThru `
     -RedirectStandardOutput $out -RedirectStandardError $err
 if (-not $process -or $process.ExitCode -ne 0) {
