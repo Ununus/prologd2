@@ -553,7 +553,6 @@ constexpr std::pair<std::string_view, std::string_view> kEnglishNames[] = {
     {"ДОБ", "assert"},          {"УДАЛЕНИЕ", "retract"},
     {"ТОЧКА", "point"},         {"ЛИНИЯ", "line"},
     {"ОКРУЖНОСТЬ", "circle"},   {"ЗАКРАСКА", "fill"},
-    {"ИМЕНА", "variables"},
 };
 
 /// English spelling of `name`, empty when it has none (already English, or

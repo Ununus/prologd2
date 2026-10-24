@@ -23,7 +23,7 @@ bool isAnsweredOutsideTheTable(std::string_view name) {
 }
 
 /// The Russian names that have no English spelling, each for a reason of its own
-/// (task_83, task_84):
+/// (task_83, task_84, task_107):
 ///
 /// * `ИЛИ/2` is the word of the original dialect, kept so that programs written
 ///   for it load.  The English way to say the same thing is `first`, the alias of
@@ -31,8 +31,11 @@ bool isAnsweredOutsideTheTable(std::string_view name) {
 /// * `КОПИЯ/4` lost `substring` because the ISO predicate for the same work is
 ///   `sub_string/5` — positions from zero, three counts — so that English name is
 ///   a predicate of its own rather than an alias.
+/// * `ИМЕНА/1` lost `variables`: it is a marker the loader reads from a file's
+///   first line, and the reader knows one word only, so the English spelling could
+///   never do the marker's work — only fail as a call.
 bool hasNoEnglishSpelling(std::string_view name) {
-  return name == "ИЛИ" || name == "КОПИЯ";
+  return name == "ИЛИ" || name == "КОПИЯ" || name == "ИМЕНА";
 }
 
 std::string_view englishOf(std::string_view russian) {
@@ -118,6 +121,20 @@ TEST_CASE("the copy predicate answers to no English name, sub_string is its own"
   REQUIRE(prologd::findBuiltin("sub_string", 5) != nullptr);
   REQUIRE(prologd::builtinArities("sub_string").arities == std::vector<std::size_t>{5});
   REQUIRE(prologd::findBuiltin("sub_string", 4) == nullptr);
+}
+
+TEST_CASE("the names marker answers to no English name") {
+  // task_107: `variables` was the marker's English spelling, and it is gone —
+  // `readVariableMarker` reads `ИМЕНА` and nothing else, so the second spelling
+  // could never set a mode; it could only be a call that fails.
+  REQUIRE(englishOf("ИМЕНА").empty());
+  REQUIRE(prologd::findBuiltin("variables", 1) == nullptr);
+  REQUIRE(prologd::findBuiltin("ИМЕНА", 1) != nullptr);
+  REQUIRE(prologd::builtinArities("ИМЕНА").arities == std::vector<std::size_t>{1});
+  REQUIRE_FALSE(prologd::builtinArities("ИМЕНА").variadic);
+  // Retired, not forgotten: the word stays reserved so a call to it is an error
+  // with an explanation instead of an unknown name.
+  REQUIRE(prologd::isReservedBuiltinName("variables"));
 }
 
 TEST_CASE("the English surface works from a program") {

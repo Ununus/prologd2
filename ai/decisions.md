@@ -1456,3 +1456,62 @@ built: a template inserts no newline and no trailing text — the line belongs t
 user.
 
 **Status.** Accepted 2026-10-24 (task_105).
+
+## ADR-044: the template carries its caret, and the marker carries its line
+
+**Context.**  task_105 gave `ИМПОРТ` a skeleton and left the rest of the family
+alone: `ХОЛСТ` still arrived as a bare name (accepting it wrote `ХОЛСТ` where the
+language wants `:- ХОЛСТ(Высота, Ширина).`), and `ИМЕНА` — the names marker —
+arrived as the call `ИМЕНА/1`, which is exactly the form that *fails*: the builtin
+raises «режим имён задаётся первой строкой файла».  The owner asked for both,
+written as the statements they are.
+
+**Decision.**  The table is `STATEMENT_TEMPLATES`, keyed by name, and it is
+consulted *before* the arities — a name in it has no call form to offer at all.
+An entry is a `Statement(template, first_line)` whose template carries a `|` where
+the caret goes (`':- ХОЛСТ(|, ).'`): the mark says both things at once, needs no
+arithmetic, and survives a quote or a comma standing before it.  `ИМЕНА` is marked
+`first_line`, and the editor drops it unless the caret is on the file's first line
+(`completion.at_file_start`) — the rule the loader itself follows, since
+`readVariableMarker` reads line one and only line one.
+
+**Consequences.**  On the first line `ИМ` offers the marker *and* the import, with
+`:- ИМЕНА().` first because the alphabet says so — which is also what a first line
+is for; below it only `:- ИМПОРТ("").` is offered, so the task_105 flow is
+unchanged.  `ХОЛ` meets the comma, so the height is typed where it belongs.  The
+English spellings `import`/`canvas` have templates of their own, but `variables`
+deliberately has none: the marker reader knows the Russian spelling only, and
+`:- variables(0).` was checked on the engine — it answers with the very error above
+(exit 3) while `:- ИМЕНА(0).` loads.  The alias is therefore still offered as a
+call, which is a wart of the alias table rather than of this table (removed in
+ADR-045, task_107).
+
+**Status.** Accepted 2026-10-24 (task_106).
+
+## ADR-045: the names marker has one spelling, because the loader knows one
+
+**Context.**  `variables` was registered as the English spelling of `ИМЕНА` by the
+same `add` that registers every alias, but the marker is not a normal builtin: the
+mode of a file is read by `readVariableMarker` *before* lexing, and that reader
+matches the word `ИМЕНА` only.  So `:- variables(0).` on a first line did not set
+anything — it fell through to the directive and the builtin raised «режим имён
+задаётся первой строкой файла» (checked on the engine: exit 3, while the Russian
+line loads).  A name that can only fail is worse than no name: it is offered by
+completion and by `--list-keywords`, and the reference panel documents it.
+
+**Decision.**  Remove the alias (`kEnglishNames` in `builtins.cpp`) and the word's
+reservation as a keyword (`kReservedBuiltins` in `lexer.cpp`), and keep it as a
+*retired* spelling (`kRetiredBuiltinNames`, message in `checks.cpp`): a call to it
+is then an error that says what to write, exactly as `substring` does since
+task_84.  Retired is not reserved: `--list-keywords`, the popup and the reference
+panel no longer know the word, so the mistake cannot be made by choosing it from a
+list.
+
+**Consequences.**  `ИМЕНА/1` is the only spelling of the marker, and the reference
+record, the English-names appendix and the `--dialect` paragraph all name it that
+way (the appendix skips records with no alias, and says why).  `test_aliases.cpp`
+counts `ИМЕНА` among the names with no English spelling, and
+`test_diagnostics.cpp` pins the message.  `ctest` is 423 tests, the reference check
+covers 128 reserved names.
+
+**Status.** Accepted 2026-10-24 (task_107).

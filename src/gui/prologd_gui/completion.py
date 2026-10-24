@@ -44,13 +44,43 @@ _QUOTES = "'\""
 #: for a sentence or two, not a wall of text over the code.
 SUMMARY_LIMIT = 400
 
-#: The directives a program writes as a statement of its own, with the text they
-#: are typed as and where the caret goes (task_105).  `ИМПОРТ` is the one whose
-#: argument is a file name, so its skeleton opens the quotes and leaves the caret
-#: inside them — the string then completes to a file (task_104).
-DIRECTIVE_TEMPLATES = {
-    "ИМПОРТ": (':- ИМПОРТ("").', 11),
-    "import": (':- import("").', 11),
+
+@dataclass(frozen=True)
+class Statement:
+    """How a name that is written as a statement of its own is typed (task_105)."""
+
+    #: The whole text the typed name is replaced with.
+    text: str
+    #: Where the caret goes, as an offset into `text`.
+    caret: int
+    #: True when the statement works on a file's first line only (task_106).
+    first_line: bool = False
+
+
+def _statement(template: str, first_line: bool = False) -> Statement:
+    """Reads a template written with `|` where the caret goes.
+
+    `':- ИМПОРТ("|").'` says both things at once — the text and the caret — and
+    needs no arithmetic when the caret is not right after the `(`.  No statement
+    has a `|` in it, so the mark cannot be mistaken for the language.
+    """
+    return Statement(template.replace("|", ""), template.index("|"), first_line)
+
+
+#: The names a program writes as a statement of its own — the directives `ИМПОРТ`
+#: (task_105) and `ХОЛСТ` (task_106), and the names marker `ИМЕНА`, which is a
+#: *call* only as an error: the loader reads it from the file's first line, and a
+#: mode cannot be changed afterwards.
+#:
+#: The caret ends up where the next keystroke belongs: inside `ИМПОРТ`'s quotes,
+#: from where the string completes to a file (task_104), before `ХОЛСТ`'s comma,
+#: and inside `ИМЕНА`'s parentheses.
+STATEMENT_TEMPLATES = {
+    "ИМЕНА": _statement(":- ИМЕНА(|).", first_line=True),
+    "ИМПОРТ": _statement(':- ИМПОРТ("|").'),
+    "import": _statement(':- import("|").'),
+    "ХОЛСТ": _statement(":- ХОЛСТ(|, )."),
+    "canvas": _statement(":- canvas(|, )."),
 }
 
 
@@ -82,6 +112,8 @@ class Candidate:
     #: True for a directive: a statement of its own, so it is offered only where a
     #: statement can start, never inside a body.
     directive: bool = False
+    #: True when that statement is a file's first line only (task_106).
+    first_line: bool = False
 
     @property
     def label(self) -> str:
@@ -245,27 +277,28 @@ def collect(text: str, keywords: Keywords | None = None, imported=None) -> list[
                     Candidate(keyword.name, None, PREDICATE, BUILTIN, variadic=True)
                 )
                 continue
+            template = STATEMENT_TEMPLATES.get(keyword.name)
+            if template is not None:
+                # A statement of its own, offered as the whole line: the bare name
+                # (`ИМПОРТ`) does not parse, and `ИМЕНА` has no call form at all —
+                # calling it is an error.  `ИМПОРТ`'s caret lands between the
+                # quotes, where the string completes to a file name (task_104).
+                candidates.append(
+                    Candidate(
+                        keyword.name,
+                        None,
+                        PREDICATE,
+                        BUILTIN,
+                        display=template.text,
+                        skeleton=(template.text, template.caret),
+                        directive=True,
+                        first_line=template.first_line,
+                    )
+                )
+                continue
             for arity in sorted(keyword.arities):
                 candidates.append(Candidate(keyword.name, arity, PREDICATE, BUILTIN))
             if not keyword.arities:
-                template = DIRECTIVE_TEMPLATES.get(keyword.name)
-                if template is not None:
-                    # A directive is a statement of its own, so it is offered as
-                    # one: `:- ИМПОРТ("").` with the caret inside the quotes, and
-                    # the string that follows completes to a file name (task_104).
-                    text, caret = template
-                    candidates.append(
-                        Candidate(
-                            keyword.name,
-                            None,
-                            PREDICATE,
-                            BUILTIN,
-                            display=text,
-                            skeleton=(text, caret),
-                            directive=True,
-                        )
-                    )
-                    continue
                 # An operator: the name alone is what is typed.
                 candidates.append(Candidate(keyword.name, None, PREDICATE, BUILTIN))
 
@@ -399,6 +432,18 @@ def at_statement_start(text: str, position: int, prefix: str = "") -> bool:
     if prefix and before.endswith(prefix):
         before = before[: len(before) - len(prefix)]
     return before.strip() == ""
+
+
+def at_file_start(text: str, position: int, prefix: str = "") -> bool:
+    """True when the statement would be the file's first line (task_106).
+
+    What the names marker needs: `:- ИМЕНА(1).` is read from the first line of a
+    file only, so the same line written lower would say nothing and a call to the
+    name is an error.
+    """
+    if text.rfind("\n", 0, position) != -1:
+        return False
+    return at_statement_start(text, position, prefix)
 
 
 def word_before(text: str, position: int) -> str:

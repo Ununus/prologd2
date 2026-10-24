@@ -11,9 +11,10 @@ namespace {
 const std::unordered_set<std::string> kReservedBuiltins = {
     // The marker that sets how names are read (task_67).  Reserved in every mode,
     // or the loader could not recognise it: a capitalised name is a variable in
-    // mode 0 and a string constant in modes 1 and 2.
+    // mode 0 and a string constant in modes 1 and 2.  It has no English spelling
+    // (task_107): `readVariableMarker` knows this one word, so a second spelling
+    // could only ever be a call to something that errors.
     "ИМЕНА",
-    "variables",
     // Control / logic, with the English spelling of each name (task_39).
     // `ИЛИ` is the one name here without an English twin: it is the word of the
     // original dialect, kept for the programs written for it, and its English
@@ -80,6 +81,10 @@ const std::unordered_set<std::string> kRetiredBuiltinNames = {
     // ISO name of anything: the ISO predicate is `sub_string/5`, with positions
     // from zero, so a call to `substring/4` reaches the checks and is told so.
     "substring",
+    // The English spelling the names marker answered to (task_107).  It never was
+    // a marker — `readVariableMarker` reads `ИМЕНА` — so a file that started with
+    // `:- variables(0).` kept the mode of the run and then failed on the call.
+    "variables",
 };
 
 /// Operator spellings borrowed from other Prologs that this dialect does not

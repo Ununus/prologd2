@@ -168,6 +168,11 @@ constexpr RetiredName kRetiredNames[] = {
     {"substring", 4,
      "«substring» снято: «КОПИЯ(Стр, Ц1, Ц2, Стр4)» считает позиции с 1, а "
      "форма ISO — «sub_string(Стр, До, Длина, После, Подстрока)» с позиций с 0"},
+    // The names marker's English spelling (task_107).  `readVariableMarker` never
+    // knew it, so `:- variables(0).` on a file's first line kept the mode of the
+    // run and the directive then failed here.
+    {"variables", 1,
+     "«variables» снято: маркер имён пишется по-русски — «:- ИМЕНА(0|1|2).»"},
 };
 
 const char* retiredNameMessage(std::string_view name, std::size_t arity) {

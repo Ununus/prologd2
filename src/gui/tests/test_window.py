@@ -3719,20 +3719,27 @@ def test_the_directive_is_inserted_as_a_whole_statement(executable: str) -> None
     A directive is a statement, not a goal: the popup offers the text that has to
     be written, with the caret between the quotes — where the file name goes, and
     where the string's own completion takes over (task_104).  Inside a body it is
-    not offered at all: a directive there is a syntax error.
+    not offered at all: a directive there is a syntax error.  `ХОЛСТ` and the names
+    marker come whole too (task_106), and the marker — being a file's first line —
+    only there.
     """
     from PySide6.QtGui import QTextCursor
 
-    window = empty_window(executable)
-    try:
-        view = window.editor()
-        view.setPlainText("ИМ")
+    def complete_from(text: str) -> list[str]:
+        view.setPlainText(text)
         cursor = view.textCursor()
         cursor.movePosition(QTextCursor.MoveOperation.End)
         view.setTextCursor(cursor)
         view._maybe_complete(force=True)
+        return view.completion_labels()
+
+    window = empty_window(executable)
+    try:
+        view = window.editor()
+        labels = complete_from("ИМ")
         try:
-            labels = view.completion_labels()
+            # The first line is where the names marker belongs, so it is there too.
+            assert any(label.startswith(":- ИМЕНА(") for label in labels), labels
             row = next(
                 (index for index, label in enumerate(labels) if label.startswith(":- ИМПОРТ(")),
                 None,
@@ -3747,14 +3754,29 @@ def test_the_directive_is_inserted_as_a_whole_statement(executable: str) -> None
         finally:
             view._hide_completion()
 
+        # `ХОЛСТ` names the height and the width, so the statement arrives with its
+        # comma and the caret before it.
+        labels = complete_from("ХОЛ")
+        assert labels and labels[0] == ":- ХОЛСТ(, ).", labels
+        try:
+            assert view._accept_completion() is True
+            assert view.toPlainText() == ":- ХОЛСТ(, ).", ascii(view.toPlainText())
+            assert view.textCursor().position() == len(":- ХОЛСТ("), (
+                view.textCursor().position()
+            )
+        finally:
+            view._hide_completion()
+
+        # The names marker says how a file is read, and only its first line says
+        # anything: below that the marker is gone, while the directive stays.
+        labels = complete_from("цель.\nИМ")
+        assert not any(label.startswith(":- ИМЕНА") for label in labels), labels
+        assert any(label.startswith(":- ИМПОРТ(") for label in labels), labels
+        view._hide_completion()
+
         # The same word inside a body: ordinary names are still offered, but the
         # directive itself is not — a statement cannot start here.
-        view.setPlainText("цель :- ИМ")
-        cursor = view.textCursor()
-        cursor.movePosition(QTextCursor.MoveOperation.End)
-        view.setTextCursor(cursor)
-        view._maybe_complete(force=True)
-        labels = view.completion_labels()
+        labels = complete_from("цель :- ИМ")
         assert not any(label.startswith(":- ") for label in labels), labels
     finally:
         discard_changes(window)

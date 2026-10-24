@@ -314,6 +314,17 @@ TEST_CASE("a retired name says what to write instead") {
   REQUIRE(gone.front().isParseError);
   REQUIRE(gone.front().message.find("«substring» снято") == 0);
   REQUIRE(gone.front().message.find("sub_string") != std::string::npos);
+
+  // The names marker lost its English spelling in task_107: `readVariableMarker`
+  // reads `ИМЕНА` and nothing else, so `:- variables(0).` never set a mode — the
+  // line was executed and the call failed.  The message has to name the marker,
+  // because that is the whole of the name's meaning.
+  const std::vector<PrologError> marker = diagnosticsOf("?variables(0).\n");
+  REQUIRE(marker.size() == 1);
+  REQUIRE(marker.front().code == ErrorCode::UnknownPredicate);
+  REQUIRE(marker.front().severity == Severity::Error);
+  REQUIRE(marker.front().message.find("«variables» снято") == 0);
+  REQUIRE(marker.front().message.find(":- ИМЕНА(0|1|2).") != std::string::npos);
 }
 
 TEST_CASE("the original dialect's or-word loads, and its two arguments are goals") {
