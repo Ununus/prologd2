@@ -1607,3 +1607,25 @@ executable, the package does).  The manual does not quote the program any more: 
 describes the features the text demonstrates, and a copy in two places would drift.
 
 **Status.** Accepted 2026-10-24 (task_112).
+
+## ADR-049: `СЛУЧ` maps the engine output itself, not through a distribution
+
+**Context.**  `std::mt19937_64` is specified bit for bit: the same seed produces
+the same raw stream in every standard library.  `std::uniform_int_distribution`
+is not specified: MSVC takes the low half of a draw, libstdc++ 15 takes the high
+half (Lemire's method), so a seeded program printed `-286924074` on Windows and
+`1095884669` on Linux.  The arithmetic test pinned the Windows number, and the
+portability audit (task_19) asked for a sequence that does not depend on the
+platform.
+
+**Decision.**  `builtins_arith.cpp` turns engine output into a range with its own
+rejection-based mapping (`randomOffset` / `randomInRange`): drop draws below
+`2^64 mod bound`, then take `value % bound`.  Both forms of `СЛУЧ` use it.
+
+**Consequences.**  A seeded `СЛУЧ` now draws the same numbers on every platform
+and every standard library.  For `СЛУЧ(X)` the mapping happens to reproduce the
+value the MSVC distribution produced, so the pinned test expectation did not
+change; a future change to the mapping is a behaviour change and must update that
+test.
+
+**Status.** Accepted 2026-10-24.

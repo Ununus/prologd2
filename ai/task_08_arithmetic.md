@@ -50,8 +50,10 @@ Implement `#expr#` evaluation and the numeric built-ins with PrologD semantics.
   `convert_to<FloatType>()`.
 * `SQRT` on integers: original computes `sqrt(double)` and compares; `zap1`
   cases use `l1*l1` (inverse is exact squaring). Reproduce exactly.
-* `СЛУЧ/1` with a bound integer seeds the RNG; with a variable binds a random
-  64-bit value clipped to the documented 32-bit range.
+* `СЛУЧ/1` with a bound integer seeds `std::mt19937_64`; with a variable binds a
+  number from -2147483648 to 2147483647.  Both `СЛУЧ/1` and `СЛУЧ/3` map the
+  engine output to their range themselves (ADR-049), not through
+  `std::uniform_int_distribution`, so a seeded run is the same on every platform.
 
 ## Tests
 

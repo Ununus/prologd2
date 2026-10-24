@@ -74,9 +74,12 @@ Make the project build and pass tests on Windows (MSVC) as well as Linux.
 - [ ] Still open: the integration test for a UTF-8 file name with Cyrillic
       content as a *CLI* test (the library-level test in `test_module_loader.cpp`
       covers the loader), and the cross-platform golden test for number
-      formatting/sorting/RNG sequences.
+      formatting/sorting (the RNG part is done, see below).
 - [ ] Still open: confirm that the CI Windows image provides VS 2026.
 - [x] UTF-8 file name integration test (`import works with UTF-8 file names`).
+- [x] RNG sequences: `СЛУЧ` maps `std::mt19937_64` output with its own
+      rejection-based mapping (ADR-049), so `test_builtins_arith.cpp`, which
+      pins seed 42 to `-286924074`, holds on every platform.
 - [x] `-Werror` preset builds and tests cleanly on Linux.
 - [x] Cross-compiled the library, the CLI and the test binary for
       `x86_64-windows-gnu` with Zig: `libprlib.a`, `prologd.exe` and

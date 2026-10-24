@@ -337,7 +337,10 @@ TEST_CASE("is_whole, is_number and the truncating conversion take what they are 
 
 TEST_CASE("the random built-in seeds, draws, and refuses what it cannot do") {
   // `СЛУЧ(N)` seeds — and the seed is what makes the next draw deterministic,
-  // which is the only reason this test can look at a random number at all.
+  // which is the only reason this test can look at a random number at all.  The
+  // engine is `std::mt19937_64` and the mapping from its output to a range is
+  // ours, not `std::uniform_int_distribution`'s (that one differs between the
+  // standard libraries), so the number below is the same on every platform.
   const auto result = runProgram(
       "?СЛУЧ(42).\n"
       "?СЛУЧ(X).\n"

@@ -28,6 +28,29 @@ std::mt19937_64& randomEngine() {
   return engine;
 }
 
+// `std::uniform_int_distribution` is not specified bit for bit: MSVC takes the
+// low half of an engine draw while libstdc++ takes the high one, so the same
+// seed would give different numbers on Windows and Linux. The engine itself is
+// specified, so the mapping is written out here and stays the same everywhere.
+std::uint64_t randomOffset(std::uint64_t bound) {
+  const std::uint64_t threshold = (std::uint64_t{0} - bound) % bound;
+  std::uint64_t value = 0;
+  do {
+    value = randomEngine()();
+  } while (value < threshold);
+  return value % bound;
+}
+
+std::int64_t randomInRange(std::int64_t low, std::int64_t high) {
+  // `high - low` in unsigned arithmetic: the whole `int64_t` span is allowed.
+  const std::uint64_t span =
+      static_cast<std::uint64_t>(high) - static_cast<std::uint64_t>(low);
+  const std::uint64_t offset = span == std::numeric_limits<std::uint64_t>::max()
+                                   ? randomEngine()()
+                                   : randomOffset(span + 1);
+  return static_cast<std::int64_t>(static_cast<std::uint64_t>(low) + offset);
+}
+
 bool isExpressionWrapper(const Term& term) {
   return term.kind == TermKind::Compound && term.compound != nullptr &&
          term.compound->name == kExpressionFunctor && term.compound->args.size() == 1;
@@ -547,11 +570,10 @@ BuiltinResult builtinRandom(Engine& engine, std::span<const Term> args) {
       return BuiltinResult::Continue;
     }
     if (!value && isUnbound(engine, args[0])) {
-      std::uniform_int_distribution<std::int32_t> distribution(
-          std::numeric_limits<std::int32_t>::min(), std::numeric_limits<std::int32_t>::max());
-      return unifyInteger(engine, args[0], BigInt(distribution(randomEngine())))
-                 ? BuiltinResult::Continue
-                 : BuiltinResult::Fail;
+      const std::int64_t drawn = randomInRange(std::numeric_limits<std::int32_t>::min(),
+                                               std::numeric_limits<std::int32_t>::max());
+      return unifyInteger(engine, args[0], BigInt(drawn)) ? BuiltinResult::Continue
+                                                          : BuiltinResult::Fail;
     }
     badArguments(engine, args, "СЛУЧ", ArgKind::Integer);
   }
@@ -563,8 +585,7 @@ BuiltinResult builtinRandom(Engine& engine, std::span<const Term> args) {
   if (*low > *high) {
     engine.raise(ErrorCode::TypeMismatch, "СЛУЧ: АРГ2 > АРГ3");
   }
-  std::uniform_int_distribution<long long> distribution(low->toInt64(), high->toInt64());
-  return unifyInteger(engine, args[0], BigInt(distribution(randomEngine())))
+  return unifyInteger(engine, args[0], BigInt(randomInRange(low->toInt64(), high->toInt64())))
              ? BuiltinResult::Continue
              : BuiltinResult::Fail;
 }
