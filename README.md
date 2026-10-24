@@ -1,9 +1,25 @@
 # prologd2
 
-Переработка интерпретатора логического программирования **PrologD** на языке C++23: с приближением к синтаксису ISO, нативной поддержкой UTF-8 и встроенными предикатами на русском языке.
+<p align="center">
+  <img src="doc/prologd2.png" width="64" height="64" alt="Логотип Пролог-Д">
+</p>
 
-Исходный код оригинального PrologD в данный репозиторий не включён; предыдущая версия доступна по адресу:
-<https://github.com/Ununus/prologd>.
+Переписанный интерпретатор логического программирования **PrologD** на C++23: синтаксис, близкий к ISO, нативная поддержка UTF-8 и встроенные предикаты на русском языке. Новый графический интерфейс на PySide6.
+
+## История
+
+Пролог-Д — учебная реализация Пролога для персональных компьютеров с
+ограниченными ресурсами. Основные работы:
+
+1. Григорьев С. Г., Морозов М. М. Давайте попробуем Пролог // Информатика и
+   образование. — 1987. — № 4. — С. 14–17.
+2. Григорьев С. Г. Реализация системы логического программирования для
+   персональных компьютеров с ограниченными ресурсами и её применения:
+   диссертация на соискание учёной степени доктора технических наук по
+   специальности «Математическое и программное обеспечение вычислительных
+   машин, комплексов и компьютерных сетей». — 1992.
+
+Исходный код оригинального Пролог-Д: <https://github.com/Ununus/prologd>.
 
 ## Linux .deb пакет
 ### Установка
@@ -199,7 +215,7 @@ Diagnostics use the usual compiler format:
 `file:line:column: error: message`.
 
 Exit codes: `0` success, `1` usage error, `2` a source file could not be loaded
- or parsed, `3` a runtime error (including an interrupted query).
+or parsed, `3` a runtime error (including an interrupted query).
 
 ### Front-end protocol
 
@@ -217,7 +233,7 @@ the same table); the later versions are listed one by one in the contract.
 
 ```
 CMakeLists.txt        top-level build
-CMakePresets.json     configure/build/test presets (Linux, Windows)
+CMakePresets.json     configure/build/test presets (Linux, Windows, macOS)
 src/prlib/            interpreter library
 src/cli/              console front-end
 src/gui/              PySide6 front-end (drives the CLI over the JSON protocol)
@@ -226,7 +242,7 @@ src/3rdparty/         FetchContent dependencies (gitignored)
 doc/                  Typst documentation (Russian)
 examples/             example PrologD programs (demo, problems, lessons, lib)
 stdlib/               standard library, shipped beside the executable
-.github/workflows/    CI (Linux GCC, Windows MSVC)
+.github/workflows/    CI (Linux GCC, Windows MSVC, macOS AppleClang)
 ai/                   plan, task breakdown and notes for the AI agent
 ```
 
@@ -258,9 +274,9 @@ Documentation is in `doc/` (`help.typ`, `library.typ`, `gui.typ`, `technical.typ
 `prologd-diff.typ`, `lessons.typ`); `cmake --build build --target docs` writes the
 PDFs into the same directory when Typst is installed.
 
-CI builds and tests on Linux (GCC) and Windows (MSVC); see
-`.github/workflows/ci.yml` and `CMakePresets.json`. Current status and the task
-board are kept in `ai/status.md`.
+CI builds and tests on Linux (GCC), Windows (MSVC) and macOS (AppleClang); see
+`.github/workflows/ci.yml`, `.github/workflows/macos.yml` and `CMakePresets.json`.
+Current status and the task board are kept in `ai/status.md`.
 
 ## License
 
