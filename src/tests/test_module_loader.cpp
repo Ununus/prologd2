@@ -218,7 +218,18 @@ TEST_CASE("a missing import names the directories that were tried") {
 
   // Absolute paths, in the order they were tried: next to the importing file
   // first, then the include directory, so a user sees which one to fix.
-  const std::size_t importer_first = outcome.error.find(toUtf8Path(dir.path()));
+  //
+  // The importer's folder is canonicalised by the loader (`loadFile` resolves the
+  // program before it parses imports), and on Windows that turns a short 8.3
+  // `%TEMP%` (`RUNNER~1`) into the long name.  The expected text is canonicalised
+  // the same way; the include folder is *not* canonicalised by `resolve`, so it is
+  // compared as it was given.
+  std::error_code code;
+  const fs::path importer = fs::weakly_canonical(dir.path(), code);
+  const std::string importer_text = toUtf8Path(code ? dir.path() : importer);
+  INFO("error: " << outcome.error);
+  INFO("importer: " << importer_text);
+  const std::size_t importer_first = outcome.error.find(importer_text);
   const std::size_t include_second = outcome.error.find(toUtf8Path(shared.path()));
   REQUIRE(importer_first != std::string::npos);
   REQUIRE(include_second != std::string::npos);

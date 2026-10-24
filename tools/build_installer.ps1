@@ -2,7 +2,7 @@
 #
 #   .\tools\build_installer.ps1                 - package of both engines, then Setup
 #   .\tools\build_installer.ps1 -SkipPackage    - reuse the newest dist\prologd-*-win64
-#   .\tools\build_installer.ps1 -Package dist\prologd-2.6.0-win64 -Inno 'D:\IS\ISCC.exe'
+#   .\tools\build_installer.ps1 -Package dist\prologd-2.6.1-win64 -Inno 'D:\IS\ISCC.exe'
 #
 # The payload is the *portable package* and nothing else: installer\prologd.iss takes
 # `dist\prologd-<version>-win64\*` as its [Files] source, so the layout the window
