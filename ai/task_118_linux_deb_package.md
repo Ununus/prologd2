@@ -1,6 +1,7 @@
 # task_118 — a `.deb` package of the window and both engines
 
-**Status:** planned (2026-10-24) — to be done on the owner's Ubuntu 26.04 machine
+**Status:** in progress (2026-10-24) — steps 1 and 2 done on the owner's Ubuntu
+machine; steps 3–7 open
 **Depends on:** task_61 (the portable layout), task_116 (installer, the settings rule),
 task_117 (the window as it is today)
 **Milestone:** 2.7.0 or later
@@ -43,10 +44,15 @@ Python version and whether PySide6 has a wheel for it, and whether the distro's 
 ### 1. Engine and CLI on Linux
 
 ```sh
-cmake --preset linux-release
+cmake --preset linux-release -DBUILD_WITH_PROLOGD=ON
 cmake --build build/linux-release
 ctest --test-dir build/linux-release
 ```
+
+`BUILD_WITH_PROLOGD` is off by default.  It has to be on here: the package ships
+both engines, and without it there is no `src/cli/prologd` for the window's
+dual-engine checks (`both_engines` copies the pair).  The pinned commit builds on
+Linux; the warnings it prints are upstream's and are not ours to fix here.
 
 The CI job `Linux (GCC)` already builds this and runs the same tests on `ubuntu-latest`,
 so failures here are about *this* release, not about the code.  Record the test count
@@ -153,7 +159,7 @@ application icon (`prologd2.png`) is the same story.
 `tools/build_deb.sh` — bash, LF, ASCII output, the twin of `tools/build_installer.ps1`:
 
 1. check the tools (`cmake`, `ninja`, `python3`, `pyinstaller`, `dpkg-deb`);
-2. build the engine (`cmake --preset linux-release`, `ctest`);
+2. build the engines (`cmake --preset linux-release -DBUILD_WITH_PROLOGD=ON`, `ctest`);
 3. freeze the window (`PyInstaller --noconfirm --clean --onedir --windowed
    --name prologd-gui --paths src/gui src/gui/main.py`, the same flags as
    `build_portable.ps1`);
@@ -187,6 +193,31 @@ sudo apt remove prologd && dpkg -L prologd | wc -l    # nothing left
 Also try a **fresh** user (or a container of the same release) — a package that only
 works because the developer's venv is on `PATH` is not a package.  Record the `.deb`
 size, the dependency list `apt` pulled in, and anything that needed a manual step.
+
+## Progress
+
+- [x] Step 1: `linux-release` with `-DBUILD_WITH_PROLOGD=ON` builds both engines;
+      `ctest` — 424/424.  The pinned original engine compiles with GCC 15 (its own
+      warnings remain).
+- [x] Step 2: all 30 `src/gui/tests/test_*.py` scripts and `protocol_smoke.py` pass
+      offscreen.  What the Linux run needed:
+  * `test_the_output_limit_stops_a_flood`: a 100000-line flood can finish before the
+    500 ms grace on Linux, and the `interrupt` request is dispatched only between
+    requests, so the process stayed alive.  The query now ends with `ЖДИ(5000)`, so
+    the grace expires while it is still solving; the test also checks
+    `--- остановлено ---`.
+  * `QDragEnterEvent` is built from `QPointF`: the `QPoint` overload is deprecated in
+    PySide6 6.10.
+  * `test_the_graphics_window_follows_the_program`: reopening shows the canvas that
+    already holds the picture.  Waiting for `рисунок получен` after it raced the
+    snapshot and passed only when the bitmap happened to arrive late.
+  * `test_engines`: `launch` is checked with `engines.OURS.file_name`, not the
+    Windows literal `prologu.exe`.
+- `This plugin does not support propagateSizeHints()` is the offscreen platform
+  plugin's own warning, once per window: harmless, and silenceable only by muting
+  every default-category Qt warning.
+- [ ] Steps 3–7: the installed tree, XDG settings, icons, `build_deb.sh`, and the
+      install/remove round trip.
 
 ## Rules that carry over from the Windows work
 

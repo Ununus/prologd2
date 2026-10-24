@@ -70,7 +70,9 @@ def test_a_launch_answers_the_engine_and_the_folder() -> None:
     """`--exe` names a folder as well as an engine: the pair is built together."""
     assert engines.launch("", "d") == (engines.ORIGINAL, "")
     assert engines.launch("   ", "мусор") == (engines.DEFAULT, "")
-    assert engines.launch("prologu.exe", "d") == (engines.OURS, ""), "a bare name is no folder"
+    assert engines.launch(engines.OURS.file_name, "d") == (engines.OURS, ""), (
+        "a bare name is no folder"
+    )
 
     # A path in the style of the platform the tests run on: `/` is read by
     # Windows as well, so this is one check on both.

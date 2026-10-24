@@ -320,7 +320,7 @@ def test_a_file_dropped_on_the_editor_opens_in_a_tab(
     its viewport, so that is where the pane's own handler runs — sending it to the
     widget itself would test a path the platform never takes.
     """
-    from PySide6.QtCore import QMimeData, QPoint, QPointF, QUrl, Qt
+    from PySide6.QtCore import QMimeData, QPointF, QUrl, Qt
     from PySide6.QtGui import QDragEnterEvent, QDropEvent
     from PySide6.QtWidgets import QApplication
 
@@ -339,7 +339,7 @@ def test_a_file_dropped_on_the_editor_opens_in_a_tab(
         QApplication.sendEvent(
             viewport,
             QDragEnterEvent(
-                QPoint(4, 4),
+                QPointF(4.0, 4.0),
                 Qt.DropAction.CopyAction,
                 mime,
                 Qt.MouseButton.LeftButton,
@@ -4565,10 +4565,15 @@ def test_the_output_limit_stops_a_flood(executable: str) -> None:
     """
     window = empty_window(executable)
     try:
+        # The flood is bounded, so a broken cap cannot hang the suite; the sleep
+        # then keeps the query solving past the stop's grace.  Without it a fast
+        # machine can print the whole flood before the deadline (Linux does), the
+        # query ends by itself, and the escalation this test is about never runs:
+        # the `interrupt` request is dispatched only between requests.
         window.editor().setPlainText(
             "строка(0) :- !.\n"
             'строка(Н) :- ВЫВОДПС("строка"), СЛОЖЕНИЕ(П, 1, Н), строка(П).\n'
-            "?строка(100000).\n"
+            "?строка(2000), ЖДИ(5000).\n"
         )
         window._settings.max_output_events = 1000
         window._actions["run"].trigger()
@@ -4576,6 +4581,7 @@ def test_the_output_limit_stops_a_flood(executable: str) -> None:
             ascii(window.system_text())
         )
         assert "предел вывода: 1000 событий" in window.system_text(), ascii(window.system_text())
+        assert "--- остановлено ---" in window.system_text(), ascii(window.system_text())
     finally:
         discard_changes(window)
     print("ok: the output limit stops a flooding program by itself")
@@ -4725,12 +4731,13 @@ def test_the_graphics_window_follows_the_program(executable: str) -> None:
         assert picture.isVisible() is False
         assert window._actions["graphics"].isChecked() is False
 
-        # Reopening asks the interpreter for the whole picture: that is the path
-        # a window that missed the drawing takes, and the picture is the same.
+        # Reopening shows the same canvas: the picture lives in the window, and
+        # hiding the window never threw it away.  The run's own snapshot has
+        # already caught up with what was drawn before the canvas existed, so a
+        # second one would say the same thing (that is what `_picture_asked` is
+        # for) — the status still names the last thing the window did.
         window._actions["graphics"].setChecked(True)
-        assert pump(window, lambda: window.status_text().startswith("рисунок получен")), (
-            window.status_text()
-        )
+        assert picture.isVisible() is True
         assert window.canvas().pixel(1, 2) == 3
         assert window.canvas().pixel(30, 15) == 9
         assert window.canvas().pixel(30, 25) == 0
