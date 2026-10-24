@@ -382,7 +382,9 @@ class Formatter {
     }
     const std::size_t tail_from = statements_.empty() ? 0 : end_[statements_.back().last];
     if (tail_from < end_offset) {
-      emitLeadGap(tail_from, end_offset, /*at_start=*/false, /*at_eof=*/true);
+      // With no statements the whole text is this gap, so its first line is
+      // content too — not the continuation of a line no statement ended.
+      emitLeadGap(tail_from, end_offset, /*at_start=*/statements_.empty(), /*at_eof=*/true);
     }
     return builder_.take();
   }
@@ -441,6 +443,14 @@ class Formatter {
     const TokenList& tokens = *tokens_;
     std::size_t i = 0;
     while (i < tokens.size()) {
+      if (tokens[i].kind == TokenKind::EndOfFile) {
+        // The end-of-file marker is not a statement.  Counted as one, it made
+        // the text after the last real dot a *gap between statements*, whose
+        // last line is «the indentation of the next statement» — and that line
+        // was dropped: a file whose last line has no newline lost its last
+        // comment (task_114).
+        break;
+      }
       Statement statement;
       statement.first = i;
       statement.directive = tokens[i].kind == TokenKind::ColonDash;
@@ -542,9 +552,12 @@ class Formatter {
         }
         continue;
       }
-      if (line_number == line_count) {
-        // The last part of the gap is the beginning of the next statement's
-        // line: indentation, not a blank line.
+      if (line_number == line_count && !at_eof) {
+        // The last part of a gap between statements is the beginning of the
+        // next statement's line: indentation, not a blank line.  At the end of
+        // the text there is no next statement — the line is content, and a file
+        // that does not end with a newline kept all but its last comment
+        // (task_114).
         break;
       }
       if (isBlankLine(line)) {

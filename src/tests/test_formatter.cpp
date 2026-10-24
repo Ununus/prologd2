@@ -740,6 +740,24 @@ TEST_CASE("a dialect conversion leaves the marker line and a fragment alone") {
   REQUIRE(kept.text == "ВЫВОД(1), ВЫВОД");
 }
 
+TEST_CASE("a last line without a final newline survives the formatter") {
+  // The end-of-file marker used to be counted as a statement, so everything
+  // after the last dot was a gap *between* statements — and the formatter reads
+  // the last line of such a gap as the indentation in front of the next
+  // statement.  A text that does not end with a newline therefore lost its last
+  // line: the owner formatted two selected comment lines and the second one
+  // disappeared (task_114).
+  REQUIRE(format("% один\n% два").text == "% один\n% два\n");
+  REQUIRE(format("факт(1).\n% один").text == "факт(1).\n% один\n");
+  REQUIRE(format("факт(1).\n\n% один\n% два").text == "факт(1).\n\n% один\n% два\n");
+  // A terminated last line is nothing special, and neither is a fragment: the
+  // cut of a selection ends wherever the caret was.
+  REQUIRE(format("% один\n% два\n").text == "% один\n% два\n");
+  FormatOptions fragment;
+  fragment.selection_only = true;
+  REQUIRE(format("% один\n% два", fragment).text == "% один\n% два\n");
+}
+
 TEST_CASE("a dialect conversion composes with the layout and the names") {
   // One request asks for all three: the words, the variables and the shape.  The
   // order is fixed — dialect first, then the names, then the layout — so the

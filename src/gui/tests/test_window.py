@@ -3403,6 +3403,53 @@ def test_formatting_only_the_selection(executable: str) -> None:
     print("ok: with «только выделенное» the selection is formatted alone")
 
 
+def test_formatting_a_selection_keeps_its_lines(executable: str) -> None:
+    """task_114: a selected line grows no blank one, and its comment survives.
+
+    Two reports, one shape.  The formatter answers with a *program*, which ends
+    with a line terminator, while a selection need not include one — so
+    `?length([1, 2, 3], Д).` came back with a newline and an empty line appeared
+    under it.  And a text whose last line has no newline lost that line: the
+    end-of-file marker was counted as a statement, so everything after the last
+    dot was a gap *between* statements, and the formatter reads the last line of
+    such a gap as the indentation in front of the next statement.
+    """
+    window = empty_window(executable)
+    try:
+        view = window.editor()
+        window._format_selection_action.setChecked(True)
+        assert window._settings.format_selection is True
+
+        def formatted(text: str, start: int, end: int) -> str:
+            view.setPlainText(text)
+            cursor = view.textCursor()
+            cursor.setPosition(start)
+            cursor.setPosition(end, QTextCursor.MoveMode.KeepAnchor)
+            view.setTextCursor(cursor)
+            window._actions["format"].trigger()
+            assert pump(
+                window, lambda: window.status_text() != "форматирование…"
+            ), window.status_text()
+            return view.toPlainText()
+
+        # A query with its trailing comment, selected without the line break: the
+        # answer must not bring a line of its own.
+        line = "?length([1, 2, 3], Д). % выделена эта строка\n"
+        assert formatted(line, 0, line.index("\n")) == line, ascii(view.toPlainText())
+        assert formatted(line, 0, line.index("\n") + 1) == line, ascii(view.toPlainText())
+
+        # Two comments, the last one without a newline after it: both stay, and
+        # the trailing spaces of the first are trimmed.
+        comments = "% первый \n% второй\n"
+        for end in (len(comments) - 1, len(comments)):
+            assert formatted(comments, 0, end) == "% первый\n% второй\n", (
+                ascii(view.toPlainText())
+            )
+    finally:
+        discard_changes(window)
+    print("ok: a formatted selection keeps its lines, and a last comment without a newline")
+
+
 def test_a_broken_program_is_reported_and_not_rewritten(executable: str) -> None:
     window = empty_window(executable)
     try:
@@ -5609,6 +5656,7 @@ def main(argv: list[str]) -> int:
         test_the_step_strip_is_one_font_and_three_pictures(executable)
         test_formatting_lays_the_buffer_out_and_stays_one_undo_step(executable)
         test_formatting_only_the_selection(executable)
+        test_formatting_a_selection_keeps_its_lines(executable)
         test_a_broken_program_is_reported_and_not_rewritten(executable)
         test_the_conversion_opens_in_a_tab_of_its_own(executable)
         test_the_mode_control_stands_beside_the_command_it_changes(executable)

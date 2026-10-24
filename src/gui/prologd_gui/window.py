@@ -2598,6 +2598,14 @@ class MainWindow(QMainWindow):
         if not changed:
             self._status.setText("уже отформатировано")
             return
+        if pending["region"] is not None:
+            # The answer is a *program*, and a program ends with a line
+            # terminator; a selection need not include one.  Putting
+            # `?цель(1).` back as `?цель(1).\n` left an empty line under it
+            # (task_114), and the selection covered a line less than it did.
+            start, end = pending["region"]
+            if text.endswith("\n") and not pending["old"][start:end].endswith("\n"):
+                text = text[:-1]
         anchor, position = formatter.map_positions(
             pending["old"], text, [pending["anchor"], pending["position"]]
         )
