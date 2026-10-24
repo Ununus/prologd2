@@ -1085,7 +1085,7 @@ is found — draws a program, asks for the finished bitmap and replays the very
 events the same session reported, so the two rasterisers (C++ and Python) cannot
 drift apart quietly.
 
-## Protocol contract (version 13)
+## Protocol contract (version 16)
 
 One JSON object per line in both directions; the interpreter writes nothing else
 to stdout.  The C++ side lives in `src/cli/protocol.cpp`, the Python side in
@@ -1116,7 +1116,13 @@ would read a mode-1 program's constants as variables.  Version 13 adds `screen` 
 `load` and `query` — the size of the picture the run draws on (`width` and `height`,
 16 … 2048; task_73) — and the same object to `ready`, which is how a front-end knows
 the screen before it asks for a snapshot; a request without it keeps the engine's
-own 600 × 600.
+own 600 × 600.  Version 14 adds `screen` as an *event*: the canvas a program names
+with `:- ХОЛСТ(Высота, Ширина).` arrives as soon as the directive is applied, so a
+window can size the picture before the first primitive (ADR-035).  Version 15 adds
+`names` to `format` — the mode to *print* the names in, which is how one request
+converts a program between the two naming modes (task_99) — and version 16 adds
+`dialect`, the language of the built-in names and of the signs they have a spelling
+for (`en` or `ru`; task_101).
 Version 1 sessions are still understood by the Python client (the table is then
 empty and completion falls back to the document's own predicates).
 

@@ -139,6 +139,7 @@ Removed from PrologD:
 | M15 | The graphics window | 45 |
 | M16 | Interpreter options, profiles and limits | 46 |
 | M17 | A portable Windows build: interpreter, window, docs and examples in one folder | 61 |
+| M18 | The editor: completion, statement forms, conversion, the session and closing | 99–114 |
 
 ## 6. Risks and mitigations
 

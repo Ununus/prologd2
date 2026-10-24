@@ -2606,9 +2606,7 @@ class MainWindow(QMainWindow):
             start, end = pending["region"]
             if text.endswith("\n") and not pending["old"][start:end].endswith("\n"):
                 text = text[:-1]
-        anchor, position = formatter.map_positions(
-            pending["old"], text, [pending["anchor"], pending["position"]]
-        )
+        anchor, position = 0, 0
         cursor = view.textCursor()
         cursor.beginEditBlock()  # one undo step for the whole replacement
         if pending["region"] is not None:
@@ -2616,6 +2614,12 @@ class MainWindow(QMainWindow):
             cursor.setPosition(start)
             cursor.setPosition(end, QTextCursor.MoveMode.KeepAnchor)
         else:
+            # Only a rewrite of the whole buffer moves the caret: `map_positions`
+            # maps an offset of `old` into `text`, and for a selection `text` is a
+            # fragment whose offsets mean something else entirely (task_114).
+            anchor, position = formatter.map_positions(
+                pending["old"], text, [pending["anchor"], pending["position"]]
+            )
             cursor.select(QTextCursor.SelectionType.Document)
         cursor.insertText(text)
         cursor.endEditBlock()

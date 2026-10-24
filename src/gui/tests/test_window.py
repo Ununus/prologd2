@@ -3445,6 +3445,16 @@ def test_formatting_a_selection_keeps_its_lines(executable: str) -> None:
             assert formatted(comments, 0, end) == "% первый\n% второй\n", (
                 ascii(view.toPlainText())
             )
+
+        # What was rewritten stays selected, and it is the *fragment*: the caret
+        # of a selection is not mapped through `map_positions`, which reads its
+        # offsets from the whole buffer (task_115).
+        formatted("% первый  \n% второй\n", 0, len("% первый  "))
+        selection = view.textCursor()
+        assert (selection.selectionStart(), selection.selectionEnd()) == (
+            0,
+            len("% первый"),
+        ), (selection.selectionStart(), selection.selectionEnd())
     finally:
         discard_changes(window)
     print("ok: a formatted selection keeps its lines, and a last comment without a newline")

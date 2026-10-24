@@ -200,6 +200,8 @@ Usage: prologu [options] [files...]
 -e, --error FILE      write diagnostics to this file
 -q, --questions       echo queries before executing them
 -t, --trace           start with tracing enabled
+    --vars 0|1|2      how names are read: 0 = ISO (default), 1 = the old dialect,
+                      2 is the same as 1
     --no-warnings     do not print warnings (they never change the exit code)
     --max-depth N     recursion depth limit for one query (0 = unlimited)
     --max-steps N     step limit for one query (0 = unlimited)
@@ -208,6 +210,9 @@ Usage: prologu [options] [files...]
     --format-width N  soft mode: what has to fit on one line (default 80)
     --format-indent N continuation indent in units (default 1)
     --format-unit U   indent unit: tab (default) or spaces
+    --names 0|1|2     print the source with its names in the other mode and exit
+    --dialect ru|en   print the built-in names and their signs in the other
+                      language and exit
     --protocol FORM   front-end protocol: text (default) or json
     --list-keywords   print the reserved names as name/arity and exit
 -h, --help            show help and exit
@@ -233,9 +238,11 @@ Exit codes: `0` success, `1` usage error, `2` a source file could not be loaded
 for front-ends: requests are JSON objects on stdin, events are JSON objects on
 stdout, one per line. `-i`/`-o`/`-e` are refused in this mode — the protocol
 owns both streams. The Python/PySide6 GUI in `src/gui` is built on it; see
-`src/gui/README.md` for the full contract. Protocol version 2 adds the reserved
-names and their arities to the `ready` event, so a front-end never keeps its own
-copy of the built-in list (`prologu --list-keywords` prints the same table).
+`src/gui/README.md` for the full contract. The contract is at version **16** —
+a front-end can read the number from `ready` and know what it is talking to.
+Version 2 added the reserved names and their arities to `ready`, so a front-end
+never keeps its own copy of the built-in list (`prologu --list-keywords` prints
+the same table); the later versions are listed one by one in the contract.
 
 ## Project layout
 
