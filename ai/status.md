@@ -6988,10 +6988,11 @@ of the package».  Отдельно: 25 оконных наборов и `protoc
 
 ### 202. macOS: `.app`/`.dmg` собирается, оба движка внутри
 
-* **Прогон.**  Ручной запуск `macos.yml` `40136493860` от `8d24337`: test job
+* **Прогоны.**  Ручной запуск `macos.yml` `40136493860` от `8d24337`: test job
   34 с, package job 1 м 17 с, оба зелёные.  Собран
   `dist/PrologD-2.6.1-arm64.dmg` (43 238 437 байт), artifact
-  `PrologD-2.6.1-arm64`.
+  `PrologD-2.6.1-arm64`.  Повторный `40136702863` от `53926cc` с жёсткими
+  проверками тоже зелёный: test 42 с, package 1 м 15 с.
 * **Движки.**  `-DBUILD_WITH_PROLOGD=ON` не помешал: AppleClang собрал
   оригинальный `prologd` (`[17/17] Linking .../src/cli/prologd`, universal
   `x86_64;arm64`) и наш `prologu` (`[172/174] Linking .../src/cli/prologu`).
