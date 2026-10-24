@@ -145,6 +145,18 @@ class Buffer(QObject):
         self.model.modified = False
         self.changed.emit()
 
+    def mark_modified(self) -> None:
+        """Claims the text as unsaved work — for a tab the window filled itself.
+
+        `setPlainText` clears Qt's flag, so a program a conversion wrote into a new
+        tab looked like a file nobody had touched: no star, and — worse — no
+        question when that text was about to be lost (task_109).  The text *is*
+        unsaved work: it exists in the editor and nowhere else.
+        """
+        self.document.setModified(True)
+        self.model.modified = True
+        self.changed.emit()
+
     def sync_modified(self) -> None:
         self.model.modified = self.document.isModified()
 

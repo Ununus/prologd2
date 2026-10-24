@@ -223,16 +223,21 @@ def test_the_file_manager_is_called_the_way_its_platform_wants() -> None:
     Windows' own file manager wants the switch and the path glued into one
     argument — `explorer /select, "path"` opens the default folder instead — and it
     reports a failure code even when it worked, which is why nobody waits for it.
+    The path is native whatever the caller had (task_109): the save dialog answers
+    with forward slashes, and `explorer` reads `/select,C:/dir/файл.pld` as neither
+    a switch nor a file.
     """
-    path = "C:/example/file.pld"
+    path = "C:/example/file with space.pld"
+    native = os.path.normpath(path)
     command = paths.reveal_command(path)
     if sys.platform == "win32":
-        assert command == ["explorer", "/select,C:/example/file.pld"], command
+        assert command == ["explorer", f"/select,{native}"], command
+        assert "\\" in command[1], "the file manager gets the native spelling"
     elif sys.platform == "darwin":
-        assert command == ["open", "-R", path], command
+        assert command == ["open", "-R", native], command
     else:
         assert command[:1] == ["xdg-open"], command
-        assert command[1] == str(pathlib.Path(path).parent)
+        assert command[1] == str(pathlib.Path(native).parent)
     print("ok: the file manager is called the way its platform wants")
 
 

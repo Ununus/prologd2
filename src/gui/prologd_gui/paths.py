@@ -18,6 +18,7 @@ Nothing here imports Qt, so a check of this module needs no display and no PySid
 
 from __future__ import annotations
 
+import os
 import pathlib
 import subprocess
 import sys
@@ -30,7 +31,11 @@ def reveal_command(path: str) -> list[str]:
 
     Windows' own file manager wants the switch and the path as *one* argument, and
     it reports a failure exit code even when it worked — so nothing checks it.
+    The path is spelled natively: `explorer` reads `/select,C:/dir/файл.pld` as
+    something other than a file to select, which is what a buffer saved from the
+    dialog used to hand it (task_109).
     """
+    path = os.path.normpath(str(path))
     if sys.platform == "win32":
         return ["explorer", f"/select,{path}"]
     if sys.platform == "darwin":

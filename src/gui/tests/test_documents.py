@@ -254,19 +254,24 @@ def test_a_record_of_the_tab_separated_shape_still_reads() -> None:
 
 
 def test_the_session_budget_drops_whole_tabs_and_reports_them() -> None:
-    """A buffer that does not fit goes entirely: half a text is worse than none."""
+    """A buffer that does not fit goes entirely: half a text is worse than none.
+
+    The budget is measured per buffer (task_108), not per session: it is the size
+    above which closing the window has to ask about a tab, and one big scratch
+    buffer must not cost the small one that stands next to it.
+    """
     tabs = [
         ("C:/a.pld", "a.pld", "x" * 100, False),
         ("", "первый", "я" * 80, True),
         ("", "второй", "я" * 80, True),
+        ("", "огромный", "я" * 120, True),
         ("", "пустой", "   \n", False),
     ]
     kept, dropped = documents.session_records(tabs, budget=100)
-    assert [record.name for record in kept] == ["a.pld", "первый"], kept
-    assert dropped == 1, "«второй» did not fit and has to be counted"
+    assert [record.name for record in kept] == ["a.pld", "первый", "второй"], kept
+    assert dropped == 1, "«огромный» did not fit and has to be counted"
 
-    # The budget counts untitled text only, and an empty tab is a placeholder: it
-    # would be replaced by the first opened file anyway.
+    # A file's text is never stored, so its size is nobody's business.
     assert documents.session_records(tabs, budget=1000)[1] == 0
     empty, dropped = documents.session_records([("", "Без имени", "\n\n", False)], budget=10)
     assert empty == [] and dropped == 0

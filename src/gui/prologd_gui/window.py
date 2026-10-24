@@ -1369,6 +1369,23 @@ class MainWindow(QMainWindow):
             self._import_under_cursor() is not None or self._name_under_cursor() is not None
         )
 
+    def _refresh_file_actions(self) -> None:
+        """Enables «Показать в проводнике» only for a buffer that has a file (task_109).
+
+        The same rule as `_refresh_navigation_actions`, and for the same reason: the
+        state belongs to the current tab, so it is recomputed where the tab's state
+        is (`_update_details`) and after the one command that gives a buffer its
+        file, `save_buffer`.  Before this, the flag was set only while a tab's
+        context menu was being built — so a «Без имени» saved a moment ago kept the
+        entry greyed out until the next right click, and an unnamed buffer could
+        keep it enabled and do nothing.
+        """
+        action = getattr(self, "_actions", {}).get("reveal")
+        if action is None:
+            return
+        buffer = self.current_buffer()
+        action.setEnabled(buffer is not None and bool(buffer.model.path))
+
     def _stop_picture(self, in_flight: bool) -> None:
         """Puts the picture of the moment on «Остановить» (part 141).
 
@@ -1394,6 +1411,7 @@ class MainWindow(QMainWindow):
     def _update_details(self) -> None:
         """The right-hand side of the status bar: state, caret, file shape."""
         self._refresh_navigation_actions()
+        self._refresh_file_actions()
         if not self._session.is_running():
             state = "интерпретатор остановлен"
         elif self._session.paused():
@@ -2444,8 +2462,12 @@ class MainWindow(QMainWindow):
 
     def _show_converted(self, text: str, note: str) -> None:
         """A converted program in a tab of its own (task_99, task_101)."""
-        self.new_buffer()
+        buffer = self.new_buffer()
         self.editor().setPlainText(text)
+        # The text exists in the editor and nowhere else: `setPlainText` clears Qt's
+        # flag, and without this the tab looked like a file nobody had touched — no
+        # star, and no question when the text was about to be lost (task_109).
+        buffer.mark_modified()
         lines = len(text.splitlines())
         self._status.setText(f"{note}: {lines} строк в новом табе")
 
@@ -2686,10 +2708,7 @@ class MainWindow(QMainWindow):
         """
         self._on_pane_activated(pane)
         pane.setCurrentIndex(index)
-        buffer = pane.current_buffer()
-        self._actions["reveal"].setEnabled(
-            buffer is not None and bool(buffer.model.path)
-        )
+        self._refresh_file_actions()
         menu = QMenu(self)
         for key in actions.TAB_CONTEXT:
             menu.addAction(self._actions[key])
@@ -2836,8 +2855,10 @@ class MainWindow(QMainWindow):
     def _reveal_in_file_manager(self) -> None:
         """Shows the file of the current tab where it lives (task_68).
 
-        An unnamed buffer has no file to show, and the menu entry is disabled for
-        it; a file that was never saved cannot be revealed at all.
+        An unnamed buffer has no file to show, so the entry is disabled for it
+        (`_refresh_file_actions`): «Без имени» lives in the remembered session, and
+        that is an INI key with escaped text in it, not a file anyone should be sent
+        to look at (task_109).
         """
         buffer = self.current_buffer()
         path = buffer.model.path if buffer is not None else None
@@ -2943,6 +2964,9 @@ class MainWindow(QMainWindow):
             return False
         buffer = self.new_buffer()
         self.editor().setPlainText(text)
+        # A program the converter produced is unsaved work like any other: it is in
+        # the tab and nowhere else (task_109).
+        buffer.mark_modified()
         self._status.setText(
             f"картинка {dialog.name()}: {len(text.splitlines())} строк в новом табе"
         )
@@ -3018,6 +3042,9 @@ class MainWindow(QMainWindow):
             return False
         buffer.mark_saved()
         self._refresh_titles()
+        # The buffer has a file now, and «Показать в проводнике» has to learn it
+        # from the same place the rest of the tab's state comes from (task_109).
+        self._refresh_file_actions()
         self._remember(written)
         self._status.setText(f"сохранён {documents.short_path(written)}")
         return True
@@ -3113,6 +3140,8 @@ class MainWindow(QMainWindow):
     def _confirm_close(self, buffer: Buffer) -> bool:
         if not buffer.is_modified():
             return True
+        if not self._closing_needs_a_question(buffer):
+            return True
         answer = self._ask_save(buffer.model.name)
         if answer == CANCEL:
             return False
@@ -3121,6 +3150,30 @@ class MainWindow(QMainWindow):
             return True
         # A save that failed must not lose the buffer either.
         return self.save_buffer(buffer)
+
+    def _closing_needs_a_question(self, buffer: Buffer) -> bool:
+        """Whether a modified buffer earns a question as the window closes (task_108).
+
+        A buffer with a file always does: the session keeps only its *path*, and the
+        next run reads the file from disk, so an edit that was not written is gone.
+        An unnamed buffer is kept by its text — that is what the session is for — so
+        closing the window may pass it by without a word: the question there would
+        be a file dialog for a scratch pad, and the answer «Не сохранять» the only
+        way to keep it out of the session.
+
+        The promise has two edges, and both of them ask: the setting that restores
+        tabs has to be on (without it there is no session to keep anything in), and
+        the text has to fit the budget for one buffer.  Closing a *tab* — `Ctrl+W`,
+        «Закрыть вкладку», «Закрыть все вкладки» — has no session behind it and asks
+        about everything, unnamed ones included.
+        """
+        if buffer.model.path is not None:
+            return True
+        if not self._closing:
+            return True
+        if not self._settings.restore_tabs:
+            return True
+        return len(buffer.text()) > documents.SESSION_TEXT_BUDGET
 
     def _offer_utf8(self, buffer: Buffer, error: UnicodeEncodeError) -> bool:
         character = error.object[error.start]
@@ -3516,7 +3569,10 @@ class MainWindow(QMainWindow):
 
         A file tab is stored by its path (see `documents.TabRecord`) and an
         untitled one by its text and by whether it held unsaved changes, up to the
-        budget; `session_records` says how many did not fit.
+        budget of one buffer (task_108); `session_records` says how many did not
+        fit.  That budget is what closing the window asks about: an untitled
+        buffer the store can keep is asked about nothing, so the two numbers have
+        to be the same one (`SESSION_TEXT_BUDGET`).
         """
         kept = [buffer for buffer in tabs if buffer not in self._discarded]
         records, dropped = documents.session_records(
@@ -3532,6 +3588,30 @@ class MainWindow(QMainWindow):
     def session_tabs(self) -> list[documents.TabRecord]:
         """The remembered session as it stands (what a test and `О программе` read)."""
         return documents.decode_tabs(self._settings.session_tabs)
+
+    def _warn_if_not_remembered(self) -> None:
+        """Says so when the session could not be written (task_108).
+
+        Closing the window keeps an unnamed tab by writing its text into the
+        settings file and asks nothing about it.  A write that failed — a full
+        disk, a folder that went read-only — would turn that silence into a lie:
+        the next run would come back without the tab, and the user, relying on the
+        behaviour they were promised, would only find out afterwards.  Said while
+        the window is still on screen; the close goes on afterwards, because this
+        is a warning and not a veto — refusing to close would be the worse trap.
+        """
+        if not self._settings.write_failed:
+            return
+        self._warn_not_remembered(
+            "Не удалось запомнить сессию: файл настроек не записывается.\n"
+            f"{self._settings.path}\n\n"
+            "Безымянные вкладки не восстановятся при следующем запуске — сохраните "
+            "их в файлы, если они нужны."
+        )
+
+    def _warn_not_remembered(self, text: str) -> None:
+        """A method of its own, like `_ask_save`: a test must not open a box."""
+        QMessageBox.warning(self, "PrologD", text)
 
     def closeEvent(self, event) -> None:  # noqa: N802 - Qt spelling
         """Closing the window asks about every modified buffer first."""
@@ -3551,6 +3631,7 @@ class MainWindow(QMainWindow):
                 self._save_split_state()
                 self._save_panel_state()
                 self._save_window_state()
+                self._warn_if_not_remembered()
                 # The interpreter is this window's child: an unasked-for close
                 # must not leave it running behind the user (and a headless test
                 # suite otherwise collects one live process per test).

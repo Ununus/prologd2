@@ -550,6 +550,18 @@ class Settings:
         # there are few enough of them for the write to cost nothing.
         self._store.sync()
 
+    @property
+    def write_failed(self) -> bool:
+        """True when the last write did not reach the disk (task_108).
+
+        The window keeps an unnamed tab by writing its text into this file, and
+        closing the window asks nothing about such a tab — so a store that cannot
+        be written would turn that silence into a lie.  A full disk or a folder
+        that went read-only is what this answers for: `QSettings` remembers the
+        status of its last `sync`, and every setter here syncs.
+        """
+        return self._store.status() != QSettings.Status.NoError
+
     def raw_value(self, key: str, default: object = None) -> object:
         """A value this class has no property for (task_29's dialog reads these)."""
         return self._store.value(key, default)

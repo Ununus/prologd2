@@ -183,8 +183,17 @@ class Document:
             return str(pathlib.Path(self.path).parent)
         return ""
     def rename(self, path: str | os.PathLike[str]) -> None:
-        self.path = str(path)
-        self.name = pathlib.Path(path).name
+        """Takes a file name — the native spelling of it (task_109).
+
+        `QFileDialog` answers with forward slashes («C:/dir/файл.pld») while the
+        file an *opened* tab keeps has been through `pathlib` and is native.  The
+        difference showed: the title bar named a path no other tab had, and the
+        file manager was handed `/select,C:/dir/файл.pld`, which Explorer reads as
+        something else than a file to select.  `normpath` is the one place that
+        decides, so everything that reads `Document.path` sees one spelling.
+        """
+        self.path = os.path.normpath(str(path))
+        self.name = pathlib.Path(self.path).name
 
     # -- text --------------------------------------------------------------
     def set_text(self, text: str) -> None:
@@ -207,9 +216,11 @@ class Document:
         return self.path or str(target)
 
 
-#: How much *untitled* text a remembered session may hold (task_29).  The store
-#: is a text file a human may open, so the budget is small enough to keep it
-#: readable; what does not fit is dropped, and the window says how much.
+#: How much text of *one* untitled buffer a remembered session may hold (task_29;
+#: measured per buffer since task_108).  The store is a text file a human may open,
+#: so the budget is small enough to keep it readable; a buffer over it is dropped
+#: whole, and the window asks about it before closing — the session could not keep
+#: it, and a question is all that stands between the text and the rubbish bin.
 SESSION_TEXT_BUDGET = 256 * 1024
 
 
@@ -315,26 +326,26 @@ def session_records(
     disk, so whether its buffer had unsaved changes when the window closed is not
     something the next run can honour.
 
-    Only an *untitled* buffer spends the budget, and one that does not fit is
-    dropped whole: a tab that comes back with half of its text is worse than one
-    that does not come back, and the window says how many were left out.  An empty
-    untitled tab is skipped altogether — it is the placeholder a first file would
-    replace anyway, and an empty tab that came back as unsaved work would ask a
-    save question about nothing.
+    Only an *untitled* buffer is measured, and each one is measured on its own
+    (task_108): the budget is the size above which closing the window has to ask,
+    so one big scratch tab must not cost the small one standing next to it.  A
+    buffer over the budget is dropped whole — a tab that comes back with half of
+    its text is worse than one that does not come back.  An empty untitled tab is
+    skipped altogether — it is the placeholder a first file would replace anyway,
+    and an empty tab that came back as unsaved work would ask a save question
+    about nothing.
     """
     records: list[TabRecord] = []
     dropped = 0
-    spent = 0
     for path, name, text, modified in tabs:
         if path:
             records.append(TabRecord(path=str(path), name=str(name)))
             continue
         if not str(text).strip():
             continue
-        if spent + len(text) > budget:
+        if len(text) > budget:
             dropped += 1
             continue
-        spent += len(text)
         records.append(TabRecord(name=str(name), text=str(text), modified=bool(modified)))
     return records, dropped
 

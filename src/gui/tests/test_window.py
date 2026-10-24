@@ -3906,10 +3906,12 @@ def test_an_unnamed_tab_left_unsaved_is_forgotten(
 ) -> None:
     """«Не сохранять» on an unnamed buffer means it is not to be seen again.
 
-    An untitled tab is remembered by its *text*, so a session written before the
-    closing questions would bring back exactly the work the user threw away — the
-    answer would be a lie.  A tab the user saves on the way out goes the other
-    way: it is remembered as the file it became, not as the unnamed buffer it was.
+    An untitled tab is remembered by its *text*, so a session written after the
+    answer would bring back exactly the work the user threw away — the answer
+    would be a lie.  Since task_108 the window's close does not ask about unnamed
+    tabs at all: the question belongs to the *tab* (`Ctrl+W`, «Закрыть вкладку»),
+    where nothing else can keep the text.  The answer still has to reach the
+    session, which is what this checks.
     """
     from prologd_gui import documents
     from prologd_gui import window as window_module
@@ -3918,7 +3920,6 @@ def test_an_unnamed_tab_left_unsaved_is_forgotten(
 
     kept = directory / "остаётся.pld"
     kept.write_text("снег.\n", encoding="utf-8")
-    saved = directory / "сохранённое на выходе.pld"
 
     window = empty_window(executable)
     settings_path = window._settings.path
@@ -3926,43 +3927,154 @@ def test_an_unnamed_tab_left_unsaved_is_forgotten(
         window.open_path(str(kept))
         window.new_buffer()
         window.editor().insertPlainText("черновик.\n")
-        draft = window.current_buffer().model.name
+        draft = window.current_buffer()
         window.new_buffer()
-        window.editor().insertPlainText("сохраню.\n")
+        window.editor().insertPlainText("остаётся.\n")
         keep = window.current_buffer().model.name
         assert window.tab_count() == 3, window.tab_count()
 
-        # «Черновик» is thrown away, «сохраню» is written to a file of its own —
-        # the file dialog is replaced the same way the question is.
-        window._ask_save = lambda name: (
-            window_module.SAVE if name == keep else window_module.DISCARD
-        )
-        window._ask_save_path = lambda buffer: str(saved)
+        # «Черновик» is thrown away by closing its own tab; «остаётся» is not asked
+        # about at all and rides into the session as text.
+        window._ask_save = lambda name: window_module.DISCARD
+        assert window.close_buffer(draft) is True
+        asked: list[str] = []
+        window._ask_save = lambda name: asked.append(name) or window_module.DISCARD
         window.close()
+        assert asked == [], asked
     finally:
         window.stop_program()
 
     settings = Settings(settings_path)
     stored = documents.decode_tabs(settings.session_tabs)
-    assert [record.name for record in stored] == [kept.name, saved.name], stored
-    assert all(record.path for record in stored), "a saved tab is a file, not text"
-    assert saved.read_text(encoding="utf-8") == "сохраню.\n", saved.read_text("utf-8")
+    assert [record.name for record in stored] == [kept.name, keep], stored
+    assert stored[0].path, "a file tab is remembered by its path"
+    assert stored[1].text == "остаётся.\n", stored[1]
 
     reopened = MainWindow(executable, [], settings)
     try:
-        assert [b.model.name for b in reopened.buffers()] == [kept.name, saved.name], [
+        assert [b.model.name for b in reopened.buffers()] == [kept.name, keep], [
             b.model.name for b in reopened.buffers()
         ]
-        assert reopened.buffers()[1].text() == "сохраню.\n"
-        assert reopened.buffers()[1].is_modified() is False
         texts = [b.text() for b in reopened.buffers()]
         assert not any("черновик" in text for text in texts), texts
+        assert reopened.buffers()[1].text() == "остаётся.\n"
+        assert reopened.buffers()[1].is_modified() is True, "unsaved work stays unsaved"
     finally:
         discard_changes(reopened)
     print(
         "ok: an unnamed tab answered with «Не сохранять» is dropped from the session, "
-        "and one saved on the way out is remembered as its file"
+        "and the window close asks nothing about the rest"
     )
+
+
+def test_the_window_close_asks_only_about_files(
+    executable: str, directory: pathlib.Path
+) -> None:
+    """task_108: the closing question is about a file, not about a scratch pad.
+
+    An unnamed buffer used to be asked about like a file, and «Сохранить» there
+    meant a file dialog for a program that had no name yet — while the session was
+    already keeping its text.  Now the window asks about buffers with a file (the
+    session keeps only their path, so an edit that was not written is gone) and
+    passes unnamed ones to the session without a word.  Two things bring the
+    question back: the session switched off (there is no store then) and a text
+    too big for the budget of one buffer.
+    """
+    from prologd_gui import documents
+    from prologd_gui import window as window_module
+
+    draft = "факт(1).\n"
+    asked: list[str] = []
+
+    def closing_window():
+        window = empty_window(executable)
+        window._ask_save = lambda name: asked.append(name) or window_module.DISCARD
+        return window
+
+    # An unnamed buffer: no question, and the text is in the session afterwards.
+    window = closing_window()
+    try:
+        window.editor().insertPlainText(draft)
+        assert window.current_buffer().is_modified()
+        window.close()
+        assert asked == [], asked
+        stored = window.session_tabs()
+        assert [record.text for record in stored] == [draft], stored
+        assert stored[0].modified is True, "unsaved work stays unsaved"
+    finally:
+        window.stop_program()
+
+    # A buffer with a file: the question is the whole point of asking.
+    asked.clear()
+    window = closing_window()
+    try:
+        program = directory / "вопрос при закрытии.pld"
+        program.write_text("снег.\n", encoding="utf-8")
+        window.open_path(str(program))
+        window.editor().insertPlainText("дождь.\n")
+        assert window.current_buffer().is_modified()
+        window.close()
+        assert asked == [program.name], asked
+        assert window.session_tabs() == [], "«Не сохранять» keeps the tab out as well"
+    finally:
+        window.stop_program()
+
+    # The session switched off is no store at all, so the unnamed buffer is asked
+    # about — its text would otherwise go nowhere.
+    asked.clear()
+    window = closing_window()
+    try:
+        window._settings.restore_tabs = False
+        window.editor().insertPlainText(draft)
+        window.close()
+        assert asked == ["Без имени"], asked
+    finally:
+        window.stop_program()
+
+    # And so is a text the session cannot hold.
+    asked.clear()
+    window = closing_window()
+    try:
+        window.editor().insertPlainText("я" * (documents.SESSION_TEXT_BUDGET + 1))
+        window.close()
+        assert asked == ["Без имени"], asked
+    finally:
+        window.stop_program()
+    print(
+        "ok: the window close asks about files, and about an unnamed tab only when "
+        "the session cannot keep it"
+    )
+
+
+def test_a_session_that_cannot_be_written_is_named(
+    executable: str, directory: pathlib.Path
+) -> None:
+    """task_108: silence about an unnamed tab is a promise; a failed write is a lie.
+
+    The window keeps an unnamed tab by writing its text into the settings file and
+    asks nothing about it on the way out.  When the store cannot be written — here
+    the folder it should live in is a plain file — the window has to say so before
+    it goes, or the user finds out by not finding the tab.
+    """
+    from prologd_gui.settings import Settings
+
+    blocked = directory / "занято"
+    blocked.write_text("не папка", encoding="utf-8")
+    settings = Settings(blocked / "gui.ini")
+
+    window = make_window(executable, settings=settings)
+    warned: list[str] = []
+    try:
+        window._warn_not_remembered = warned.append
+        window.editor().insertPlainText("факт(1).\n")
+        assert window.current_buffer().is_modified()
+        window.close()
+    finally:
+        window.stop_program()
+    assert settings.write_failed is True, "the store cannot be written at all"
+    assert warned, "the window closed without a word about the lost session"
+    assert "сесси" in warned[0], warned
+    print("ok: a session that cannot be written is named before the window goes")
 
 
 def test_an_untouched_unnamed_tab_comes_back_clean(executable: str) -> None:
@@ -5012,6 +5124,77 @@ def test_the_process_directory_is_where_files_go(
         discard_changes(window)
 
 
+def test_a_saved_buffer_is_named_the_way_the_file_manager_wants(
+    executable: str, directory: pathlib.Path
+) -> None:
+    """task_109: «Показать в проводнике» on a buffer saved from «Без имени».
+
+    The save dialog answers with forward slashes («C:/dir/файл.pld»), and the buffer
+    used to keep them: the title bar named a path no other tab had, and the file
+    manager was handed `/select,C:/dir/файл.pld` — neither a switch nor a file to
+    select.  A file *opened* from the same dialog went through `pathlib` and was
+    native, which is why only a saved buffer went wrong.
+
+    The entry itself follows the current tab now: off while the buffer has no file,
+    on the moment it has one.
+    """
+    target = directory / "сохранённый буфер.pld"
+    typed = str(target).replace(os.sep, "/")  # what `QFileDialog` answers
+
+    window = empty_window(executable)
+    try:
+        assert window._actions["reveal"].isEnabled() is False, (
+            "an unnamed buffer has no file to show"
+        )
+
+        window.editor().insertPlainText("факт(1).\n")
+        assert window.save_buffer(path=typed) is True
+        buffer = window.current_buffer()
+        assert buffer.model.path == str(target), (
+            f"{buffer.model.path!r} is not the native {str(target)!r}"
+        )
+        assert window.windowTitle() == f"{target} — PrologD", window.windowTitle()
+        assert window._actions["reveal"].isEnabled() is True, (
+            "the file exists now, so the entry has to be offered"
+        )
+    finally:
+        discard_changes(window)
+    print("ok: a saved buffer keeps the native path, and the tab menu knows it has a file")
+
+
+def test_a_converted_program_is_unsaved_work(executable: str) -> None:
+    """task_109: a tab the window filled itself carries the «unsaved» mark.
+
+    A conversion answers with `setPlainText`, which clears Qt's flag, so the new tab
+    looked like a file nobody had touched: no star, and — the real harm — no
+    question when its text was about to be lost.  The owner found it with a
+    picture converted at full detail: the generated program was bigger than the
+    session can keep, and the window still closed without a word.
+    """
+    from prologd_gui import documents
+    from prologd_gui import window as window_module
+
+    window = empty_window(executable)
+    asked: list[str] = []
+    try:
+        window._show_converted("факт(1).\n", "имена переведены")
+        buffer = window.current_buffer()
+        assert buffer.model.path is None, "a conversion opens an unnamed tab"
+        assert buffer.is_modified() is True, "the generated text is in the tab only"
+        assert buffer.model.title().startswith("*"), buffer.model.title()
+
+        # And that is what makes the over-budget question possible at all: a text
+        # the session cannot keep is asked about instead of vanishing.
+        window._ask_save = lambda name: asked.append(name) or window_module.DISCARD
+        window.editor().setPlainText("я" * (documents.SESSION_TEXT_BUDGET + 1))
+        window.current_buffer().mark_modified()
+        window.close()
+        assert asked == [buffer.model.name], asked
+    finally:
+        window.stop_program()
+    print("ok: a generated program is unsaved work, and too big a one is asked about")
+
+
 def test_the_document_opens_from_the_package(executable: str) -> None:
     """task_61: `Shift+F1` finds `doc/` beside the window, not inside the bundle.
 
@@ -5381,6 +5564,10 @@ def main(argv: list[str]) -> int:
         test_saving_before_a_run_writes_the_file(executable, files)
         test_the_tabs_come_back_on_the_next_start(executable, files)
         test_an_unnamed_tab_left_unsaved_is_forgotten(executable, files)
+        test_the_window_close_asks_only_about_files(executable, files)
+        test_a_session_that_cannot_be_written_is_named(executable, files)
+        test_a_saved_buffer_is_named_the_way_the_file_manager_wants(executable, files)
+        test_a_converted_program_is_unsaved_work(executable)
         test_an_untouched_unnamed_tab_comes_back_clean(executable)
         test_the_document_opens_from_the_package(executable)
         test_the_first_line_sets_the_naming_mode_of_the_highlighting(executable)
