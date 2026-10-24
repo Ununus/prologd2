@@ -82,6 +82,21 @@ TEST_CASE("the standard library is the stdlib folder beside the interpreter") {
   REQUIRE(standardLibraryDirectory(file.path()).empty());
 }
 
+TEST_CASE("the executable directory is the folder holding this test") {
+  // The engine finds `stdlib` beside its own executable.  This helper is what
+  // makes that work on Windows (`GetModuleFileNameW`), Linux (`/proc/self/exe`)
+  // and macOS (`_NSGetExecutablePath`); a missing branch answers with an empty
+  // path, which the first check catches on every platform.
+  const fs::path directory = executableDirectory();
+  REQUIRE_FALSE(directory.empty());
+  REQUIRE(fs::is_directory(directory));
+#if defined(_WIN32)
+  REQUIRE(fs::is_regular_file(directory / "prlib_tests.exe"));
+#else
+  REQUIRE(fs::is_regular_file(directory / "prlib_tests"));
+#endif
+}
+
 TEST_CASE("an import reaches the standard library beside the program") {
   TempDir dir;
   fs::create_directories(dir.path() / "stdlib");

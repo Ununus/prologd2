@@ -1660,3 +1660,32 @@ price of keeping one folder.  The wrapper leaves room for a `--settings`
 argument later; the settings rule itself does not depend on it.
 
 **Status.** Accepted 2026-10-25 (task_118).
+
+## ADR-051: a macOS `.app` is installed, and its settings live in Application Support
+
+**Context.**  The window finds its settings by asking `paths.settings_path()`; a
+portable folder keeps `gui.ini` beside the executable, an installed copy lets Qt
+choose the per-user directory.  On macOS PyInstaller puts the executable in
+`PrologD.app/Contents/MacOS`, which is writable for the user — the old rule would
+therefore write `gui.ini` into the bundle and change a signed app on the first
+close.  Qt's `AppConfigLocation` on macOS is `~/Library/Preferences`, the place for
+property lists, while the task's layout calls for `~/Library/Application Support`.
+
+**Decision.**  `paths.inside_app_bundle()` recognises `Contents/MacOS` under a
+`.app`; `settings_path()` answers `None` for it, so the window uses
+`settings.default_path()`.  That function uses `AppDataLocation`
+(`~/Library/Application Support/PrologD/gui`) on macOS and keeps
+`AppConfigLocation` (`AppData/Local` on Windows, `~/.config` on Linux) elsewhere.
+A copy of the same folder outside a `.app` remains portable.  The `macos-release`
+CMake preset sets the deployment target to 14.4, the floor of the PySide6 6.12/Qt
+6.12 wheels the Linux and macOS builds install.
+
+**Consequences.**  The bundle can be signed: nothing writes into `Contents/MacOS`
+on a normal close.  Settings survive an app upgrade and a reinstall, and a user who
+copies the folder to a USB stick still gets the portable behaviour.  A macOS
+release built with PySide6 6.8 instead would have to lower the preset and
+`LSMinimumSystemVersion` together; claiming 12.0 while shipping Qt 6.12 would be a
+lie.  The shortcut table is a separate gap: its Windows scan codes do not match
+the macOS key codes, and that is recorded in task_119.
+
+**Status.** Accepted 2026-10-25 (task_119).

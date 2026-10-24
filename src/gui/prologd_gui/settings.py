@@ -20,6 +20,7 @@ Three promises hold for a hand-edited or foreign file:
 from __future__ import annotations
 
 import json
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -496,16 +497,31 @@ MACHINE_KEYS = (
 )
 
 
+def default_location() -> QStandardPaths.StandardLocation:
+    """The Qt location that holds `gui.ini` on this platform.
+
+    `AppConfigLocation` is `AppData/Local` on Windows and `~/.config` on Linux,
+    which is what the rest of the project uses.  On macOS it is
+    `~/Library/Preferences`, the place for property lists and system-managed
+    state; the window keeps an INI file, and the task's installed layout names
+    `~/Library/Application Support/PrologD/gui/gui.ini` (task_119), so macOS
+    answers `AppDataLocation` instead.
+    """
+    if sys.platform == "darwin":
+        return QStandardPaths.StandardLocation.AppDataLocation
+    return QStandardPaths.StandardLocation.AppConfigLocation
+
+
 def default_path() -> Path:
     """`%LOCALAPPDATA%\\PrologD\\gui\\gui.ini` on Windows, the XDG equivalent elsewhere.
 
-    `AppConfigLocation` is `AppLocalDataLocation` on Windows (the *local*, not the
-    roaming directory) and is derived from the organisation and application name,
-    so `main.py` sets both on `QCoreApplication` before the first call here.
+    The location is `default_location()`: `AppConfigLocation` on Windows (the
+    *local*, not the roaming directory) and Linux, `AppDataLocation`
+    (`~/Library/Application Support`) on macOS.  Both are derived from the
+    organisation and application name, so `main.py` sets them on
+    `QCoreApplication` before the first call here.
     """
-    directory = QStandardPaths.writableLocation(
-        QStandardPaths.StandardLocation.AppConfigLocation
-    )
+    directory = QStandardPaths.writableLocation(default_location())
     return Path(directory or ".") / "gui.ini"
 
 

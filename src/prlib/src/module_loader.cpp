@@ -1,8 +1,10 @@
 #include "prlib/module_loader.hpp"
 
 #include <algorithm>
+#include <cstdint>
 #include <fstream>
 #include <sstream>
+#include <vector>
 
 #if defined(_WIN32)
 #ifndef NOMINMAX
@@ -12,6 +14,8 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
+#elif defined(__APPLE__)
+#include <mach-o/dyld.h>
 #endif
 
 #include "prlib/utf8.hpp"
@@ -364,6 +368,20 @@ std::filesystem::path executableDirectory() {
 #elif defined(__linux__)
   std::error_code error;
   const std::filesystem::path self = std::filesystem::read_symlink("/proc/self/exe", error);
+  return error ? std::filesystem::path{} : self.parent_path();
+#elif defined(__APPLE__)
+  // `_NSGetExecutablePath` writes into a caller's buffer and asks for the needed
+  // size with a null buffer.  The answer may contain `..`, so it is canonicalised
+  // before the parent is taken: the engine looks for `stdlib` beside itself.
+  std::uint32_t size = 0;
+  _NSGetExecutablePath(nullptr, &size);
+  std::vector<char> buffer(size, '\0');
+  if (_NSGetExecutablePath(buffer.data(), &size) != 0) {
+    return {};
+  }
+  std::error_code error;
+  const std::filesystem::path self =
+      std::filesystem::weakly_canonical(std::filesystem::path(buffer.data()), error);
   return error ? std::filesystem::path{} : self.parent_path();
 #else
   return {};

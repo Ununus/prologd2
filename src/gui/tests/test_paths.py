@@ -73,6 +73,22 @@ def make_package(directory: pathlib.Path, *, with_executable: bool = True) -> pa
     return directory
 
 
+@contextlib.contextmanager
+def on_platform(name: str):
+    """`sys.platform` faked for the rules that branch on it (task_119).
+
+    Only the platform *name* is faked; Qt and the filesystem are the real ones.
+    That is enough for `paths` (the `.app` rule) and `settings.default_location`,
+    which is what these checks are about.
+    """
+    saved = sys.platform
+    sys.platform = name
+    try:
+        yield
+    finally:
+        sys.platform = saved
+
+
 def test_a_checkout_reads_its_own_tree() -> None:
     """With no `sys.frozen` the answers are the ones the sources always had."""
     assert paths.frozen() is False
@@ -164,6 +180,45 @@ def test_an_installed_copy_under_opt_keeps_its_settings_in_xdg() -> None:
         with packaged(pathlib.Path(folder)):
             assert paths.settings_path() is None, folder
     print("ok: /opt and the system prefixes count as install locations on Linux")
+
+
+def test_an_app_bundle_is_installed_and_a_loose_copy_is_portable() -> None:
+    """task_119: a macOS `.app` must not keep `gui.ini` inside itself.
+
+    The folder `Contents/MacOS` is writable for the user, so the old rule would
+    put the settings beside the frozen window and change a signed bundle on the
+    first close.  A plain copy outside any `.app` stays portable.
+    """
+    with tempfile.TemporaryDirectory(prefix="prologd_app_") as name:
+        base = pathlib.Path(name)
+        bundle = base / "PrologD.app" / "Contents" / "MacOS"
+        bundle.mkdir(parents=True)
+        with on_platform("darwin"), packaged(bundle):
+            assert paths.inside_app_bundle() is True
+            assert paths.settings_path() is None, "a bundle must not write gui.ini inside itself"
+
+        loose = base / "копия" / "MacOS"
+        loose.mkdir(parents=True)
+        with on_platform("darwin"), packaged(loose):
+            assert paths.inside_app_bundle() is False
+            assert paths.settings_path() == loose / "gui.ini", paths.settings_path()
+    print("ok: a .app is installed, and a copy outside the bundle is portable")
+
+
+def test_a_checkout_finds_the_macos_release_build() -> None:
+    """task_119: the source tree's macOS build is one of the places `interpreter` looks."""
+    with tempfile.TemporaryDirectory(prefix="prologd_macos_build_") as name:
+        root = pathlib.Path(name)
+        cli = root / "build" / "macos-release" / "src" / "cli"
+        cli.mkdir(parents=True)
+        (cli / paths.EXECUTABLE_NAME).write_bytes(b"MZ")
+        saved = paths.source_root
+        paths.source_root = lambda: root
+        try:
+            assert paths.interpreter() == str(cli / paths.EXECUTABLE_NAME)
+        finally:
+            paths.source_root = saved
+    print("ok: a checkout finds build/macos-release/src/cli")
 
 
 def test_a_settings_file_that_is_already_there_is_kept() -> None:
@@ -387,6 +442,8 @@ def main(argv: list[str]) -> int:
     test_a_package_without_the_interpreter_names_the_expected_place()
     test_an_installed_copy_keeps_its_settings_in_appdata()
     test_an_installed_copy_under_opt_keeps_its_settings_in_xdg()
+    test_an_app_bundle_is_installed_and_a_loose_copy_is_portable()
+    test_a_checkout_finds_the_macos_release_build()
     test_a_settings_file_that_is_already_there_is_kept()
     test_a_folder_that_cannot_be_written_falls_back_to_appdata()
     test_the_icons_come_from_the_same_answer()

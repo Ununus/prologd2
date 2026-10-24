@@ -6890,3 +6890,55 @@ of the package».  Отдельно: 25 оконных наборов и `protoc
   свежий пользователь, `sudo apt remove` и пустой `dpkg -L`.
 * **Лицензия.**  По слову владельца проект под MIT: `LICENSE` в корне,
   `installer/linux/copyright` - Expat (MIT), README дополнен.
+
+### 197. task_119: что нужно для сборки macOS в облаке
+
+* **Вопрос.**  Mac нет; можно ли собрать `.app` на GitHub и какие правки для
+  macOS нужны в проекте.
+* **Ответ.**  Да: macOS-раннеры GitHub дают Xcode, `iconutil`, `hdiutil` и
+  `codesign`, так что движок, ctest, PyInstaller, `.icns`, `.dmg` и ad-hoc
+  подпись можно собрать в CI.  Актуальные метки - `macos-15` (arm64),
+  `macos-15-intel` (x86_64), `macos-26`/`macos-26-intel`; `macos-14` уже
+  deprecated.  Запуск из Finder, меню, ⌘, Retina, «Открыть с помощью» и
+  Gatekeeper всё равно остаются человеку.
+* **Найденные правки** (записаны в `ai/task_119_macos_app_bundle.md`):
+  * `module_loader.cpp`: ветки `__APPLE__` нет, `executableDirectory()` на
+    macOS возвращает пустой путь, и `stdlib` рядом с движком не находится;
+  * `paths.py`: `.app` не считается установленным - `gui.ini` попал бы внутрь
+    `Contents/MacOS` и сломал подпись; `default_path()` на macOS даёт
+    `~/Library/Preferences`, а нужен `Application Support`; `interpreter()`
+    не ищет `build/macos-release`;
+  * шорткаты: Qt 6 по умолчанию маппит Command в `Qt::ControlModifier`,
+    поэтому `QKeySequence("Ctrl+N")` уже становится ⌘N; настоящая проблема -
+    таблица вставок по `nativeScanCode()`, на macOS нужен `nativeVirtualKey`
+    и маковские коды;
+  * `CMakePresets.json`: нет `macos-release`; PySide6 6.12/Qt 6.12 требует
+    macOS 14.4, поэтому `LSMinimumSystemVersion 12.0` неверен (или надо
+    пинить PySide6 6.8);
+  * сборка оригинального `prologd` на AppleClang не проверена.
+* **Порядок.**  Сначала ветка `__APPLE__`, пресет, macOS-правила путей и
+  test-only workflow; упаковка `.app`/`.dmg` - следующим шагом.
+
+### 198. task_119: macOS — первая ветка, пресет и CI
+
+* **Просьба владельца.**  Сделать пункты 1-3 из разбора: ветку `__APPLE__`,
+  правила путей, пресет и workflow, который собирает и тестирует движок.
+* **Что сделано.**
+  * `module_loader.cpp`: `_NSGetExecutablePath` + `weakly_canonical`; тест
+    `the executable directory is the folder holding this test` проверяет, что
+    каталог существует и содержит `prlib_tests` (на Windows - `.exe`).
+  * `paths.py`: `inside_app_bundle()` (`Foo.app/Contents/MacOS`);
+    `settings_path()` не пишет `gui.ini` внутрь бандла; `interpreter()` ищет
+    `build/macos-release/src/cli`.  `settings.py`: на macOS
+    `AppDataLocation` (`~/Library/Application Support`), на остальных -
+    `AppConfigLocation`.  Проверки в `test_paths.py` и `test_settings.py`.
+  * `CMakePresets.json`: `macos-release` (Ninja, Release, deployment target
+    14.4), build/test-пресеты.
+  * `.github/workflows/macos.yml`: test-only job на `macos-15` (arm64) -
+    configure, build, ctest на push/PR и вручную.
+* **Проверка.**  `test_paths.py` и `test_settings.py` зелёные; `ctest` -
+  425/425 (новый тест); `CMakePresets.json` - валидный JSON, пресет виден.
+  Сам macOS-job ещё не запускался: нужен push.
+* **Осталось.**  Таблица вставок по `nativeScanCode` на macOS
+  (`nativeVirtualKey` + подписи ⌘); упаковка `.app`/`.dmg`, `.icns`,
+  `Info.plist`, подпись; проверки на настоящем Mac.

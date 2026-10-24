@@ -88,6 +88,66 @@ half-broken.
    cannot write ICNS away from macOS).  The document icon is optional on macOS — the
    bundle icon is what Finder shows.
 
+## Findings from the code (2026-10-25)
+
+What the plan above gets right, and three corrections found by reading the code and
+the current tooling:
+
+* `executableDirectory()` indeed ends in `#else return {}`; on macOS the engine
+  finds no `stdlib` until the `_NSGetExecutablePath` branch is added.  Confirmed.
+* `settings_path()` has no `.app` rule: a frozen build inside
+  `PrologD.app/Contents/MacOS` is writable for the user, so it would put `gui.ini`
+  there — inside the bundle, which breaks the signature on the first write.  The
+  rule must recognise `Contents/MacOS` under a `.app` as *installed*.  `default_path()`
+  uses `AppConfigLocation`, which on macOS is `~/Library/Preferences/<APPNAME>` (Qt
+  docs); the file the task wants is in `~/Library/Application Support`, so macOS
+  should use `AppDataLocation` (or an explicit path), not the Preferences folder.
+  `interpreter()` also lacks `build/macos-release/src/cli`.
+* **Shortcuts, corrected:** Qt 6 by default remaps Command to
+  `Qt::ControlModifier` (`AA_MacDontSwapCtrlAndMeta` is not set), so
+  `QKeySequence("Ctrl+N")` already becomes ⌘N and the menu rows are fine.  A
+  Ctrl→Meta translation is therefore not the fix and would break the default.
+  The real gap is the *insert table*: it matches `QKeyEvent.nativeScanCode()`, and
+  the table stores Windows scan codes.  On macOS Cocoa hands the virtual key code
+  in `nativeVirtualKey` (and `nativeScanCode` is not the Windows value), so the table
+  needs macOS key codes (a second mapping keyed by `nativeVirtualKey`) or another
+  physical-key match.  The cheat sheet should print ⌘, not Ctrl, on macOS.
+
+Two more facts from the current runners and wheels:
+
+* `macos-14` is deprecated in 2026.  Available labels: `macos-15` (arm64),
+  `macos-15-intel` (x86_64), `macos-26` (arm64), `macos-26-intel` (x86_64).
+  Use `macos-15` for the first run and add the Intel label only if a second build
+  is needed.
+* The unpinned `PySide6>=6.6` currently installs 6.12, and Qt 6.12 supports macOS
+  **14.4 or newer**, with Xcode 16 / macOS 15 SDK.  `LSMinimumSystemVersion 12.0`
+  would therefore promise a system the bundled Qt cannot run on.  Either set the
+  deployment target and plist to 14.4, or pin PySide6 6.8 (Qt 6.8) and keep a
+  12.0 floor.  The C++ engine itself has no macOS-specific link requirements.
+* Whether the original `prologd` builds with AppleClang is unverified.  Its own
+  `src/CMakeLists.txt` sets `CMAKE_OSX_ARCHITECTURES "x86_64;arm64"`; try
+  `-DBUILD_WITH_PROLOGD=ON` in CI and fall back to a `prologu`-only bundle for the
+  first release if it does not.
+
+## Progress (2026-10-25)
+
+- [x] `module_loader.cpp`: the `__APPLE__` branch reads `_NSGetExecutablePath` and
+      canonicalises it; `test_module_loader.cpp` checks that the directory is real
+      and holds the test binary on every platform.
+- [x] `paths.py`: `inside_app_bundle()` recognises `Foo.app/Contents/MacOS`;
+      `settings_path()` leaves such a bundle alone; `interpreter()` searches
+      `build/macos-release/src/cli`.  `settings.py` uses `AppDataLocation` on macOS
+      (`~/Library/Application Support`) and keeps `AppConfigLocation` elsewhere.
+      Checks live in `test_paths.py` and `test_settings.py`.
+- [x] `CMakePresets.json`: `macos-release` (Ninja, Release, deployment target 14.4)
+      with build/test presets.
+- [x] `.github/workflows/macos.yml`: test-only job on `macos-15` — configure, build
+      and `ctest` on every push/PR and by hand.
+- [ ] The insert table still matches Windows scan codes; macOS needs
+      `nativeVirtualKey` and ⌘ labels (see the findings above).
+- [ ] Packaging: `.icns`, PyInstaller `.app`, `Info.plist`, ad-hoc signing, `.dmg`,
+      and the real-Mac checks.
+
 ## The bundle
 
 ```
@@ -140,11 +200,11 @@ separate file keeps the tag-triggered packaging out of every push):
 ```yaml
 jobs:
   test:                      # every push: does the engine still build on macOS?
-    runs-on: macos-14        # arm64; macos-13 is the x86_64 runner
+    runs-on: macos-15        # arm64; macos-15-intel is the x86_64 runner
     steps: checkout → cmake --preset macos-release → build → ctest
 
   package:                   # tag v* or manual dispatch
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - build the engine (Release)
       - python3 -m venv .venv && pip install -r src/gui/requirements.txt pyinstaller

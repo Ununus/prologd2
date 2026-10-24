@@ -1,0 +1,50 @@
+name: macos
+
+# The engine has never been built on macOS; this job is the honest answer to
+# «does it still compile and pass its tests there?».  Packaging the .app/.dmg is
+# a separate job in task_119, added once the engine is green.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: macOS (AppleClang, arm64)
+    # macos-15 is arm64; macos-15-intel is the x86_64 runner (macos-14 is
+    # deprecated).  The C++ engine is native-only until a universal build is
+    # decided in task_119.
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: |
+          sw_vers
+          uname -m
+          cmake --version | head -n 1
+          c++ --version | head -n 1
+      # Only the fetched *sources* are cached, never a build tree: a FetchContent
+      # build directory carries absolute paths and its own CMake cache, and a stale
+      # one is a failure that looks like a source problem.
+      - name: Cache FetchContent sources
+        uses: actions/cache@v4
+        with:
+          path: |
+            src/3rdparty/catch2-src
+            src/3rdparty/cli11-src
+            src/3rdparty/json-*
+          key: fetchcontent-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('CMakeLists.txt') }}
+      - name: Configure
+        run: cmake --preset macos-release
+      - name: Build
+        run: cmake --build --preset macos-release
+      - name: Test
+        run: ctest --preset macos-release

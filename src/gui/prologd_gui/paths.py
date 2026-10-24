@@ -80,6 +80,24 @@ def data_root() -> pathlib.Path:
     return source_root()
 
 
+def inside_app_bundle() -> bool:
+    """Whether a frozen build runs from `Foo.app/Contents/MacOS` (task_119).
+
+    A macOS bundle is an *installed* copy even when the user owns it: the folder
+    may be signed, and writing `gui.ini` beside the executable would change the
+    bundle's contents and break the signature.  A copy of the same folder *outside*
+    a `.app` is still portable, exactly like the Windows folder on a flash drive.
+    """
+    if sys.platform != "darwin" or not frozen():
+        return False
+    root = data_root()
+    return (
+        root.name == "MacOS"
+        and root.parent.name == "Contents"
+        and root.parent.parent.suffix == ".app"
+    )
+
+
 def resource(name: str) -> pathlib.Path:
     """Read-only data that travels with the program (the icons)."""
     bundled = getattr(sys, "_MEIPASS", None)
@@ -109,8 +127,15 @@ def settings_path() -> pathlib.Path | None:
     A folder it cannot write to at all (a CD, a share opened read-only) falls back to
     AppData as well: a `gui.ini` that fails at every close is worse than one away
     from the folder.
+
+    A macOS `.app` is installed whatever its owner: writing beside the executable
+    would change the bundle's contents and break its signature (task_119), so it
+    answers AppData too — `~/Library/Application Support/PrologD/gui`, chosen by
+    `settings.default_path`.
     """
     if not frozen():
+        return None
+    if inside_app_bundle():
         return None
     root = data_root()
     beside = root / SETTINGS_NAME
@@ -204,6 +229,7 @@ def interpreter(file_name: str = EXECUTABLE_NAME) -> str:
             data_root(),
             root / "build" / "windows-msvc" / "src" / "cli" / "Release",
             root / "build" / "linux-release" / "src" / "cli",
+            root / "build" / "macos-release" / "src" / "cli",
             root / "build" / "src" / "cli" / "Release",
             root / "build" / "src" / "cli",
         ]

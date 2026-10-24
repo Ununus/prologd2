@@ -20,10 +20,11 @@ from prologd_gui.settings import (  # noqa: E402
     DEFAULT_FONT_SIZE,
     SETTINGS,
     Settings,
+    default_location,
     default_path,
 )
 
-from PySide6.QtCore import QSettings  # noqa: E402
+from PySide6.QtCore import QSettings, QStandardPaths  # noqa: E402
 
 
 def test_defaults_are_used_on_an_empty_file(directory: pathlib.Path) -> None:
@@ -148,6 +149,28 @@ def test_the_default_path_is_under_the_user_configuration() -> None:
     assert Settings.organization in path.parts, path
     assert Settings.application in path.parts, path
     print(f"ok: default settings path is {path}")
+
+
+def test_macos_uses_application_support_not_preferences() -> None:
+    """task_119: macOS keeps `gui.ini` in Application Support, not Preferences.
+
+    Qt's `AppConfigLocation` on macOS is `~/Library/Preferences`, which is for
+    property lists and system-managed state.  The window keeps an INI file and
+    the bundle's layout names `~/Library/Application Support/PrologD/gui`.
+    """
+    saved = sys.platform
+    sys.platform = "darwin"
+    try:
+        assert default_location() == QStandardPaths.StandardLocation.AppDataLocation
+    finally:
+        sys.platform = saved
+    expected = (
+        QStandardPaths.StandardLocation.AppDataLocation
+        if sys.platform == "darwin"
+        else QStandardPaths.StandardLocation.AppConfigLocation
+    )
+    assert default_location() == expected
+    print("ok: macOS uses Application Support, the other platforms keep their config folder")
 
 
 def test_every_key_is_described_or_written_by_the_window() -> None:
@@ -435,6 +458,7 @@ def main() -> int:
     test_every_key_is_described_or_written_by_the_window()
     test_the_table_describes_usable_rows()
     test_the_default_path_is_under_the_user_configuration()
+    test_macos_uses_application_support_not_preferences()
     print("all settings checks passed")
     return 0
 

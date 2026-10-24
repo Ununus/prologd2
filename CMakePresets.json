@@ -39,6 +39,15 @@
       "inherits": "base",
       "generator": "Ninja",
       "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "macos-release",
+      "inherits": "base",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_OSX_DEPLOYMENT_TARGET": "14.4"
+      }
     }
   ],
   "buildPresets": [
@@ -50,7 +59,8 @@
       "configurePreset": "windows-msvc",
       "configuration": "Release"
     },
-    { "name": "windows-ninja", "configurePreset": "windows-ninja" }
+    { "name": "windows-ninja", "configurePreset": "windows-ninja" },
+    { "name": "macos-release", "configurePreset": "macos-release" }
   ],
   "testPresets": [
     {
@@ -72,6 +82,11 @@
     {
       "name": "windows-ninja",
       "configurePreset": "windows-ninja",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "macos-release",
+      "configurePreset": "macos-release",
       "output": { "outputOnFailure": true }
     }
   ]
