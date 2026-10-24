@@ -204,14 +204,15 @@ void BitmapGraphicsBackend::ellipse(long long x, long long y, long long rx, long
              centre_x + static_cast<long long>(radius_x), centre_y, color);
     return;
   }
-  for (long long column = halfUp(centre_x - radius_x); column <= halfUp(centre_x + radius_x);
-       ++column) {
+  for (long long column = halfUp(static_cast<double>(centre_x) - radius_x);
+       column <= halfUp(static_cast<double>(centre_x) + radius_x); ++column) {
     const double t = (static_cast<double>(column) - static_cast<double>(centre_x)) / radius_x;
     const double offset = radius_y * std::sqrt(std::max(0.0, 1.0 - t * t));
     put(column, halfUp(static_cast<double>(centre_y) - offset), color);
     put(column, halfUp(static_cast<double>(centre_y) + offset), color);
   }
-  for (long long row = halfUp(centre_y - radius_y); row <= halfUp(centre_y + radius_y); ++row) {
+  for (long long row = halfUp(static_cast<double>(centre_y) - radius_y);
+       row <= halfUp(static_cast<double>(centre_y) + radius_y); ++row) {
     const double t = (static_cast<double>(row) - static_cast<double>(centre_y)) / radius_y;
     const double offset = radius_x * std::sqrt(std::max(0.0, 1.0 - t * t));
     put(halfUp(static_cast<double>(centre_x) - offset), row, color);

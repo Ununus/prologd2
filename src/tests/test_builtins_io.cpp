@@ -394,7 +394,7 @@ TEST_CASE("the prompt of a read is written before the read") {
   REQUIRE(plain.loaded);
   REQUIRE(plain.output == "X=7\n");
 
-  for (const std::string& goal : {"ВВОДЦЕЛ(X, P)", "ВВОДЦЕЛ(X, 5)", "ВВОДСТР(X, P)",
+  for (const std::string goal : {"ВВОДЦЕЛ(X, P)", "ВВОДЦЕЛ(X, 5)", "ВВОДСТР(X, P)",
                                   "ВВОДСИМВ(X, P)", "ВВОДВЕЩ(X, 5)"}) {
     const auto result = runProgram("? " + goal + ".\n", "7\n");
     REQUIRE(result.loaded);
@@ -443,7 +443,7 @@ TEST_CASE("the stream built-ins report the current stream, or fail") {
   REQUIRE_FALSE(directory.runtimeError);
   REQUIRE(directory.output == "НЕТ\n");
 
-  for (const std::string& goal : {"ЧТЕНИЕ_ИЗ(5)", "ЗАПИСЬ_В(5)"}) {
+  for (const std::string goal : {"ЧТЕНИЕ_ИЗ(5)", "ЗАПИСЬ_В(5)"}) {
     const auto result = runProgram("? " + goal + ".\n");
     REQUIRE(result.loaded);
     REQUIRE(result.runtimeError);

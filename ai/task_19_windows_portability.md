@@ -81,6 +81,10 @@ Make the project build and pass tests on Windows (MSVC) as well as Linux.
       rejection-based mapping (ADR-049), so `test_builtins_arith.cpp`, which
       pins seed 42 to `-286924074`, holds on every platform.
 - [x] `-Werror` preset builds and tests cleanly on Linux.
+- [x] Clean build on GCC 15.2 is warning-free (58 -> 0, status 194):
+      `InputRequestKind::Character` for the shadowed `CodePoint`, by-value
+      `std::string` variables in test loops over literal lists, explicit
+      `double` casts in `graphics.cpp`.
 - [x] Cross-compiled the library, the CLI and the test binary for
       `x86_64-windows-gnu` with Zig: `libprlib.a`, `prologd.exe` and
       `prlib_tests.exe` are all valid PE32+ executables, so the Windows code

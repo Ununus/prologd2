@@ -17,7 +17,7 @@ namespace prologd {
 ///
 /// A front-end uses this to decide what to ask the user: a dialog for a whole
 /// line, a single-character prompt, or a token field.
-enum class InputRequestKind { Token, Line, CodePoint };
+enum class InputRequestKind { Token, Line, Character };
 
 /// Answers one interactive read. Returning `std::nullopt` means end of input.
 using InputRequestHandler = std::function<std::optional<std::string>(InputRequestKind)>;

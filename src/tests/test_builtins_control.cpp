@@ -139,7 +139,7 @@ TEST_CASE("negation keeps what a goal did to the database") {
 }
 
 TEST_CASE("negation answers a goal that is not a predicate with an error") {
-  for (const std::string& goal : {"НЕ(5)", "НЕ(X)"}) {
+  for (const std::string goal : {"НЕ(5)", "НЕ(X)"}) {
     const auto result = runProgram("? " + goal + ".\n");
     REQUIRE(result.loaded);
     REQUIRE(result.runtimeError);
@@ -361,7 +361,7 @@ TEST_CASE("a cut inside a branch is local to that branch") {
 }
 
 TEST_CASE("the choice form answers a goal that is not a predicate with an error") {
-  for (const std::string& goal : {"ПЕРВОЕ(5, НЕ(ЛОЖЬ))", "ПЕРВОЕ(ЛОЖЬ, 5)", "ПЕРВОЕ(X, НЕ(ЛОЖЬ))"}) {
+  for (const std::string goal : {"ПЕРВОЕ(5, НЕ(ЛОЖЬ))", "ПЕРВОЕ(ЛОЖЬ, 5)", "ПЕРВОЕ(X, НЕ(ЛОЖЬ))"}) {
     const auto result = runProgram("? " + goal + ".\n");
     REQUIRE(result.loaded);
     REQUIRE(result.runtimeError);

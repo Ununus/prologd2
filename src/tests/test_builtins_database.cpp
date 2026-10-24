@@ -82,7 +82,7 @@ TEST_CASE("the built-ins are not also database clauses") {
 }
 
 TEST_CASE("the clause counter: a bad name or count is an error") {
-  for (const std::string& goal : {"СКОЛЬКО(5, N)", "СКОЛЬКО(X, N)", "СКОЛЬКО(прим, \"1\")"}) {
+  for (const std::string goal : {"СКОЛЬКО(5, N)", "СКОЛЬКО(X, N)", "СКОЛЬКО(прим, \"1\")"}) {
     checkBadArguments(goal, "СКОЛЬКО");
   }
   // Арность, для которой ничего не зарегистрировано, не может сработать: об
@@ -142,7 +142,7 @@ TEST_CASE("the clause reader renames the variables of the clause") {
 }
 
 TEST_CASE("the clause reader rejects a bad name or number") {
-  for (const std::string& goal : {"ПРЕДЛ(5, 1, H, B)", "ПРЕДЛ(прим, X, H, B)",
+  for (const std::string goal : {"ПРЕДЛ(5, 1, H, B)", "ПРЕДЛ(прим, X, H, B)",
                                   "ПРЕДЛ(прим, \"1\", H, B)"}) {
     checkBadArguments(goal, "ПРЕДЛ");
   }
@@ -180,7 +180,7 @@ TEST_CASE("the term converter builds a term from a list of any length") {
 TEST_CASE("the term converter: an empty or open list is an error, a bad shape is a failure") {
   // Пустой список не описывает ни один терм, и список с «хвостом» — тоже не
   // список: это ошибка, а не неудача.
-  for (const std::string& goal : {"ТЕРМ(T, [])", "ТЕРМ(T, [прим | 1])"}) {
+  for (const std::string goal : {"ТЕРМ(T, [])", "ТЕРМ(T, [прим | 1])"}) {
     const auto result = runProgram("? " + goal + ".\n");
     REQUIRE(result.loaded);
     REQUIRE(result.runtimeError);
@@ -282,7 +282,7 @@ TEST_CASE("the assert built-in renumbers the variables of the clause") {
 }
 
 TEST_CASE("the assert built-in rejects a head or a goal that cannot be called") {
-  for (const std::string& goal : {"ДОБ(5, [], 1)", "ДОБ(X, [], 1)", "ДОБ(факт, 5, 1)",
+  for (const std::string goal : {"ДОБ(5, [], 1)", "ДОБ(X, [], 1)", "ДОБ(факт, 5, 1)",
                                   "ДОБ(факт, [], \"1\")", "ДОБ(факт, [], X)",
                                   "ДОБ(факт, [1], 1)", "ДОБ(факт, [X], 1)"}) {
     checkBadArguments(goal, "ДОБ");
@@ -367,7 +367,7 @@ TEST_CASE("the retract built-in: a name without clauses fails, a bad argument is
   REQUIRE_FALSE(missing.runtimeError);
   REQUIRE(missing.output == "НЕТ\n");
 
-  for (const std::string& goal : {"УДАЛЕНИЕ(5, 1)", "УДАЛЕНИЕ(прим, X)",
+  for (const std::string goal : {"УДАЛЕНИЕ(5, 1)", "УДАЛЕНИЕ(прим, X)",
                                   "УДАЛЕНИЕ(прим, \"1\")"}) {
     checkBadArguments(goal, "УДАЛЕНИЕ");
   }

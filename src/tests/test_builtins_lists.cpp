@@ -69,7 +69,7 @@ TEST_CASE("sort refuses a list that is not a proper list") {
   // first argument: a listlike tail (`[1 | 2]`), something that is not a list,
   // and a list that contains itself — the last is why the walk is guarded, a
   // plain walk would follow the cycle forever.
-  for (const std::string& goal :
+  for (const std::string goal :
        {"СОРТИРОВКА([1 | 2], С)", "СОРТИРОВКА(Х, С)",
         "РАВНО(Ц, [1 | Ц]), СОРТИРОВКА(Ц, С)"}) {
     INFO("goal: " << goal);
@@ -124,7 +124,7 @@ TEST_CASE("sort with an order sign refuses anything but the four signs") {
   // The order is an atom from a set of four: `<` and `>` are arithmetic, not the
   // standard order, and a bare word is a typo.  An improper list keeps the short
   // message — it is a list, just not one that ends.
-  for (const std::string& goal :
+  for (const std::string goal :
        {"СОРТИРОВКА(<, [1], С)", "СОРТИРОВКА(порядок, [1], С)",
         "СОРТИРОВКА(@<, [1 | 2], С)"}) {
     INFO("goal: " << goal);

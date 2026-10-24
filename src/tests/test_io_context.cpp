@@ -46,7 +46,7 @@ class ScriptedInput {
         case InputRequestKind::Line:
           text += "line,";
           break;
-        case InputRequestKind::CodePoint:
+        case InputRequestKind::Character:
           text += "codepoint,";
           break;
       }

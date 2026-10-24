@@ -133,7 +133,7 @@ TEST_CASE("a list is compared only with a list of comparable elements") {
   // Kinds do not mix: a list is not comparable with a number or with text, and
   // the elements obey the same rule — a number against an atom inside a list is
   // the same refusal.
-  for (const std::string& goal :
+  for (const std::string goal :
        {"БОЛЬШЕ([1,2], 5)", "БОЛЬШЕ(5, [1,2])", "БОЛЬШЕ([1], [аня])",
         "БОЛЬШЕ([Х], [1])"}) {
     INFO("goal: " << goal);
@@ -398,7 +398,7 @@ TEST_CASE("the arithmetic built-ins report a wrong type as an error") {
 
   // `is_whole` and `is_number` have an error of their own: the argument is a
   // number or it is nothing, and «ошибка преобразования типа» says which.
-  for (const std::string& goal :
+  for (const std::string goal :
        {"is_whole(\"4\")", "is_number(\"4\")", "is_whole(X)", "is_number(X)"}) {
     const auto result = runProgram("?" + goal + ".\n");
     REQUIRE(result.loaded);

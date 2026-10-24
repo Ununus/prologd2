@@ -174,7 +174,7 @@ void addLocation(Json& event, const SourceLocation& location) {
       return "token";
     case InputRequestKind::Line:
       return "line";
-    case InputRequestKind::CodePoint:
+    case InputRequestKind::Character:
       return "codepoint";
   }
   return "line";

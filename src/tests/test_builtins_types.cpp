@@ -32,7 +32,7 @@ TEST_CASE("the variable test is true exactly for an unbound variable") {
 TEST_CASE("a type test with an unregistered arity is an error") {
   // Each of these names has exactly one arity, so a two-argument call can never
   // succeed; the load stops with the message instead of a silent `НЕТ`.
-  for (const std::string& goal :
+  for (const std::string goal :
        {"ПЕР(X, X)", "ЦЕЛ(1, 1)", "ВЕЩ(1.0, 1.0)", "СИМВ(a, a)", "СПИСОК([], [])",
         "ПОЛНЫЙ([], [])"}) {
     const auto result = runProgram("?" + goal + ".\n");
@@ -173,7 +173,7 @@ TEST_CASE("a cyclic term is written, not followed") {
 TEST_CASE("a cyclic term cannot be copied") {
   // `ДОБ` and `НАЙТИВСЕ` copy what they are given, and a cyclic term has no
   // finite copy: they say so instead of recursing until the stack ends.
-  for (const std::string& goal : {"?РАВНО(X, f(X)), ДОБ(X, [], 1).\n",
+  for (const std::string goal : {"?РАВНО(X, f(X)), ДОБ(X, [], 1).\n",
                                   "?РАВНО(X, f(X)), НАЙТИВСЕ(X, НЕ(ЛОЖЬ), L).\n"}) {
     const auto result = runProgram(goal);
     REQUIRE(result.loaded);

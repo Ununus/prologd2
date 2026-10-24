@@ -179,7 +179,7 @@ std::optional<CodePoint> IoContext::readCodePoint() {
       return decoded.code_point;
     }
     std::string line;
-    if (!fetchLine(line, InputRequestKind::CodePoint)) {
+    if (!fetchLine(line, InputRequestKind::Character)) {
       has_current_line_ = false;
       return std::nullopt;
     }

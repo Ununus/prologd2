@@ -81,7 +81,7 @@ TEST_CASE("a meta-call with extra arguments is call/N") {
 }
 
 TEST_CASE("a meta-call with extra arguments refuses a non-callable goal") {
-  for (const std::string& goal : {"ВЫП(5, 1)", "ВЫП(X, 1)"}) {
+  for (const std::string goal : {"ВЫП(5, 1)", "ВЫП(X, 1)"}) {
     const auto result = runProgram("? " + goal + ".\n");
     REQUIRE(result.loaded);
     REQUIRE(result.runtimeError);

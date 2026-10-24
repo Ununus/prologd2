@@ -192,7 +192,7 @@ TEST_CASE("a retired spelling is still a predicate name, not a variable") {
   // `НАЙТИВСЁ` (with ё) left the language in task_44 and `substring` in task_84;
   // the lexer keeps both reserved so a call reaches the checks and is told what
   // happened, instead of failing as an upper-case variable.
-  for (const std::string& spelling : {"НАЙТИВСЁ", "substring"}) {
+  for (const std::string spelling : {"НАЙТИВСЁ", "substring"}) {
     INFO("spelling: " << spelling);
     DiagnosticSink sink;
     const auto tokens = lex(spelling, sink);
