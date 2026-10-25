@@ -7075,3 +7075,29 @@ of the package».  Отдельно: 25 оконных наборов и `protoc
   `true`.
 * **Осталось.**  Просмотреть черновик, нажать Publish (`gh release edit v2.6.1
   --draft=false`) и прогнать smoke-test скачанных файлов.
+
+### 207. v2.6.1 опубликован; smoke-test скачанного .deb
+
+* **Публикация.**  Владелец нажал Publish: `isDraft` false, `publishedAt`
+  2026-10-25T00:19:19Z, метка Latest, все четыре файла в состоянии `uploaded`.
+* **Проверка .deb из релиза.**  Скачан заново
+  (`sha256 45756c5a... badd9013f`): `Version: 2.6.1`, `Depends: libc6 (>= 2.39)`;
+  в дереве `prologu`, `prologd`, `prologd-gui`, `doc`, `examples`, `stdlib`;
+  `prologu --version` = `Пролог-У 2.6.1 (2026-10-24)`, урок 1 отрабатывает,
+  оригинальный движок печатает 67 строк ключевых слов, `.desktop` и MIME на месте.
+* **Исправление «Показать в проводнике» внутри пакета.**  Строки в собранном не
+  ищутся: PyInstaller держит модули приложения в сжатом `PYZ` внутри
+  исполняемого файла.  Распаковано через `PyInstaller.archive.readers`:
+  `prologd_gui.paths`, `.settingsdialog` и `.window` содержат
+  `without_bundled_environment` / `external_environment`, то есть `d701346` в
+  релизе есть.
+* **Найдено расхождение.**  В `_internal` Linux-пакета лежат Qt-библиотеки, которых
+  окно не загружает: `Qt6Qml*`, `Qt6Quick`, `Qt6Pdf`, `Qt6VirtualKeyboard*`,
+  `Qt6Network` - 22,95 MiB в распакованном виде.  `build_portable.ps1` удаляет их
+  списком `$trimmedFiles` и проверяет `check_dependencies.py`, а `build_deb.sh`
+  полагается на `--exclude-module`, который на Linux данные PySide6 не убирает
+  (на Windows это отмечено в комментарии: «the DLLs stayed»).  Отсюда 66,2 MiB
+  против 42,5 MiB у zip.
+* **Осталось.**  Повторить обрезку в `build_deb.sh` (файлы и плагины, затем
+  offscreen-запуск окна уже есть в шаге 7) и выпустить это в следующей версии;
+  smoke-test установщика Windows и `.dmg` на настоящем Mac.
