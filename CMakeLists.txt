@@ -175,34 +175,25 @@ if(BUILD_WITH_PROLOGD)
   set(PROLOGD_ENGINE_REPOSITORY "https://github.com/Ununus/prologd.git"
       CACHE STRING "Where the original engine is taken from")
   # A commit, never a branch: `master` moves, and the engine a front-end is checked
-  # against must not change under our feet.  The pinned one answers protocol 13 —
-  # a *documented subset* of ours (its own `src/protocol.cpp` says so): the requests
+  # against must not change under our feet.  The pinned one answers protocol 13 — a
+  # *documented subset* of ours (its own `src/protocol.cpp` says so): the requests
   # and events both engines share exist, stepping, tracing, formatting and graphics
-  # do not.  Bumped in part 133 to the commit that made its paths UTF-8
-  # (`ce23afb`): a Cyrillic file name on the command line, in `-I` and in
-  # `?ИМПОРТ("…")` is taken as it was typed.  Bumped in part 139 to `cf4001e` —
-  # «БОЛЬШЕ: сравнение списков» (`112e241`) together with the commit that put
-  # `prlib/extfunc.cpp` back into CP1251: that file had been re-saved as UTF-8 and
-  # every message from it came out as garbage, which is why the pin waited (part
-  # 138).  Bumped in part 140 to c36f101 — «Предикат СОРТИРОВКА»: its СОРТИРОВКА/2
-  # orders by the comparison of БОЛЬШЕ and refuses lists of mixed kinds, which
-  # ours does not (ours follows the standard order, task_90).  Bumped in part 143 to
-  # 823a9d1, which moved the built-in reference into the engine (`doc/builtins.json`)
-  # and generated its manual in Typst (`doc/help.typ`, `doc/style.typ`): a package
-  # that ships only this engine takes both from here instead of ours (part 143).  # Bumped in part 164 to daf6b1b — «Атомы в кавычках и переменные с
-  # подчёркиванием»: the old dialect reads `'атом'` (the quotes are not part of the
-  # name, so `'атом'` and `атом` are one constant, and an unclosed quote is its
-  # error 45) and `_имя` (a variable, with `_Пер'` the same variable as `_Пер`).
-  # That is the half of the naming gap that made task_99's reverse direction turn
-  # atoms into strings; ours follows the same rules since task_100.  #
+  # do not.
+  #
+  # The pin is also what makes the old engine usable beside this one: it reads UTF-8
+  # paths, `'атомы'` in quotes and `_имя` variables the way we do.  Its comparison
+  # predicates keep their own semantics (`БОЛЬШЕ`, `СОРТИРОВКА/2`), which ours do not
+  # copy — that difference is deliberate (task_90).  Every move of the pin has its
+  # part in `ai/status.md` (133, 139, 140, 143, 164); this file carries the rule, not
+  # the history.
+  #
   # Not a cache variable on purpose: a cache entry is written once, by the first
-  # configure, and every later bump of the pin would then be invisible in a tree
-  # that has already been built.  To build against another commit, point
+  # configure, and every later bump of the pin would then be invisible in a tree that
+  # has already been built.  To build against another commit, point
   # `PROLOGD_ENGINE_SOURCE` at a clone of it — that is the override this file
   # documents.  A tree configured before this rule may still carry
-  # `PROLOGD_ENGINE_COMMIT` in `CMakeCache.txt` (7b7f46f here, for instance): the
-  # ordinary `set()` below shadows that entry, so the number in the cache means
-  # nothing and is not the pin.
+  # `PROLOGD_ENGINE_COMMIT` in `CMakeCache.txt`: the ordinary `set()` below shadows
+  # that entry, so the number in the cache means nothing and is not the pin.
   set(PROLOGD_ENGINE_COMMIT "daf6b1bf60a68200268adc81f8e7e4cb9ce65603")
   set(PROLOGD_ENGINE_SOURCE ""
       CACHE PATH "An existing clone of the original engine; skips the download")
