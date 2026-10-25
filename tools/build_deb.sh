@@ -5,6 +5,7 @@
 #   tools/build_deb.sh --skip-tests    quick repack; the build tree is reused
 #   tools/build_deb.sh --skip-docs     reuse the PDFs already in doc/
 #   tools/build_deb.sh --skip-freeze   reuse dist/prologd-gui
+#   tools/build_deb.sh --no-trim       keep the Qt files the freeze produced
 #
 # The package mirrors the portable Windows folder, with Debian's own places: the
 # engines, the frozen window, doc/*.pdf, examples and stdlib live together in
@@ -33,12 +34,44 @@ PYTHON=${PYTHON:-$ROOT/.venv/bin/python}
 JOBS=${JOBS:-$(nproc 2>/dev/null || echo 2)}
 DOCUMENTS=(help technical prologd-diff gui lessons library)
 
+#: Qt pieces the window never loads, relative to /opt/prologd (task_118).  Freezing
+#: keeps them whatever `--exclude-module` says: PySide6 ships its Qt libraries as
+#: data of the whole package, which was measured on Windows too (build_portable.ps1,
+#: `$trimmedFiles`).  The `libQt6*.so.6` names without a folder are the loader's
+#: symlinks to the files under `PySide6/Qt/lib`, and the four plugins are only
+#: reachable through the libraries above (`libqvnc` needs Qt6Network).
+TRIMMED=(
+    _internal/libQt6Network.so.6
+    _internal/libQt6Pdf.so.6
+    _internal/libQt6Qml.so.6
+    _internal/libQt6QmlMeta.so.6
+    _internal/libQt6QmlModels.so.6
+    _internal/libQt6QmlWorkerScript.so.6
+    _internal/libQt6Quick.so.6
+    _internal/libQt6VirtualKeyboard.so.6
+    _internal/libQt6VirtualKeyboardQml.so.6
+    _internal/PySide6/Qt/lib/libQt6Network.so.6
+    _internal/PySide6/Qt/lib/libQt6Pdf.so.6
+    _internal/PySide6/Qt/lib/libQt6Qml.so.6
+    _internal/PySide6/Qt/lib/libQt6QmlMeta.so.6
+    _internal/PySide6/Qt/lib/libQt6QmlModels.so.6
+    _internal/PySide6/Qt/lib/libQt6QmlWorkerScript.so.6
+    _internal/PySide6/Qt/lib/libQt6Quick.so.6
+    _internal/PySide6/Qt/lib/libQt6VirtualKeyboard.so.6
+    _internal/PySide6/Qt/lib/libQt6VirtualKeyboardQml.so.6
+    _internal/PySide6/Qt/plugins/generic/libqtuiotouchplugin.so
+    _internal/PySide6/Qt/plugins/imageformats/libqpdf.so
+    _internal/PySide6/Qt/plugins/platforminputcontexts/libqtvirtualkeyboardplugin.so
+    _internal/PySide6/Qt/plugins/platforms/libqvnc.so
+)
+
 skip_tests=0
 skip_docs=0
 skip_freeze=0
+skip_trim=0
 
 show_help() {
-    sed -n '2,24p' "$0"
+    sed -n '2,23p' "$0"
 }
 
 while [ $# -gt 0 ]; do
@@ -46,6 +79,7 @@ while [ $# -gt 0 ]; do
         --skip-tests) skip_tests=1 ;;
         --skip-docs) skip_docs=1 ;;
         --skip-freeze) skip_freeze=1 ;;
+        --no-trim) skip_trim=1 ;;
         -h|--help) show_help; exit 0 ;;
         *) echo "unknown option: $1" >&2; exit 2 ;;
     esac
@@ -142,6 +176,27 @@ mkdir -p "$TREE/opt/prologd/doc" "$TREE/usr/bin" \
          "$TREE/usr/share/icons/hicolor" "$TREE/usr/share/doc/prologd" \
          "$TREE/usr/share/lintian/overrides" "$TREE/DEBIAN"
 cp -a "$GUI_DIST/." "$TREE/opt/prologd/"
+
+# The freeze keeps Qt pieces the window never loads; dropping them takes about 23
+# MiB out of the package (measured on the 2.6.1 `.deb`).  The offscreen start below
+# is what says the window still runs without them.
+if [ "$skip_trim" -eq 0 ]; then
+    freed=0
+    for relative in "${TRIMMED[@]}"; do
+        target="$TREE/opt/prologd/$relative"
+        if [ ! -e "$target" ] && [ ! -L "$target" ]; then
+            continue
+        fi
+        size=$(du -sk -- "$target" | cut -f1)
+        rm -rf -- "$target"
+        freed=$((freed + size))
+        printf 'trimmed : %s (%s KiB)\n' "$relative" "$size"
+    done
+    printf 'trimmed : %s KiB of Qt files no window of ours loads\n' "$freed"
+else
+    echo 'trimmed : skipped (--no-trim)'
+fi
+
 install -m 0755 "$PROLOGU" "$TREE/opt/prologd/prologu"
 install -m 0755 "$PROLOGD" "$TREE/opt/prologd/prologd"
 for name in "${DOCUMENTS[@]}"; do
@@ -155,6 +210,7 @@ install -m 0755 installer/linux/prologd-gui "$TREE/usr/bin/prologd-gui"
 install -m 0644 installer/linux/prologd.desktop "$TREE/usr/share/applications/prologd.desktop"
 install -m 0644 installer/linux/prologd.xml "$TREE/usr/share/mime/packages/prologd.xml"
 cp -a installer/linux/icons/hicolor/. "$TREE/usr/share/icons/hicolor/"
+
 install -m 0644 installer/linux/copyright "$TREE/usr/share/doc/prologd/copyright"
 install -m 0644 installer/linux/lintian-overrides "$TREE/usr/share/lintian/overrides/prologd"
 {
@@ -191,6 +247,21 @@ if [ "$status" -ne 124 ]; then
     fail "the frozen window did not stay up (exit $status)"
 fi
 rm -f "$TREE/opt/prologd/gui.ini"
+if [ "$skip_trim" -eq 0 ]; then
+    # A trimmed library that something still names would be found on this machine
+    # (system Qt) and nowhere on a user's: ask every remaining binary what it
+    # needs, and refuse a name that was taken away.
+    trimmed_names=$(printf '%s\n' "${TRIMMED[@]}" | sed -e 's|.*/||' | sort -u)
+    still_wanted=$(find "$TREE/opt/prologd" -type f \( -name '*.so*' -o -name 'prologd-gui' \) \
+        -print0 | xargs -0 -r readelf -d 2>/dev/null |
+        grep -oE 'libQt6[A-Za-z0-9]+\.so[0-9.]*' | sort -u |
+        while read -r name; do
+            if printf '%s\n' "$trimmed_names" | grep -qx -- "$name"; then
+                echo "$name"
+            fi
+        done)
+    [ -z "$still_wanted" ] || fail "the package still asks for the trimmed $still_wanted"
+fi
 echo "engines : prologu $VERSION, prologd $legacy_keywords keyword lines"
 echo 'window  : the frozen prologd-gui starts offscreen'
 

@@ -263,11 +263,30 @@ size, the dependency list `apt` pulled in, and anything that needed a manual ste
       user data and stays through both, on purpose.
 - [ ] Step 7, still for a person: the menu entry, «Открыть с помощью», a fresh
       user, and the visual pass with a display (step 2's list).
+- [x] Trimming (2026-10-25): `--exclude-module` does not take PySide6's Qt data with
+      it, so the 2.6.1 package carried `Qt6Qml*`, `Qt6Quick`, `Qt6Pdf`,
+      `Qt6VirtualKeyboard*` and `Qt6Network` — 23 MiB unpacked, measured on the
+      published `.deb`.  `tools/build_deb.sh` now removes the same pieces by name
+      (`TRIMMED`, mirroring `$trimmedFiles` of `build_portable.ps1`) plus the four
+      plugins only they reach: `libqvnc` and `qtuiotouchplugin` need Qt6Network,
+      `libqpdf` needs Qt6Pdf, the virtual-keyboard input context needs the rest.
+      Step 7 then asks every remaining binary what it needs (`readelf -d`) and
+      refuses a name that was taken away — the offscreen start alone cannot judge
+      this, because a machine with system Qt would happily load a replacement.
+      `--no-trim` keeps the old behaviour.
 
 Built: `dist/prologd_2.6.0_amd64.deb`, 57,735,990 bytes (56 MiB), Installed-Size
 185,908 KiB, 528 entries.  `Depends: libc6 (>= 2.43), libgl1,
 libxkbcommon-x11-0, libxcb-cursor0, libfontconfig1, libdbus-1-3`;
 `Recommends: xdg-utils`.
+
+The 2.6.1 package as published was 66,242,272 bytes, Installed-Size 216,304 KiB
+(the CI runner installs the newest PySide6 and its own glibc, which made
+`libc6 (>= 2.39)`).  Measured on one machine, with the same sources and the same
+`dpkg-deb` (zstd): 57,737,522 bytes without the trimming against 50,172,334 with
+it — 7.57 MB (13%) less compressed, and Installed-Size 185,920 -> 162,128 KiB,
+23.2 MiB less unpacked.  Compression gains less than unpacking: Qt libraries pack
+about three to one.
 
 ## Rules that carry over from the Windows work
 
