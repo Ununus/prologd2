@@ -5,19 +5,27 @@
 
 namespace prologd {
 
-/// The product the engine calls itself (task_76: «Пролог-У»), injected by CMake.
+/// What the program calls itself on the command line: `prologd`, injected by CMake.
 std::string_view productName();
 
 /// Semantic version of the interpreter, injected by CMake.
 std::string_view versionString();
 
-/// Human readable build date, injected by CMake.
-std::string_view buildDateString();
-
-/// `Пролог-У 2.4.0 (2026-10-20)` — what `--version` and the built-in `ВЕРСИЯ` print.
+/// The day the release was cut, `YYYY-MM-DD`, injected by CMake.
 ///
-/// One function for the two callers on purpose: they printed the same string before
-/// it existed, in two copies, and a version bump had to find both (task_76).
+/// A *release* date and not a build date: `--version` has to be the same string on
+/// every machine that builds the same tag.
+std::string_view releaseDateString();
+
+/// `prologd 2.6.1 (2026-10-25)` — what `--version` prints.
 std::string versionBanner();
+
+/// The version the *language* reports through `ВЕРСИЯ`.
+///
+/// It does not follow the interpreter's own version and never will: the number is
+/// part of the dialect as the course's programs know it, and a lesson that prints it
+/// has to keep printing it after a release.  `2.6.1` is what the program is;
+/// `27.1` is what the language is.
+inline constexpr std::string_view kDialectVersion = "27.1";
 
 }  // namespace prologd

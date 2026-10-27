@@ -59,8 +59,8 @@ function Find-Package([string]$Given) {
         Fail 'no package in dist: run .\tools\build_portable.ps1 first (or drop -SkipPackage)'
     }
     $folder = $folders[0]
-    if (-not (Test-Path (Join-Path $folder.FullName 'prologu.exe'))) {
-        Fail ("the package carries no prologu.exe: {0}" -f $folder.Name)
+    if (-not (Test-Path (Join-Path $folder.FullName 'prologd.exe'))) {
+        Fail ("the package carries no prologd.exe: {0}" -f $folder.Name)
     }
     return $folder
 }

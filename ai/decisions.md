@@ -1806,3 +1806,31 @@ stays is the *reading* of ISO spellings — English built-in names, `=`, `is`, `
 built-ins (ADR-039).  A reader with a program in the previous dialect has to rewrite
 its names by hand; the two rules that do most of the work are «one letter is a name,
 not a variable» and «a long variable ends with an apostrophe».
+
+## ADR-055: the program is `prologd`, and the language is 27.1
+
+**Context.**  The engine had been renamed «Пролог-У» when the branch became
+ISO-compatible (task_75/task_76): the target was `prologu`, the manuals said
+«Пролог-У» and «Пролог-Д 2.0», the banner carried the build timestamp, and `ВЕРСИЯ`
+printed that banner.  With the second engine gone (ADR-052) and the naming modes gone
+(ADR-054) there is one interpreter in the repository, and two names for it — ours and
+the previous one — read as two programs that are no longer there.
+
+**Decision.**  One name: `prologd` — the target, the executable, and the word in every
+manual, script and example.  No «Пролог-У», no «2.x», no «2.0»: the product is
+«Пролог-Д», the language it reads is Пролог-Д, and the only number is the release.
+
+**Two versions, on purpose.**  `prologd --version` prints `prologd 2.6.1
+(2026-10-25)` — the *program*, with the day its release was cut (`PROLOGD_RELEASE_DATE`
+in the top `CMakeLists.txt`, bumped with `VERSION`; a build timestamp would make the
+same tag print differently on two machines).  `?ВЕРСИЯ` prints `27.1` — the
+*language*, a constant (`kDialectVersion`) that never follows a release, because the
+course's programs and lessons print it and a lesson that prints a version has to keep
+printing it.  The two are not the same question: «which build am I running» is asked of
+the console, «which dialect is this» of the program.
+
+**Consequences.**  A lesson may now promise the `ВЕРСИЯ` line: the appendix prints
+`27.1` and `ДА` and is checked like any other question.  A package keeps one binary
+named `prologd`, so `/opt/prologd/prologd` is no longer a name that could be confused
+with the original engine's `prologd.exe` — the original is not built any more
+(ADR-052).

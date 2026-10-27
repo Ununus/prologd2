@@ -1,6 +1,6 @@
 """Headless checks of the keyword table (the `ready` event and `--list-keywords`).
 
-    python src/gui/tests/test_keywords.py [path-to-prologu]
+    python src/gui/tests/test_keywords.py [path-to-prologd]
 
 Qt-free and framework-free, like the other front-end tests.  Without an
 interpreter argument the script looks for the newest build and, if there is
@@ -116,7 +116,7 @@ def find_executable(argv: list[str]) -> str | None:
 
 
 def test_list_lines_build_the_same_table() -> None:
-    """`prologu --list-keywords` is what the window fetches at startup."""
+    """`prologd --list-keywords` is what the window fetches at startup."""
     table = Keywords.from_event(
         {
             "keywords": [
@@ -176,7 +176,7 @@ def main(argv: list[str]) -> int:
 
     executable = find_executable(argv)
     if executable is None:
-        print("skipped: no prologu build found, pass its path to check the interpreter")
+        print("skipped: no prologd build found, pass its path to check the interpreter")
         return 0
     print(f"interpreter: {executable}")
     test_against_the_interpreter(executable)

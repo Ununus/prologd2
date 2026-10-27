@@ -250,9 +250,10 @@ BuiltinResult builtinQuiet(Engine& engine, std::span<const Term>) {
   return BuiltinResult::Continue;
 }
 
+/// `ВЕРСИЯ` prints the version of the *language*, not of the program: see
+/// `kDialectVersion`.  `prologd --version` is where the release number lives.
 BuiltinResult builtinVersion(Engine& engine, std::span<const Term>) {
-  const std::string text(versionBanner());
-  engine.io().write(text);
+  engine.io().write(kDialectVersion);
   engine.io().newline();
   return BuiltinResult::Continue;
 }

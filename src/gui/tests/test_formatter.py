@@ -1,6 +1,6 @@
 """Headless check of the formatter over the protocol (no Qt needed).
 
-    python src/gui/tests/test_formatter.py [path-to-prologu]
+    python src/gui/tests/test_formatter.py [path-to-prologd]
 
 What the window's **Форматировать** will do is done here without a window: the
 text goes out as a `format` request and the laid-out text comes back in a
@@ -55,7 +55,7 @@ def check_default_executable() -> str:
 
     executable = paths.interpreter()
     if not pathlib.Path(executable).is_file():
-        raise SystemExit("build prologu first, or pass its path as an argument")
+        raise SystemExit("build prologd first, or pass its path as an argument")
     return executable
 
 

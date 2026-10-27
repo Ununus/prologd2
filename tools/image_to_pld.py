@@ -310,7 +310,7 @@ def pld_name(name: str) -> str:
 
 
 def drawing_lines(canvas_cell: int) -> list[str]:
-    """The predicate that paints the facts, broken the way `prologu --format soft` is.
+    """The predicate that paints the facts, broken the way `prologd --format soft` is.
 
     A cell of one dot needs no arithmetic, and `X1 * 1 + 0` in a teaching example is
     only noise.  The head line ends on column 80 for a cell of two digits, which is

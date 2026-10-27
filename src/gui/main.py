@@ -45,7 +45,7 @@ def report_missing_interpreter(executable: str) -> int:
     QApplication(sys.argv[:1])  # a box needs an application object first
     QMessageBox.critical(
         None,
-        "Пролог-Д 2.0",
+        "Пролог-Д",
         f"Рядом с окном нет интерпретатора {name}.\n\n"
         f"Искали здесь: {executable}\n"
         f"Папка сборки: {paths.data_root()}\n\n"
@@ -71,7 +71,7 @@ class WindowParser(argparse.ArgumentParser):
         QApplication(sys.argv[:1])  # a box needs an application object first
         QMessageBox.critical(
             None,
-            "Пролог-Д 2.0",
+            "Пролог-Д",
             f"Не понимаю аргументы командной строки:\n{message}",
         )
         raise SystemExit(2)

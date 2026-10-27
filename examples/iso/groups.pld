@@ -4,7 +4,7 @@
 % setof - то же, но список группы отсортирован и без повторов;
 % D^Цель - "D не важно": переменная не дробит группы.
 %
-% Запуск:  prologu -s examples/iso/groups.pld
+% Запуск:  prologd -s examples/iso/groups.pld
 
 автор(gnu, диаса).
 автор(gnu, драйвер).

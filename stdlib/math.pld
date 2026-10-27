@@ -3,7 +3,7 @@
 % Предикаты над встроенной арифметикой:
 % gcd, lcm, power, factorial, is_prime, has_divisor, primes
 %
-% Подключение:  prologu -I stdlib -s программа.pld  и в программе
+% Подключение:  prologd -I stdlib -s программа.pld  и в программе
 %   :- ИМПОРТ("math.pld").
 %
 % Директива подключает iso.pld: between/3, здесь на нём построены primes/2.

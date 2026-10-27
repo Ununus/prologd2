@@ -1,10 +1,14 @@
-# prologd2
+<div align="center">
 
 <p align="center">
   <img src="doc/prologd2.png" width="64" height="64" alt="Логотип Пролог-Д">
 </p>
 
-Переписанный интерпретатор логического программирования **PrologD** на C++23: синтаксис, близкий к ISO, нативная поддержка UTF-8 и встроенные предикаты на русском языке. Новый графический интерфейс на PySide6.
+# Пролог-Д
+
+Интерпретатор логического программирования **Пролог-Д** на C++23: синтаксис, близкий к ISO, нативная поддержка UTF-8 и встроенные предикаты на русском языке. Графический интерфейс на PySide6 (Qt).
+
+</div>
 
 ## История
 
@@ -26,14 +30,12 @@
 ```sh
 sudo apt install dist/prologd_<version>_amd64.deb
 ```
-Запуск
+
+### Запуск
 ```sh
-/opt/prologd/prologu --version
+/opt/prologd/prologd --version
 prologd-gui
-# Открыть первый урок
 prologd-gui /opt/prologd/examples/lessons/lesson_01.pld
-# Файл настроек (после первого запуска)
-ls ~/.config/PrologD/gui/gui.ini
 ```
 ### Удаление
 ```sh
@@ -44,7 +46,7 @@ sudo apt remove prologd
 rm -f ~/.config/PrologD/gui/gui.ini
 rmdir ~/.config/PrologD/gui ~/.config/PrologD
 ```
-`apt remove` оставляет запись dpkg в состоянии `rc`; `sudo apt purge prologd` убирает и её.
+`apt remove` оставляет запись dpkg в состоянии `rc`; `sudo apt purge prologd` чтобы убирать.
 
 ## Обзор языка
 
@@ -95,15 +97,15 @@ cmake --build build
 ctest --test-dir build
 ```
 
-The console interpreter is `build/src/cli/prologu`.
+The console interpreter is `build/src/cli/prologd`.
 
 ```sh
 # Run a program file
-./build/src/cli/prologu -s examples/findall.pld
+./build/src/cli/prologd -s examples/findall.pld
 # Or read the program from stdin
-./build/src/cli/prologu < examples/findall.pld
+./build/src/cli/prologd < examples/findall.pld
 # Help
-./build/src/cli/prologu -h
+./build/src/cli/prologd -h
 ```
 
 Start the GUI:
@@ -116,7 +118,7 @@ Run the tests:
 python3 -m venv .venv
 .venv/bin/pip install -r src/gui/requirements.txt
 export QT_QPA_PLATFORM=offscreen
-export PROLOGD_TEST_EXE=$PWD/build/linux-release/src/cli/prologu
+export PROLOGD_TEST_EXE=$PWD/build/linux-release/src/cli/prologd
 .venv/bin/python src/gui/tests/test_window.py
 .venv/bin/python src/gui/tests/protocol_smoke.py
 ```
@@ -143,7 +145,7 @@ cmake --build --preset windows-msvc
 ctest --preset windows-msvc
 ```
 
-The executable is `build\src\cli\Release\prologu.exe`.
+The executable is `build\src\cli\Release\prologd.exe`.
 
 The portable package is built by one script:
 ```powershell
@@ -164,7 +166,7 @@ and writes the zip.
 ## Command line
 
 ```
-Usage: prologu [options] [files...]
+Usage: prologd [options] [files...]
 
 -s, --source FILE     interpret a source file (repeatable)
 -I, --include DIR     add a module search directory
@@ -190,8 +192,8 @@ Usage: prologu [options] [files...]
 Source files can also be given as positional arguments:
 
 ```sh
-prologu examples/findall.pld
-prologu --source examples/findall.pld
+prologd examples/findall.pld
+prologd --source examples/findall.pld
 ```
 
 Diagnostics use the usual compiler format:
@@ -202,14 +204,14 @@ or parsed, `3` a runtime error (including an interrupted query).
 
 ### Front-end protocol
 
-`prologu --protocol json` replaces the human-readable console with a session
+`prologd --protocol json` replaces the human-readable console with a session
 for front-ends: requests are JSON objects on stdin, events are JSON objects on
 stdout, one per line. `-i`/`-o`/`-e` are refused in this mode — the protocol
 owns both streams. The Python/PySide6 GUI in `src/gui` is built on it; see
-`src/gui/README.md` for the full contract. The contract is at version **16** —
+`src/gui/README.md` for the full contract. The contract is at version **15** —
 a front-end can read the number from `ready` and know what it is talking to.
 Version 2 added the reserved names and their arities to `ready`, so a front-end
-never keeps its own copy of the built-in list (`prologu --list-keywords` prints
+never keeps its own copy of the built-in list (`prologd --list-keywords` prints
 the same table); the later versions are listed one by one in the contract.
 
 ## Project layout
@@ -228,38 +230,6 @@ stdlib/               standard library, shipped beside the executable
 .github/workflows/    CI (Linux GCC, Windows MSVC, macOS AppleClang)
 ai/                   plan, task breakdown and notes for the AI agent
 ```
-
-## Status
-
-The working folder of the AI agent that
-built this rewrite — plan, task breakdown, architecture decisions and the
-development journal, in English — is `ai/`; it is developer material, not user
-documentation. User and technical documentation is in `doc/` (Russian, Typst).
-
-Implemented: lexer, parser with diagnostics, unification with trail, the
-resolution engine (backtracking, cut, meta-call, negation, disjunction),
-arithmetic with a hand-written `BigInt`, all documented built-in predicate
-groups (control, types, conversions, strings, I/O, program database, graphics
-stubs), `НАЙТИВСЕ/3` with `ВСЕРЕШ/3` (`bagof`) and `МНОРЕШ/3` (`setof`), the
-module loader (`ИМПОРТ`) and the CLI.
-
-Examples live in `examples/` — one demo per predicate of the language surface, the
-problems (`factorial`, the Hanoi tower, `knapsack`), the lessons and the library —
-and are covered by golden tests: a lesson or a demo carries its own expected output
-in `%!` lines, and `src/tests/test_lessons.cpp` compares the two.  The library the
-dialect ships is in `stdlib/`, beside the executable, and has its own runnable tour
-(`examples/stdlib.pld`) checked the same way. The PySide6 front-end in
-`src/gui` drives the interpreter through the JSON protocol: tabs, syntax
-highlighting that tells Latin names from Cyrillic ones, completion built from
-the reserved names and the program's own, run/stop with a fresh interpreter per
-run, and the usual file handling (save prompts, line endings and encodings kept).
-Documentation is in `doc/` (`help.typ`, `library.typ`, `gui.typ`, `technical.typ`,
-`lessons.typ`); `cmake --build build --target docs` writes the PDFs into the same
-directory when Typst is installed.
-
-CI builds and tests on Linux (GCC), Windows (MSVC) and macOS (AppleClang); see
-`.github/workflows/ci.yml`, `.github/workflows/macos.yml` and `CMakePresets.json`.
-Current status and the task board are kept in `ai/status.md`.
 
 ## License
 

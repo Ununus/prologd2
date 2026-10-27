@@ -384,9 +384,9 @@ def test_the_pinned_row_and_the_process_directory_round_trip(directory: pathlib.
     # folder of this launch.  The key has no record any more, so the file is written
     # the way a hand edit would — which is also the case the reader exists for.
     raw = QSettings(str(path), QSettings.Format.IniFormat)
-    raw.setValue("execution/interpreter", "C:/сборка/prologu.exe")
+    raw.setValue("execution/interpreter", "C:/сборка/prologd.exe")
     raw.sync()
-    assert Settings(path).legacy_interpreter == "C:/сборка/prologu.exe"
+    assert Settings(path).legacy_interpreter == "C:/сборка/prologd.exe"
     print("ok: the pinned row and the process directory round-trip")
 
 

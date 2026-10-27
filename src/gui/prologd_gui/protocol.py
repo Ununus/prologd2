@@ -1,4 +1,4 @@
-"""Wire format of the `prologu --protocol json` session.
+"""Wire format of the `prologd --protocol json` session.
 
 Requests are JSON objects, one per line, and events come back the same way.  The
 C++ side of the contract lives in `src/cli/protocol.cpp`; keep the two in step.

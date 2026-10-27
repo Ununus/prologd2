@@ -13,14 +13,17 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-string(TIMESTAMP PROLOGD_BUILD_DATE "%Y-%m-%d" UTC)
+# The date `--version` prints beside the number.  It is the *release* date, not the
+# build date: a banner that changes on every compile cannot be checked against, and a
+# package built from a tag should name the day the tag was cut.  Bump it with
+# `VERSION` above.
+set(PROLOGD_RELEASE_DATE "2026-10-25")
 
-# The product the *engine* calls itself (task_76).  It reaches the generated
-# `src/prlib/src/version.cpp` through `configure_file`, not through a `-D` macro: a
-# non-ASCII value on the compiler's command line travels through a response file in the
-# machine's ANSI code page, while the generated source is written as UTF-8 bytes and
-# compiled with `/utf-8` like every other file of `prlib`.
-set(PROLOGD_PRODUCT_NAME "Пролог-У")
+# What `--version` calls the program: the executable's own name in Latin letters.
+# It reaches the generated `src/prlib/src/version.cpp` through `configure_file`, not
+# through a `-D` macro, so that an encoding slip cannot reach the compiler's command
+# line.
+set(PROLOGD_PRODUCT_NAME "prologd")
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)

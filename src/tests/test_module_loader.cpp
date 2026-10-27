@@ -146,7 +146,7 @@ TEST_CASE("a directive import brings the definitions and leaves the questions al
   REQUIRE(outcome.output == "X=да\n");
 }
 
-TEST_CASE("the question form of the import keeps the splice of PrologD 2.x") {
+TEST_CASE("the question form of the import keeps its splice") {
   // `?ИМПОРТ("lib.pld").` is how the previous version wrote an import: the file
   // was spliced in where the line stood, questions and all.  Old programs keep
   // that behaviour, and a program that wants a quiet library writes `:-` instead.

@@ -44,7 +44,7 @@ import zlib
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 #: Where a Release build of the interpreter lands, and the variable the GUI tests
 #: use to point at another one.
-DEFAULT_EXECUTABLE = ROOT / "build" / "windows-msvc" / "src" / "cli" / "Release" / "prologu.exe"
+DEFAULT_EXECUTABLE = ROOT / "build" / "windows-msvc" / "src" / "cli" / "Release" / "prologd.exe"
 
 
 def decode_rgba(pixels: bytes) -> bytes:
@@ -110,7 +110,7 @@ def write_png(path: pathlib.Path, width: int, height: int, rgba: bytes, scale: i
 
 
 class Session:
-    """One `prologu --protocol json` process, driven line by line."""
+    """One `prologd --protocol json` process, driven line by line."""
 
     def __init__(self, executable: pathlib.Path, answers: list[str], includes: list[str]) -> None:
         command = [str(executable)]

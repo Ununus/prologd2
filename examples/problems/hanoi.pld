@@ -7,9 +7,9 @@
 % по кругу из семи, от размера диска. Рисунок видно в окне (кнопка «Запустить»);
 % в консоли графика молчит и остаётся только время пауз.
 %
-% Запуск:  prologu -s examples/problems/hanoi.pld
+% Запуск:  prologd -s examples/problems/hanoi.pld
 % В дереве исходников, где папки stdlib рядом с интерпретатором нет, - с ключом
-% -I:  prologu -I stdlib -s examples/problems/hanoi.pld
+% -I:  prologd -I stdlib -s examples/problems/hanoi.pld
 
 :- ХОЛСТ(380, 620).
 

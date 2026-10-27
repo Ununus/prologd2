@@ -72,7 +72,7 @@ class Keywords:
 
     @classmethod
     def from_list_lines(cls, text: str) -> "Keywords":
-        """Builds the table from `prologu --list-keywords` output.
+        """Builds the table from `prologd --list-keywords` output.
 
         The window fetches the names this way when it is opened, so completion
         and colouring work before the first run without keeping an interpreter
@@ -133,7 +133,7 @@ class Keywords:
         return tuple(f"{keyword.name}/{arity}" for arity in keyword.arities)
 
     def all_labels(self) -> list[str]:
-        """Every label in sorted order — the same lines ``prologu --list-keywords`` prints."""
+        """Every label in sorted order — the same lines ``prologd --list-keywords`` prints."""
         return [label for name in self._names for label in self.labels(name)]
 
     # -- containers --------------------------------------------------------

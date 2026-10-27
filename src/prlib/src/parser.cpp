@@ -978,8 +978,8 @@ bool Parser::parseQueryOrDirective(ParsedProgram& out) {
   }
 
   // `ИМПОРТ("file")` is a directive, not a runtime goal.  Where it was written as a
-  // question (`?ИМПОРТ(...)`) it also carries that file's own questions, which is
-  // what PrologD 2.x did by splicing the file in; a `:-` directive does not.
+  // question (`?ИМПОРТ(...)`) it also carries that file's own questions, the way an
+  // include splices a file in; a `:-` directive does not.
   if (goals.size() == 1 && goals[0].kind == TermKind::Compound &&
       goals[0].compound != nullptr && isImportName(goals[0].compound->name) &&
       goals[0].compound->args.size() == 1) {

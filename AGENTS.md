@@ -6,9 +6,9 @@ This file stays short on purpose: it is loaded into every request.
 
 ## What this repository is
 
-A Prolog-D implementation, «Пролог-У»: the engine in `src/prlib`, the console
-front-end `prologu`, and the PySide6 window in `src/gui`.  Windows appends `.exe` to
-the program names.  `doc/*.typ` are the Russian manuals; `ai/` is the agent's journal,
+A Prolog-D implementation: the engine in `src/prlib`, the console front-end
+`prologd`, and the PySide6 window in `src/gui` (`prologd-gui`).  Windows appends
+`.exe` to both.  `doc/*.typ` are the Russian manuals; `ai/` is the agent's journal,
 not user documentation.
 
 ## Build and test
@@ -34,12 +34,12 @@ its own (29 of them), and each needs a built interpreter:
 
 ```sh
 export QT_QPA_PLATFORM=offscreen PYTHONUTF8=1
-export PROLOGD_TEST_EXE=$PWD/build/linux-release/src/cli/prologu
+export PROLOGD_TEST_EXE=$PWD/build/linux-release/src/cli/prologd
 .venv/bin/python src/gui/tests/test_window.py
 ```
 
 PowerShell spells the same with `$env:QT_QPA_PLATFORM='offscreen'`,
-`.venv\Scripts\python.exe` and `build\windows-msvc\src\cli\Release\prologu.exe`.
+`.venv\Scripts\python.exe` and `build\windows-msvc\src\cli\Release\prologd.exe`.
 `.venv` in the repository root is the build Python: `src/gui/requirements.txt`, plus
 `src/gui/requirements-build.txt` for PyInstaller.
 
@@ -73,10 +73,13 @@ release; `ci.yml` (Linux, Windows) and `macos.yml` test every push to `main`.
 * Do not edit `src/3rdparty/` or `ai/_ref/`.
 * Never pass multi-line Python to `powershell -c` or a here-string: the shell mangles
   quotes and hanging strings.  Write the snippet to a file and run the file.
-* The version lives in `CMakeLists.txt` (`project(... VERSION ...)`).  The numbers in
-  `installer/prologd.iss`, `tools/build_installer.ps1` and `doc/help.typ` are a
-  default and two examples — bump them with it.  Packaging reads the version from
-  `prologu --version`, never from a second copy.
+* The version lives in `CMakeLists.txt` (`project(... VERSION ...)`), and the release
+  date it prints beside it is `PROLOGD_RELEASE_DATE` there — bump the two together.
+  The numbers in `installer/prologd.iss`, `tools/build_installer.ps1` and
+  `doc/help.typ` are a default and two examples — bump them with it.  Packaging reads
+  the version from `prologd --version`, never from a second copy.
+* `?ВЕРСИЯ` prints `27.1`, the version of the *language* (`kDialectVersion` in
+  `prlib/version.hpp`), and it must not follow the release number: lessons print it.
 * Records: after a session append a numbered part to `ai/status.md` (the number
   continues the last one) and update the task file; non-obvious choices go to
   `ai/decisions.md`.  Journal and code comments are English; `doc/*.typ`, lesson texts

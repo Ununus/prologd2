@@ -1,6 +1,6 @@
 """Checks that `doc/builtins.json` agrees with the interpreter and the manual.
 
-    python src/gui/tests/test_reference.py [path-to-prologu]
+    python src/gui/tests/test_reference.py [path-to-prologd]
 
 Three places know the same thing, and this file is what keeps them one fact:
 

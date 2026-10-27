@@ -5,7 +5,7 @@
  * имени и аргументам. Список - составной терм '.', поэтому пары сортируются по
  * первому элементу.
  *
- * Запуск:  prologu -I stdlib -s examples/iso/order.pld
+ * Запуск:  prologd -I stdlib -s examples/iso/order.pld
  */
 :- import("iso.pld").
 

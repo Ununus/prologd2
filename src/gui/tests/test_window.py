@@ -1,6 +1,6 @@
 """Offscreen checks of the window's file handling (needs PySide6 and a build).
 
-    python src/gui/tests/test_window.py [path-to-prologu]
+    python src/gui/tests/test_window.py [path-to-prologd]
 
 The defect this pins down: **Открыть** used to push the file into the running
 interpreter, so opening it a second time — or running the buffer and then opening
@@ -39,11 +39,10 @@ EXAMPLE = pathlib.Path(__file__).resolve().parents[3] / "examples" / "problems" 
 ANSWER = "Ф=720\n"
 
 #: task_36's files: the lesson whose `?сумма(5, Сумма).` must answer `Сумма=15`
-#: alone, and the appendix whose questions only run if someone asks for one.
+#: alone, and the lesson with a question parked in a comment (`% ?дед(иван,
+#: анна).`) that only runs if someone asks for one.
+LESSON_02 = pathlib.Path(__file__).resolve().parents[3] / "examples" / "lessons" / "lesson_02.pld"
 LESSON_04 = pathlib.Path(__file__).resolve().parents[3] / "examples" / "lessons" / "lesson_04.pld"
-APPENDIX_DEBUG = (
-    pathlib.Path(__file__).resolve().parents[3] / "examples" / "lessons" / "appendix_debug.pld"
-)
 
 #: A failing ground query: the interpreter answers `НЕТ` itself, so the window
 #: must not answer a second time.  Kept as the user wrote it.
@@ -156,7 +155,7 @@ def discard_changes(window) -> None:
     every test closes through here, where the answer is `DISCARD`.
 
     The interpreter is stopped too: a test window that only closed its buffers
-    left a live `prologu` behind, and a suite of them (one per test) slowed the
+    left a live `prologd` behind, and a suite of them (one per test) slowed the
     machine down and made the run before a failure look like a hang.
     """
     from prologd_gui import window as window_module
@@ -981,7 +980,7 @@ def test_the_recent_menu_and_the_window_carry_the_pictures(
         # spaces does not (a proportional font is what broke the earlier version).
         assert text.startswith("Пролог-Д"), ascii(text)
         assert "учебная система" in text, ascii(text)
-        assert "Графическая оболочка 2.0 (PySide6)" in text, ascii(text)
+        assert "Графическая оболочка (PySide6)" in text, ascii(text)
         assert "Интерпретатор: " in text, ascii(text)
         credits = [
             (role, name.rstrip(",."))
@@ -2980,29 +2979,25 @@ def test_a_marker_answers_one_question_alone(executable: str) -> None:
 
 
 def test_a_question_parked_in_a_comment_runs_from_the_margin(executable: str) -> None:
-    """`%   ?ВЕРСИЯ.` in the appendix: the file never runs it, a click does."""
+    """`%   ?дед(иван, анна).` in lesson 2: the file never runs it, a click does."""
     window = empty_window(executable)
     try:
-        assert window.open_path(str(APPENDIX_DEBUG))
+        assert window.open_path(str(LESSON_02))
         view = window.editor()
-        assert "?ВЕРСИЯ." in view.query_statements().values()
-        view.queryRequested.emit("?ВЕРСИЯ.")
+        assert "?дед(иван, анна)." in view.query_statements().values()
+        view.queryRequested.emit("?дед(иван, анна).")
         wait_for_result(window)
         printed = printed_lines(window)
-        # The answer is the engine's own banner (task_76) — a product name, a version and
-        # the build date.  The version in it is compared with the one the session
-        # announced in `ready`: the product name belongs to the engine, and a second copy
-        # of it here would only go stale at the next rename.
-        assert printed, ascii(window.output_text())
-        assert f" {window._version} " in printed[0], ascii(printed[0])
-        assert printed[0].endswith(")"), ascii(printed[0])
+        # A ground question: the answer of the parked line is the same `ДА` any
+        # other question with no variables gets.
+        assert printed == ["ДА"], ascii(window.output_text())
         # task_58: the quiet load says so in «Система», like `F5` does.  The line
         # used to be swallowed by the early return that waits for the answer.
         assert "--- база знаний загружена (" in window.system_text(), ascii(window.system_text())
         assert " мс) ---" in window.system_text(), ascii(window.system_text())
     finally:
         discard_changes(window)
-    print("ok: a question parked in a comment answers from the margin (appendix)")
+    print("ok: a question parked in a comment answers from the margin (lesson 2)")
 
 
 def test_a_marker_while_a_step_is_paused_starts_a_fresh_quiet_run(executable: str) -> None:
@@ -5119,7 +5114,7 @@ def main(argv: list[str]) -> int:
         return 0
     executable = find_executable(argv)
     if executable is None:
-        print("skipped: no prologu build found, pass its path to check the window")
+        print("skipped: no prologd build found, pass its path to check the window")
         return 0
 
     application = QApplication(sys.argv[:1])

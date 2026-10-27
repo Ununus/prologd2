@@ -233,7 +233,7 @@ def test_the_dialog_predicts_the_canvas_the_tool_draws(directory: pathlib.Path) 
 def test_the_program_is_already_soft_formatted(directory: pathlib.Path) -> None:
     """The tab must not look like a reformat away from the house style.
 
-    The drawing clause is broken by hand the way `prologu --format soft` breaks it,
+    The drawing clause is broken by hand the way `prologd --format soft` breaks it,
     so formatting the freshly converted tab changes nothing.  A packing change in
     the formatter shows up here instead of in someone's eyes.
     """

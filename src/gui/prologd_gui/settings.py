@@ -146,7 +146,7 @@ TIMEOUT_MILLISECONDS = "execution/timeout_milliseconds"
 #: printed — and the answer to a flood is the same escalation: the request, then
 #: the process.
 MAX_OUTPUT_EVENTS = "execution/max_output_events"
-#: The row of task_46 that named a `prologu` by hand — «Выполнение →
+#: The row of task_46 that named a `prologd` by hand — «Выполнение →
 #: Интерпретатор».  Removed from the dialog in task_79: a *particular build* is
 #: `--exe` now.  The old value is still **read**, because a file that names another
 #: build has to keep naming it — it is the folder the interpreter is looked for in

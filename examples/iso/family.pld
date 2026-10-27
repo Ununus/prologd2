@@ -3,7 +3,7 @@
  * Классический пример из книг: предикаты для поиска по базе знаний, findall
  * собирает все ответы в список, length их считает.
  *
- * Запуск:  prologu -I stdlib -s examples/iso/family.pld
+ * Запуск:  prologd -I stdlib -s examples/iso/family.pld
  */
 :- import("iso.pld").
 

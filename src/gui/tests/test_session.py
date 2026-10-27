@@ -1,6 +1,6 @@
 """Offscreen checks of the interpreter session (needs PySide6 and a build).
 
-    python src/gui/tests/test_session.py [path-to-prologu]
+    python src/gui/tests/test_session.py [path-to-prologd]
 
 Two things are worth a test rather than a comment:
 
@@ -157,7 +157,7 @@ def main(argv: list[str]) -> int:
         return 0
     executable = find_executable(argv)
     if executable is None:
-        print("skipped: no prologu build found, pass its path to check the session")
+        print("skipped: no prologd build found, pass its path to check the session")
         return 0
 
     application = QCoreApplication(sys.argv[:1])

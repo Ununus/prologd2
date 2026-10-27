@@ -21,13 +21,13 @@
 Из командной строки то же самое выглядит так:
 
 ```sh
-prologu -s examples/lessons/lesson_01.pld
+prologd -s examples/lessons/lesson_01.pld
 
 # урок 7 читает ответы из файла рядом с собой
-prologu -s examples/lessons/lesson_07.pld < examples/lessons/lesson_07.input.txt
+prologd -s examples/lessons/lesson_07.pld < examples/lessons/lesson_07.input.txt
 
 # урок 11 подключает библиотеку из examples/lib
-prologu -I examples/lib -s examples/lessons/lesson_11.pld
+prologd -I examples/lib -s examples/lessons/lesson_11.pld
 ```
 
 ## Вопросы на полях
@@ -60,7 +60,7 @@ prologu -I examples/lib -s examples/lessons/lesson_11.pld
 
 ## Оформление
 
-Все файлы курса выровнены самим интерпретатором — `prologu --format -s файл`
+Все файлы курса выровнены самим интерпретатором — `prologd --format -s файл`
 (мягкий режим, 80 знаков, один таб на шаг) — и за этим следит проверка «every
 shipped program is already in the standard shape» в `src/tests/test_formatter.cpp`:
 она называет файл, который перестал совпадать со своим форматированным видом.

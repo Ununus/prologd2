@@ -11,7 +11,7 @@ Usage:
     python tools/bench_engine.py                 # the default sizes
     python tools/bench_engine.py --quick         # small, for a smoke run
     python tools/bench_engine.py --only queens   # one workload, by label substring
-    python tools/bench_engine.py --exe build/windows-msvc/src/cli/Release/prologu.exe
+    python tools/bench_engine.py --exe build/windows-msvc/src/cli/Release/prologd.exe
 
 task_42 added two workloads: a dispatch-bound step loop (the per-goal lookup
 cost) and the N-queens search (few clauses with heavy bodies — the shape
@@ -152,7 +152,7 @@ def measure(executable: pathlib.Path, work: pathlib.Path, name: str, source: str
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--exe", default=None, help="path to the prologu executable")
+    parser.add_argument("--exe", default=None, help="path to the prologd executable")
     parser.add_argument("--quick", action="store_true", help="small sizes, for a smoke run")
     parser.add_argument("--only", default=None,
                         help="run only the workloads whose label contains this text")
@@ -164,13 +164,13 @@ def main() -> int:
     root = pathlib.Path(__file__).resolve().parents[1]
     candidates = [
         args.exe,
-        root / "build/windows-msvc/src/cli/Release/prologu.exe",
-        root / "build/src/cli/prologu",
-        root / "build/windows-msvc/src/cli/Debug/prologu.exe",
+        root / "build/windows-msvc/src/cli/Release/prologd.exe",
+        root / "build/src/cli/prologd",
+        root / "build/windows-msvc/src/cli/Debug/prologd.exe",
     ]
     executable = next((pathlib.Path(c) for c in candidates if c and pathlib.Path(c).is_file()), None)
     if executable is None:
-        print("prologu not found; pass --exe or build it first")
+        print("prologd not found; pass --exe or build it first")
         return 2
 
     depth_sizes = [10_000, 50_000] if args.quick else [50_000, 100_000, 400_000]

@@ -1,6 +1,6 @@
 """Checks of the entry point's command line (task_116): a file becomes a document.
 
-    python src/gui/tests/test_main.py [path-to-prologu]
+    python src/gui/tests/test_main.py [path-to-prologd]
 
 No window is built and no interpreter is run.  `main()` is called with the two
 pieces that would make it a real start replaced by recorders: the application

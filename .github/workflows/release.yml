@@ -181,22 +181,21 @@ jobs:
       - name: Lay out the bundle
         run: |
           set -e
-          version=$(build/macos-release/src/cli/prologu --version | head -n 1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+          version=$(build/macos-release/src/cli/prologd --version | head -n 1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
           test -n "$version"
           echo "VERSION=$version" >> "$GITHUB_ENV"
           app=dist/PrologD.app/Contents/MacOS
           test -d "$app"
-          cp build/macos-release/src/cli/prologu "$app/"
+          cp build/macos-release/src/cli/prologd "$app/"
           mkdir -p "$app/doc"
           cp doc/*.pdf doc/builtins.json "$app/doc/"
           cp -R examples stdlib "$app/"
-          rm -rf "$app/examples/lessons/_old"
           python3 tools/macos_plist.py dist/PrologD.app/Contents/Info.plist "$version"
           plutil -lint dist/PrologD.app/Contents/Info.plist
           test "$(plutil -extract CFBundleShortVersionString raw dist/PrologD.app/Contents/Info.plist)" = "$version"
-          test -x "$app/prologu"
-          if otool -L "$app/prologu" | grep -q "$PWD/build/"; then
-            echo "::error::prologu links the build tree"
+          test -x "$app/prologd"
+          if otool -L "$app/prologd" | grep -q "$PWD/build/"; then
+            echo "::error::prologd links the build tree"
             exit 1
           fi
       - name: Sign and check
@@ -204,7 +203,7 @@ jobs:
           set -e
           codesign --force --deep --sign - dist/PrologD.app
           codesign --verify --deep --strict --verbose=2 dist/PrologD.app
-          dist/PrologD.app/Contents/MacOS/prologu -s examples/lessons/lesson_01.pld >/dev/null
+          dist/PrologD.app/Contents/MacOS/prologd -s examples/lessons/lesson_01.pld >/dev/null
       - name: Make the .dmg
         run: |
           set -e

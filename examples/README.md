@@ -3,7 +3,7 @@
 Готовые программы на Пролог-Д — их можно запускать как есть:
 
 ```sh
-prologu -s examples/first.pld
+prologd -s examples/first.pld
 ```
 
 ## Что где
@@ -31,7 +31,7 @@ prologu -s examples/first.pld
 
 | Папка | Что там |
 |---|---|
-| `iso/` | программы, записанные **именами и знаками ISO**: `arith.pld` — `is`, `=:=`, `=\=`, `\=`; `lists.pld` — `member`, `append`, `length`, `msort`, `sort`; `family.pld` — родословная и `findall`; `order.pld` — `compare/3`, `@<` и две сортировки; `if_then.pld` — `->`; `groups.pld` — `bagof`/`setof` и квантор `^`; `sub_string.pld` — `sub_string/5`. Запуск: `prologu -I stdlib -s examples/iso/arith.pld` |
+| `iso/` | программы, записанные **именами и знаками ISO**: `arith.pld` — `is`, `=:=`, `=\=`, `\=`; `lists.pld` — `member`, `append`, `length`, `msort`, `sort`; `family.pld` — родословная и `findall`; `order.pld` — `compare/3`, `@<` и две сортировки; `if_then.pld` — `->`; `groups.pld` — `bagof`/`setof` и квантор `^`; `sub_string.pld` — `sub_string/5`. Запуск: `prologd -I stdlib -s examples/iso/arith.pld` |
 
 Стандартная библиотека лежит рядом с интерпретатором — в папке
 `stdlib`; как её подключить, написано в `stdlib/README.md`.
@@ -58,5 +58,5 @@ promise` и `the example programs print what their comments promise`), поэт�
 
 ```sh
 cd examples/problems/maze
-prologu -I ../../../stdlib -s maze.pld
+prologd -I ../../../stdlib -s maze.pld
 ```

@@ -54,33 +54,32 @@ catch_discover_tests(prlib_tests)
 # ---------------------------------------------------------------------------
 # Command-line integration tests
 # ---------------------------------------------------------------------------
-if(TARGET prologu)
+if(TARGET prologd)
   set(PROLOGD_DEMO "${CMAKE_SOURCE_DIR}/examples/findall.pld")
 
-  add_test(NAME cli_source_short COMMAND prologu -s "${PROLOGD_DEMO}")
-  add_test(NAME cli_source_long COMMAND prologu --source "${PROLOGD_DEMO}")
-  add_test(NAME cli_source_equals COMMAND prologu "--source=${PROLOGD_DEMO}")
-  add_test(NAME cli_positional COMMAND prologu "${PROLOGD_DEMO}")
+  add_test(NAME cli_source_short COMMAND prologd -s "${PROLOGD_DEMO}")
+  add_test(NAME cli_source_long COMMAND prologd --source "${PROLOGD_DEMO}")
+  add_test(NAME cli_source_equals COMMAND prologd "--source=${PROLOGD_DEMO}")
+  add_test(NAME cli_positional COMMAND prologd "${PROLOGD_DEMO}")
   foreach(test IN ITEMS cli_source_short cli_source_long cli_source_equals cli_positional)
     set_tests_properties(${test} PROPERTIES
       PASS_REGULAR_EXPRESSION "А=\\[\\[вова,корчагин\\]")
   endforeach()
 
-  add_test(NAME cli_version COMMAND prologu --version)
-  # The version has one source — `project(prologd VERSION x.y.z)` — and this test
-  # asks the binary for it instead of repeating the literal.  It used to be a
-  # literal with escaped dots (`2\\.1\\.0`), which a grep for the old number does
-  # not find: the escape sits between the digits (part 105).
+  add_test(NAME cli_version COMMAND prologd --version)
+  # The banner is `<name> <version> (<release date>)`, and it has **one** source:
+  # `project(prologd VERSION x.y.z)` and `PROLOGD_RELEASE_DATE` in the top
+  # `CMakeLists.txt`.  The test asks the binary instead of repeating the literals.
   string(REPLACE "." "\\." PROLOGD_VERSION_PATTERN "${PROJECT_VERSION}")
   set_tests_properties(cli_version PROPERTIES
-    PASS_REGULAR_EXPRESSION "${PROLOGD_VERSION_PATTERN}")
+    PASS_REGULAR_EXPRESSION "^prologd ${PROLOGD_VERSION_PATTERN} \\([0-9]+-[0-9]+-[0-9]+\\)")
 
-  add_test(NAME cli_help COMMAND prologu --help)
+  add_test(NAME cli_help COMMAND prologd --help)
   set_tests_properties(cli_help PROPERTIES
     PASS_REGULAR_EXPRESSION "--source")
 
   add_test(NAME cli_include
-    COMMAND prologu -I "${CMAKE_SOURCE_DIR}/examples/lib"
+    COMMAND prologd -I "${CMAKE_SOURCE_DIR}/examples/lib"
             -s "${CMAKE_SOURCE_DIR}/examples/import.pld")
   set_tests_properties(cli_include PROPERTIES
     PASS_REGULAR_EXPRESSION "Дважды=42")
@@ -90,39 +89,39 @@ if(TARGET prologu)
   # the programs are written here, at configure time; the needles are ASCII on
   # purpose, because CMake decodes a child's output with the code page of the build's
   # console (`cli_diagnostics.cmake` says the same in its own comment).
-  set(prologu_cyrillic "${CMAKE_CURRENT_BINARY_DIR}/кириллица")
-  file(MAKE_DIRECTORY "${prologu_cyrillic}" "${prologu_cyrillic}/библиотеки")
-  file(WRITE "${prologu_cyrillic}/программа.pld" "?СЛОЖЕНИЕ(2, 3, С).\n")
-  file(WRITE "${prologu_cyrillic}/вход.txt" "hello\n")
-  file(WRITE "${prologu_cyrillic}/чтение.pld" "?ВВОДСТР(X).\n")
-  file(WRITE "${prologu_cyrillic}/библиотеки/библиотека.pld"
+  set(prologd_cyrillic "${CMAKE_CURRENT_BINARY_DIR}/кириллица")
+  file(MAKE_DIRECTORY "${prologd_cyrillic}" "${prologd_cyrillic}/библиотеки")
+  file(WRITE "${prologd_cyrillic}/программа.pld" "?СЛОЖЕНИЕ(2, 3, С).\n")
+  file(WRITE "${prologd_cyrillic}/вход.txt" "hello\n")
+  file(WRITE "${prologd_cyrillic}/чтение.pld" "?ВВОДСТР(X).\n")
+  file(WRITE "${prologd_cyrillic}/библиотеки/библиотека.pld"
        "удвоить(Ч, Д):-УМНОЖЕНИЕ(Ч, 2, Д).\n")
-  file(WRITE "${prologu_cyrillic}/импорт.pld"
+  file(WRITE "${prologd_cyrillic}/импорт.pld"
        "?ИМПОРТ(\"библиотека.pld\").\n?удвоить(21, Д).\n")
 
   add_test(NAME cli_cyrillic_path
-    COMMAND prologu -s "${prologu_cyrillic}/программа.pld")
+    COMMAND prologd -s "${prologd_cyrillic}/программа.pld")
   set_tests_properties(cli_cyrillic_path PROPERTIES
     PASS_REGULAR_EXPRESSION "=5")
 
   # `-i` names a file too, and the same conversion opens it.
   add_test(NAME cli_cyrillic_input_file
-    COMMAND prologu -s "${prologu_cyrillic}/чтение.pld"
-            -i "${prologu_cyrillic}/вход.txt")
+    COMMAND prologd -s "${prologd_cyrillic}/чтение.pld"
+            -i "${prologd_cyrillic}/вход.txt")
   set_tests_properties(cli_cyrillic_input_file PROPERTIES
     PASS_REGULAR_EXPRESSION "X=hello")
 
   # The library lies in another Cyrillic directory, so only `-I` can find it.
   add_test(NAME cli_cyrillic_include
-    COMMAND prologu -I "${prologu_cyrillic}/библиотеки"
-            -s "${prologu_cyrillic}/импорт.pld")
+    COMMAND prologd -I "${prologd_cyrillic}/библиотеки"
+            -s "${prologd_cyrillic}/импорт.pld")
   set_tests_properties(cli_cyrillic_include PROPERTIES
     PASS_REGULAR_EXPRESSION "Д=42")
 
   # task_32: an import that cannot be resolved must name the directories that
   # were searched, so a working-folder mistake is visible in the front-end.
   add_test(NAME cli_import_search_report
-    COMMAND prologu -s "${CMAKE_CURRENT_SOURCE_DIR}/missing_import.pld")
+    COMMAND prologd -s "${CMAKE_CURRENT_SOURCE_DIR}/missing_import.pld")
   set_tests_properties(cli_import_search_report PROPERTIES
     PASS_REGULAR_EXPRESSION "Искался в:")
 
@@ -130,30 +129,30 @@ if(TARGET prologu)
   # loading anything.  The Catch2 test covers the content; these cover the CLI
   # shape — `/3` for a predicate, `/+` for a variadic name (ВЫВОД, ВЫВОДПС,
   # ПЕРВОЕ).
-  add_test(NAME cli_list_keywords COMMAND prologu --list-keywords)
+  add_test(NAME cli_list_keywords COMMAND prologd --list-keywords)
   set_tests_properties(cli_list_keywords PROPERTIES
     PASS_REGULAR_EXPRESSION "НАЙТИВСЕ/3")
 
-  add_test(NAME cli_list_keywords_variadic COMMAND prologu --list-keywords)
+  add_test(NAME cli_list_keywords_variadic COMMAND prologd --list-keywords)
   set_tests_properties(cli_list_keywords_variadic PROPERTIES
     PASS_REGULAR_EXPRESSION "ВЫВОД/\\+")
 
-  add_test(NAME cli_list_keywords_variadic_first COMMAND prologu --list-keywords)
+  add_test(NAME cli_list_keywords_variadic_first COMMAND prologd --list-keywords)
   set_tests_properties(cli_list_keywords_variadic_first PROPERTIES
     PASS_REGULAR_EXPRESSION "ПЕРВОЕ/\\+")
 
-  add_test(NAME cli_list_keywords_variadic_writeln COMMAND prologu --list-keywords)
+  add_test(NAME cli_list_keywords_variadic_writeln COMMAND prologd --list-keywords)
   set_tests_properties(cli_list_keywords_variadic_writeln PROPERTIES
     PASS_REGULAR_EXPRESSION "ВЫВОДПС/\\+")
 
-  add_test(NAME cli_list_keywords_variadic_writeln_english COMMAND prologu --list-keywords)
+  add_test(NAME cli_list_keywords_variadic_writeln_english COMMAND prologd --list-keywords)
   set_tests_properties(cli_list_keywords_variadic_writeln_english PROPERTIES
     PASS_REGULAR_EXPRESSION "writeln/\\+")
 
   # The names marker is retired with the modes it declared: a file that still
   # starts with one is refused, and the message says why rather than «не найдено».
   add_test(NAME cli_names_marker_is_refused
-    COMMAND prologu -s "${CMAKE_CURRENT_SOURCE_DIR}/names_marker.pld")
+    COMMAND prologd -s "${CMAKE_CURRENT_SOURCE_DIR}/names_marker.pld")
   set_tests_properties(cli_names_marker_is_refused PROPERTIES
     PASS_REGULAR_EXPRESSION "режимов имён больше нет")
 
@@ -162,7 +161,7 @@ if(TARGET prologu)
   # change it.  Both need the real executable, so a CMake script drives it.
   add_test(NAME cli_format
     COMMAND ${CMAKE_COMMAND}
-            "-DPROLOGD_EXE=$<TARGET_FILE:prologu>"
+            "-DPROLOGD_EXE=$<TARGET_FILE:prologd>"
             "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}"
             "-DSOURCE_DIR=${CMAKE_SOURCE_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/cli_format.cmake")
@@ -171,7 +170,7 @@ if(TARGET prologu)
   # instead of the usual PASS_REGULAR_EXPRESSION form.
   add_test(NAME cli_json_protocol
     COMMAND ${CMAKE_COMMAND}
-            "-DPROLOGD_EXE=$<TARGET_FILE:prologu>"
+            "-DPROLOGD_EXE=$<TARGET_FILE:prologd>"
             "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/protocol_session.cmake")
 
@@ -180,7 +179,7 @@ if(TARGET prologu)
   # instead of inside the test binary.
   add_test(NAME cli_engine_limits
     COMMAND ${CMAKE_COMMAND}
-            "-DPROLOGD_EXE=$<TARGET_FILE:prologu>"
+            "-DPROLOGD_EXE=$<TARGET_FILE:prologd>"
             "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/engine_limits.cmake")
 
@@ -189,7 +188,7 @@ if(TARGET prologu)
   # which `PASS_REGULAR_EXPRESSION` cannot see, so a CMake script drives it.
   add_test(NAME cli_diagnostics
     COMMAND ${CMAKE_COMMAND}
-            "-DPROLOGD_EXE=$<TARGET_FILE:prologu>"
+            "-DPROLOGD_EXE=$<TARGET_FILE:prologd>"
             "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/cli_diagnostics.cmake")
 endif()

@@ -15,9 +15,7 @@
   #define AppVersion "2.6.1"
 #endif
 
-; Имя продукта в установщике — без «2.0»: это имя оболочки, и рядом с номером
-; версии оно читалось как два номера подряд («Пролог-Д 2.0 2.6.1», task_116).
-; В окне, руководствах и «О программе» название «Пролог-Д 2.0» остаётся.
+; Имя продукта — просто «Пролог-Д»: у программы один номер, и это номер версии.
 #define AppName "Пролог-Д"
 ; Идентификатор связи. Он же имя класса файлов в реестре и, главное, — признак
 ; «это наша связь»: по нему решается, забирать ли .pld у чужой программы и
@@ -118,13 +116,13 @@ Root: HKA; Subkey: "Software\Classes\{#ProgId}"; ValueType: string; ValueName: "
 Root: HKA; Subkey: "Software\Classes\{#ProgId}\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\pld.ico"; Tasks: associate
 Root: HKA; Subkey: "Software\Classes\{#ProgId}\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\prologd-gui.exe"" ""%1"""; Tasks: associate
 ; Второй глагол контекстного меню: тот же файл, но в консольном интерпретаторе.
-Root: HKA; Subkey: "Software\Classes\{#ProgId}\shell\console"; ValueType: string; ValueName: ""; ValueData: "{cm:ConsoleVerb}"; Tasks: associate; Check: FileExists(ExpandConstant('{app}\prologu.exe'))
-Root: HKA; Subkey: "Software\Classes\{#ProgId}\shell\console\command"; ValueType: string; ValueName: ""; ValueData: """{app}\prologu.exe"" -s ""%1"""; Tasks: associate; Check: FileExists(ExpandConstant('{app}\prologu.exe'))
+Root: HKA; Subkey: "Software\Classes\{#ProgId}\shell\console"; ValueType: string; ValueName: ""; ValueData: "{cm:ConsoleVerb}"; Tasks: associate; Check: FileExists(ExpandConstant('{app}\prologd.exe'))
+Root: HKA; Subkey: "Software\Classes\{#ProgId}\shell\console\command"; ValueType: string; ValueName: ""; ValueData: """{app}\prologd.exe"" -s ""%1"""; Tasks: associate; Check: FileExists(ExpandConstant('{app}\prologd.exe'))
 
-; App Paths: `prologu` находится из любого каталога и из Win+R, хотя
+; App Paths: `prologd` находится из любого каталога и из Win+R, хотя
 ; PATH не правится.
-Root: HKA; Subkey: "Software\Microsoft\Windows\CurrentVersion\App Paths\prologu.exe"; ValueType: string; ValueName: ""; ValueData: "{app}\prologu.exe"; Flags: uninsdeletekey; Check: FileExists(ExpandConstant('{app}\prologu.exe'))
-Root: HKA; Subkey: "Software\Microsoft\Windows\CurrentVersion\App Paths\prologu.exe"; ValueType: string; ValueName: "Path"; ValueData: "{app}"; Check: FileExists(ExpandConstant('{app}\prologu.exe'))
+Root: HKA; Subkey: "Software\Microsoft\Windows\CurrentVersion\App Paths\prologd.exe"; ValueType: string; ValueName: ""; ValueData: "{app}\prologd.exe"; Flags: uninsdeletekey; Check: FileExists(ExpandConstant('{app}\prologd.exe'))
+Root: HKA; Subkey: "Software\Microsoft\Windows\CurrentVersion\App Paths\prologd.exe"; ValueType: string; ValueName: "Path"; ValueData: "{app}"; Check: FileExists(ExpandConstant('{app}\prologd.exe'))
 
 [Run]
 Filename: "{app}\prologd-gui.exe"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent

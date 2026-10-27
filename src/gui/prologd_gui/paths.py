@@ -8,7 +8,7 @@ told to add ends up under `sys._MEIPASS` - so the two questions a front-end asks
 must be answered by the *layout*, not by where this file happens to lie:
 
 * `data_root()` - the folder the user sees: beside `prologd-gui.exe` in a package,
-  the repository root in a checkout.  The interpreter (`prologu.exe`), the settings
+  the repository root in a checkout.  The interpreter (`prologd.exe`), the settings
   file (`gui.ini`), `doc/` and `examples/` all live there;
 * `resource(name)` - read-only data the package carries (today only `assets`):
   under `sys._MEIPASS` in a package, `src/gui/<name>` in a checkout.
@@ -88,11 +88,11 @@ def reveal(path: str) -> None:
     subprocess.Popen(reveal_command(path), env=external_environment())
 
 
-#: The interpreter of this repository inside a `data_root()`: «Пролог-У» (task_75).
-EXECUTABLE_NAME = "prologu.exe" if os.name == "nt" else "prologu"
+#: The interpreter of this repository inside a `data_root()`.
+EXECUTABLE_NAME = "prologd.exe" if os.name == "nt" else "prologd"
 
 #: The name for the user: the status bar and the «пределы» note.
-ENGINE_TITLE = "Пролог-У"
+ENGINE_TITLE = "Пролог-Д"
 
 #: The settings file of a packaged build: beside the window, so the folder stays
 #: portable (task_61).  A checkout keeps its settings in AppData, as before.

@@ -6,9 +6,9 @@
 % её не программа, а читатель. Диск со старого места стирается белым, а цвет
 % берётся из stdlib/graphics.pld - по кругу из семи, от размера диска.
 %
-% Запуск:  prologu -s examples/problems/hanoi_play.pld
+% Запуск:  prologd -s examples/problems/hanoi_play.pld
 % В дереве исходников, где папки stdlib рядом с интерпретатором нет, - с ключом
-% -I:  prologu -I stdlib -s examples/problems/hanoi_play.pld
+% -I:  prologd -I stdlib -s examples/problems/hanoi_play.pld
 
 :- ХОЛСТ(380, 620).
 

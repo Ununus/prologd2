@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Builds the portable Windows package of Prolog-D 2.0 (task_61).
+    Builds the portable Windows package of Prolog-D (task_61).
 
 .DESCRIPTION
     Release build -> ctest -> docs (typst) -> PyInstaller freeze of the window ->
@@ -8,7 +8,7 @@
     -> zip.
 
     What the package is: `prologd-gui.exe` with its `_internal` folder beside
-    `prologu.exe`, the three Visual C++ DLLs our C++ needs, `doc` (five PDFs and
+    `prologd.exe`, the three Visual C++ DLLs our C++ needs, `doc` (five PDFs and
     `builtins.json` — the sources of the manuals stay in the repository), `examples`
     (lessons, tasks, `lib`) and `stdlib` (the standard library, which the interpreter
     searches beside itself).  The window finds the interpreter next to itself and
@@ -30,7 +30,7 @@
     is used.
 
 .PARAMETER Version
-    Version for the folder name.  By default it is read from `prologu.exe --version`.
+    Version for the folder name.  By default it is read from `prologd.exe --version`.
 
 .PARAMETER SkipTests
     Skip `ctest` (for a quick repack; the checks on the built tree are then missing).
@@ -114,7 +114,7 @@ $trimmedFiles = @(
 
 #: What the checks insist on besides the files every package has.
 $neededFiles = @(
-    'prologu.exe', 'doc\builtins.json',
+    'prologd.exe', 'doc\builtins.json',
     'examples\lib\library.pld', 'examples\lessons\lesson_01.pld',
     'examples\problems\knapsack.pld', 'examples\sorting.pld',
     'stdlib\lists.pld', 'stdlib\sets.pld', 'stdlib\iso.pld'
@@ -126,10 +126,6 @@ $packagePrograms = @(
     @('-I', 'examples\lib', '-s', 'examples\import.pld'),
     @('-i', 'examples\stdlib.input.txt', '-s', 'examples\stdlib.pld')
 )
-
-#: Folders of `examples/` that stay in the repository: `lessons\_old` is the previous
-#: form of the lessons, kept for the reader who wants to compare.
-$examplesDrop = @('lessons\_old')
 
 function Write-Step([string]$Text) {
     Write-Host ''
@@ -171,7 +167,7 @@ $dist = Join-Path $root 'dist'
 
 Push-Location $root
 try {
-    Write-Host "Prolog-D 2.0 - portable Windows package" -ForegroundColor Green
+    Write-Host "Prolog-D - portable Windows package" -ForegroundColor Green
     Write-Host "repository: $root"
 
     Write-Step '1/8 Tools'
@@ -197,7 +193,7 @@ try {
     & cmake --build $build --config $Configuration
     Assert-Exit 'cmake --build'
 
-    $cli = Join-Path $build "src\cli\$Configuration\prologu.exe"
+    $cli = Join-Path $build "src\cli\$Configuration\prologd.exe"
     if (-not (Test-Path $cli)) { Fail "the interpreter was not built: $cli" }
     if (-not $Version) {
         # `--version` prints the whole banner -- product name, number, build date
@@ -206,7 +202,7 @@ try {
         # banner's Cyrillic half reaches a pipe as ANSI bytes.
         $banner = (& $cli --version | Select-Object -First 1)
         if ($banner) { $banner = $banner.Trim() }
-        if (-not $banner) { Fail 'prologu.exe --version printed nothing' }
+        if (-not $banner) { Fail 'prologd.exe --version printed nothing' }
         $number = [regex]::Match($banner, '\d+\.\d+\.\d+')
         if (-not $number.Success) { Fail "--version printed no version number: $banner" }
         $Version = $number.Value
@@ -263,7 +259,7 @@ try {
 
     # The frozen window goes to the *root* of the package, not into a folder of its
     # own: that is what makes `paths.data_root()` be the folder the user sees, with
-    # `prologu.exe` and `gui.ini` beside it (task_61, section 4).
+    # `prologd.exe` and `gui.ini` beside it (task_61, section 4).
     Copy-Item (Join-Path $guiDist '*') $package -Recurse -Force
     Copy-Item $cli $package -Force
 
@@ -321,10 +317,6 @@ try {
     Write-Host "runtime    : $CrtDirectory"
 
     Copy-Item 'examples' (Join-Path $package 'examples') -Recurse -Force
-    foreach ($relative in $examplesDrop) {
-        $gone = Join-Path $package "examples\$relative"
-        if (Test-Path $gone) { Remove-Item $gone -Recurse -Force }
-    }
     # The standard library travels beside the interpreter: `-I stdlib` is the path the
     # manual, the demo and `stdlib\README.md` name, and a library the user cannot
     # find is no library.
@@ -367,7 +359,7 @@ try {
         }
     }
 
-    $openProgram = Join-Path $package 'prologu.exe'
+    $openProgram = Join-Path $package 'prologd.exe'
     # The banner again, read the same way: the number inside it must be the one the
     # folder is named after.  The date may differ if the package was built on another
     # day, so the whole line is not compared.

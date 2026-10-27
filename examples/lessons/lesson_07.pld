@@ -8,7 +8,7 @@
 % Справка: doc/help.typ, разделы 6 и 13 (ТИХО).
 %
 % В этом уроке необходим файл для чтения. Запустить урок целиком в командной строке:
-%     prologu -s examples/lessons/lesson_07.pld < examples/lessons/lesson_07.input.txt
+%     prologd -s examples/lessons/lesson_07.pld < examples/lessons/lesson_07.input.txt
 % Ответы, которые вводятся с клавиатуры, лежат рядом в файле lesson_07.input.txt:
 % запросы читают его по порядку, поэтому его нельзя переставлять.
 %

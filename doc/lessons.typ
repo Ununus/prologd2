@@ -2,7 +2,7 @@
 #import "style.typ": apply, logos
 #show: apply
 
-#set document(title: "Пролог-У: курс уроков", author: "Проект PrologD")
+#set document(title: "Пролог-Д: курс уроков", author: "Проект PrologD")
 #set page(
   paper: "a5",
   numbering: "1",
@@ -44,13 +44,13 @@
 Из командной строки то же самое выглядит так:
 
 ```sh
-prologu -s examples/lessons/lesson_01.pld
+prologd -s examples/lessons/lesson_01.pld
 
 # урок 7 читает данные из файла
-prologu -s examples/lessons/lesson_07.pld < examples/lessons/lesson_07.input.txt
+prologd -s examples/lessons/lesson_07.pld < examples/lessons/lesson_07.input.txt
 
 # урок 11 подключает библиотеку, поэтому ему нужен каталог поиска модулей
-prologu -I examples/lib -s examples/lessons/lesson_11.pld
+prologd -I examples/lib -s examples/lessons/lesson_11.pld
 ```
 
 = 2. Порядок уроков

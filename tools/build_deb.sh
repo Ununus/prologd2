@@ -117,11 +117,11 @@ echo "python : $PYTHON"
 step '2/8 Build the engine'
 cmake --preset "$PRESET"
 cmake --build "$BUILD" -j "$JOBS"
-PROLOGU="$BUILD/src/cli/prologu"
-[ -x "$PROLOGU" ] || fail "the build left no $PROLOGU"
+PROLOGD="$BUILD/src/cli/prologd"
+[ -x "$PROLOGD" ] || fail "the build left no $PROLOGD"
 
-VERSION=$("$PROLOGU" --version | head -n 1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1 || true)
-[ -n "$VERSION" ] || fail "prologu --version printed no version number"
+VERSION=$("$PROLOGD" --version | head -n 1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1 || true)
+[ -n "$VERSION" ] || fail "prologd --version printed no version number"
 ARCH=$(dpkg --print-architecture)
 GLIBC=$(ldd --version | head -n 1 | grep -oE '[0-9]+\.[0-9]+$' | head -n 1 || true)
 [ -n "$GLIBC" ] || fail "could not read the glibc version from ldd --version"
@@ -195,13 +195,12 @@ else
     echo 'trimmed : skipped (--no-trim)'
 fi
 
-install -m 0755 "$PROLOGU" "$TREE/opt/prologd/prologu"
+install -m 0755 "$PROLOGD" "$TREE/opt/prologd/prologd"
 for name in "${DOCUMENTS[@]}"; do
     install -m 0644 "doc/$name.pdf" "$TREE/opt/prologd/doc/$name.pdf"
 done
 install -m 0644 doc/builtins.json "$TREE/opt/prologd/doc/builtins.json"
 cp -a examples "$TREE/opt/prologd/examples"
-rm -rf "$TREE/opt/prologd/examples/lessons/_old"
 cp -a stdlib "$TREE/opt/prologd/stdlib"
 install -m 0755 installer/linux/prologd-gui "$TREE/usr/bin/prologd-gui"
 install -m 0644 installer/linux/prologd.desktop "$TREE/usr/share/applications/prologd.desktop"
@@ -220,11 +219,11 @@ install -m 0644 installer/linux/lintian-overrides "$TREE/usr/share/lintian/overr
 # mode as non-standard).
 find "$TREE" -type d -exec chmod 0755 {} +
 find "$TREE" -type f -exec chmod 0644 {} +
-chmod 0755 "$TREE/opt/prologd/prologu" \
+chmod 0755 "$TREE/opt/prologd/prologd" \
            "$TREE/opt/prologd/prologd-gui" "$TREE/usr/bin/prologd-gui"
 
 step '7/8 Check the tree and the frozen window'
-[ -x "$TREE/opt/prologd/prologu" ] || fail 'the tree has no prologu'
+[ -x "$TREE/opt/prologd/prologd" ] || fail 'the tree has no prologd'
 [ -x "$TREE/usr/bin/prologd-gui" ] || fail 'the tree has no prologd-gui command'
 [ -f "$TREE/usr/share/icons/hicolor/48x48/apps/prologd.png" ] || fail 'the hicolor icons were not copied'
 if command -v desktop-file-validate >/dev/null 2>&1; then
@@ -233,10 +232,10 @@ fi
 if command -v xmllint >/dev/null 2>&1; then
     xmllint --noout "$TREE/usr/share/mime/packages/prologd.xml"
 fi
-"$TREE/opt/prologd/prologu" --version >/dev/null
-keywords=$("$TREE/opt/prologd/prologu" --list-keywords | wc -l)
-[ "$keywords" -ge 100 ] || fail "prologu lists only $keywords keyword lines"
-(cd "$TREE/opt/prologd" && ./prologu -s examples/lessons/lesson_01.pld >/dev/null)
+"$TREE/opt/prologd/prologd" --version >/dev/null
+keywords=$("$TREE/opt/prologd/prologd" --list-keywords | wc -l)
+[ "$keywords" -ge 100 ] || fail "prologd lists only $keywords keyword lines"
+(cd "$TREE/opt/prologd" && ./prologd -s examples/lessons/lesson_01.pld >/dev/null)
 status=0
 QT_QPA_PLATFORM=offscreen timeout 8 "$TREE/opt/prologd/prologd-gui" >/dev/null 2>&1 || status=$?
 if [ "$status" -ne 124 ]; then
@@ -258,7 +257,7 @@ if [ "$skip_trim" -eq 0 ]; then
         done)
     [ -z "$still_wanted" ] || fail "the package still asks for the trimmed $still_wanted"
 fi
-echo "engine  : prologu $VERSION, $keywords keyword lines"
+echo "engine  : prologd $VERSION, $keywords keyword lines"
 echo 'window  : the frozen prologd-gui starts offscreen'
 
 step '8/8 Build the .deb'

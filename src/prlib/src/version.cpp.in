@@ -13,8 +13,8 @@ std::string_view versionString() {
   return PROLOGD_VERSION;
 }
 
-std::string_view buildDateString() {
-  return "@PROLOGD_BUILD_DATE@";
+std::string_view releaseDateString() {
+  return "@PROLOGD_RELEASE_DATE@";
 }
 
 std::string versionBanner() {
@@ -22,7 +22,7 @@ std::string versionBanner() {
   text += ' ';
   text += versionString();
   text += " (";
-  text += buildDateString();
+  text += releaseDateString();
   text += ')';
   return text;
 }

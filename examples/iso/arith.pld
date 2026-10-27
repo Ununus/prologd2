@@ -4,7 +4,7 @@
  * Операнды - обычные арифметические выражения, без пометки #...#.
  * \= спрашивает про унификацию термов.
  *
- * Запуск:  prologu -I stdlib -s examples/iso/arith.pld
+ * Запуск:  prologd -I stdlib -s examples/iso/arith.pld
  */
 
 :- import("iso.pld").

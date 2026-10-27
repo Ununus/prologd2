@@ -337,7 +337,7 @@ TEST_CASE("the standard-order signs survive formatting") {
 }
 
 TEST_CASE("every shipped program is already in the standard shape") {
-  // `prologu --format` is the layout the repository keeps its own programs in,
+  // `prologd --format` is the layout the repository keeps its own programs in,
   // and the lessons are the widest corpus of real text there is (task_47): the
   // moment one of them drifts, this check says which.  `test_lessons.cpp` is what
   // proves that formatting a lesson did not move a printed line.

@@ -4,7 +4,7 @@
 % member/2, append/3, length/2, last/2, between/3 и msort/2,
 % тесты типов, once/1, ignore/1, succ/2, nth1/3 и memberchk/2.
 %
-% Подключение:  prologu -I stdlib -s программа.pld  и в программе
+% Подключение:  prologd -I stdlib -s программа.pld  и в программе
 %   :- ИМПОРТ("iso.pld").
 %
 % Зачем это нужно: примеры из книги, написанные на ISO, должны работать без

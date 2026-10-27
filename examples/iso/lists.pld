@@ -3,7 +3,7 @@
  * Предикаты из stdlib/iso.pld со стандартной семантикой. sort/2 убирает
  * повторы, msort/2 оставляет их.
  *
- * Запуск:  prologu -I stdlib -s examples/iso/lists.pld
+ * Запуск:  prologd -I stdlib -s examples/iso/lists.pld
  */
 :- import("iso.pld").
 

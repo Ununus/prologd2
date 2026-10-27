@@ -99,7 +99,7 @@ def test_the_folders_are_the_ones_the_engine_would_try() -> None:
         (root / "библиотеки").mkdir()
         (root / "stdlib").mkdir()
         found = imports.search_folders(
-            root / "проект", [str(root / "библиотеки"), str(root / "нет")], str(root / "prologu.exe")
+            root / "проект", [str(root / "библиотеки"), str(root / "нет")], str(root / "prologd.exe")
         )
         assert found == [root / "проект", root / "библиотеки", root / "stdlib"], found
         # The same folder twice is one entry, and the order is the engine's.

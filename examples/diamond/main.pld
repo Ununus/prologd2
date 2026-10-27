@@ -14,7 +14,7 @@
 %
 % Запуск - без ключей: файлы лежат рядом, и подключаемый файл ищется сначала в
 % каталоге подключающего.
-%   prologu -s examples/diamond/main.pld
+%   prologd -s examples/diamond/main.pld
 
 :- ИМПОРТ("left.pld").
 :- ИМПОРТ("right.pld").

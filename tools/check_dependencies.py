@@ -1,6 +1,6 @@
 """What a Windows executable imports, and whether a package carries it.
 
-    python tools/check_dependencies.py dist/prologd-2.0.0-win64
+    python tools/check_dependencies.py dist/prologd-2.6.1-win64
 
 The build machine is the wrong place to ask "does the package have everything?":
 it has the Visual C++ runtime in `System32` (Visual Studio installed), so a
@@ -187,7 +187,7 @@ def check(package: pathlib.Path) -> int:
 
 
 def main(argv: list[str]) -> int:
-    package = pathlib.Path(argv[1] if len(argv) > 1 else "dist/prologd-2.4.0-win64")
+    package = pathlib.Path(argv[1] if len(argv) > 1 else "dist/prologd-2.6.1-win64")
     if not package.is_dir():
         print(f"not a folder: {package}")
         return 2
