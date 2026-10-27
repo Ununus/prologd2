@@ -493,20 +493,6 @@ using BuiltinTable = std::unordered_map<BuiltinKey, BuiltinFn, BuiltinKeyHash>;
 /// registered by the same `add` call, so a new built-in cannot be added to the
 /// dispatch table and forgotten here.
 ///
-/// `ИМЕНА/1` is the *marker* that says how the names of a file are read, and it
-/// works only as the first line of that file (task_67): the loader reads that line
-/// before it lexes the file, and a mode cannot be changed afterwards — the text
-/// above the call has already been read.  Reaching this function means the marker
-/// was written somewhere else, so say where it belongs instead of failing quietly.
-BuiltinResult builtinVariablesMarker(Engine& engine, std::span<const Term> args) {
-  (void)args;
-  // No `return` after this: `Engine::raise` is `[[noreturn]]`, so the end of the
-  // body is unreachable, and a value written there is dead code — MSVC says so
-  // out loud (C4702, part 153).
-  engine.raise(ErrorCode::InvalidGoal,
-               "режим имён задаётся первой строкой файла: `:- ИМЕНА(0|1|2).`");
-}
-
 /// Names that are not listed are already English (`abs`, `sqrt`, `sin`, `cos`,
 /// `tan`, `exp`, `mod`, `div`) or are answered outside the dispatch
 /// table (`ВЫП`/`call`, handled by the solver; `ИМПОРТ`/`import`, handled by the
@@ -621,7 +607,6 @@ const BuiltinTable& builtinTable() {
     add("ТРАССА", 0, builtinTrace);
     add("НЕТ_ТРАССЫ", 0, builtinNoTrace);
     add("ТИХО", 0, builtinQuiet);
-    add("ИМЕНА", 1, builtinVariablesMarker);
     add("ВЕРСИЯ", 0, builtinVersion);
     add("НЕ", 1, builtinNot);
     add("ДЛЯВСЕХ", 2, builtinForall);

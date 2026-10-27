@@ -43,9 +43,7 @@ def is_directive_name(token) -> bool:
     return token.text in DIRECTIVE_NAMES and token.kind in _DIRECTIVE_KINDS
 
 
-def directive_names(
-    text: str, keywords=None, mode: int = tokens.MODE_ISO
-) -> list[str]:
+def directive_names(text: str, keywords=None) -> list[str]:
     """The file names the `ИМПОРТ` directives of `text` name, in the order written.
 
     The line is read with the editor's own tokenizer, so a directive inside a
@@ -61,7 +59,7 @@ def directive_names(
         if "ИМПОРТ" not in line and "import" not in line:
             continue
         inside = False
-        for token in tokens.tokenize(line, keywords, mode):
+        for token in tokens.tokenize(line, keywords):
             # The name of the directive is a reserved word, so it arrives as a
             # `KEYWORD` or, once the kinds are known, a `DIRECTIVE` (task_111).
             if is_directive_name(token):
@@ -193,7 +191,7 @@ SEPARATOR = "/"
 
 
 def import_argument_at(
-    text: str, position: int, keywords=None, mode: int = tokens.MODE_ISO
+    text: str, position: int, keywords=None
 ) -> tuple[str, str] | None:
     """What is typed inside the file name of an `ИМПОРТ` directive, at `position`.
 
@@ -211,7 +209,7 @@ def import_argument_at(
     line = text[line_start:] if line_end < 0 else text[line_start:line_end]
     column = position - line_start
     directive = False
-    for token in tokens.tokenize(line, keywords, mode):
+    for token in tokens.tokenize(line, keywords):
         if is_directive_name(token):
             directive = True
             continue

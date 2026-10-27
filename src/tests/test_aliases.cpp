@@ -31,11 +31,8 @@ bool isAnsweredOutsideTheTable(std::string_view name) {
 /// * `КОПИЯ/4` lost `substring` because the ISO predicate for the same work is
 ///   `sub_string/5` — positions from zero, three counts — so that English name is
 ///   a predicate of its own rather than an alias.
-/// * `ИМЕНА/1` lost `variables`: it is a marker the loader reads from a file's
-///   first line, and the reader knows one word only, so the English spelling could
-///   never do the marker's work — only fail as a call.
 bool hasNoEnglishSpelling(std::string_view name) {
-  return name == "ИЛИ" || name == "КОПИЯ" || name == "ИМЕНА";
+  return name == "ИЛИ" || name == "КОПИЯ";
 }
 
 std::string_view englishOf(std::string_view russian) {
@@ -123,18 +120,17 @@ TEST_CASE("the copy predicate answers to no English name, sub_string is its own"
   REQUIRE(prologd::findBuiltin("sub_string", 4) == nullptr);
 }
 
-TEST_CASE("the names marker answers to no English name") {
-  // task_107: `variables` was the marker's English spelling, and it is gone —
-  // `readVariableMarker` reads `ИМЕНА` and nothing else, so the second spelling
-  // could never set a mode; it could only be a call that fails.
-  REQUIRE(englishOf("ИМЕНА").empty());
+TEST_CASE("the names marker is not a built-in at all") {
+  // The modes are gone, so nothing answers to the marker: both spellings are
+  // retired, which keeps them reserved — a call reaches the checks and is told
+  // why — while the keyword table, completion and `--list-keywords` stay clear of
+  // a name that does nothing.
+  REQUIRE(prologd::findBuiltin("ИМЕНА", 1) == nullptr);
   REQUIRE(prologd::findBuiltin("variables", 1) == nullptr);
-  REQUIRE(prologd::findBuiltin("ИМЕНА", 1) != nullptr);
-  REQUIRE(prologd::builtinArities("ИМЕНА").arities == std::vector<std::size_t>{1});
-  REQUIRE_FALSE(prologd::builtinArities("ИМЕНА").variadic);
-  // Retired, not forgotten: the word stays reserved so a call to it is an error
-  // with an explanation instead of an unknown name.
+  REQUIRE(prologd::builtinArities("ИМЕНА").arities.empty());
+  REQUIRE(prologd::isReservedBuiltinName("ИМЕНА"));
   REQUIRE(prologd::isReservedBuiltinName("variables"));
+  REQUIRE(prologd::reservedBuiltinNames().count("ИМЕНА") == 0);
 }
 
 TEST_CASE("the English surface works from a program") {

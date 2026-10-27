@@ -30,7 +30,7 @@ needed; the multi-config Windows preset already passes `--config Release` throug
 build and test presets.
 
 GUI checks — every `src/gui/tests/test_*.py` plus `protocol_smoke.py` is a script of
-its own (30 of them), and each needs a built interpreter:
+its own (29 of them), and each needs a built interpreter:
 
 ```sh
 export QT_QPA_PLATFORM=offscreen PYTHONUTF8=1
@@ -65,14 +65,12 @@ release; `ci.yml` (Linux, Windows) and `macos.yml` test every push to `main`.
 * Sources are UTF-8 with **LF**.  Check after editing: `git ls-files --eol <file>`.
   The exception is `installer/prologd.iss`, which must keep its **BOM**: Inno reads a
   BOM-less script as ANSI and the Cyrillic turns to rubbish.
-* `.pld` programs under `examples/` and `stdlib/` stay within the alphabet of the
-  previous dialect: no `—`, `–`, `−`, `…`, `№`, `§`.  Write `-` and `...`.  (The
-  engine itself reads them anywhere; the rule keeps the corpus comparable with the
-  upstream snapshot in `examples/prologd/`.)
+* `.pld` programs under `examples/` and `stdlib/` are written in the alphabet the
+  dialect's own texts use: no `—`, `–`, `−`, `…`, `№`, `§`.  Write `-` and `...`.
+  (The engine reads them anywhere; the rule keeps the corpus plain ASCII-punctuated.)
 * PowerShell scripts here print **ASCII only** (PowerShell 5.1 reads a BOM-less script
   as ANSI).
-* Do not edit `examples/prologd/` (byte-for-byte upstream), `src/3rdparty/` or
-  `ai/_ref/`.
+* Do not edit `src/3rdparty/` or `ai/_ref/`.
 * Never pass multi-line Python to `powershell -c` or a here-string: the shell mangles
   quotes and hanging strings.  Write the snippet to a file and run the file.
 * The version lives in `CMakeLists.txt` (`project(... VERSION ...)`).  The numbers in

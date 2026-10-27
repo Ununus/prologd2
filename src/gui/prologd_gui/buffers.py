@@ -16,7 +16,6 @@ from . import actions, documents
 from .editor import CodeEditor
 from .highlighter import PrologHighlighter
 from .settings import Settings
-from .tokens import mode_from_first_line
 
 
 class Buffer(QObject):
@@ -59,17 +58,6 @@ class Buffer(QObject):
         )
 
         self.document.modificationChanged.connect(self._on_modification_changed)
-        # The naming mode belongs to the *file* (task_67) and only its first line can
-        # set it, so watching for a change is one string comparison per keystroke
-        # instead of a re-tokenisation of the buffer.
-        self._first_line = ""
-        self._variable_mode = 0
-        #: How a file that says nothing is read (task_67): the *window's* answer,
-        #: handed to every buffer as they appear (`set_fallback_variable_mode`).  The
-        #: row is only the starting point: the window owns it, this object does not.
-        self._fallback_mode = self._settings.variable_mode_number
-        self.document.contentsChanged.connect(self._on_contents_changed)
-        self.refresh_variable_mode()
 
     # -- views -------------------------------------------------------------
     def add_view(self) -> CodeEditor:
@@ -159,46 +147,6 @@ class Buffer(QObject):
         self.model.modified = self.document.isModified()
 
     # -- shared state ------------------------------------------------------
-    def refresh_variable_mode(self) -> None:
-        """Works out how this document's names are read, and tells the highlighter.
-
-        The file's own `:- ИМЕНА(N).` first line wins (task_67); a file that says
-        nothing is read in the window's answer (`_fallback_mode`), the way `--vars`
-        covers the CLI.  This is colouring only: the interpreter reads the same
-        marker when it runs or formats the file.
-        """
-        declared = mode_from_first_line(self.text())
-        self._variable_mode = (
-            self._fallback_mode if declared is None else declared
-        )
-        self.highlighter.set_mode(self._variable_mode)
-
-    def set_fallback_variable_mode(self, mode: int) -> None:
-        """What a file that declares nothing about names is read in (task_67).
-
-        The window answers, not this object: the «Имена переменных» row is the
-        window's, and it is changed from the dialog and from the toolbar.  A file
-        that declares `:- ИМЕНА(N).` is not touched — the dialect belongs to the
-        file — and the colouring follows at once.
-        """
-        self._fallback_mode = int(mode)
-        self.refresh_variable_mode()
-
-    def variable_mode(self) -> int:
-        """How this document's names are read (task_67) — see `refresh_variable_mode`.
-
-        The window sends it with a question of its own: the margin marker and the
-        goal line ask with a single statement, which carries no marker of its own.
-        """
-        return self._variable_mode
-
-    def _on_contents_changed(self) -> None:
-        first = self.document.firstBlock().text()
-        if first == self._first_line:
-            return
-        self._first_line = first
-        self.refresh_variable_mode()
-
     def set_keywords(self, keywords) -> None:
         """The reserved names from `ready`, for the colours and the popups."""
         self.highlighter.set_keywords(keywords)

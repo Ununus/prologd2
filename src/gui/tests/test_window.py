@@ -1987,26 +1987,21 @@ def test_the_toolbar_reuses_the_actions(executable: str) -> None:
             assert actions.BY_KEY[key].title in shown, (key, shown)
         # task_58: «Очистить вывод» left the toolbar for the «Выполнение» menu, and
         # the size control left it too (see `test_two_font_sizes_and_one_wheel`).
-        # task_93: the right end carries one control that stands for the naming mode
-        # of the window, so the last *labelled* entry is «Настройки…» and the two
-        # empty-text entries are that control and the formatter's mode control.
+        # The state control went with the naming modes (part 213), so the last entry
+        # is «Настройки…» and the one empty-text entry is the formatter's mode
+        # control, right after «Форматировать».
         labels = [entry.text() for entry in toolbar.actions() if not entry.isSeparator()]
         assert actions.BY_KEY["help_doc"].title not in labels, labels
         assert actions.BY_KEY["clear_output"].title not in labels, labels
-        assert labels[-1] == "", labels
-        assert labels[-2] == actions.BY_KEY["settings"].title, labels
+        assert labels[-1] == actions.BY_KEY["settings"].title, labels
         widgets = [index for index, label in enumerate(labels) if not label]
-        assert len(widgets) == 2, labels
+        assert len(widgets) == 1, labels
         assert widgets[0] == labels.index(actions.BY_KEY["format"].title) + 1, labels
+        # The only widget on the toolbar is the formatter's mode control: the state
+        # control went with the naming modes (part 213).
         trailing = [entry.defaultWidget() for entry in toolbar.actions()
-                    if isinstance(entry, QWidgetAction)][-1:]
-        assert trailing == [window._state_button], trailing
-        # The state control is not a command: its picture is the state in force, and
-        # its tooltip says which one that is (task_93).
-        assert window._state_button.isEnabled() is True
-        assert window._state_button.toolTip().startswith(
-            actions.STATE_BY_KEY[window._current_state()].hint
-        ), window._state_button.toolTip()
+                    if isinstance(entry, QWidgetAction)]
+        assert trailing == [window._format_action.defaultWidget()], trailing
         # The toolbar keeps the three file buttons that act on the tab in front of
         # the user; «Сохранить все» acts on every tab and belongs in «Файл» (task_48).
         assert actions.BY_KEY["save_all"].title not in shown, shown
@@ -3767,8 +3762,7 @@ def test_the_directive_is_inserted_as_a_whole_statement(executable: str) -> None
         view = window.editor()
         labels = complete_from("ИМ")
         try:
-            # The first line is where the names marker belongs, so it is there too.
-            assert any(label.startswith(":- ИМЕНА(") for label in labels), labels
+            assert not any(label.startswith(":- ИМЕНА") for label in labels), labels
             row = next(
                 (index for index, label in enumerate(labels) if label.startswith(":- ИМПОРТ(")),
                 None,
@@ -3796,10 +3790,9 @@ def test_the_directive_is_inserted_as_a_whole_statement(executable: str) -> None
         finally:
             view._hide_completion()
 
-        # The names marker says how a file is read, and only its first line says
-        # anything: below that the marker is gone, while the directive stays.
+        # A directive is a statement wherever a statement can start, first line or
+        # not.
         labels = complete_from("цель.\nИМ")
-        assert not any(label.startswith(":- ИМЕНА") for label in labels), labels
         assert any(label.startswith(":- ИМПОРТ(") for label in labels), labels
         view._hide_completion()
 
@@ -4775,105 +4768,6 @@ def test_the_welcome_program_runs(executable: str) -> None:
         discard_changes(window)
 
 
-def test_the_state_control_switches_the_names_and_remembers(
-    executable: str, directory: pathlib.Path
-) -> None:
-    """task_93: one control, two states, and the choice outlives the window."""
-    from prologd_gui import actions, assets
-    from prologd_gui.settings import Settings
-
-    ini = directory / "names.ini"
-    window = make_window(executable, ready=False, settings=Settings(ini))
-    try:
-        # The picture is the state in force — the ISO reading — not a destination:
-        # the control says what the window is set to (task_93).
-        assert (
-            window._state_button.icon().cacheKey()
-            == assets.icon(actions.STATE_BY_KEY[actions.STATE_ISO].icon).cacheKey()
-        ), "the control does not wear the state in force"
-        assert window._state_actions[actions.STATE_ISO].isChecked() is True
-        window.editor().setPlainText('?ВЫВОД("ok"),ПС.\n')
-        window.run_program()
-        wait_for_result(window)
-        assert "ok" in window.output_text(), ascii(window.output_text())
-
-        window._choose_state(actions.STATE_PLD)
-        assert window._settings.variable_mode == "1"
-        assert (
-            window._state_button.icon().cacheKey()
-            == assets.icon(actions.STATE_BY_KEY[actions.STATE_PLD].icon).cacheKey()
-        ), "the control did not follow the mode"
-        assert window._state_actions[actions.STATE_PLD].isChecked() is True
-        assert window._naming_label() == "PLD", window._naming_label()
-
-        # The switching is a stored value and nothing more: the same interpreter
-        # runs the same program, and a live session is not touched.
-        window.editor().setPlainText('?ВЫВОД("ok2"),ПС.\n')
-        window.run_program()
-        wait_for_result(window)
-        assert "ok2" in window.output_text(), ascii(window.output_text())
-        print("ok: the control switches the naming mode, and the run is untouched")
-    finally:
-        discard_changes(window)
-
-    second = make_window(executable, ready=False, settings=Settings(ini))
-    try:
-        assert second._settings.variable_mode == "1", "the choice is not remembered"
-        assert second._current_state() == actions.STATE_PLD
-        print("ok: the mode the control chose is the one the next window starts with")
-    finally:
-        discard_changes(second)
-
-
-def test_the_state_control_duplicates_the_names_row(
-    executable: str, directory: pathlib.Path
-) -> None:
-    """task_93: the two rows are the «Имена переменных» row, and its words.
-
-    The control owns no preference of its own: it writes the row's key, and the words
-    are read from the `Setting` record (from behind its own `ISO:`/`PLD:`, which the
-    state label already carries), so a renamed row renames the menu with it.  A mode
-    chosen here is in force at once — the buffers that declare no dialect follow.
-    """
-    from prologd_gui import actions, tokens
-    from prologd_gui import settings as settings_module
-
-    row = settings_module.BY_KEY[settings_module.VARIABLE_MODE]
-    window = make_window(executable, ready=False)
-    try:
-        window.editor().setPlainText("шапка(Сумма).\n")
-        buffer = window.current_buffer()
-        iso, pld = (title.split(":", 1)[-1].strip() for _value, title in row.choices)
-        assert window._settings.variable_mode == "0"
-        assert buffer.variable_mode() == tokens.MODE_ISO
-        assert window._state_button.isEnabled() is True
-        assert [entry.text() for entry in window._state_menu.actions()] == [
-            f"ISO: {iso}",
-            f"PLD: {pld}",
-        ], [entry.text() for entry in window._state_menu.actions()]
-        assert window._state_actions[actions.STATE_ISO].isChecked() is True
-        assert window._naming_label() == "ISO"
-        assert "имена переменных как в стандарте ISO" in window._state_button.toolTip(), (
-            window._state_button.toolTip()
-        )
-
-        window._state_actions[actions.STATE_PLD].trigger()
-        assert window._settings.variable_mode == "1", "the menu must write the row's key"
-        assert window._state_actions[actions.STATE_PLD].isChecked() is True
-        assert window._state_actions[actions.STATE_ISO].isChecked() is False, (
-            "the entries are exclusive"
-        )
-        assert buffer.variable_mode() == tokens.MODE_OLD, "the buffer follows at once"
-        assert "имена переменных" in window.status_text(), window.status_text()
-
-        window._state_actions[actions.STATE_ISO].trigger()
-        assert window._settings.variable_mode == "0", "the dialect is the light answer"
-        assert buffer.variable_mode() == tokens.MODE_ISO
-        print("ok: the state control writes the names row, and the buffers follow")
-    finally:
-        discard_changes(window)
-
-
 def test_the_settings_dialog_opens_where_the_launch_points(
     executable: str, directory: pathlib.Path
 ) -> None:
@@ -5075,59 +4969,6 @@ def test_the_document_opens_from_the_package(executable: str) -> None:
     finally:
         discard_changes(window)
     print("ok: the manual is opened from the package's own doc folder")
-
-
-def test_the_first_line_sets_the_naming_mode_of_the_highlighting(executable: str) -> None:
-    """`:- ИМЕНА(N).` is the file's business, and the window follows it (task_67)."""
-    window = empty_window(executable)
-    try:
-        buffer = window.current_buffer()
-        assert buffer is not None
-        assert buffer.highlighter.mode == 0
-        assert window._settings.variable_mode == "0", "the row's default is the ISO reading"
-        buffer.document.setPlainText(":- ИМЕНА(1).\n?ВЕРСИЯ.\n")
-        assert buffer.highlighter.mode == 1, "the first line of the file sets the mode"
-
-        # The window's own row is what a file *without* a marker is read in, and a
-        # marker still beats it — the same order `--vars` has on the command line.
-        window._settings.variable_mode = "0"
-        window.apply_settings()
-        assert buffer.highlighter.mode == 1, "the marker beats the row"
-        buffer.document.setPlainText("% без маркера\n")
-        window.apply_settings()
-        assert buffer.highlighter.mode == 0, "without a marker the row stands"
-        # `2` is a spelling of `1` (task_77): a stored 2 is the old dialect, not the
-        # default — falling back to ISO would move that reader without a word.
-        window._settings.variable_mode = "2"
-        window.apply_settings()
-        assert window._settings.variable_mode == "1", "a stored `2` is the old dialect"
-        assert buffer.highlighter.mode == 1
-        print("ok: a file's first line sets the naming mode of its highlighting")
-    finally:
-        discard_changes(window)
-
-
-def test_a_question_of_a_mode_one_file_keeps_its_names(executable: str) -> None:
-    """A question asked on its own is read in the mode the file in front declares.
-
-    The goal line — and a click on a margin marker — loads the program quietly and
-    then asks one statement, and that statement arrives *without* the file's first
-    line, so it carries the mode itself.  Without it `?студент(Вова).` of a mode-1
-    file read `Вова` as a free variable and answered with the first student instead
-    of the one the file means (the user's find, task_67).
-    """
-    window = empty_window(executable)
-    try:
-        window.editor().setPlainText(":- ИМЕНА(1).\nстудент(Вова).\nстудент(Данил).\n")
-        window._query_line.setText("?студент(Вова).")
-        window._run_query()
-        wait_for_the_run(window)
-
-        assert "ДА" in window.output_text(), ascii(window.output_text())
-        assert "Вова=Вова" not in window.output_text(), ascii(window.output_text())
-    finally:
-        discard_changes(window)
-    print("ok: a question of a mode-1 file reads its names the way the file does")
 
 
 def test_the_tab_menu_shows_the_clicked_file(executable: str, directory: pathlib.Path) -> None:
@@ -5395,8 +5236,6 @@ def main(argv: list[str]) -> int:
         test_the_launch_binary_names_the_build_folder(executable, files)
         test_a_missing_interpreter_is_reported_not_half_started(executable, files)
         test_the_welcome_program_runs(executable)
-        test_the_state_control_switches_the_names_and_remembers(executable, files)
-        test_the_state_control_duplicates_the_names_row(executable, files)
         test_the_settings_dialog_opens_where_the_launch_points(executable, files)
         test_the_process_directory_is_where_files_go(executable, files)
         test_autosave_writes_named_buffers_and_skips_the_rest(executable, files)
@@ -5410,8 +5249,6 @@ def main(argv: list[str]) -> int:
         test_a_converted_program_is_unsaved_work(executable)
         test_an_untouched_unnamed_tab_comes_back_clean(executable)
         test_the_document_opens_from_the_package(executable)
-        test_the_first_line_sets_the_naming_mode_of_the_highlighting(executable)
-        test_a_question_of_a_mode_one_file_keeps_its_names(executable)
         test_the_tab_menu_shows_the_clicked_file(executable, files)
         test_the_output_tab_offers_clear(executable)
         test_the_screen_size_setting_reaches_the_picture(executable)

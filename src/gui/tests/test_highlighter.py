@@ -28,9 +28,6 @@ from prologd_gui.theme import Theme  # noqa: E402
 from prologd_gui.tokens import (  # noqa: E402
     ATOM,
     CYRILLIC,
-    MODE_ISO,
-    MODE_OLD,
-    STRING,
     VARIABLE,
 )
 
@@ -54,11 +51,10 @@ class Coloured:
         line: str,
         keywords: Keywords = TABLE,
         theme: Theme = THEME,
-        mode: int = MODE_ISO,
     ) -> None:
         self.line = line
         self.document = QTextDocument()
-        self.highlighter = PrologHighlighter(self.document, keywords, theme, mode)
+        self.highlighter = PrologHighlighter(self.document, keywords, theme)
         self.document.setPlainText(line)
         self.highlighter.rehighlight()
 
@@ -188,23 +184,6 @@ def test_changing_the_theme_recolours() -> None:
     print("ok: the theme is data and re-applies without touching the text")
 
 
-def test_the_naming_mode_changes_the_colours() -> None:
-    """Mode 1 reads the old dialect's names (task_67): `д` is a variable there and
-    `Молоко` a string constant, while mode 0 reads them the other way round."""
-    coloured = Coloured("голова(д,Молоко)")
-    assert coloured.colour("д") == THEME.color_for(ATOM, CYRILLIC)
-    assert coloured.colour("Молоко") == THEME.color_for(VARIABLE, CYRILLIC)
-
-    coloured.highlighter.set_mode(MODE_OLD)
-    assert coloured.colour("д") == THEME.color_for(VARIABLE, CYRILLIC)
-    assert coloured.colour("Молоко") == THEME.color_for(STRING, CYRILLIC)
-    # A mode that does not move the colours must not cost a re-highlight either:
-    # the value is what a document keeps, and setting it again changes nothing.
-    coloured.highlighter.set_mode(MODE_OLD)
-    assert coloured.highlighter.mode == MODE_OLD
-    print("ok: the naming mode re-colours the old dialect's names")
-
-
 def test_astral_characters_do_not_shift_the_rest_of_the_line() -> None:
     """Qt counts UTF-16 units, Python counts code points; the offsets are mapped."""
     coloured = Coloured('член(😀). % привет')
@@ -213,33 +192,24 @@ def test_astral_characters_do_not_shift_the_rest_of_the_line() -> None:
     print("ok: an astral character in a comment does not shift the colours")
 
 
-def test_quoted_atoms_and_underscore_names_in_both_modes() -> None:
-    """task_100: the old dialect reads `'атом'` and `_имя` the way ISO does.
+def test_quoted_atoms_and_underscore_names() -> None:
+    """A quoted constant is coloured as one, and a name with `_` is a variable.
 
-    A quoted constant is coloured as one in both modes, and a name starting with
-    `_` is a variable in both.  The apostrophe is where the modes part: in the old
-    dialect it is the suffix of a variable name and belongs to the token, while in
-    ISO it opens a quoted atom and must stay a quote.
+    An apostrophe opens a quoted atom and never ends a name: `_Пер'` is the
+    variable `_Пер` and then a quote, which is what the old naming mode used to
+    read as one token.
     """
-    iso = Coloured("пункт('атом', _Пер, _пер)")
-    assert iso.colour("'атом'") == THEME.quoted_atom
-    assert iso.colour("_Пер") == THEME.color_for(VARIABLE, CYRILLIC)
-    assert iso.colour("_пер") == THEME.color_for(VARIABLE, CYRILLIC)
-
-    old = Coloured("пункт('атом', _Пер', _пер)", mode=MODE_OLD)
-    assert old.colour("'атом'") == THEME.quoted_atom
-    assert old.colour("_Пер") == THEME.color_for(VARIABLE, CYRILLIC)
-    assert old.colour("_пер") == THEME.color_for(VARIABLE, CYRILLIC)
-    # The apostrophe is part of the variable's token in the old dialect.
-    spans = {old.line[start : start + length] for start, length, _c, _w in old.ranges()}
-    assert "_Пер'" in spans, spans
-    print("ok: атомы в кавычках и имена с подчёркиванием красятся в обеих модах")
+    coloured = Coloured("пункт('атом', _Пер, _пер)")
+    assert coloured.colour("'атом'") == THEME.quoted_atom
+    assert coloured.colour("_Пер") == THEME.color_for(VARIABLE, CYRILLIC)
+    assert coloured.colour("_пер") == THEME.color_for(VARIABLE, CYRILLIC)
+    print("ok: атомы в кавычках и имена с подчёркиванием красятся")
 
 
 def coloured_lines(text: str) -> list[list[tuple[str, str | None]]]:
     """Every line of a multi-line document, each as (text, colour) spans."""
     document = QTextDocument()
-    highlighter = PrologHighlighter(document, TABLE, THEME, MODE_ISO)
+    highlighter = PrologHighlighter(document, TABLE, THEME)
     document.setPlainText(text)
     highlighter.rehighlight()
     lines = []
@@ -300,8 +270,7 @@ def main() -> int:
     test_builtins_are_bold_and_names_are_not()
     test_changing_the_table_recolours()
     test_changing_the_theme_recolours()
-    test_the_naming_mode_changes_the_colours()
-    test_quoted_atoms_and_underscore_names_in_both_modes()
+    test_quoted_atoms_and_underscore_names()
     test_astral_characters_do_not_shift_the_rest_of_the_line()
     test_a_block_comment_is_coloured_on_every_line()
     print("all highlighter checks passed")

@@ -930,6 +930,9 @@ not is unaffected.  The refusal is documented where a reader looks for it — `h
 
 ## ADR-029: The state control names an engine *line*, not a release
 
+**Superseded by ADR-054** (part 213): the naming modes are gone, and the state
+control with them.
+
 **Context.**  Task_79 ended the toolbar with two state controls: `n.png` («имена») with a
 menu of the two dialects, and `u.png`/`d.png` switching the engine.  Both had to be
 deciphered, and the first reader of a package took `Д` for «Пролог-Д 2.0» — the name of
@@ -1463,6 +1466,9 @@ user.
 
 ## ADR-044: the template carries its caret, and the marker carries its line
 
+**Partly superseded by ADR-054** (part 213): the marker's first-line rule went
+with the modes; the caret template stays.
+
 **Context.**  task_105 gave `ИМПОРТ` a skeleton and left the rest of the family
 alone: `ХОЛСТ` still arrived as a bare name (accepting it wrote `ХОЛСТ` where the
 language wants `:- ХОЛСТ(Высота, Ширина).`), and `ИМЕНА` — the names marker —
@@ -1493,6 +1499,8 @@ ADR-045, task_107).
 **Status.** Accepted 2026-10-24 (task_106).
 
 ## ADR-045: the names marker has one spelling, because the loader knows one
+
+**Superseded by ADR-054** (part 213): there is no marker at all any more.
 
 **Context.**  `variables` was registered as the English spelling of `ИМЕНА` by the
 same `add` that registers every alias, but the marker is not a normal builtin: the
@@ -1757,3 +1765,44 @@ either naming mode directly, so an old program runs as it is; the state control 
 the mode for a file that declares none.  The ISO *reading* is unaffected: English built-in
 names, `=`, `is`, `>`, `\+` are still understood and still parsed as sugar over the
 Russian built-ins (ADR-039's premise holds), only the printing of them is gone.
+
+## ADR-054: one reading of a name, and it is ISO's
+
+**Context.**  task_67 taught the reader two naming modes — `0` (ISO: an upper-case
+initial is a variable) and `1` (the previous dialect: any single letter is a variable,
+a bare capitalised name is a string constant, a long variable name ends with an
+apostrophe) — and let a file declare its own with `:- ИМЕНА(N).` on the first line.
+The mode travelled everywhere: `--vars` on the command line, the `vars` field of the
+`load`/`query`/`format` requests, `execution/variable_mode` in the window, a
+`QToolButton` with two pictures on the toolbar, a rule of the highlighter, the
+completer and `F12`.  The corpus it served is almost gone: `examples/prologd/` and the
+`_old` lessons were the only programs written for it, and after the conversion passes
+went (ADR-053) the owner asked for the modes themselves to go too.
+
+**Decision.**  There is **one** way to read a name, and it is ISO's: a lower-case
+initial is a name, an upper-case one a variable, `_` starts a variable, `'` quotes an
+atom, and an apostrophe never ends a name.  Removed: `VariableMode`,
+`variableModeFromNumber`, `readVariableMarker`, `LexerOptions`, `--vars`, the `vars`
+protocol field (the protocol is now 15), `ИМЕНА/1` as a built-in, the settings row,
+the toolbar control, the highlighter's `set_mode`, `mode_from_first_line` and the
+`first_line` rule of the completion popup.  `examples/prologd/`, `examples/names.pld`,
+`examples/lib/old_lib*.pld` and `examples/lessons/_old/` are deleted: they could not
+be read any more, and keeping unreadable programs in a repository that ships them as
+examples would be worse than losing the archive (git keeps it).
+
+**The marker is still reserved, and it is an error.**  `ИМЕНА` and `variables` stay in
+`kRetiredBuiltinNames`, so a file whose first line is `:- ИМЕНА(1).` parses as a call
+and the checks refuse it with «режимов имён больше нет: имена читаются как в ISO…».
+That is deliberately a *hard* error rather than a warning: the file was written for a
+reading this engine no longer has, and its meaning would change silently — `Сумма'`
+would be a name and a stray quote, `Вдова` a variable instead of a constant.  A
+warning would let it load and answer something else.
+
+**Consequences.**  The lexer keeps one branch instead of three, the formatter loses
+the «unquoted string constant» span rule it needed for the old mode, and the window
+loses a control, a settings row and a mode-dependent path through three modules.  What
+stays is the *reading* of ISO spellings — English built-in names, `=`, `is`, `>`,
+`\+` — which never depended on the mode: it is the parser's sugar over the Russian
+built-ins (ADR-039).  A reader with a program in the previous dialect has to rewrite
+its names by hand; the two rules that do most of the work are «one letter is a name,
+not a variable» and «a long variable ends with an apostrophe».

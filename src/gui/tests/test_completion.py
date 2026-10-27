@@ -247,15 +247,12 @@ def test_a_directive_is_offered_as_the_whole_statement() -> None:
     """`ИМ` gives `:- ИМПОРТ("").` with the caret inside the quotes (task_105).
 
     A directive is not a goal: the skeleton is the statement, and the string it
-    opens is the one that completes to a file name (task_104).  The other two
-    statements follow the same rule (task_106): `ХОЛСТ` meets its comma, and the
-    names marker meets the argument it takes.  `ИМЕНА` is a *callable* builtin —
-    calling it is an error — and it is offered the same way, as a statement.
+    opens is the one that completes to a file name (task_104).  `ХОЛСТ` follows the
+    same rule (task_106) and meets its comma.
     """
     reserved = Keywords.from_event(
         {
             "keywords": [
-                {"name": "ИМЕНА", "kind": "predicate", "arities": [1]},
                 {"name": "ИМПОРТ", "kind": "directive", "arities": []},
                 {"name": "import", "kind": "directive", "arities": []},
                 {"name": "ХОЛСТ", "kind": "directive", "arities": []},
@@ -279,21 +276,12 @@ def test_a_directive_is_offered_as_the_whole_statement() -> None:
     assert [offer.label for offer in model.candidates("ca")] == [":- canvas(, )."], (
         model.candidates("ca")
     )
-    # `ИМЕНА` is the marker of a file's first line: a statement, and first-line only.
-    marker = model.candidates("ИМЕН")
-    assert [offer.call_form for offer in marker] == [(":- ИМЕНА().", 9)], marker
-    assert marker[0].first_line is True
     # Where the statement can start — the rule the editor applies, which has to
     # look at what stands *before* the word being typed.
     line = "  ИМ"
     assert completion.at_statement_start(line, len(line), "ИМ") is True
     body = "цель :- ИМ"
     assert completion.at_statement_start(body, len(body), "ИМ") is False
-    # And where it stops being the file's first line.
-    assert completion.at_file_start(line, len(line), "ИМ") is True
-    second = "цель.\nИМ"
-    assert completion.at_statement_start(second, len(second), "ИМ") is True
-    assert completion.at_file_start(second, len(second), "ИМ") is False
     print("ok: a directive is offered as its whole statement, only at a line start")
 
 

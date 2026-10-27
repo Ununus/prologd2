@@ -216,44 +216,26 @@ TEST_CASE("a query and a directive keep their one line") {
   }
 }
 
-TEST_CASE("the first line of a file decides how its names are read") {
-  // `Сумма'` is one variable in the old dialect and an unterminated quote in mode
-  // 0, so the very same clause parses only when the file says so (task_67).  The
-  // marker also has to *stay* the first line of the output: it is an ordinary
-  // statement.
-  const std::string clause = "длинное:-РАВНО(Сумма',5).\n";
-  const FormatResult declared = format(":- ИМЕНА(2).\n" + clause);
-  REQUIRE(declared.ok());
-  REQUIRE(declared.text.find("Сумма'") != std::string::npos);
-  REQUIRE(declared.text.rfind(":- ИМЕНА(2).", 0) == 0);
-
-  // task_77: `2` is a spelling of `1` now, so the same file whose first line says
-  // `1` comes back the same way, marker and all.
-  const FormatResult spelled_one = format(":- ИМЕНА(1).\n" + clause);
-  REQUIRE(spelled_one.ok());
-  std::string expected = declared.text;
-  expected.replace(0, std::string(":- ИМЕНА(2).").size(), ":- ИМЕНА(1).");
-  REQUIRE(spelled_one.text == expected);
-
-  const FormatResult bare = format(clause);
-  REQUIRE_FALSE(bare.ok());
-
-  // The option is the fallback for a text without a marker — the window's row and
-  // the CLI's `--vars`.
-  FormatOptions options;
-  options.variables = prologd::VariableMode::Old;
-  REQUIRE(format(clause, options).ok());
+TEST_CASE("the names marker is laid out like any other directive") {
+  // The modes are gone, so the line declares nothing — but it is still a call the
+  // parser reads, and laying text out is not loading it: the formatter leaves the
+  // line alone and it is the loader that refuses the file, with the message of a
+  // retired name (see the engine's own checks).
+  const std::string source = ":- ИМЕНА(1).\nдлинное:-РАВНО(Сумма, 5).\n";
+  const FormatResult result = format(source);
+  REQUIRE(result.ok());
+  REQUIRE(result.text.rfind(":- ИМЕНА(1).", 0) == 0);
 }
 
-TEST_CASE("a string constant of the old dialect keeps its span") {
-  // In mode 1 a bare capitalised name is a string constant (task_67), and the
-  // formatter measures every token's raw span: assuming a quote there swallowed
-  // the rest of the line, and the formatted text of the old lessons came back
-  // twenty times longer than the input.
-  const std::string program = ":- ИМЕНА(1).\nстудент(Вова).\nстудент(Боря).\n";
-  const FormatResult formatted = format(program);
-  REQUIRE(formatted.ok());
-  REQUIRE(formatted.text == program);
+TEST_CASE("an apostrophe is a quote and never part of a name") {
+  // The old dialect's long variable names are gone with its mode: `Сумма'` is the
+  // name `Сумма` and an unterminated quoted atom, so a file written that way does
+  // not parse and the formatter hands it back as it is.
+  const std::string source = "длинное:-РАВНО(Сумма',5).\n";
+  const FormatResult result = format(source);
+  REQUIRE_FALSE(result.ok());
+  REQUIRE(result.text == source);
+  REQUIRE_FALSE(result.diagnostics.empty());
 }
 
 TEST_CASE("a source that does not parse comes back untouched, with diagnostics") {
@@ -290,26 +272,9 @@ TEST_CASE("blank lines collapse between clauses and survive inside one") {
 TEST_CASE("formatting is idempotent for every example program") {
   namespace fs = std::filesystem;
   const fs::path root(PROLOGD_TEST_DATA_DIR);
-  // `examples/lessons/_old` keeps the ported originals as they were written,
-  // so their spellings are the ones the port changed (`;` as a terminator,
-  // `1.` for 1.0 — task_52) and a few of them no longer parse.  The formatter
-  // refuses a source it cannot parse, so they are not its business.
-  const fs::path archived = root / "lessons" / "_old";
-  // `examples/prologd` is that same story for a whole folder: the original
-  // dialect's own programs (task_86), copied as they were written.  The folder is
-  // compared by its *first path component*, not by a prefix of the whole path, so
-  // a name that merely begins with `prologd` cannot slip into the skip.
-  const fs::path original("prologd");
   std::vector<fs::path> files;
   for (const auto& entry : fs::recursive_directory_iterator(root)) {
     if (!entry.is_regular_file() || entry.path().extension() != ".pld") {
-      continue;
-    }
-    if (entry.path().string().find(archived.string()) != std::string::npos) {
-      continue;
-    }
-    const fs::path relative = entry.path().lexically_relative(root);
-    if (!relative.empty() && *relative.begin() == original) {
       continue;
     }
     files.push_back(entry.path());
@@ -374,10 +339,8 @@ TEST_CASE("the standard-order signs survive formatting") {
 TEST_CASE("every shipped program is already in the standard shape") {
   // `prologu --format` is the layout the repository keeps its own programs in,
   // and the lessons are the widest corpus of real text there is (task_47): the
-  // moment one of them drifts, this check says which.  `examples/lessons/_old`
-  // holds the ported originals for comparison with the port, so it keeps their
-  // spelling rather than the port's; `test_lessons.cpp` is what proves that
-  // formatting a lesson did not move a printed line.
+  // moment one of them drifts, this check says which.  `test_lessons.cpp` is what
+  // proves that formatting a lesson did not move a printed line.
   //
   // `stdlib` is the second shipped folder — the standard library travels beside
   // the executable — and it obeys the same rule: a library file is written the
@@ -386,22 +349,10 @@ TEST_CASE("every shipped program is already in the standard shape") {
   namespace fs = std::filesystem;
   const std::vector<fs::path> roots = {fs::path(PROLOGD_TEST_DATA_DIR),
                                        fs::path(PROLOGD_STDLIB_DIR)};
-  // The original dialect's own folder is left alone here for the same reason as
-  // `_old` above: those programs are kept exactly as they were written (task_86),
-  // and their spelling is what the port changed.
-  const fs::path top(PROLOGD_TEST_DATA_DIR);
-  const fs::path original("prologd");
   std::size_t checked = 0;
   for (const fs::path& root : roots) {
     for (const auto& entry : fs::recursive_directory_iterator(root)) {
       if (!entry.is_regular_file() || entry.path().extension() != ".pld") {
-        continue;
-      }
-      if (entry.path().parent_path().filename() == "_old") {
-        continue;
-      }
-      const fs::path relative = entry.path().lexically_relative(top);
-      if (!relative.empty() && *relative.begin() == original) {
         continue;
       }
       const std::string source = readFile(entry.path());

@@ -173,7 +173,6 @@ Usage: prologu [options] [files...]
 -e, --error FILE      write diagnostics to this file
 -q, --questions       echo queries before executing them
 -t, --trace           start with tracing enabled
-    --vars 0|1        how names are read: 0 = ISO (default), 1 = the old dialect
     --no-warnings     do not print warnings (they never change the exit code)
     --max-depth N     recursion depth limit for one query (0 = unlimited)
     --max-steps N     step limit for one query (0 = unlimited)

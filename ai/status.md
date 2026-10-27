@@ -7256,3 +7256,63 @@ of the package».  Отдельно: 25 оконных наборов и `protoc
 * **Проверки.**  `linux-release` и `linux-werror` собираются чисто, 413/413 в
   обоих.  Все 30 скриптов окна и `protocol_smoke.py` зелены.  `docs` собирает
   пять PDF.
+
+### 213. Режимов имён больше нет — остался ISO
+
+* **Просьба владельца.**  Убрать поддержку двух режимов имён: снять маркер
+  `ИМЕНА` из движка, строку «Имена переменных» и переключатель состояния из окна,
+  `engine-iso.png`/`engine-pld.png`, упоминания режимов из `doc/`, директивы из
+  примеров и `stdlib`, тесты.  В таблице сравнения `help.typ` столбец
+  «Пролог-Д (ISO)» стал «Пролог-Д».
+* **Движок.**  Из `lexer.hpp`/`lexer.cpp` ушли `enum class VariableMode`,
+  `variableModeFromNumber`, `readVariableMarker`, `LexerOptions` (у него не
+  осталось полей) и `isOldVariableName`; правило чтения имени теперь одно — по
+  ISO.  Из `EngineOptions` ушло поле `variableMode`, из `FormatOptions` —
+  `variables`, и `lexAndParse` больше не получает режим.  `ИМЕНА/1` перестал быть
+  встроенным: `builtinVariablesMarker` удалён, а оба написания маркера (`ИМЕНА`,
+  `variables`) переехали в снятые имена — файл, который всё ещё начинается
+  строкой маркера, **не загружается** и объясняет, почему, вместо ответа
+  «не найдено».  В `formatter.cpp` вместе с режимом ушла мёртвая ветка
+  `rawLength`, которая мерила прописное имя как «строку без кавычек».
+* **Протокол.**  Поле `vars` убрано из `load`, `query` и `format`, номер стал
+  **15**.  Неизвестное поле движок и раньше не считал ошибкой, поэтому старый
+  клиент не отказывается — его запрос просто читается по ISO, а номер говорит,
+  что прежнего чтения имён больше нет.
+* **Окно.**  Удалены `tokens.MODE_ISO`/`MODE_OLD`/`MODES`/`MODE_NUMBERS`,
+  `MARKER_NAME`, `mode_from_first_line`, `_is_old_variable_name`;
+  `PrologHighlighter.set_mode`/`mode`; `Buffer.refresh_variable_mode`,
+  `set_fallback_variable_mode`, `variable_mode`; `actions.State`, `STATES`,
+  `STATE_ISO`/`STATE_PLD`, `STATE_ICONS`, маркер панели `STATE`; строка
+  `execution/variable_mode` и её свойства в `settings.py`; `_build_state_button`,
+  `_build_state_menu`, `_state_detail`, `_current_state`, `_sync_state_button`,
+  `_sync_state_menu`, `_choose_state`, `_set_variable_mode`, `_naming_label`,
+  `_default_variable_mode`, `_apply_dialect`, `_variable_mode` в `window.py`.
+  `engine-iso.png` и `engine-pld.png` удалены.  Из автодополнения ушёл шаблон
+  `:- ИМЕНА().` и правило «только первой строкой» (`Statement.first_line`,
+  `at_file_start`) — других таких директив не было.
+* **Данные.**  Директивы `:- ИМЕНА(0).` сняты из `stdlib/*.pld` (6 файлов) и
+  `examples/problems/maze/maze.pld`.  Владелец удалил `examples/prologd/` (корпус
+  старого диалекта), `examples/names.pld` и `examples/lib/old_lib*.pld` — они
+  читались только режимом 1.  По его же выбору удалена `examples/lessons/_old/`
+  вместе с тестами, которые её гоняли: без режима эти файлы не разбираются.
+  Обновлены `examples/README.md` и `examples/lessons/README.md`; из
+  `AGENTS.md` ушло правило про `examples/prologd/`.
+* **Документация.**  `help.typ`: раздел 2 — одно правило чтения имён и очередь
+  «файл с маркером не загружается»; таблица сравнения — четыре столбца вместо
+  пяти; ключ `--vars` убран.  `gui.typ`: абзацы про строку «Имена переменных» и
+  переключатель состояния, подсказка `ИМЕНА`.  `doc/builtins.json` — записи
+  `ИМЕНА` нет.  `README.md` — `--vars` из блока `--help`; `src/gui/README.md` —
+  протокол 15 и панель без переключателя.
+* **Тесты.**  Удалён `src/gui/tests/test_variable_modes.py`; в
+  `test_highlighter.py`, `test_settings.py`, `test_completion.py`,
+  `test_window.py` (два теста переключателя, тест подсветки по маркеру и тест
+  вопроса файла режима 1) сняты случаи про режимы; в `test_queries.py` — записи
+  удалённых программ.  В C++: `test_lexer.cpp` (правило ISO и снятый маркер),
+  `test_formatter.cpp` (маркер выравнивается как обычная директива, апостроф —
+  кавычка), `test_builtins_control.cpp`, `test_diagnostics.cpp`,
+  `test_aliases.cpp`, `test_lessons.cpp`; в `src/tests/CMakeLists.txt` два теста
+  `--vars` заменены одним `cli_names_marker_is_refused`, файл
+  `apostrophe_names.pld` заменён на `names_marker.pld`.
+* **Проверки.**  `linux-release` и `linux-werror`: 405/405 в обоих.  Все 28
+  скриптов окна (`test_variable_modes.py` удалён) и `protocol_smoke.py` зелены.
+  `docs` собирает пять PDF.

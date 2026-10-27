@@ -61,45 +61,6 @@ THEME_ICON = "view-theme"
 ADD_ICON = "settings-add"
 REMOVE_ICON = "settings-remove"
 
-#: The two states of the right-hand toolbar control (task_93): in which dialect the
-#: engine reads a name the file does not spell out.  It replaced the two controls of
-#: task_79 — a picture of an `И` and a picture of a `Д`, which asked the reader to
-#: know what the letters stood for, and `Д` was in fact read as «Пролог-Д 2.0», the
-#: name of the whole product.  These pictures carry their words themselves.
-@dataclass(frozen=True)
-class State:
-    """One state of «how the engine reads names»."""
-
-    #: The name the window and the tests use for it.
-    key: str
-    #: The words of the menu entry — the naming mode the manual describes
-    #: (`doc/help.typ`).
-    label: str
-    #: The picture in `assets/`, which is the same words drawn.
-    icon: str
-    #: The tooltip, verbatim as the author of the pictures worded it.
-    hint: str
-
-
-STATE_ISO = "iso"
-STATE_PLD = "pld"
-
-STATES: tuple[State, ...] = (
-    State(STATE_ISO, "ISO", "engine-iso", "имена переменных как в стандарте ISO"),
-    State(
-        STATE_PLD,
-        "PLD",
-        "engine-pld",
-        "имена переменных прежнего диалекта",
-    ),
-)
-
-STATE_BY_KEY: dict[str, State] = {state.key: state for state in STATES}
-
-#: The pictures of the control, for the audit: a missing file would leave the button
-#: wordless, because here the picture *is* the label.
-STATE_ICONS: tuple[str, ...] = tuple(state.icon for state in STATES)
-
 #: A menu entry that is a separator or a submenu rather than an action.
 SEPARATOR = "-"
 RECENT = "recent"
@@ -114,13 +75,6 @@ RECENT = "recent"
 #: toolbar, so the marker went with it.  A size is changed by `Ctrl`+wheel and the
 #: three zoom commands, and an exact value is a row of the settings dialog.
 FORMAT_MODE = "#format-mode"
-
-#: The state control (task_93): the *right end* of the toolbar, the counterpart of
-#: `FORMAT_MODE`, and the one control that answers «how does the engine read a name
-#: the file does not spell out» (`STATES`).  It is not a command of the program but a
-#: property of the whole window; the window builds it
-#: (`window._build_state_button`).
-STATE = "#state"
 
 #: The appearance (task_29's dark theme): a submenu of «Вид», because a *set* of
 #: three themes is not something one checkable entry can say.  It used to be a
@@ -307,7 +261,6 @@ ICON_NAMES: frozenset[str] = frozenset(
     [action.icon for action in ACTIONS if action.icon]
     + [RECENT_ICON, FIND_ICON, REPLACE_ICON, FORMAT_ICON, FILE_ICON,
        SAVED_ICON, MODIFIED_ICON, APPLICATION_ICON, THEME_ICON, ADD_ICON, REMOVE_ICON]
-    + list(STATE_ICONS)
 )
 
 #: The menu bar: (title, entries).  `-` is a separator, `recent` the submenu of
@@ -415,10 +368,6 @@ MENUS: tuple[tuple[str, tuple[str, ...]], ...] = (
 #: menu keeps it.  «Сохранить все» is not here either: a command that acts on every
 #: tab belongs in «Файл», and the toolbar keeps the three file buttons that act on
 #: the tab in front of the user (task_48).
-#:
-#: The state control (task_93) is the last control of all: it is not a command of the
-#: program but the naming mode the whole window reads by, so it stands apart, after a
-#: separator, at the right edge, where the eye looks for it.
 TOOLBAR: tuple[str, ...] = (
     "new",
     "open",
@@ -436,8 +385,6 @@ TOOLBAR: tuple[str, ...] = (
     "graphics",
     SEPARATOR,
     "settings",
-    SEPARATOR,
-    STATE,
 )
 
 #: The context menu of an editor *tab* (task_68), built from the same table as

@@ -44,25 +44,6 @@ QUERY = "query"  # `?`
 QUERY_COMMENT = "query_comment"  # a question parked in a comment: `% ?…`
 EXPRESSION = "expression"  # the `#` of `#… #`
 
-# -- naming modes (task_67, merged in task_77) -------------------------------
-#: The two ways a name is read, with the numbers the marker `:- ИМЕНА(N).` and
-#: `--vars` use.  Mode 0 is the port's own ISO reading; mode 1 is the old dialect,
-#: where any single letter is a variable, a bare capitalised name is a string
-#: constant, and a long name ends with an apostrophe (`Сумма'`).
-#:
-#: `2` was a mode of its own until task_77 and is a *spelling* of `1` now: the
-#: original reads apostrophe names in a file that declares nothing, so the two
-#: were one dialect all along.  `MODE_NUMBERS` is the only place a spelling is
-#: turned into a mode, and a file that says `2` colours exactly as one that says
-#: `1` — the mirror of `variableModeFromNumber` in `src/prlib/src/lexer.cpp`.
-MODE_ISO = 0
-MODE_OLD = 1
-MODES = (MODE_ISO, MODE_OLD)
-MODE_NUMBERS = {0: MODE_ISO, 1: MODE_OLD, 2: MODE_OLD}
-
-#: What `:- ИМЕНА(N).` looks like when it is written down.
-MARKER_NAME = "ИМЕНА"
-
 # -- alphabets --------------------------------------------------------------
 LATIN = "latin"
 CYRILLIC = "cyrillic"
@@ -160,7 +141,7 @@ def plain_newlines(text: str) -> str:
     return text
 
 
-def tokenize(line: str, keywords: Keywords | None = None, mode: int = MODE_ISO) -> list[Token]:
+def tokenize(line: str, keywords: Keywords | None = None) -> list[Token]:
     """Splits one line into highlightable tokens, in source order.
 
     A line taken on its own: a block comment that does not close here ends with
@@ -171,17 +152,13 @@ def tokenize(line: str, keywords: Keywords | None = None, mode: int = MODE_ISO) 
     interpreter older than protocol 2 leaves us with: everything is then an atom
     or a variable, and the GUI cannot tell a built-in from a user name.
 
-    `mode` is how the file's names are read (task_67): 0 is the ISO reading, 1 the
-    old dialect.  It is *one line's* rule and nothing more — the mode itself comes
-    from the file's first line (see `mode_from_first_line`).
     """
-    return scan_line(line, keywords, mode)[0]
+    return scan_line(line, keywords)[0]
 
 
 def scan_line(
     line: str,
     keywords: Keywords | None = None,
-    mode: int = MODE_ISO,
     block_comment: bool = False,
 ) -> tuple[list[Token], bool]:
     """Splits one line into tokens, and says whether it ends inside `/* … */`.
@@ -259,18 +236,10 @@ def scan_line(
             while end < length and is_name_character(line[end]):
                 end += 1
             text = line[index:end]
-            # The old dialect's long variable names: a name followed by an
-            # apostrophe, and the apostrophe is a *suffix* — at the start of a token
-            # it is still the quote of `'атом'`.  The one old mode reads it as one
-            # name (task_77); in mode 0 the apostrophe is left where it is, the way
-            # any malformed literal is (see the module docstring).
-            if mode == MODE_OLD and end < length and line[end] == "'":
-                end += 1
-                text = line[index:end]
-                tokens.append(Token(VARIABLE, text, index, end, alphabet_of(text)))
-                index = end
-                continue
-            tokens.append(_identifier(text, index, end, keywords, mode))
+            # An apostrophe after a name is left where it is — the start of a
+            # quoted atom or the end of a malformed literal (see the module
+            # docstring) — and never a variable's suffix.
+            tokens.append(_identifier(text, index, end, keywords))
             index = end
             continue
 
@@ -345,65 +314,16 @@ def literal_text(text: str) -> str:
     return inner.replace("''", "'")
 
 
-def mode_from_first_line(text: str, keywords: Keywords | None = None) -> int | None:
-    """The naming mode a file declares in its first line, or `None` (task_67).
-
-    A mirror of the interpreter's `readVariableMarker`, and the *only* thing the
-    window works out for itself: the marker is the first line and nothing else —
-    a comment above it, or anything on the line beyond the marker itself, means the
-    file says nothing and the run's own mode stands.  A trailing comment is fine
-    (`%` ends the line for the lexer, and for this), and `ИМЕНА` must be written
-    exactly like that: the interpreter reserves the name, so it never lexes as a
-    variable.
-
-    `None` means «no marker», which is not the same as mode 0: a caller that has a
-    mode of its own (the window's row, `--vars`) uses it in that case.  The answer
-    is always a *mode*: a marker of `2` comes back as `1`, its own spelling
-    (task_77), so no caller has to know about the two numbers.
-    """
-    first_line = plain_newlines(text).split("\n", 1)[0]
-    parts = [token for token in tokenize(first_line, keywords)
-             if token.kind not in (COMMENT, QUERY_COMMENT)]
-    if len(parts) != 6:
-        return None
-    texts = [part.text for part in parts]
-    if texts[0] != ":-" or texts[1] != MARKER_NAME:
-        return None
-    if texts[2] != "(" or texts[4] != ")" or texts[5] != ".":
-        return None
-    digit = parts[3]
-    if digit.kind != INTEGER or len(digit.text) != 1 or not digit.text.isdigit():
-        return None
-    return MODE_NUMBERS.get(int(digit.text))
-
-
-def _is_old_variable_name(text: str) -> bool:
-    """One letter with at most one `_` after it — the old dialect's variable
-    (`д`, `Б`, `A_`), the rule `isOldVariableName` applies in the lexer."""
-    if not text or not is_letter(text[0]):
-        return False
-    return len(text) == 1 or (len(text) == 2 and text[1] == "_")
-
-
-def _identifier(text: str, start: int, end: int, keywords: Keywords | None,
-                mode: int = MODE_ISO) -> Token:
+def _identifier(text: str, start: int, end: int, keywords: Keywords | None) -> Token:
     if text.startswith("_"):
         return Token(VARIABLE, text, start, end, alphabet_of(text))
     # A reserved name wins over the variable rule: `ВЫП` starts with an
-    # upper-case letter but is an atom, and the lexer decides that the same way —
-    # in every mode, because the mode is only a way of reading names.
+    # upper-case letter but is an atom.
     if keywords is not None:
         keyword = keywords.get(text)
         if keyword is not None:
             kind = _KIND_OF_KEYWORD.get(keyword.kind, KEYWORD)
             return Token(kind, text, start, end, alphabet_of(text))
-    if mode != MODE_ISO:
-        # The old dialect: a variable is one letter (`isOldVariableName`), a bare
-        # capitalised name is a string constant, everything else is an atom.
-        if _is_old_variable_name(text):
-            return Token(VARIABLE, text, start, end, alphabet_of(text))
-        kind = STRING if is_upper_letter(text[0]) else ATOM
-        return Token(kind, text, start, end, alphabet_of(text))
     kind = VARIABLE if is_upper_letter(text[0]) else ATOM
     return Token(kind, text, start, end, alphabet_of(text))
 

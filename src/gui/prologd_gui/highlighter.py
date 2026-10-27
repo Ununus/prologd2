@@ -11,7 +11,7 @@ from PySide6.QtGui import QColor, QFont, QSyntaxHighlighter, QTextCharFormat
 
 from .keywords import Keywords
 from .theme import Theme
-from .tokens import MODE_ISO, scan_line
+from .tokens import scan_line
 
 
 def _has_astral(text: str) -> bool:
@@ -49,12 +49,10 @@ class PrologHighlighter(QSyntaxHighlighter):
         document,
         keywords: Keywords | None = None,
         theme: Theme | None = None,
-        mode: int = MODE_ISO,
     ) -> None:
         super().__init__(document)
         self._keywords = keywords or Keywords()
         self._theme = theme or Theme()
-        self._mode = mode
         self._formats: dict[tuple[str, bool], QTextCharFormat] = {}
 
     # -- configuration ------------------------------------------------------
@@ -67,24 +65,6 @@ class PrologHighlighter(QSyntaxHighlighter):
         self._theme = theme
         self._formats.clear()
         self.rehighlight()
-
-    def set_mode(self, mode: int) -> None:
-        """How this document's names are read (task_67).
-
-        A colouring decision and nothing else: the interpreter reads the file's own
-        `:- ИМЕНА(N).` line when it runs or formats it.  The window settles the
-        value — the file's first line, or its own row for a file that says nothing —
-        and a change means the colours have to be worked out again.
-        """
-        if mode == self._mode:
-            return
-        self._mode = mode
-        self.rehighlight()
-
-    @property
-    def mode(self) -> int:
-        """The mode in force, as the numbers of `tokens.MODES`."""
-        return self._mode
 
     @property
     def theme(self) -> Theme:
@@ -101,7 +81,6 @@ class PrologHighlighter(QSyntaxHighlighter):
         tokens, still_open = scan_line(
             text,
             self._keywords,
-            self._mode,
             block_comment=self.previousBlockState() == self._BLOCK_COMMENT,
         )
         self.setCurrentBlockState(self._BLOCK_COMMENT if still_open else 0)

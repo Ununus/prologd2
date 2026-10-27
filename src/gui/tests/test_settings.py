@@ -92,28 +92,24 @@ def test_setters_clamp(directory: pathlib.Path) -> None:
     print("ok: what is written is already inside the bounds")
 
 
-def test_the_retired_naming_mode_reads_as_the_old_dialect(
-    directory: pathlib.Path,
-) -> None:
-    """A stored or hand-written `2` is the old dialect, not the ISO default.
+def test_a_stored_naming_mode_is_left_alone(directory: pathlib.Path) -> None:
+    """The row is gone, and an old value in the file is not an error (part 213).
 
-    `2` was a naming mode of its own until task_77, when it became a spelling of `1`.
-    The row does not offer it any more, so without a deliberate answer `set_value`
-    would take it for an unknown choice and write the setting's *default* — moving a
-    reader who asked for the old dialect into ISO without a word.
+    `execution/variable_mode` was a setting; the modes went with the ISO-only
+    engine.  The key is simply not read any more, and the window must start on a
+    file that still carries it — a setting that disappears is a key a reader keeps
+    in an ini for years.
     """
-    path = directory / "legacy_mode.ini"
-    settings = Settings(path)
-    settings.variable_mode = "2"
-    assert settings.variable_mode == "1"
-    assert settings.variable_mode_number == 1
+    from prologd_gui import settings as settings_module
 
-    # And the same value found in a file somebody edited by hand.
-    path.write_text("[execution]\nvariable_mode=2\n", encoding="utf-8")
-    hand = Settings(path)
-    assert hand.variable_mode == "1"
-    assert hand.variable_mode_number == 1
-    print("ok: a retired `2` is read as the old dialect, not as the default")
+    assert "execution/variable_mode" not in settings_module.BY_KEY
+    path = directory / "legacy_mode.ini"
+    path.write_text("[execution]\nvariable_mode=1\n", encoding="utf-8")
+    settings = Settings(path)
+    # The key survives as data — `unknown_keys_survive` below is the rule — and the
+    # rows of the dialog simply do not offer it.
+    assert settings.raw_value("execution/variable_mode") == "1"
+    print("ok: a stored naming mode is no longer a setting, and does not stop the window")
 
 
 def test_unknown_keys_survive(directory: pathlib.Path) -> None:
@@ -435,7 +431,7 @@ def main() -> int:
         test_broken_values_fall_back_instead_of_breaking_the_window(directory)
         test_setters_clamp(directory)
         test_unknown_keys_survive(directory)
-        test_the_retired_naming_mode_reads_as_the_old_dialect(directory)
+        test_a_stored_naming_mode_is_left_alone(directory)
         test_the_new_keys_have_the_documented_defaults(directory)
         test_the_pinned_row_and_the_process_directory_round_trip(directory)
         test_syntax_overrides_round_trip_and_reach_the_palette(directory)

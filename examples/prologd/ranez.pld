@@ -1,4 +1,0 @@
-ranez([a|D],c,[a|B]):-НЕ(БОЛЬШЕ(a,c)),ranez(D,#c-a#,B).
-ranez([_|D],c,B):-ranez(D,c,B).
-ranez([],0,[]).
-?ranez([1,2,3,4,7,9,13,15,17,19],20,V).

@@ -265,30 +265,25 @@ class PrologSession(QObject):
                   trace: bool = False, questions: bool = True,
                   print_questions: bool = False,
                   limits: dict | None = None,
-                  variable_mode: int = 0,
                   screen: tuple[int, int] | None = None) -> None:
         self._send(protocol.load_text(text, name, step=step, trace=trace,
                                       questions=questions,
                                       print_questions=print_questions,
                                       limits=limits,
-                                      variable_mode=variable_mode,
                                       screen=screen))
 
     def load_file(self, path: str, *, step: bool = False, trace: bool = False,
                   questions: bool = True, print_questions: bool = False,
-                  limits: dict | None = None, variable_mode: int = 0,
+                  limits: dict | None = None,
                   screen: tuple[int, int] | None = None) -> None:
         self._send(protocol.load_file(path, step=step, trace=trace, questions=questions,
                                       print_questions=print_questions,
                                       limits=limits,
-                                      variable_mode=variable_mode,
                                       screen=screen))
 
     def run_query(self, text: str, *, step: bool = False, trace: bool = False,
-                  variable_mode: int = 0,
                   screen: tuple[int, int] | None = None) -> None:
-        self._send(protocol.query(text, step=step, trace=trace,
-                                  variable_mode=variable_mode, screen=screen))
+        self._send(protocol.query(text, step=step, trace=trace, screen=screen))
 
     def answer_input(self, text: str) -> None:
         self._awaiting_input = False
@@ -342,7 +337,6 @@ class PrologSession(QObject):
         unit: str = "tab",
         selection: bool = False,
         name: str = "<format>",
-        variable_mode: int = 0,
     ) -> None:
         """Asks the interpreter to lay the text out; `formatted` answers it.
 
@@ -354,7 +348,7 @@ class PrologSession(QObject):
         self._send(
             protocol.format_text(
                 text, mode=mode, width=width, indent=indent, unit=unit,
-                selection=selection, name=name, variable_mode=variable_mode,
+                selection=selection, name=name,
             )
         )
 

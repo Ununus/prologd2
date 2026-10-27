@@ -31,9 +31,7 @@ python -m venv .venv
 named folder is where it is looked for — nowhere else.  Without it the search is
 `paths.interpreter`: beside the window in a package, the build trees in a checkout.
 A value an older file still holds under `execution/interpreter` is read as the same
-kind of launch pin (task_79).  The **state control at the right end of the toolbar**
-is not a launch pin: it is the naming mode — `ISO` or `PLD`, whose picture is the
-state in force (task_93).  `--include` adds an
+kind of launch pin (task_79).  `--include` adds an
 `ИМПОРТ` search directory and may be repeated, and `--icons DIR` points the icon
 loader at another directory (the default is `src/gui/assets` in a checkout, the copy
 inside its own folder in a package).  The status bar names the interpreter a run
@@ -357,10 +355,7 @@ The toolbar is grouped as
 the reference front-end had it: file | run/stop/step | editing (comment,
 uncomment, format and, right beside it, the formatter's **mode control** — a
 `QToolButton` with the three modes and «только выделенное», where a mode is
-switched while looking at the code) | tools (graphics, settings) | the window's own
-**state control** — one `QToolButton` with two rows, `ISO` and `PLD`, whose
-picture is the state in force (task_93, `actions.STATE` and the `actions.STATES`
-table);
+switched while looking at the code) | tools (graphics, settings);
 `QToolBar.setIconSize(QSize(24, 24))` is set explicitly so the layout does not
 depend on the style.  The right end lost three buttons in task_58.  «Руководство
 пользователя» went first: a button that opens a PDF takes room in the middle of the
@@ -369,15 +364,6 @@ next to «Графическое окно» — both are about what is on the sc
 the run.  And the font-size box went with them: `Ctrl`+wheel and the three zoom
 commands cover the everyday change, and an exact value is the «Размер шрифта» row of
 the settings dialog.
-
-The state control belongs to no action: it is not a command of the program but the
-naming mode, so it is a `QToolButton` added by the window (`_build_state_button`)
-as the last entry of `actions.TOOLBAR`, and everything about it — the picture and
-the tooltip — follows from the stored dialect (`_sync_state_button`).  Its two rows
-write `execution/variable_mode`, the same key the «Имена переменных» row edits, and
-read their words from that row, so the dialog and the toolbar cannot drift apart.
-A click is the light answer: the value is stored, the buffers that declare no
-dialect are re-coloured, and a live session is left alone (`_choose_state`).
 
 Two commands left the toolbar in this round.  «Сохранить все» acts on *every*
 tab, so it lives in «Файл» where the rest of them are: the toolbar keeps the
@@ -934,7 +920,7 @@ table).
 | Редактор | font family and size, line numbers, the current-line band, word wrap, tabs or spaces and the width, auto-indent, completion (on/off, after how many letters, `Учитывать регистр`) |
 | Вид | theme (light, dark or system), toolbar, the output panel (shown; right or bottom, the bottom being the default since task_50), the goal field, where a program's input question is asked (console or dialog), the output's font size, its line limit and whether it follows the end |
 | Формат | the formatter's mode, width, indent and unit, «только выделенное» |
-| Выполнение | whether a run answers the program's own `?`-questions, save before run, the four limits (steps, depth, НАЙТИВСЕ solutions, milliseconds), the naming mode (the fallback for a file that declares none; the same key is edited by the two rows of the state control), **the process directory** (the running file's folder, the window's folder, or a fixed one — `ЗАПИСЬ_В`/`ЧТЕНИЕ_ИЗ` open relative to it), the `ИМПОРТ` search folders |
+| Выполнение | whether a run answers the program's own `?`-questions, save before run, the four limits (steps, depth, НАЙТИВСЕ solutions, milliseconds), **the process directory** (the running file's folder, the window's folder, or a fixed one — `ЗАПИСЬ_В`/`ЧТЕНИЕ_ИЗ` open relative to it), the `ИМПОРТ` search folders |
 | Файлы | autosave in minutes (0 = off), how many recent files to remember, restoring the open tabs at start-up |
 | Подсветка | the syntax colours, one swatch per highlighted role («Комментарий», «Строка», «Атом латиницей» …) for the light and the dark theme side by side; a click on a swatch asks for a new colour and the hex is stored per theme (`syntax/light`, `syntax/dark`) and applied at once, «Вернуть встроенные цвета» drops every override |
 | Вставки | the live `Ctrl`+key table (task_31), the settings file path, «Вернуть встроенную таблицу» |
@@ -1091,19 +1077,16 @@ adds the drawing: `graphics` events, one per primitive, and the `graphics` reque
 with `snapshot`, answered with the whole `bitmap` (task_45); version 11 adds
 `printQuestions` to `load` — a run question echoes itself (`?цель.`) before its
 answer, the way `-q` does (task_46 split `questions` into *run* and *print*);
-version 12 adds `vars` to `load`, `query` and `format` — the naming mode (0 or 1;
-`2` is the old spelling of `1`, task_67, merged in task_77), the window's half of
-`--vars`, which a file's own `:- ИМЕНА(N).` first
-line overrides for that file.  A `query` needs it because a single statement
-carries no first line of its own: without it a question clicked on a margin marker
-would read a mode-1 program's constants as variables.  Version 13 adds `screen` to
+version 12 added `vars` to `load`, `query` and `format` — the naming mode, which
+went with the modes themselves in version 15.  Version 13 adds `screen` to
 `load` and `query` — the size of the picture the run draws on (`width` and `height`,
 16 … 2048; task_73) — and the same object to `ready`, which is how a front-end knows
 the screen before it asks for a snapshot; a request without it keeps the engine's
 own 600 × 600.  Version 14 adds `screen` as an *event*: the canvas a program names
 with `:- ХОЛСТ(Высота, Ширина).` arrives as soon as the directive is applied, so a
-window can size the picture before the first primitive (ADR-035), and that is the
-current version.
+window can size the picture before the first primitive (ADR-035).  Version 15
+removes `vars`: there is one way to read a name — ISO's — so the field and the
+`:- ИМЕНА(N).` marker with it are gone, and that is the current version.
 Version 1 sessions are still understood by the Python client (the table is then
 empty and completion falls back to the document's own predicates).
 

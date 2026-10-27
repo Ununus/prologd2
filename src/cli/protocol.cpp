@@ -51,7 +51,11 @@ using Json = nlohmann::json;
 //    and `height`), and `ready` carries the engine's own screen (task_73).
 // 14: `screen` is also an *event*: the canvas a program names with
 //    `:- ХОЛСТ(Высота, Ширина).` (ADR-035).
-constexpr int kProtocolVersion = 14;
+// 15: `vars` is gone.  There is one way to read a name — ISO's — so the field,
+//     its range and the `:- ИМЕНА(N).` marker with it were removed.  An unknown
+//     field is ignored, so an old client is not refused: its request is answered
+//     in ISO, and this number is what tells it that the old naming is not there.
+constexpr int kProtocolVersion = 15;
 
 /// The screen a front-end may ask for: small enough to stay cheap both in memory
 /// and on the wire (a snapshot is `width × height × 4` bytes), large enough for a
@@ -359,17 +363,6 @@ class Session {
     // the program's own `?`-statements and directives run during the load, so the
     // step hook has to be armed around it, not only around `query`.
     engine_.setTrace(request.value("trace", false));
-    // How this run reads its names (task_67): a file's own `:- ИМЕНА(N).` first
-    // line wins over this, and a request that names no mode means mode 0.  Set on
-    // every load, like the trace flag, or a mode asked for once would outlive the
-    // request it was meant for.
-    const int vars = request.value("vars", 0);
-    const std::optional<VariableMode> mode = variableModeFromNumber(vars);
-    if (!mode.has_value()) {
-      fail(command, command + ": режим имён должен быть 0, 1 или 2");
-      return;
-    }
-    engine_.options().variableMode = *mode;
     // A load starts a run, and a run starts on the canvas the front-end names; the
     // program may replace that choice with `:- ХОЛСТ(Высота, Ширина).`, and from
     // then on it is the program's (ADR-035).
@@ -536,15 +529,6 @@ class Session {
                               : IndentUnit::Tab;
     options.selection_only = request.value("selection", false);
     options.source_name = request.value("name", std::string("<format>"));
-    // The naming mode of the text being laid out (task_67); its own `:- ИМЕНА(N).`
-    // line wins over this one.  Not `mode`: that name is the *format* mode here.
-    const int vars = request.value("vars", 0);
-    const std::optional<VariableMode> naming = variableModeFromNumber(vars);
-    if (!naming.has_value()) {
-      fail("format", "format: режим имён должен быть 0, 1 или 2");
-      return;
-    }
-    options.variables = *naming;
     const FormatResult formatted =
         formatSource(request.at("text").get<std::string>(), options);
     if (!formatted.ok()) {

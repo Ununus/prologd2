@@ -1022,10 +1022,6 @@ class CodeEditor(ZoomablePlainTextEdit):
             # A directive is a statement of its own (task_105): inside a body the
             # popup offers names, not `:- ИМПОРТ("…").`.
             self._offers = [offer for offer in self._offers if not offer.directive]
-        elif not completion.at_file_start(text, position, prefix):
-            # The names marker says how a file is read, and the loader reads it
-            # from the first line alone (task_106): lower down it would do nothing.
-            self._offers = [offer for offer in self._offers if not offer.first_line]
         if not self._offers:
             self._hide_completion()
             return

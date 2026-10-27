@@ -27,10 +27,6 @@ enum class IndentUnit {
 /// Everything the formatter is allowed to do, as the settings spell it.
 struct FormatOptions {
   FormatMode mode = FormatMode::Soft;
-  /// How a name is read (task_67).  A file's own `:- ИМЕНА(N).` first line wins
-  /// over this; this is what a file without a marker gets, the way `--vars`
-  /// gives the CLI a mode for a file that says nothing.
-  VariableMode variables = VariableMode::Iso;
   /// What the diagnostics of a source that does not parse name as their file.
   /// A front-end passes the buffer's own name; the CLI the path it read.
   std::string source_name = "<format>";

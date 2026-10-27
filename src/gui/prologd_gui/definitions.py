@@ -45,7 +45,7 @@ def name_at(text: str, position: int) -> str | None:
 
 
 def first_definition(
-    text: str, name: str, keywords=None, mode: int = tokens.MODE_ISO
+    text: str, name: str, keywords=None
 ) -> tuple[int, int] | None:
     """The line (0-based) and column of the first clause head of `name`.
 
@@ -63,7 +63,7 @@ def first_definition(
             continue
         if stripped.startswith((":-", "?")):
             continue
-        line_tokens = tokens.tokenize(line, keywords, mode)
+        line_tokens = tokens.tokenize(line, keywords)
         if len(line_tokens) < 2:
             continue
         head = line_tokens[0]

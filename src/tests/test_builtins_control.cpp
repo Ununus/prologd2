@@ -6,67 +6,24 @@
 
 using prologd::test::runProgram;
 
-TEST_CASE("the first line of a file says how its names are read") {
-  // task_67: the marker is read by the loader *before* the file is lexed, so it is
-  // the one way a file can ask for the old dialect's names — and it does not run
-  // as a goal afterwards.
-  // `Молоко` without quotes is a string constant in mode 1, not a variable.
-  const auto result = runProgram(
-      ":- ИМЕНА(1).\n"
-      "?РАВНО(д, 1).\n"
-      "?СЦЕП(Молоко, \" и\", Х).\n");
-  REQUIRE(result.loaded);
-  REQUIRE(result.output == "д=1\nХ=Молоко и\n");
-}
-
-TEST_CASE("the old dialect reads apostrophe names, and `2` says the same") {
-  // task_77: `2` was a mode of its own until the merge, and both numbers name the
-  // old dialect now — the apostrophe name is what says which reading a file got.
-  const auto one = runProgram(":- ИМЕНА(1).\n?РАВНО(Сумма', 5).\n");
-  REQUIRE(one.loaded);
-  REQUIRE(one.output == "Сумма'=5\n");
-
-  const auto two = runProgram(":- ИМЕНА(2).\n?РАВНО(Сумма', 5).\n");
-  REQUIRE(two.loaded);
-  REQUIRE(two.output == "Сумма'=5\n");
-}
-
-TEST_CASE("quoted atoms and underscore names read the way the original reads them") {
-  // task_100: the pinned original learned `'атом'` and `_имя`, and ours follows it.
-  // A quoted constant is the *same* constant as the bare name — the quotes are not
+TEST_CASE("quoted atoms and underscore names read the way ISO reads them") {
+  // A quoted constant is the *same* constant as a bare name — the quotes are not
   // part of it — so a fact written one way answers a question written the other.
   {
-    const auto result = runProgram(
-        ":- ИМЕНА(1).\n"
-        "пункт(атом).\n"
-        "?пункт('атом').\n"
-        "?пункт(атом).\n");
+    const auto result = runProgram("пункт(атом).\n?пункт('атом').\n?пункт(атом).\n");
     REQUIRE(result.loaded);
     REQUIRE(result.output == "ДА\nДА\n");
   }
-  // `_Пер'` is the same variable as `_Пер`: one variable on both sides, so the
-  // goal about one argument holds and the one about two different ones does not.
-  {
-    const auto result = runProgram(
-        ":- ИМЕНА(1).\n"
-        "одинаковые(_Пер, _Пер').\n"
-        "?одинаковые(1, 1).\n"
-        "?одинаковые(1, 2).\n");
-    REQUIRE(result.loaded);
-    REQUIRE(result.output == "ДА\nНЕТ\n");
-  }
   // `_` stays the anonymous variable, and two of them are two variables.
   {
-    const auto result = runProgram(":- ИМЕНА(1).\n?РАВНО(_, _).\n");
+    const auto result = runProgram("?РАВНО(_, _).\n");
     REQUIRE(result.loaded);
     REQUIRE(result.output == "ДА\n");
   }
   // A quoted name is a predicate name as well (`?'пункт'(1).` — ISO's spelling),
-  // and an atom with a space inside is one constant, printed without the quotes
-  // the way the original prints it.
+  // and an atom with a space inside is one constant, printed without the quotes.
   {
     const auto result = runProgram(
-        ":- ИМЕНА(1).\n"
         "пункт(атом).\n"
         "?'пункт'(атом).\n"
         "?ВЫВОД('Тоже атом').\n");
@@ -75,14 +32,12 @@ TEST_CASE("quoted atoms and underscore names read the way the original reads the
   }
 }
 
-TEST_CASE("a marker off the first line says where it belongs") {
-  // A comment above the marker makes it a plain directive — and a directive cannot
-  // set a mode the text above it was already read in.  The load itself succeeds, so
-  // the complaint arrives as a runtime error, not as a load failure.
+TEST_CASE("the names marker is refused, first line or not") {
+  // There is one way to read a name now, so the declaration has nothing to say:
+  // the call is a retired name, and the loader says so wherever the line stands.
   const auto result = runProgram("% комментарий\n:- ИМЕНА(1).\n");
-  REQUIRE(result.loaded);
-  REQUIRE(result.runtimeError);
-  REQUIRE(result.error.find("первой строкой") != std::string::npos);
+  REQUIRE_FALSE(result.loaded);
+  REQUIRE(result.error.find("режимов имён больше нет") != std::string::npos);
 }
 
 TEST_CASE("the always-false goal fails and negation turns it round") {

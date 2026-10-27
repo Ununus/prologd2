@@ -80,16 +80,8 @@ STOP_GRACE_MS = 500
 #: (task_112).  The owner wrote it as a cheat sheet — the most useful commands, one
 #: line each, and a program whose every line shows something.
 #:
-#: It is written so that both naming modes read it the same way, because the reader
-#: may have «Имена переменных» set either way:
-#:
-#: * atoms are lower-case and *unquoted*, which is an atom in the ISO reading and
-#:   a name in the previous one;
-#: * the variables are **single** capital letters — `Имя` is a variable in the ISO
-#:   reading and a string constant in the previous one, while a one-letter name is
-#:   a variable in both;
-#: * no quotes, dashes or ellipses anywhere, so nothing depends on how either
-#:   reading treats punctuation.
+#: It is written plainly: atoms are lower-case and unquoted, variables start with a
+#: capital letter, and there are no quotes, dashes or ellipses anywhere.
 WELCOME = """\
 % F5 или Ctrl+R - запуск; Shift+F5 - остановить счёт (красная кнопка)
 %   или выгрузить базу из памяти (синяя кнопка)
@@ -107,11 +99,8 @@ WELCOME = """\
 """
 
 #: What the first tab holds: the standard library and the two things it shows —
-#: `ИМПОРТ` and the ISO `length` (task_112).
-#:
-#: The text carries no marker line, so `Д` is read the way the window's «Имена
-#: переменных» says — and it is a variable in both readings, which is why the text
-#: needs no `:- ИМЕНА(0).`.
+#: `ИМПОРТ` and the ISO `length` (task_112).  `Д` is a variable, the way ISO reads
+#: an upper-case name.
 WELCOME_TEXT = (
     ':- ИМПОРТ("iso.pld"). % подключает стандартные предикаты ISO\n'
     "% F12 над ИМПОРТ откроет файл\n"
@@ -621,9 +610,6 @@ class MainWindow(QMainWindow):
         self._build_actions()
         self._build_toolbar()
         self._build_menus()
-        # The naming control wears the state in force before anything can be
-        # clicked: the picture and the tooltip are read off the settings.
-        self._sync_state_button()
 
         self._status = QLabel("запуск…")
         self.statusBar().addWidget(self._status)
@@ -815,118 +801,10 @@ class MainWindow(QMainWindow):
                 self._toolbar.addSeparator()
             elif key == actions.FORMAT_MODE:
                 self._format_action = self._toolbar.addWidget(self._build_format_button())
-            elif key == actions.STATE:
-                self._state_action = self._toolbar.addWidget(self._build_state_button())
             else:
                 self._toolbar.addAction(self._actions[key])
         self._toolbar.setVisible(self._settings.toolbar_visible)
         self.addToolBar(self._toolbar)
-
-    def _build_state_button(self) -> QToolButton:
-        """«How names are read» — the last control (task_93).
-
-        One `QToolButton` with a menu of two states, in place of the two controls of
-        task_79.  Those carried a picture of an `И` and a picture of a `Д`, so the
-        reader had to know what the letters stood for — and `Д` was taken for
-        «Пролог-Д 2.0», the name of the whole product.  The two pictures
-        (`engine-iso`, `engine-pld`) are the words themselves, so the state is read
-        off the toolbar without a click, and the menu spells each one out.
-
-        Everything about the button follows from the state of the window
-        (`_sync_state_button`).
-        """
-        button = QToolButton(self)
-        button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        button.setMenu(self._build_state_menu())
-        self._state_button = button
-        return button
-
-    def _build_state_menu(self) -> QMenu:
-        """The two states, word for word as the dialog and the manual name them.
-
-        Both entries are the «Имена переменных» row, so their words are read
-        from the `Setting` record itself — from the part after its own `ISO:`/`PLD:`,
-        which the state label already carries — and a renamed row renames the menu with
-        it.  A second copy of those words is exactly what would drift.
-        """
-        menu = QMenu("Движок и имена", self)
-        # A menu row is read at a glance; the rest of the sentence goes to the tooltip.
-        menu.setToolTipsVisible(True)
-        self._state_menu = menu
-        group = QActionGroup(self)
-        group.setExclusive(True)
-        self._state_actions: dict[str, QAction] = {}
-        for state in actions.STATES:
-            entry = menu.addAction(f"{state.label}: {self._state_detail(state)}")
-            entry.setCheckable(True)
-            entry.setActionGroup(group)
-            entry.setToolTip(state.hint)
-            entry.triggered.connect(
-                lambda _checked=False, key=state.key: self._choose_state(key)
-            )
-            self._state_actions[state.key] = entry
-        self._sync_state_menu()
-        return menu
-
-    def _state_detail(self, state: actions.State) -> str:
-        """The words after the state label in its menu row.
-
-        «ISO: переменная с большой буквы» is assembled from the label and the
-        settings row itself, so the menu says what the dialog says.
-        """
-        value = "0" if state.key == actions.STATE_ISO else "1"
-        for choice, title in settings.BY_KEY[settings.VARIABLE_MODE].choices:
-            if choice == value:
-                return title.split(":", 1)[-1].strip() or title
-        return ""
-
-    def _current_state(self) -> str:
-        """Which of the two rows is in force."""
-        if self._settings.variable_mode == "1":
-            return actions.STATE_PLD
-        return actions.STATE_ISO
-
-    def _sync_state_button(self) -> None:
-        """The picture and the tooltip of the naming control.
-
-        It answers one question — how a name the file does not spell out is read —
-        and both answers are always available, so the control is always shown.
-        """
-        state = actions.STATE_BY_KEY[self._current_state()]
-        found = assets.icon(state.icon)
-        if found is None:
-            # The picture *is* the label here, so a missing file would leave a button
-            # with nothing on it: the words are the fallback, and `test_icons` is what
-            # keeps the file from going missing in the first place.
-            self._state_button.setIcon(QIcon())
-            self._state_button.setText(state.label)
-            self._state_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
-        else:
-            self._state_button.setIcon(found)
-            self._state_button.setText("")
-            self._state_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
-        self._state_button.setToolTip(f"{state.hint} — нажмите, чтобы сменить")
-        self._sync_state_menu()
-
-    def _sync_state_menu(self) -> None:
-        """Shows the state in force."""
-        if not hasattr(self, "_state_menu"):
-            return
-        current = self._current_state()
-        for state in actions.STATES:
-            entry = self._state_actions[state.key]
-            entry.blockSignals(True)
-            entry.setChecked(state.key == current)
-            entry.blockSignals(False)
-
-    def _choose_state(self, key: str) -> None:
-        """A row of the menu: the naming mode, and nothing else.
-
-        The two rows differ only in the dialect — a stored value and the colouring of
-        the open buffers — so the click costs nothing and a live session is left
-        alone.
-        """
-        self._set_variable_mode("0" if key == actions.STATE_ISO else "1")
 
     def _build_format_button(self) -> QToolButton:
         """The formatter's mode, on the toolbar beside «Форматировать» (task_47).
@@ -1000,32 +878,6 @@ class MainWindow(QMainWindow):
     def _set_format_selection(self, flag: bool) -> None:
         self._settings.format_selection = bool(flag)
         self._sync_format_menu()
-
-    def _set_variable_mode(self, mode: str) -> None:
-        """The state control writes the row's own key, and the open buffers follow.
-
-        One key, one write: the dialog reads the same `execution/variable_mode`, and
-        the fallback of every buffer that declares no dialect is handed out again
-        (`_apply_dialect`) — a mode chosen here is in force as soon as it is clicked.
-        The control itself follows too: it wears the picture of the dialect in force
-        (`_sync_state_button`).
-        """
-        self._settings.variable_mode = mode
-        self._sync_state_button()
-        self._apply_dialect()
-        self._status.setText(f"имена переменных: {self._naming_label()}")
-
-    def _naming_label(self) -> str:
-        """The mode in force as the row names it: its label up to the colon.
-
-        «ISO: переменная с большой буквы» is read as `ISO` — the two dialects have
-        short names, and they are the row's own words; a label that grows no colon is
-        used whole, so a renamed row cannot make this empty.
-        """
-        for value, entry_title in settings.BY_KEY[settings.VARIABLE_MODE].choices:
-            if value == self._settings.variable_mode:
-                return entry_title.split(":", 1)[0].strip() or entry_title
-        return self._settings.variable_mode
 
     def _build_theme_menu(self, title: str) -> QMenu:
         """The appearance: light, dark or the platform's own (task_29).
@@ -1937,8 +1789,7 @@ class MainWindow(QMainWindow):
             self._session.load_file(path, step=step, trace=trace, questions=questions,
                                     print_questions=self._settings.print_questions,
                                     limits=limits,
-                                    screen=self._settings.screen_size,
-                                    variable_mode=buffer.variable_mode())
+                                    screen=self._settings.screen_size)
             self._status.setText(f"выполняется {pathlib.Path(path).name}")
         else:
             # Otherwise the text comes from the editor, and the path, when there
@@ -1954,8 +1805,7 @@ class MainWindow(QMainWindow):
                                     trace=trace, questions=questions,
                                     print_questions=self._settings.print_questions,
                                     limits=limits,
-                                    screen=self._settings.screen_size,
-                                    variable_mode=buffer.variable_mode())
+                                    screen=self._settings.screen_size)
             name = pathlib.Path(path).name if path else buffer.title()
             self._status.setText(f"выполняется {name} (есть несохранённые правки)")
         return True
@@ -2279,7 +2129,6 @@ class MainWindow(QMainWindow):
             unit=self._settings.format_unit,
             selection=region is not None,
             name="<buffer>",
-            variable_mode=self._variable_mode(),
         )
 
     def _on_formatted(self, text: str, changed: bool) -> None:
@@ -2337,41 +2186,6 @@ class MainWindow(QMainWindow):
         view.setTextCursor(restored)
         self._status.setText("отформатировано")
 
-    def _default_variable_mode(self) -> int:
-        """How a file that says nothing about names is read: the row's answer.
-
-        A file that declares `:- ИМЕНА(N).` in its first line keeps its own mode
-        instead — the dialect belongs to the file (task_67).
-        """
-        return self._settings.variable_mode_number
-
-    def _apply_dialect(self) -> None:
-        """Gives every open buffer the mode a file that declares none is read in.
-
-        The «Имена переменных» row (the dialog's «Применить» or the toolbar control)
-        moves that answer, and one door for the whole window is what keeps a buffer
-        from colouring one dialect while the engine reads another.
-        """
-        mode = self._default_variable_mode()
-        for buffer in self._buffers:
-            buffer.set_fallback_variable_mode(mode)
-
-    def _variable_mode(self) -> int:
-        """How the program in front of the user reads names (task_67).
-
-        The file's own `:- ИМЕНА(N).` first line, else the window's answer for a file
-        that says nothing (`_default_variable_mode`).  This is the same answer the
-        highlighter is given.  A run and a formatting request carry it, and so does a
-        question of its own: a statement typed into the goal line or clicked on a
-        margin marker arrives *without* the file's first line, so the interpreter
-        cannot read a mode out of it, and without this a question about a mode-1
-        program would read its constants as variables.
-        """
-        buffer = self.current_buffer()
-        if buffer is not None:
-            return buffer.variable_mode()
-        return self._default_variable_mode()
-
     def _run_query(self) -> None:
         text = self._query_line.text().strip()
         if not text:
@@ -2400,8 +2214,7 @@ class MainWindow(QMainWindow):
         # A goal typed into the line answers into the output panel: asking it with
         # that panel hidden would look like nothing happened at all (part 92).
         self._reveal_output_panel()
-        self._session.run_query(text, variable_mode=self._variable_mode(),
-                                screen=self._settings.screen_size)
+        self._session.run_query(text, screen=self._settings.screen_size)
         self._sync_run_actions()
         self._update_details()
 
@@ -2659,8 +2472,7 @@ class MainWindow(QMainWindow):
         if statement is None:
             return
         self._arm_answer_table()
-        self._session.run_query(statement, variable_mode=self._variable_mode(),
-                                screen=self._settings.screen_size)
+        self._session.run_query(statement, screen=self._settings.screen_size)
 
     def _drop_pending_query(self, note: str = "") -> None:
         """Forgets a question whose program never loaded, saying so if asked.
@@ -3121,11 +2933,8 @@ class MainWindow(QMainWindow):
         buffer.document.undoAvailable.connect(self._sync_undo_actions)
         buffer.document.redoAvailable.connect(self._sync_undo_actions)
         # The reserved names arrive with `ready`; a buffer opened after that gets
-        # them here, and a buffer created before it is served by `_on_ready`.  The
-        # dialect of a file that declares none comes from the row, and a restart may
-        # have changed it.
+        # them here, and a buffer created before it is served by `_on_ready`.
         buffer.set_keywords(self._session.keywords)
-        buffer.set_fallback_variable_mode(self._default_variable_mode())
         buffer.set_reference(self._reference)
         buffer.set_shortcuts(self._shortcuts)
         buffer.set_import_lookup(self._import_lookup_for(buffer))
@@ -3986,13 +3795,9 @@ class MainWindow(QMainWindow):
         One door for the places they change: the engine that answered `ready`
         (task_50) and a restart of the session, so colouring, completion and the
         cheat sheet are rebuilt from the same table.
-
-        The dialect a marker-less file is read in travels with them, because a
-        restart may also have changed the row (`--vars` on a new launch).
         """
         for buffer in self._buffers:
             buffer.set_keywords(self._session.keywords)
-        self._apply_dialect()
         # The goal field offers the same names (task_50).
         self._query_line.set_completion_keywords(self._session.keywords)
 
@@ -4137,9 +3942,6 @@ class MainWindow(QMainWindow):
                 self._settings.auto_complete_after,
                 self._settings.completion_match_case,
             )
-            # How this file's names are read (task_67): its own first line, else the
-            # row that just changed.
-            buffer.refresh_variable_mode()
         # The goal field follows the same two knobs (task_50).
         self._query_line.set_auto_complete_after(self._settings.auto_complete_after)
         self._query_line.set_completion_match_case(self._settings.completion_match_case)
@@ -4178,9 +3980,6 @@ class MainWindow(QMainWindow):
         self._sync_format_menu()
         self._sync_theme_menu()
         self._sync_actions()
-        # «Имена переменных» is a *fallback* (task_67), so the rows of this dialog
-        # reach the buffers directly.
-        self._apply_dialect()
         self._status.setText("настройки применены")
 
         # Where the child process starts is a row of this dialog (task_46), and a

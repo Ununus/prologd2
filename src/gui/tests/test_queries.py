@@ -114,14 +114,6 @@ PINNED: dict[str, int] = {
     "iso/lists.pld": 10,
     "iso/order.pld": 13,
     "iso/sub_string.pld": 7,
-    "lessons/_old/lesson_1.pld": 24,
-    "lessons/_old/lesson_2.pld": 6,
-    "lessons/_old/lesson_3.pld": 5,
-    "lessons/_old/lesson_4.pld": 13,
-    "lessons/_old/lesson_5.pld": 3,
-    "lessons/_old/lesson_6.pld": 3,
-    "lessons/_old/lesson_8.pld": 3,
-    "lessons/_old/lesson_9.pld": 5,
     "lessons/appendix_debug.pld": 7,
     "lessons/lesson_01.pld": 9,
     "lessons/lesson_02.pld": 12,
@@ -136,8 +128,6 @@ PINNED: dict[str, int] = {
     "lessons/lesson_11.pld": 5,
     "lessons/lesson_12.pld": 11,
     "lib/library.pld": 0,
-    "lib/old_lib.pld": 0,
-    "lib/old_lib_2.pld": 0,
     "problems/factorial.pld": 2,
     "problems/hanoi.pld": 2,
     "problems/hanoi_play.pld": 1,
@@ -148,7 +138,6 @@ PINNED: dict[str, int] = {
     "sort.pld": 12,
     "sorting.pld": 8,
     "stdlib.pld": 73,
-    "names.pld": 3,
 }
 
 
@@ -193,14 +182,11 @@ def interpreter_keywords() -> Keywords:
 def example_files() -> list[pathlib.Path]:
     """Every example program of *this* dialect, sorted.
 
-    `examples/prologd` is the original dialect's own folder (task_86): those
-    programs are kept exactly as they were written there, so neither the question
-    rule nor the count of markers has anything to say about them.
+    Every one of them is written in the dialect this engine reads: there is no
+    folder of programs in another naming mode beside them any more.
     """
     root = pathlib.Path(__file__).resolve().parents[3] / "examples"
-    files = sorted(
-        path for path in root.rglob("*.pld") if path.relative_to(root).parts[0] != "prologd"
-    )
+    files = sorted(root.rglob("*.pld"))
     assert files, f"no example programs under {root}"
     return files
 

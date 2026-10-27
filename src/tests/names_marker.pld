@@ -1,0 +1,6 @@
+% The naming modes are gone: this line used to say how the names of the file are
+% read.  There is one reading now - ISO's - so the loader refuses the file and
+% says so, instead of answering «не найдено: ИМЕНА/1».
+:- ИМЕНА(1).
+факт(7).
+?факт(7).

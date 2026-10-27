@@ -100,7 +100,6 @@ const std::vector<std::string>& checkedExamples() {
       "forall.pld",
       "sorting.pld",
       "stdlib.pld",
-      "names.pld",
       "problems/factorial.pld",
       "problems/knapsack.pld",
       "iso/arith.pld",
@@ -110,26 +109,6 @@ const std::vector<std::string>& checkedExamples() {
       "iso/order.pld",
       "iso/if_then.pld",
       "iso/sub_string.pld",
-  };
-  return names;
-}
-
-/// The old course's own lessons, kept beside the rewritten ones.  They are written
-/// in the dialect the course was taught in, so every one of them starts with
-/// `:- ИМЕНА(1).` (task_67) and carries the answers it promises as `%!` lines.
-/// Uncommenting an old `?` question means recording its answers.  A question that
-/// cannot be uncommented — it never finishes, or it prints hundreds of solutions —
-/// stays a comment in the file with the reason written above it, and `_old/lesson_2`
-/// and `_old/lesson_9` are not listed at all: the first no longer loads, and the
-/// second answers only after a dialogue the check cannot have.
-const std::vector<std::string>& checkedOldLessons() {
-  static const std::vector<std::string> names = {
-      "_old/lesson_1.pld",
-      "_old/lesson_3.pld",
-      "_old/lesson_4.pld",
-      "_old/lesson_5.pld",
-      "_old/lesson_6.pld",
-      "_old/lesson_8.pld",
   };
   return names;
 }
@@ -175,10 +154,6 @@ TEST_CASE("ported example programs parse cleanly") {
       "problems/maze/maze.images.pld",
       "file_io.pld", "drawing.pld", "findall.pld", "import.pld", "lib/library.pld",
   };
-  // `lib/old_lib*.pld` are not here: `withoutQueries` strips every `:` line, and
-  // that takes the naming marker with it, so the file would be read in mode 0 and
-  // its apostrophe names would not parse.  They are exercised through
-  // `names.pld`, which imports and calls both of them.
   for (const std::string& file : files) {
     const auto result = runProgram(withoutQueries(readExample(file)));
     INFO("file: " << file);
@@ -205,24 +180,10 @@ TEST_CASE("the example programs print what their comments promise") {
   for (const std::string& name : checkedExamples()) {
     // `stdlib.pld` imports the standard library, so the check looks where
     // the CLI looks with `-I stdlib`; it is also the only example that reads —
-    // the numbers come from `stdlib.input.txt` beside it.  `names.pld`
-    // imports the two old-format libraries by a path relative to the examples
-    // folder, which is the data directory itself.
+    // the numbers come from `stdlib.input.txt` beside it.
     const std::string stem = name.substr(0, name.rfind('.'));
     checkPromises(name, readOptional(stem + ".input.txt"),
                   {std::string(PROLOGD_TEST_DATA_DIR), std::string(PROLOGD_STDLIB_DIR)});
-  }
-}
-
-TEST_CASE("the old course's lessons print what their comments promise") {
-  for (const std::string& name : checkedOldLessons()) {
-    const std::string stem = name.substr(0, name.rfind('.'));
-    // The mode marker on the first line does the job `--vars 1` does for the CLI,
-    // so the file is run exactly as a reader would run it.
-    checkPromises("lessons/" + name, readOptional("lessons/" + stem + ".input.txt"),
-                  {std::string(PROLOGD_TEST_DATA_DIR) + "/lessons",
-                   std::string(PROLOGD_TEST_DATA_DIR) + "/lib",
-                   std::string(PROLOGD_STDLIB_DIR)});
   }
 }
 

@@ -100,13 +100,6 @@ std::string_view commentOf(std::string_view line) {
 std::size_t rawLength(std::string_view source, std::size_t begin, const Token& token) {
   if (token.kind == TokenKind::String || token.kind == TokenKind::QuotedAtom) {
     const char quote = token.kind == TokenKind::String ? '"' : '\'';
-    // A string constant of the old dialect is a bare capitalised name with no
-    // quotes at all (task_67, modes 1 and 2).  Scanning for a quote there ran to
-    // the next one in the file — or to the end of the line — and the formatted
-    // text grew by an order of magnitude; the decoded text *is* the raw name.
-    if (begin >= source.size() || source[begin] != quote) {
-      return token.text.size();
-    }
     const bool doubled = token.kind == TokenKind::QuotedAtom;
     std::size_t i = begin + 1;
     while (i < source.size()) {
@@ -731,11 +724,9 @@ struct Lexed {
   bool parses = false;
 };
 
-Lexed lexAndParse(std::string_view text, const std::string& name, VariableMode mode) {
+Lexed lexAndParse(std::string_view text, const std::string& name) {
   Lexed out;
-  LexerOptions lexer_options;
-  lexer_options.variables = mode;
-  Lexer lexer(text, name, lexer_options);
+  Lexer lexer(text, name);
   out.tokens = lexer.tokenize(out.sink);
   Parser parser(out.tokens,
                 [count = VarId{0}](std::string_view) mutable { return ++count; },
@@ -771,15 +762,7 @@ FormatResult formatSource(std::string_view text, const FormatOptions& options) {
     return result;
   }
   const std::string_view source = stripByteOrderMark(text);
-  // A file may say how its names are read in its first line (task_67), and that
-  // line wins over the mode of the run — the same order the loader uses.  The
-  // marker stays in the text: it is an ordinary statement, and the file keeps it
-  // as its first line.
-  VariableMode mode = options.variables;
-  if (const auto marker = readVariableMarker(source)) {
-    mode = marker->first;
-  }
-  Lexed lexed = lexAndParse(source, options.source_name, mode);
+  Lexed lexed = lexAndParse(source, options.source_name);
   result.diagnostics = lexed.sink.diagnostics();
   if (!lexed.parses && !options.selection_only) {
     return result;  // byte for byte, with the diagnostics
@@ -832,11 +815,11 @@ FormatResult formatSource(std::string_view text, const FormatOptions& options) {
     const std::size_t cut = begins[*it];
     std::string candidate(source.substr(0, cut));
     candidate += '.';
-    const Lexed check = lexAndParse(candidate, options.source_name, mode);
+    const Lexed check = lexAndParse(candidate, options.source_name);
     if (!check.parses) {
       continue;
     }
-    Lexed prefix = lexAndParse(source.substr(0, cut), options.source_name, mode);
+    Lexed prefix = lexAndParse(source.substr(0, cut), options.source_name);
     Formatter formatter(source, options);
     std::string formatted = formatter.run(prefix.tokens, cut);
     formatted += source.substr(cut);

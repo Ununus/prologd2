@@ -15,13 +15,6 @@ std::vector<Token> lex(const std::string& source, DiagnosticSink& sink) {
   return lexer.tokenize(sink);
 }
 
-std::vector<Token> lexWith(const std::string& source, VariableMode mode, DiagnosticSink& sink) {
-  LexerOptions options;
-  options.variables = mode;
-  Lexer lexer(source, "test", options);
-  return lexer.tokenize(sink);
-}
-
 }  // namespace
 
 TEST_CASE("lexer recognises structural tokens") {
@@ -67,7 +60,9 @@ TEST_CASE("lexer distinguishes atoms, variables and reserved names") {
   REQUIRE(tokens[6].text == "quoted atom");
 }
 
-TEST_CASE("mode 0 is the dialect the corpus is written in") {
+TEST_CASE("a name is read the way ISO reads it") {
+  // The one rule there is: a lower-case initial is a name, an upper-case one a
+  // variable, `'` quotes an atom, and a name never ends with an apostrophe.
   DiagnosticSink sink;
   const auto tokens = lex("д Д Молоко молоко 'Молоко'", sink);
   REQUIRE_FALSE(sink.hasErrors());
@@ -76,100 +71,28 @@ TEST_CASE("mode 0 is the dialect the corpus is written in") {
   REQUIRE(tokens[2].kind == TokenKind::Variable);    // Молоко
   REQUIRE(tokens[3].kind == TokenKind::Identifier);  // молоко
   REQUIRE(tokens[4].kind == TokenKind::QuotedAtom);  // 'Молоко'
-}
-
-TEST_CASE("the old dialect reads single-letter variables and capitalised names") {
-  // Any single letter is a variable, and a bare capitalised name is a *string*
-  // constant: the original kept strings and symbolic constants together, and old
-  // programs call string predicates on such names (task_67).
-  DiagnosticSink sink;
-  const auto tokens =
-      lexWith("д Д Молоко молоко 'Молоко' ИМПОРТ В_ A_", VariableMode::Old, sink);
+  // An underscore makes a variable, and a capitalised name with one too (`В_`).
+  const auto underscored = lex("_ _Пер В_", sink);
   REQUIRE_FALSE(sink.hasErrors());
-  REQUIRE(tokens[0].kind == TokenKind::Variable);
-  REQUIRE(tokens[1].kind == TokenKind::Variable);
-  REQUIRE(tokens[2].kind == TokenKind::String);
-  REQUIRE(tokens[2].text == "Молоко");
-  REQUIRE(tokens[3].kind == TokenKind::Identifier);
-  REQUIRE(tokens[4].kind == TokenKind::QuotedAtom);
-  REQUIRE(tokens[5].kind == TokenKind::Identifier);  // reserved names stay predicates
-  // The old corpus writes its variables as a letter with an underscore after it
-  // (`В_`, `A_`), which is a variable in every mode when it starts upper-case —
-  // and must stay one here, or old lessons stop answering.
-  REQUIRE(tokens[6].kind == TokenKind::Variable);
-  REQUIRE(tokens[6].text == "В_");
-  REQUIRE(tokens[7].kind == TokenKind::Variable);
-  REQUIRE(tokens[7].text == "A_");
+  REQUIRE(underscored[0].kind == TokenKind::Variable);
+  REQUIRE(underscored[1].kind == TokenKind::Variable);
+  REQUIRE(underscored[2].kind == TokenKind::Variable);
 }
 
-TEST_CASE("the old dialect reads apostrophe names, and a leading apostrophe stays a quote") {
+TEST_CASE("the names marker is a retired name now") {
+  // There is nothing to declare on a file's first line any more, but the word is
+  // still reserved: an old file must reach the checks and be told why it no
+  // longer loads, rather than be read as a call to an unknown predicate (or, in
+  // the old reading, as a string constant).
   DiagnosticSink sink;
-  const auto tokens = lexWith("Сумма' X' a' 'Молоко'", VariableMode::Old, sink);
+  const auto tokens = lex("ИМЕНА variables", sink);
   REQUIRE_FALSE(sink.hasErrors());
-  REQUIRE(tokens[0].kind == TokenKind::Variable);
-  REQUIRE(tokens[0].text == "Сумма'");
-  REQUIRE(tokens[1].kind == TokenKind::Variable);
-  REQUIRE(tokens[1].text == "X'");
-  REQUIRE(tokens[2].kind == TokenKind::Variable);
-  REQUIRE(tokens[2].text == "a'");
-  REQUIRE(tokens[3].kind == TokenKind::QuotedAtom);
-  REQUIRE(tokens[3].text == "Молоко");
-}
-
-TEST_CASE("an underscore name takes the apostrophe and drops it") {
-  // task_100: the original reads `_Пер'` as the very same variable as `_Пер` and
-  // cuts the apostrophe out of the name — otherwise a head saying `_Арг` and a
-  // body saying `_Арг'` would be two variables, and nothing would say so.
-  {
-    DiagnosticSink sink;
-    const auto tokens = lexWith("_Пер _Пер' _ _пер", VariableMode::Old, sink);
-    REQUIRE_FALSE(sink.hasErrors());
-    REQUIRE(tokens[0].kind == TokenKind::Variable);
-    REQUIRE(tokens[0].text == "_Пер");
-    REQUIRE(tokens[1].kind == TokenKind::Variable);
-    REQUIRE(tokens[1].text == "_Пер");  // the apostrophe is not part of the name
-    REQUIRE(tokens[2].kind == TokenKind::Variable);
-    REQUIRE(tokens[2].text == "_");
-    REQUIRE(tokens[3].kind == TokenKind::Variable);
-    REQUIRE(tokens[3].text == "_пер");  // case still matters: another variable
-  }
-  // A lone `_` is the anonymous variable, and a quote after it stays a quote.
-  {
-    DiagnosticSink sink;
-    const auto tokens = lexWith("_'x'", VariableMode::Old, sink);
-    REQUIRE(tokens[0].kind == TokenKind::Variable);
-    REQUIRE(tokens[0].text == "_");
-    REQUIRE(tokens[1].kind == TokenKind::QuotedAtom);
-    REQUIRE(tokens[1].text == "x");
-  }
-  // The ISO reading is untouched: `'` there opens a quoted atom, and swallowing
-  // it after a name would hide a typo instead of reporting it.
-  {
-    DiagnosticSink sink;
-    const auto tokens = lex("_Пер'x'", sink);
-    REQUIRE(tokens[0].kind == TokenKind::Variable);
-    REQUIRE(tokens[0].text == "_Пер");
-    REQUIRE(tokens[1].kind == TokenKind::QuotedAtom);
-    REQUIRE(tokens[1].text == "x");
-  }
-}
-
-TEST_CASE("`2` is a spelling of the old dialect, not a mode of its own") {
-  // task_77: the original reads `число'` in a file that declares nothing, so what
-  // the port shipped as modes 1 and 2 was one dialect all along.  `2` is still
-  // accepted — a file, a script or an ini that says it must keep working — and it
-  // means the old dialect, which is what the apostrophe name needed.
-  REQUIRE(variableModeFromNumber(0) == VariableMode::Iso);
-  REQUIRE(variableModeFromNumber(1) == VariableMode::Old);
-  REQUIRE(variableModeFromNumber(2) == VariableMode::Old);
-  REQUIRE_FALSE(variableModeFromNumber(3).has_value());
-  REQUIRE_FALSE(variableModeFromNumber(-1).has_value());
-
-  DiagnosticSink sink;
-  const auto tokens = lexWith("X'", VariableMode::Old, sink);
-  REQUIRE_FALSE(sink.hasErrors());
-  REQUIRE(tokens[0].kind == TokenKind::Variable);
-  REQUIRE(tokens[0].text == "X'");
+  REQUIRE(tokens[0].kind == TokenKind::Identifier);
+  REQUIRE(tokens[1].kind == TokenKind::Identifier);
+  REQUIRE(isReservedBuiltinName("ИМЕНА"));
+  REQUIRE(isReservedBuiltinName("variables"));
+  // Reserved for the checks, not offered as a built-in: nothing can call it.
+  REQUIRE(reservedBuiltinNames().count("ИМЕНА") == 0);
 }
 
 TEST_CASE("`\\+` is one token, and a lone backslash is an error") {

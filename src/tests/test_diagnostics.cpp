@@ -88,10 +88,10 @@ TEST_CASE("a value where a functor belongs is not called an unpaired bracket") {
 }
 
 TEST_CASE("a string where a functor belongs says so, and the head rule keeps its own") {
-  // The dialect's naming mode reads a capitalised word as a string, and a string is
-  // a value: the same message, worded for a string.
+  // A string is a value, and a value cannot be a functor: the same message,
+  // worded for a string.
   const std::vector<PrologError> diagnostics = diagnosticsOf(
-      ":- ИМЕНА(1).\nатом(Переменная(\"текст\")).\n");
+      "атом(\"текст\"(1)).\n");
   REQUIRE(diagnostics.size() == 1);
   REQUIRE(diagnostics.front().message.find("Строка не может быть именем функции") !=
           std::string::npos);
@@ -315,16 +315,18 @@ TEST_CASE("a retired name says what to write instead") {
   REQUIRE(gone.front().message.find("«substring» снято") == 0);
   REQUIRE(gone.front().message.find("sub_string") != std::string::npos);
 
-  // The names marker lost its English spelling in task_107: `readVariableMarker`
-  // reads `ИМЕНА` and nothing else, so `:- variables(0).` never set a mode — the
-  // line was executed and the call failed.  The message has to name the marker,
-  // because that is the whole of the name's meaning.
-  const std::vector<PrologError> marker = diagnosticsOf("?variables(0).\n");
-  REQUIRE(marker.size() == 1);
-  REQUIRE(marker.front().code == ErrorCode::UnknownPredicate);
-  REQUIRE(marker.front().severity == Severity::Error);
-  REQUIRE(marker.front().message.find("«variables» снято") == 0);
-  REQUIRE(marker.front().message.find(":- ИМЕНА(0|1|2).") != std::string::npos);
+  // The names marker is retired with the modes it declared: both spellings say
+  // there is nothing to declare any more, because that is the whole of what the
+  // word meant.
+  for (const char* spelling : {"ИМЕНА", "variables"}) {
+    INFO("marker: " << spelling);
+    const std::vector<PrologError> marker =
+        diagnosticsOf(std::string("?-") + spelling + "(0).\n");
+    REQUIRE(marker.size() == 1);
+    REQUIRE(marker.front().code == ErrorCode::UnknownPredicate);
+    REQUIRE(marker.front().severity == Severity::Error);
+    REQUIRE(marker.front().message.find("режимов имён больше нет") == 0);
+  }
 }
 
 TEST_CASE("the original dialect's or-word loads, and its two arguments are goals") {

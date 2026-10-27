@@ -39,7 +39,10 @@ from typing import Any, Iterator
 #: 14: `screen` is also an *event*: the canvas a program names with
 #:    `:- ХОЛСТ(Высота, Ширина).`, sent as soon as the directive is applied, so a
 #:    window can take the size before the first primitive (ADR-035).
-PROTOCOL_VERSION = 14
+#: 15: `vars` is gone.  There is one way to read a name — ISO's — so the field,
+#:    the `:- ИМЕНА(N).` marker with it were removed; the engine ignores an unknown
+#:    field, and this number is what tells a client the old naming is not there.
+PROTOCOL_VERSION = 15
 
 #: Event names the interpreter emits.
 EVENTS = ("ready", "output", "result", "input_request", "step", "trace", "graphics",
@@ -104,7 +107,6 @@ def load_text(text: str, name: str = "<buffer>", *, step: bool = False,
               trace: bool = False, questions: bool = True,
               print_questions: bool = False,
               limits: dict | None = None,
-              variable_mode: int = 0,
               screen: tuple[int, int] | None = None) -> bytes:
     """Loads program text (the editor buffer).
 
@@ -122,10 +124,6 @@ def load_text(text: str, name: str = "<buffer>", *, step: bool = False,
     `maxFindall`, each `0` for «без предела».  The *wall-clock* timeout is not
     here — it is the front-end's own clock (task_46).
 
-    `variable_mode` is how this run reads names that no marker in the file has
-    settled (protocol 12, task_67): 0 is the ISO reading, 1 and 2 the old
-    dialect's, and a file's own `:- ИМЕНА(N).` line wins over all of them.
-
     `screen` is the size of the picture the run draws on (protocol 13, task_73).
     """
     return encode_request(
@@ -133,14 +131,13 @@ def load_text(text: str, name: str = "<buffer>", *, step: bool = False,
         **_flags(step=step, trace=trace, questions=questions,
                  print_questions=print_questions),
         **_limits(limits),
-        **_variable_mode(variable_mode),
         **_screen(screen),
     )
 
 
 def load_file(path: str, *, step: bool = False, trace: bool = False,
               questions: bool = True, print_questions: bool = False,
-              limits: dict | None = None, variable_mode: int = 0,
+              limits: dict | None = None,
               screen: tuple[int, int] | None = None) -> bytes:
     """Loads a program from disk; imports resolve against `-I` directories."""
     return encode_request(
@@ -148,27 +145,20 @@ def load_file(path: str, *, step: bool = False, trace: bool = False,
         **_flags(step=step, trace=trace, questions=questions,
                  print_questions=print_questions),
         **_limits(limits),
-        **_variable_mode(variable_mode),
         **_screen(screen),
     )
 
 
 def query(text: str, *, step: bool = False, trace: bool = False,
-          variable_mode: int = 0, screen: tuple[int, int] | None = None) -> bytes:
+          screen: tuple[int, int] | None = None) -> bytes:
     """Runs one statement, usually `?Goal.`.
-
-    `variable_mode` is how *this statement* reads names (task_67): a question typed
-    into the goal line or clicked on a margin marker arrives on its own, without a
-    file's first line, so it has to be told what the program it asks reads —
-    otherwise `?студент(Вова, Корчагин).` of a mode-1 program would read the two
-    names as variables instead of the constants the file meant.
 
     `screen` is the size of the picture this statement draws on (protocol 13): the
     graphics window is live while a question is answered, so a question carries the
     screen the question before it used.
     """
     return encode_request(cmd="query", text=text, **_flags(step=step, trace=trace),
-                          **_variable_mode(variable_mode), **_screen(screen))
+                          **_screen(screen))
 
 
 def graphics_snapshot() -> bytes:
@@ -197,7 +187,6 @@ def format_text(
     unit: str = "tab",
     selection: bool = False,
     name: str = "<format>",
-    variable_mode: int = 0,
 ) -> bytes:
     """Asks the interpreter to lay `text` out; the answer is `formatted`.
 
@@ -220,7 +209,6 @@ def format_text(
         fields["selection"] = True
     if name != "<format>":
         fields["name"] = name
-    fields.update(_variable_mode(variable_mode))
     return encode_request(**fields)
 
 
@@ -250,16 +238,6 @@ def _limits(limits: dict | None) -> dict:
         return {}
     asked = {name: int(value) for name, value in limits.items() if int(value) > 0}
     return {"limits": asked} if asked else {}
-
-
-def _variable_mode(mode: int) -> dict:
-    """The naming mode of a run or of a formatting request (protocol 12, task_67).
-
-    Mode 0 is left off the wire: it is the interpreter's own default, so a zero
-    would be a second way of saying «nothing was asked for».  A file's own
-    `:- ИМЕНА(N).` line still wins over whatever travels here.
-    """
-    return {"vars": int(mode)} if int(mode) else {}
 
 
 def _screen(size: tuple[int, int] | None) -> dict:

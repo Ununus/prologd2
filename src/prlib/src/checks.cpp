@@ -168,11 +168,15 @@ constexpr RetiredName kRetiredNames[] = {
     {"substring", 4,
      "«substring» снято: «КОПИЯ(Стр, Ц1, Ц2, Стр4)» считает позиции с 1, а "
      "форма ISO — «sub_string(Стр, До, Длина, После, Подстрока)» с позиций с 0"},
-    // The names marker's English spelling (task_107).  `readVariableMarker` never
-    // knew it, so `:- variables(0).` on a file's first line kept the mode of the
-    // run and the directive then failed here.
+    // The naming modes and the marker that declared them.  There is one way to
+    // read a name now — ISO's — so there is nothing to declare, and a file that
+    // still says it is told that instead of being answered «не найдено».
+    {"ИМЕНА", 1,
+     "режимов имён больше нет: имена читаются как в ISO (строчная буква — атом, "
+     "прописная — переменная), и строку «:- ИМЕНА(N).» писать не нужно"},
     {"variables", 1,
-     "«variables» снято: маркер имён пишется по-русски — «:- ИМЕНА(0|1|2).»"},
+     "режимов имён больше нет: имена читаются как в ISO, и «:- variables(N).» "
+     "писать не нужно"},
 };
 
 const char* retiredNameMessage(std::string_view name, std::size_t arity) {

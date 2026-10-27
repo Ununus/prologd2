@@ -178,22 +178,6 @@ OUTPUT_POSITIONS = ("right", "bottom")
 DEFAULT_INPUT_MODE = "panel"
 INPUT_MODES = ("panel", "dialog")
 
-#: How a file's names are read *when the file does not say* (task_67).  The old
-#: Пролог-Д wrote a variable as one letter, left a string constant unquoted and let
-#: a long variable name end with an apostrophe, which mode 0 reads as a variable, so
-#: an old program means something else there.  A file whose first line declares
-#: `:- ИМЕНА(N).` is read that way whatever this row says — the dialect belongs to
-#: the file — and an imported file is read in its own mode, too.  So this is a
-#: fallback, and the fallback is the modern reading.
-VARIABLE_MODE = "execution/variable_mode"
-VARIABLE_MODES = ("0", "1")
-
-#: The number `2` the old dialect was asked for with until task_77.  It is a
-#: spelling of `1` now (the original reads apostrophe names anyway), and an ini that
-#: still says it has to keep meaning the old dialect — falling back to the default
-#: would move that reader to ISO without a word.
-VARIABLE_MODE_LEGACY = "2"
-
 #: The screen the graphics predicates draw on (task_73).  The engine's own default
 #: is the same 600 × 600 (`kMaxGrX`/`kMaxGrY`): the whole buffer travels to the
 #: window in a snapshot and ЗАКРАСКА walks it cell by cell, so the picture is as
@@ -266,7 +250,6 @@ MAXIMUM_TIMEOUT_MILLISECONDS = 3_600_000
 #: A program that needs more raises the row in the dialog; `0` still means
 #: «без предела».
 DEFAULT_MAX_OUTPUT_EVENTS = 50_000
-DEFAULT_VARIABLE_MODE = "0"
 MAXIMUM_MAX_OUTPUT_EVENTS = 10_000_000
 
 #: task_46's process directory: where a program's relative file paths point.
@@ -405,11 +388,6 @@ SETTINGS: tuple[Setting, ...] = (
             DEFAULT_SCREEN_SIZE, MINIMUM_SCREEN_SIZE, MAXIMUM_SCREEN_SIZE,
             suffix=" точек",
             hint="Высота графического буфера."),
-    Setting(VARIABLE_MODE, "Имена переменных", "Выполнение", "choice",
-            DEFAULT_VARIABLE_MODE,
-            choices=(("0", "ISO: переменная с большой буквы"),
-                     ("1", "PLD: одна буква, имена с апострофом")),
-            hint="Как читать имена в файле.\nСтрока «:- ИМЕНА(N).» первой строкой файла важнее этой настройки"),
     Setting(IMPORT_PATHS, "Дополнительные каталоги ИМПОРТ", "Выполнение", "dirs", (),
             hint="Каталоги, в которых ИМПОРТ ищет файлы; передаются интерпретатору как -I, в этом порядке"),
     # task_79: the «Интерпретатор» row stood here.  A particular build is `--exe`
@@ -439,7 +417,6 @@ BY_KEY: dict[str, Setting] = {setting.key: setting for setting in SETTINGS}
 #: A record looked up by key, for a property that wants the bounds of that record
 #: rather than a number written out a second time (`input_mode`).
 _INPUT_MODE_SETTING = BY_KEY[INPUT_MODE]
-_VARIABLE_MODE_SETTING = BY_KEY[VARIABLE_MODE]
 #: The same for the process directory (task_46): its `file|window|custom` answer
 #: is written through the description, so a wrong value in a hand-edited file
 #: falls back the way every other choice does.
@@ -1114,40 +1091,6 @@ class Settings:
         """The editor and the output panel as last seen — widths or heights,
         depending on which side the panel is on."""
         return self._sizes(PANEL_SIZES)
-
-    @property
-    def variable_mode(self) -> str:
-        """How a file *without* a marker of its own is read: `0` or `1`.
-
-        The file's own `:- ИМЕНА(N).` first line beats this (task_67), so what is
-        left is the window's half of `--vars`: the mode of a file that says
-        nothing — `0`, unless the reader asks for the old dialect by name.
-
-        A stored `2` is answered as `1` rather than falling through `_choice` to the
-        default: the two were one mode before task_77, and a reader who asked for
-        the old dialect must not land in ISO because a number was renamed.
-        """
-        key = _VARIABLE_MODE_SETTING.key
-        if self._text(key, DEFAULT_VARIABLE_MODE).strip() == VARIABLE_MODE_LEGACY:
-            return "1"
-        return self._choice(_VARIABLE_MODE_SETTING)
-
-    @variable_mode.setter
-    def variable_mode(self, value: str) -> None:
-        """Sets the row, reading a `2` as the old dialect.
-
-        `2` is not one of the row's two choices any more (task_77), and `set_value`
-        answers a value it does not know with the setting's *default* — which would
-        move a caller who asked for the old dialect into ISO without a word.  So the
-        spelling is turned into the mode here, before the row sees it.
-        """
-        self.set_value(_VARIABLE_MODE_SETTING,
-                       "1" if str(value).strip() == VARIABLE_MODE_LEGACY else value)
-
-    @property
-    def variable_mode_number(self) -> int:
-        """The same choice as the number a run takes."""
-        return int(self.variable_mode)
 
     @panel_sizes.setter
     def panel_sizes(self, sizes) -> None:

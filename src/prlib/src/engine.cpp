@@ -1121,16 +1121,7 @@ void Engine::raiseAt(ErrorCode code, const SourceLocation& location, std::string
 
 ParsedProgram Engine::parseSource(std::string_view source, const std::string& file_name) {
   DiagnosticSink sink;
-  // A file may declare how its names are read in its first line; the marker is
-  // dropped so that it does not run as a goal (task_67).
-  VariableMode mode = options_.variableMode;
-  if (const auto marker = readVariableMarker(source)) {
-    mode = marker->first;
-    source = source.substr(marker->second);
-  }
-  LexerOptions lexer_options;
-  lexer_options.variables = mode;
-  Lexer lexer(source, file_name, lexer_options);
+  Lexer lexer(source, file_name);
   std::vector<Token> tokens = lexer.tokenize(sink);
   auto allocator = [this](std::string_view name) { return allocateVar(name); };
   Parser parser(std::move(tokens), allocator, &sink);
