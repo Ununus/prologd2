@@ -99,9 +99,8 @@ def make_window(executable: str, *, ready: bool = True, settings=None):
     """A window whose preferences live in a throw-away file.
 
     Without this the window would read (and, on zoom, write) the settings of the
-    person running the tests.  `settings` of its own is the exception: task_79's
-    checks want two windows over *one* file, because that is how the chosen engine
-    is remembered.
+    person running the tests.  `settings` of its own is the exception: a check that
+    wants two windows over *one* file passes the same store to both.
 
     `ready=True` starts the interpreter the way the first run does, because most
     checks are about what happens afterwards — the reserved names, the
@@ -122,25 +121,18 @@ def make_window(executable: str, *, ready: bool = True, settings=None):
     return window
 
 
-def both_engines(directory: pathlib.Path, executable: str) -> pathlib.Path:
-    """A folder with both engines in it, as a built tree has them (task_79).
+def copied_build(directory: pathlib.Path, executable: str) -> pathlib.Path:
+    """A folder with a copy of the interpreter the suite was pointed at.
 
-    The window looks for the engine it runs *beside* the binary of the launch, so a
-    check of the switch needs the pair in one folder.  A copy, not the build tree
+    The window looks for the interpreter *beside* the binary of the launch, so the
+    check of `--exe` needs one in a folder of its own.  A copy, not the build tree
     itself: `--exe` is the thing being checked, and a test must not run the tree it
-    was built from.  The tree is the one `executable` lies in, which is the one the
-    suite was pointed at.
+    was built from.
     """
-    from prologd_gui import engines
-
-    folder = directory / "движки"
+    folder = directory / "движок"
     folder.mkdir(exist_ok=True)
-    tree = pathlib.Path(executable).parent
-    for engine in engines.ENGINES:
-        assert (tree / engine.file_name).is_file(), (
-            f"the build has no {engine.file_name}: {tree} (task_78 builds it)"
-        )
-        shutil.copy2(tree / engine.file_name, folder / engine.file_name)
+    name = pathlib.Path(executable).name
+    shutil.copy2(executable, folder / name)
     return folder
 
 
@@ -2008,10 +2000,9 @@ def test_the_toolbar_reuses_the_actions(executable: str) -> None:
             assert actions.BY_KEY[key].title in shown, (key, shown)
         # task_58: «Очистить вывод» left the toolbar for the «Выполнение» menu, and
         # the size control left it too (see `test_two_font_sizes_and_one_wheel`).
-        # task_93: the right end carries one control that stands for the *state* of the
-        # window — which engine runs and how it reads names — so the last *labelled*
-        # entry is «Настройки…» and the two empty-text entries are that control and
-        # the formatter's mode control.
+        # task_93: the right end carries one control that stands for the naming mode
+        # of the window, so the last *labelled* entry is «Настройки…» and the two
+        # empty-text entries are that control and the formatter's mode control.
         labels = [entry.text() for entry in toolbar.actions() if not entry.isSeparator()]
         assert actions.BY_KEY["help_doc"].title not in labels, labels
         assert actions.BY_KEY["clear_output"].title not in labels, labels
@@ -2026,9 +2017,9 @@ def test_the_toolbar_reuses_the_actions(executable: str) -> None:
         # The state control is not a command: its picture is the state in force, and
         # its tooltip says which one that is (task_93).
         assert window._state_button.isEnabled() is True
-        assert window._state_button.toolTip().startswith("новый движок"), (
-            window._state_button.toolTip()
-        )
+        assert window._state_button.toolTip().startswith(
+            actions.STATE_BY_KEY[window._current_state()].hint
+        ), window._state_button.toolTip()
         # The toolbar keeps the three file buttons that act on the tab in front of
         # the user; «Сохранить все» acts on every tab and belongs in «Файл» (task_48).
         assert actions.BY_KEY["save_all"].title not in shown, shown
@@ -4235,12 +4226,12 @@ def test_an_untouched_unnamed_tab_comes_back_clean(executable: str) -> None:
     """
     from prologd_gui import documents
     from prologd_gui.settings import Settings
-    from prologd_gui.window import MainWindow, welcome_text
+    from prologd_gui.window import WELCOME_TEXT, MainWindow
 
     window = make_window(executable)
     settings_path = window._settings.path
     try:
-        assert window.buffers()[0].text() == welcome_text(True), "the welcome tab"
+        assert window.buffers()[0].text() == WELCOME_TEXT, "the welcome tab"
         assert window.buffers()[0].is_modified() is False
         window.new_buffer()
         assert window.tab_count() == 2, window.tab_count()
@@ -4252,13 +4243,13 @@ def test_an_untouched_unnamed_tab_comes_back_clean(executable: str) -> None:
     settings = Settings(settings_path)
     stored = documents.decode_tabs(settings.session_tabs)
     assert [record.name for record in stored] == ["Без имени"], stored
-    assert stored[0].text == welcome_text(True)
+    assert stored[0].text == WELCOME_TEXT
     assert stored[0].modified is False, "nobody edited the welcome program"
 
     reopened = MainWindow(executable, [], settings)
     try:
         assert reopened.tab_count() == 1, [b.model.name for b in reopened.buffers()]
-        assert reopened.buffers()[0].text() == welcome_text(True)
+        assert reopened.buffers()[0].text() == WELCOME_TEXT
         assert reopened.buffers()[0].is_modified() is False, (
             "the restored tab carries a star it never earned"
         )
@@ -4762,80 +4753,50 @@ def test_the_graphics_window_follows_the_program(executable: str) -> None:
     print("ok: the graphics window follows the program, survives hiding, and saves")
 
 
-def test_the_launch_binary_names_the_folder_and_the_engine(
+def test_the_launch_binary_names_the_build_folder(
     executable: str, directory: pathlib.Path
 ) -> None:
     """task_79: `--exe` replaces the «Интерпретатор» row task_46 added.
 
-    The path is not only a file: it is the *folder* the engines were built in, and
-    that is where the other one is looked for.  The status bar names both, because
-    what the command line chose is invisible otherwise — and which of the two
-    *engines* runs matters more than the path, since the same click means different
-    things under them.
+    The path is not only a file: it is the *folder* the build lies in, and that is
+    where the interpreter is looked for — nowhere else.  The status bar names both,
+    because what the command line chose is invisible otherwise.
     """
-    from prologd_gui import engines
+    from prologd_gui import paths
 
-    folder = both_engines(directory, executable)
-    window = empty_window(str(folder / engines.OURS.file_name))
+    folder = copied_build(directory, executable)
+    pinned = folder / pathlib.Path(executable).name
+    window = empty_window(str(pinned))
     try:
-        assert window.engine() is engines.OURS
-        assert window.session.executable() == str(folder / engines.OURS.file_name)
+        assert window.session.executable() == str(pinned)
         details = window._details.text()
-        assert f"движок: {engines.OURS.title}" in details, details
-        assert str(folder / engines.OURS.file_name) in details, details
+        assert f"движок: {paths.ENGINE_TITLE}" in details, details
+        assert str(pinned) in details, details
 
         window.editor().setPlainText('?ВЫВОД("ok"),ПС.\n')
         window.run_program()
         wait_for_result(window)
         assert "ok" in window.output_text(), ascii(window.output_text())
-        print("ok: the launch names the build folder and the engine, and the run works")
+        print("ok: the launch names the build folder, and the run works")
     finally:
         discard_changes(window)
 
 
-def test_a_launch_naming_the_other_engine_starts_it(
+def test_a_missing_interpreter_is_reported_not_half_started(
     executable: str, directory: pathlib.Path
 ) -> None:
-    """A `--exe` that says `prologd.exe` means «Пролог-Д» (task_79).
-
-    A developer who built the other engine and named that file does not want our
-    own started from its folder — and the folder is where *both* are looked for, so
-    the two halves of the answer come from one path.
-    """
-    from prologd_gui import engines
-
-    folder = both_engines(directory, executable)
-    window = make_window(str(folder / engines.ORIGINAL.file_name), ready=False)
-    try:
-        assert window.engine() is engines.ORIGINAL
-        assert window.session.executable() == str(folder / engines.ORIGINAL.file_name)
-        assert window._interpreter_path() == str(folder / engines.ORIGINAL.file_name)
-
-        # The other engine answers the same program in its own dialect: an ASCII
-        # literal, because the original writes its output in CP1251.
-        window.editor().setPlainText('?ВЫВОД("ok"),ПС.\n')
-        window.run_program()
-        wait_for_result(window)
-        assert "ok" in window.output_text(), ascii(window.output_text())
-        print("ok: a `--exe` naming the other engine runs it, from that folder")
-    finally:
-        discard_changes(window)
-
-
-def test_a_missing_engine_is_reported_not_half_started(executable: str, directory: pathlib.Path) -> None:
     """task_46's promise kept under task_79's rule: a launch that points at nothing.
 
     The row that could name a missing file is gone, but the gate is still needed:
     a build folder that was cleaned, or a `--exe` typed from memory, must be
     reported in the pane before a process is asked to start.
     """
-    from prologd_gui import engines
+    from prologd_gui import paths
 
-    missing = directory / "нет" / engines.OURS.file_name
+    missing = directory / "нет" / paths.EXECUTABLE_NAME
 
     window = make_window(str(missing), ready=False)
     try:
-        assert window.engine() is engines.OURS, "the file name says which engine was meant"
         assert window.session.executable() == str(missing)
 
         window.editor().setPlainText('?ВЫВОД("ok"),ПС.\n')
@@ -4844,87 +4805,51 @@ def test_a_missing_engine_is_reported_not_half_started(executable: str, director
             "не удалось запустить интерпретатор" in window.problems_text()
         ), ascii(window.problems_text())
         assert window.session.is_running() is False, "a missing binary must not start a session"
-        print("ok: a missing engine is reported in the pane, and no session starts")
+        print("ok: a missing interpreter is reported in the pane, and no session starts")
     finally:
         discard_changes(window)
 
 
-def test_a_build_with_one_engine_opens_on_it_and_offers_no_switch(
-    executable: str, directory: pathlib.Path
-) -> None:
-    """Part 143: the package of «Пролог-Д» alone opens on it, and has no switch.
+def test_the_welcome_program_runs(executable: str) -> None:
+    """task_112: the first tab holds a program that answers on the engine of this build.
 
-    The settings of a fresh machine say «Пролог-У», and a package that carries the
-    original engine only must not refuse to open over it: the one engine file that
-    *is* there runs, the pane says why, and the toolbar carries no button that would
-    switch to a file which is not there (a disabled control is furniture and takes
-    the place a command might have had).
+    The text is what a reader sees before doing anything, so the one thing it must
+    do is run: it loads `iso.pld` and asks `length/2` from it.
     """
-    from prologd_gui import engines
+    from prologd_gui.window import WELCOME_TEXT
 
-    folder = directory / "один движок"
-    folder.mkdir(exist_ok=True)
-    shutil.copy2(
-        pathlib.Path(executable).parent / engines.ORIGINAL.file_name,
-        folder / engines.ORIGINAL.file_name,
-    )
-    # The launch names the engine the package does *not* carry — `prologu.exe` is
-    # absent where a run would look for it — which is the state of a fresh machine
-    # over a one-engine package: no `gui.ini`, so the choice is the default one.
-    window = make_window(str(folder / engines.OURS.file_name), ready=False)
+    window = make_window(executable, ready=False)
     try:
-        assert window.engine() is engines.ORIGINAL, "the engine of this build runs"
-        assert window.session.executable() == str(folder / engines.ORIGINAL.file_name)
-        # The window has to be *shown* before the toolbar is asked: `QToolBar` lays
-        # its widgets out on show and shows every item whose action is visible, which
-        # is why hiding the widget alone was undone in the package (part 145) — the
-        # action `addWidget` answers with is what the layout reads.
-        window.show()
-        from PySide6.QtWidgets import QApplication
-
-        QApplication.processEvents()
-        # The one state control goes too (task_93): its three rows are two ways to
-        # reach our own engine and one to reach the original, and this build has
-        # neither — a control with nothing to choose is furniture, and a dead button
-        # at the end of the toolbar is worse than none.
-        assert window._state_button.isHidden(), (
-            "a build with one engine and one dialect has nothing to choose"
-        )
-        assert window._state_action.isVisible() is False, "the toolbar's item is still there"
-        # The names row is written down as «PLD» (part 148): the only engine reads the
-        # old dialect, so the row must say that rather than keep a choice that belongs
-        # to an engine this build does not carry.
-        assert window._settings.variable_mode == "1", window._settings.variable_mode
-        assert window._naming_label() == "PLD", window._naming_label()
-        assert "в этой сборке нет" in window.system_text(), ascii(window.system_text())
-        assert engines.OURS.file_name in window.system_text(), ascii(window.system_text())
-
-        # And it runs, in its own dialect: no `#…#`, an ASCII literal for the pane.
-        window.editor().setPlainText('?ВЫВОД("ok"),ПС.\n')
+        assert window.buffers()[0].text() == WELCOME_TEXT, "the first tab holds it"
+        # The standard library has to be on the import path: a build tree has no
+        # `stdlib` beside the executable (the package does), which is why the row is
+        # filled here.
+        window._settings.import_paths = [str(STDLIB)]
+        window.apply_settings()
         window.run_program()
         wait_for_result(window)
-        assert "ok" in window.output_text(), ascii(window.output_text())
-        print("ok: a one-engine build opens on its engine, says so, and has no switch")
+        assert not window.problems_text().strip(), ascii(window.problems_text())
+        # The questions of the welcome text: the library's `length/2` first, then the
+        # program's own two.
+        output = window.output_text()
+        assert output == ("Д=3\nИ=вова\nФ=корчагин\nИ=данил\nФ=ахмеров\n"), ascii(output)
+        print("ok: the welcome program loads the library and answers")
     finally:
         discard_changes(window)
 
 
-def test_the_state_control_switches_and_remembers(
+def test_the_state_control_switches_the_names_and_remembers(
     executable: str, directory: pathlib.Path
 ) -> None:
-    """task_93: one control, three states, and the engine choice outlives the window."""
-    from prologd_gui import actions, assets, engines
+    """task_93: one control, two states, and the choice outlives the window."""
+    from prologd_gui import actions, assets
     from prologd_gui.settings import Settings
 
-    folder = both_engines(directory, executable)
-    ini = directory / "engine.ini"
-    window = make_window(
-        str(folder / engines.OURS.file_name), ready=False, settings=Settings(ini)
-    )
+    ini = directory / "names.ini"
+    window = make_window(executable, ready=False, settings=Settings(ini))
     try:
-        ours_names = set(window.session.keywords.all_labels())
-        # The picture is the state in force — our own engine, the ISO dialect — not a
-        # destination: the control says what the window is set to (task_93).
+        # The picture is the state in force — the ISO reading — not a destination:
+        # the control says what the window is set to (task_93).
         assert (
             window._state_button.icon().cacheKey()
             == assets.icon(actions.STATE_BY_KEY[actions.STATE_ISO].icon).cacheKey()
@@ -4935,260 +4860,49 @@ def test_the_state_control_switches_and_remembers(
         wait_for_result(window)
         assert "ok" in window.output_text(), ascii(window.output_text())
 
-        window.choose_engine(engines.ORIGINAL)
-        assert window.engine() is engines.ORIGINAL
-        assert window.session.executable() == str(folder / engines.ORIGINAL.file_name)
-        assert Settings(ini).engine == engines.ORIGINAL.key, "the choice is not remembered"
+        window._choose_state(actions.STATE_PLD)
+        assert window._settings.variable_mode == "1"
         assert (
             window._state_button.icon().cacheKey()
-            == assets.icon(actions.STATE_BY_KEY[actions.STATE_ORIGINAL].icon).cacheKey()
-        ), "the control did not follow the engine"
-        assert window._state_actions[actions.STATE_ORIGINAL].isChecked() is True
-        assert f"движок: {engines.ORIGINAL.title}" in window._details.text()
-        assert f"--- движок: {engines.ORIGINAL.title}" in window.system_text(), (
-            ascii(window.system_text())
-        )
-        # The reserved names are the engine's, and they were re-read: colouring,
-        # completion and the cheat sheet are all built from them (task_78 measured
-        # the two tables — 66 names against our 131 — so an empty one is a bug).
-        now = set(window.session.keywords.all_labels())
-        assert now and now != ours_names, (len(now), len(ours_names))
+            == assets.icon(actions.STATE_BY_KEY[actions.STATE_PLD].icon).cacheKey()
+        ), "the control did not follow the mode"
+        assert window._state_actions[actions.STATE_PLD].isChecked() is True
+        assert window._naming_label() == "PLD", window._naming_label()
 
-        # The other engine really runs the program: it answers it itself.
+        # The switching is a stored value and nothing more: the same interpreter
+        # runs the same program, and a live session is not touched.
         window.editor().setPlainText('?ВЫВОД("ok2"),ПС.\n')
         window.run_program()
         wait_for_result(window)
         assert "ok2" in window.output_text(), ascii(window.output_text())
-        print("ok: the control switches the engine, the other one runs, the choice is stored")
+        print("ok: the control switches the naming mode, and the run is untouched")
     finally:
         discard_changes(window)
 
-    second = make_window("", ready=False, settings=Settings(ini))
+    second = make_window(executable, ready=False, settings=Settings(ini))
     try:
-        assert second.engine() is engines.ORIGINAL, "a new window starts on the chosen engine"
-        assert "движок" in second._details.text(), second._details.text()
-        print("ok: the engine the control chose is the one the next window starts")
+        assert second._settings.variable_mode == "1", "the choice is not remembered"
+        assert second._current_state() == actions.STATE_PLD
+        print("ok: the mode the control chose is the one the next window starts with")
     finally:
         discard_changes(second)
-
-
-def test_the_state_control_stops_the_run_first(
-    executable: str, directory: pathlib.Path
-) -> None:
-    """A live process belongs to the engine being left, so it goes first (task_79).
-
-    The case that matters is a press *while a program runs*: the child goes on
-    sending events, and after the choice changed they would be read as the output of
-    a run that belongs to the other binary.
-    """
-    from prologd_gui import engines
-
-    folder = both_engines(directory, executable)
-    window = make_window(str(folder / engines.OURS.file_name), ready=False)
-    try:
-        window.editor().setPlainText("?ВВОДСТР(С).\n")  # waits for input for ever
-        window.run_program()
-        assert pump(window, lambda: window._busy), "the run never started"
-        assert window.session.is_running() is True
-
-        window.choose_engine(engines.ORIGINAL)
-        assert window.session.is_running() is False, "the old engine's process survived the press"
-        assert window._busy is False
-        assert "--- движок изменён ---" in window.system_text(), ascii(window.system_text())
-        assert window.engine() is engines.ORIGINAL
-        print("ok: the press stops the session before it switches the engine")
-    finally:
-        discard_changes(window)
-
-
-def test_the_other_engine_gets_only_what_it_answers(
-    executable: str, directory: pathlib.Path
-) -> None:
-    """task_79: what is greyed out, and what the limits note may promise."""
-    from prologd_gui import engines
-
-    folder = both_engines(directory, executable)
-    window = make_window(str(folder / engines.OURS.file_name), ready=False)
-    gated = ("format", "step", "step_over", "run_trace", "graphics")
-    try:
-        # Shown first: the toolbar lays its widgets out on show, and only then does a
-        # hidden control stay hidden (part 145 — hiding the widget alone was undone).
-        window.show()
-        from PySide6.QtWidgets import QApplication
-
-        QApplication.processEvents()
-        for key in gated:
-            assert window._actions[key].isEnabled() is True, key
-        assert window._format_button.isHidden() is False
-        assert window._format_action.isVisible() is True
-        window._settings.max_steps = 5000
-        assert "«Предел шагов» 5000" in window._limits_note()
-
-        window.choose_engine(engines.ORIGINAL)
-        QApplication.processEvents()
-        assert window.engine() is engines.ORIGINAL
-        for key in gated:
-            action = window._actions[key]
-            assert action.isEnabled() is False, key
-            assert "не умеет" in action.toolTip(), (key, action.toolTip())
-        # Running a program is what both engines do, and the window's own two guards
-        # stay: the clock and the event counter live in this process (task_46).
-        assert window._actions["run"].isEnabled() is True
-        assert window._actions["stop"].isEnabled() is False, "nothing is running"
-        assert window._format_button.isHidden() is True, "the mode control goes with the command"
-        assert window._format_action.isVisible() is False, "the toolbar's item is still there"
-        note = window._limits_note()
-        assert "не читает" in note and "Предел шагов" in note, note
-        assert "--- пределы:" not in note, note
-        print("ok: the other engine greys out what it cannot answer, and the note says so")
-    finally:
-        discard_changes(window)
-
-
-def test_the_other_engine_reads_names_its_own_way(
-    executable: str, directory: pathlib.Path
-) -> None:
-    """Under Пролог-Д a file that declares nothing is read the old way (task_79).
-
-    The engine has no modes at all: it reads one-letter variables and unquoted string
-    constants because that *is* the old dialect.  So the colouring, the completion and
-    what the window sends have to follow the engine rather than the settings row —
-    otherwise a name the engine prints as a string constant would be coloured as a
-    variable.  A file that declares `:- ИМЕНА(N).` keeps its own mode either way.
-    """
-    from prologd_gui import engines, tokens
-
-    folder = both_engines(directory, executable)
-    window = make_window(str(folder / engines.OURS.file_name), ready=False)
-    try:
-        assert window._settings.variable_mode == "0", "the row says ISO"
-        window.editor().setPlainText("шапка(Сумма').\n")
-        buffer = window.buffers()[0]
-        assert buffer.variable_mode() == tokens.MODE_ISO
-
-        window.choose_engine(engines.ORIGINAL)
-        assert buffer.variable_mode() == tokens.MODE_OLD, "the engine reads the old dialect"
-        assert buffer.highlighter.mode == tokens.MODE_OLD, "and the colouring follows it"
-        assert window._variable_mode() == tokens.MODE_OLD, "a question of its own too"
-
-        # A file that declares its mode is not touched: the dialect is the file's.
-        window.editor().setPlainText(":- ИМЕНА(0).\nшапка(Сумма').\n")
-        assert buffer.variable_mode() == tokens.MODE_ISO, "the marker wins"
-
-        # A buffer opened while the other engine runs gets the same answer.
-        window.editor().setPlainText("шапка(Сумма').\n")
-        window.new_buffer()
-        assert window.current_buffer().variable_mode() == tokens.MODE_OLD
-
-        window.choose_engine(engines.OURS)
-        assert buffer.variable_mode() == tokens.MODE_ISO, "and the row answers again under ours"
-        print("ok: a marker-less file is read the way the engine that runs reads it")
-    finally:
-        discard_changes(window)
-
-
-def test_the_welcome_program_runs_on_both_engines(
-    executable: str, directory: pathlib.Path
-) -> None:
-    """The first tab's program is written in the intersection of the dialects (task_79).
-
-    It is the one text the window shows before the user has chosen anything, so it has
-    to answer whoever runs it — and the two engines read names differently: the old
-    dialect has no quoted atoms at all (`студент('Вова', …)` is a parse error there),
-    and a multi-letter capitalised name is a string constant in it, not a variable.
-    Hence lower-case unquoted atoms and single-letter variables, which both read the
-    same way.  Measured, not assumed: the output of the two runs is compared.
-    """
-    from prologd_gui import engines
-    from prologd_gui.window import welcome_text
-
-    folder = both_engines(directory, executable)
-    answers: dict[str, str] = {}
-    for engine in engines.ENGINES:
-        window = make_window(str(folder / engine.file_name), ready=False)
-        try:
-            # Both engines are in this folder, so the window shows the whole map;
-            # the program inside it is the common one, and that is what has to
-            # answer the same on both.
-            assert window.buffers()[0].text() == welcome_text(True), "the first tab holds it"
-            window.editor().setPlainText(welcome_text(False))
-            window.run_program()
-            wait_for_result(window)
-            assert not window.problems_text().strip(), ascii(window.problems_text())
-            answers[engine.key] = window.output_text()
-        finally:
-            discard_changes(window)
-
-    assert answers[engines.OURS.key] == answers[engines.ORIGINAL.key], {
-        key: ascii(value) for key, value in answers.items()
-    }
-    assert answers[engines.OURS.key] == "И=вова\nФ=корчагин\nИ=данил\nФ=ахмеров\n", ascii(
-        answers[engines.OURS.key]
-    )
-
-    # The whole map — the part only our engine can run — runs there too.  The
-    # standard library has to be on the import path: a build tree has no `stdlib`
-    # beside the executable (the package does), which is why the row is filled here.
-    window = make_window(executable, ready=False)
-    try:
-        window._settings.import_paths = [str(STDLIB)]
-        window.apply_settings()
-        window.editor().setPlainText(welcome_text(True))
-        window.run_program()
-        wait_for_result(window)
-        assert not window.problems_text().strip(), ascii(window.problems_text())
-        assert window.output_text().startswith("Д=3\n"), ascii(window.output_text())
-    finally:
-        discard_changes(window)
-    print("ok: the welcome program answers the same on both engines")
-
-
-def test_a_build_with_the_original_alone_shows_the_shorter_welcome(
-    executable: str, directory: pathlib.Path
-) -> None:
-    """task_112: the package `d` cannot run `ИМПОРТ`, so its welcome does not show it.
-
-    The text is chosen by what the build carries — `paths.engine_present` — and not
-    by a flag in the packaging script: a folder with our engine shows the whole map,
-    one with the original alone shows the common half.  The first thing a welcome
-    must do is run.
-    """
-    from prologd_gui import engines
-    from prologd_gui.window import welcome_text
-
-    alone = directory / "только_д"
-    alone.mkdir()
-    original = engines.ORIGINAL.file_name
-    shutil.copy2(str(pathlib.Path(executable).parent / original), str(alone / original))
-
-    window = make_window(str(alone / original), ready=False)
-    try:
-        text = window.buffers()[0].text()
-        assert text == welcome_text(False), ascii(text)
-        assert "ИМПОРТ" not in text, "the original dialect has no such statement"
-        assert "Ctrl+Space" in text, "the window's own hints stay"
-    finally:
-        discard_changes(window)
-    print("ok: a build with the original engine alone shows the common welcome")
 
 
 def test_the_state_control_duplicates_the_names_row(
     executable: str, directory: pathlib.Path
 ) -> None:
-    """task_93: the two `2.x` rows are the «Имена переменных» row, and its words.
+    """task_93: the two rows are the «Имена переменных» row, and its words.
 
     The control owns no preference of its own: it writes the row's key, and the words
     are read from the `Setting` record (from behind its own `ISO:`/`PLD:`, which the
     state label already carries), so a renamed row renames the menu with it.  A mode
-    chosen here is in force at once — the buffers that declare no dialect follow — and
-    a visit to the original engine leaves the stored dialect where it was.
+    chosen here is in force at once — the buffers that declare no dialect follow.
     """
-    from prologd_gui import actions, engines, tokens
+    from prologd_gui import actions, tokens
     from prologd_gui import settings as settings_module
 
     row = settings_module.BY_KEY[settings_module.VARIABLE_MODE]
-    folder = both_engines(directory, executable)
-    window = make_window(str(folder / engines.OURS.file_name), ready=False)
+    window = make_window(executable, ready=False)
     try:
         window.editor().setPlainText("шапка(Сумма).\n")
         buffer = window.current_buffer()
@@ -5197,13 +4911,12 @@ def test_the_state_control_duplicates_the_names_row(
         assert buffer.variable_mode() == tokens.MODE_ISO
         assert window._state_button.isEnabled() is True
         assert [entry.text() for entry in window._state_menu.actions()] == [
-            f"2.x ISO: {iso}",
-            f"2.x PLD: {pld}",
-            "1.x: оригинальный движок",
+            f"ISO: {iso}",
+            f"PLD: {pld}",
         ], [entry.text() for entry in window._state_menu.actions()]
         assert window._state_actions[actions.STATE_ISO].isChecked() is True
         assert window._naming_label() == "ISO"
-        assert "новый движок, имена ISO" in window._state_button.toolTip(), (
+        assert "имена переменных как в стандарте ISO" in window._state_button.toolTip(), (
             window._state_button.toolTip()
         )
 
@@ -5219,59 +4932,32 @@ def test_the_state_control_duplicates_the_names_row(
         window._state_actions[actions.STATE_ISO].trigger()
         assert window._settings.variable_mode == "0", "the dialect is the light answer"
         assert buffer.variable_mode() == tokens.MODE_ISO
-
-        # The original engine: the row in force is `1.x`, and the stored dialect is
-        # left alone — so the way back keeps the choice the user made (task_93; the old
-        # naming button was simply disabled on that engine).
-        window._state_actions[actions.STATE_ORIGINAL].trigger()
-        assert window.engine() is engines.ORIGINAL
-        assert window._state_actions[actions.STATE_ORIGINAL].isChecked() is True
-        assert window._state_button.isEnabled() is True
-        assert window._settings.variable_mode == "0", "a visit must not rewrite the row"
-        assert "оригинальный движок" in window._state_button.toolTip(), (
-            window._state_button.toolTip()
-        )
-
-        # And a `2.x` row is the way back as well as the choice of dialect.
-        window._state_actions[actions.STATE_PLD].trigger()
-        assert window.engine() is engines.OURS, "a `2.x` row starts our own engine again"
-        assert window._settings.variable_mode == "1"
-        assert buffer.variable_mode() == tokens.MODE_OLD
-        print("ok: the state control writes the names row and the engine, and keeps them apart")
+        print("ok: the state control writes the names row, and the buffers follow")
     finally:
         discard_changes(window)
 
 
-def test_the_settings_dialog_follows_the_engine_that_runs(
+def test_the_settings_dialog_opens_where_the_launch_points(
     executable: str, directory: pathlib.Path
 ) -> None:
-    """The dialog gates its rows for the *running* engine (task_79).
+    """The dialog's choosers open at the folder of *this* window's interpreter (task_80).
 
-    A launch can pin the other engine (`--exe`, and the value of the removed
-    «Интерпретатор» row) while the stored choice still says ours — the rows have to
-    follow the engine that runs, or the dialog would be describing another window.
+    A launch can pin another build (`--exe`, and the value of the removed
+    «Интерпретатор» row), and the dialog has to describe the window in front of it
+    rather than the one a plain search would find.
     """
-    from prologd_gui import engines
-    from prologd_gui import settings as settings_module
-
-    folder = both_engines(directory, executable)
-    window = make_window(str(folder / engines.ORIGINAL.file_name), ready=False)
+    window = make_window(executable, ready=False)
     try:
-        assert window._settings.engine == engines.OURS.key, "the file says nothing else"
-
         def drive(dialog) -> bool:
-            assert dialog.windowTitle().endswith(engines.ORIGINAL.title), dialog.windowTitle()
-            for keys in settings_module.GATED_ROWS.values():
-                for key in keys:
-                    assert dialog._widgets[key].isEnabled() is False, key
-            # The choosers open where *this* window's engine is (task_80), which is
-            # the folder it was pinned to and not the one a plain search would find.
-            assert dialog._engine_directory == str(folder), dialog._engine_directory
+            assert dialog.windowTitle() == "Настройки", dialog.windowTitle()
+            assert dialog._engine_directory == str(
+                pathlib.Path(window._interpreter_path()).parent
+            ), dialog._engine_directory
             return False
 
         window._run_settings_dialog = drive
         assert window.show_settings() is False, "nothing was accepted by this driver"
-        print("ok: the dialog's rows follow the engine the window runs, not the stored one")
+        print("ok: the dialog opens where this launch looks for the interpreter")
     finally:
         discard_changes(window)
 
@@ -5745,18 +5431,12 @@ def main(argv: list[str]) -> int:
         test_the_settings_dialog_changes_the_window_without_a_restart(executable)
         test_the_theme_switch_reaches_the_text_and_the_widgets(executable)
         test_the_shared_folder_reaches_the_interpreter(executable)
-        test_the_launch_binary_names_the_folder_and_the_engine(executable, files)
-        test_a_launch_naming_the_other_engine_starts_it(executable, files)
-        test_a_missing_engine_is_reported_not_half_started(executable, files)
-        test_a_build_with_one_engine_opens_on_it_and_offers_no_switch(executable, files)
-        test_the_state_control_switches_and_remembers(executable, files)
-        test_the_state_control_stops_the_run_first(executable, files)
-        test_the_other_engine_gets_only_what_it_answers(executable, files)
-        test_the_other_engine_reads_names_its_own_way(executable, files)
-        test_the_welcome_program_runs_on_both_engines(executable, files)
-        test_a_build_with_the_original_alone_shows_the_shorter_welcome(executable, files)
+        test_the_launch_binary_names_the_build_folder(executable, files)
+        test_a_missing_interpreter_is_reported_not_half_started(executable, files)
+        test_the_welcome_program_runs(executable)
+        test_the_state_control_switches_the_names_and_remembers(executable, files)
         test_the_state_control_duplicates_the_names_row(executable, files)
-        test_the_settings_dialog_follows_the_engine_that_runs(executable, files)
+        test_the_settings_dialog_opens_where_the_launch_points(executable, files)
         test_the_process_directory_is_where_files_go(executable, files)
         test_autosave_writes_named_buffers_and_skips_the_rest(executable, files)
         test_saving_before_a_run_writes_the_file(executable, files)

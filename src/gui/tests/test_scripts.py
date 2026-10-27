@@ -22,7 +22,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 from PySide6.QtGui import QColor, QImage  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
-from prologd_gui import actions, engines, scriptdialog, scripts  # noqa: E402
+from prologd_gui import actions, scriptdialog, scripts  # noqa: E402
 
 
 def draw_picture(path: pathlib.Path) -> None:
@@ -64,7 +64,6 @@ def test_the_menu_holds_the_converter_before_the_help() -> None:
     assert [entry.title for entry in conversions] == ["Имена: PLD в ISO", "Имена: ISO в PLD"], (
         conversions
     )
-    assert all(entry.needs == engines.FORMAT for entry in conversions), conversions
     # The other axis: the language of the built-in names, with the signs each of
     # them has a spelling for (task_101).
     dialect = [actions.BY_KEY[key] for key in actions.DIALECT_CONVERSIONS]
@@ -72,7 +71,6 @@ def test_the_menu_holds_the_converter_before_the_help() -> None:
         "Диалект: Русский в Английский",
         "Диалект: Английский в Русский",
     ], dialect
-    assert all(entry.needs == engines.FORMAT for entry in dialect), dialect
     assert actions.CONVERSIONS == actions.NAMES_CONVERSIONS + (
         actions.SEPARATOR,
     ) + actions.DIALECT_CONVERSIONS

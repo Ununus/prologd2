@@ -312,10 +312,10 @@ def test_the_insert_page_shows_the_settings_file_where_it_lies(
 def test_the_process_directory_rows(directory: pathlib.Path) -> None:
     """The rows of task_46 that are left: a three-way choice each way round.
 
-    The «Интерпретатор» row that stood beside them is gone (task_79): the engine is
-    chosen by the button on the toolbar, and a *particular build* by `--exe`.  A
-    file that still holds the key is read — `Settings.legacy_interpreter` — which is
-    why the row's absence is asserted here by key and not by title.
+    The «Интерпретатор» row that stood beside them is gone (task_79): a *particular
+    build* is named by `--exe` now.  A file that still holds the key is read —
+    `Settings.legacy_interpreter` — which is why the row's absence is asserted here
+    by key and not by title.
     """
     dialog = dialog_for(directory, "interp.ini")
     keys = {setting.key: setting for setting in settings_module.SETTINGS}
@@ -327,39 +327,28 @@ def test_the_process_directory_rows(directory: pathlib.Path) -> None:
     assert combo.currentData() == "file"
     values = [combo.itemData(row) for row in range(combo.count())]
     assert values == ["file", "window", "custom"], values
-    print("ok: the process directory row is a three-way choice, and the engine row is gone")
+    print("ok: the process directory row is a three-way choice, and the old row is gone")
 
 
-def test_the_engine_rows_are_gated_by_the_engine(directory: pathlib.Path) -> None:
-    """Rows an engine does not read are disabled and say whose they are (task_79).
+def test_every_row_is_editable_and_its_label_is_plain(directory: pathlib.Path) -> None:
+    """No row is gated any more: the window has one engine, which reads them all.
 
-    Both halves matter: a row that is editable and does nothing is a promise that
-    is not kept, and a *disabled* widget is not shown a tooltip at all — so the
-    reason has to be in the label, where it is read without hovering.
+    The gating of task_79 existed because the second engine had no step, no trace,
+    no formatter, no graphics and no `limits`.  With that engine gone every row
+    answers, and a label that named an owner would be a lie.
     """
-    from prologd_gui import engines
-    from prologd_gui.settingsdialog import SettingsDialog
-
-    settings = Settings(directory / "engine.ini")
-    settings.engine = engines.ORIGINAL.key
-    dialog = SettingsDialog(settings)
-    assert dialog.windowTitle().endswith(engines.ORIGINAL.title), dialog.windowTitle()
-    for capability, keys in settings_module.GATED_ROWS.items():
-        assert not engines.ORIGINAL.has(capability), capability
-        for key in keys:
-            label = dialog._row_labels[key].text()
-            assert dialog._widgets[key].isEnabled() is False, key
-            assert label.startswith(settings_module.BY_KEY[key].label), (key, label)
-            assert engines.OURS.title in label, (key, label)
-
-    # Under our own engine every row is editable, and its label is plain again.
-    ours = SettingsDialog(Settings(directory / "ours.ini"))
-    assert ours.windowTitle().endswith(engines.OURS.title), ours.windowTitle()
-    for keys in settings_module.GATED_ROWS.values():
-        for key in keys:
-            assert ours._widgets[key].isEnabled() is True, key
-            assert ours._row_labels[key].text() == f"{settings_module.BY_KEY[key].label}:", key
-    print("ok: the engine gates its rows, and the labels say whose they are")
+    dialog = dialog_for(directory, "gates.ini")
+    assert dialog.windowTitle() == "Настройки", dialog.windowTitle()
+    for setting in settings_module.SETTINGS:
+        if setting.key.startswith("shortcuts/"):
+            continue      # the insert table's own rows are built from its JSON
+        # The process directory's path follows the choice above it (task_46) and is
+        # inactive while «каталог файла программы» is chosen — that rule has its
+        # own check (`test_the_process_directory_path_follows_its_choice`).
+        if setting.key != "execution/process_directory_path":
+            assert dialog._widgets[setting.key].isEnabled() is True, setting.key
+        assert dialog._row_labels[setting.key].text() == f"{setting.label}:", setting.key
+    print("ok: every row is editable, and no label names an engine")
 
 
 def test_the_process_directory_path_follows_its_choice(directory: pathlib.Path) -> None:
@@ -439,7 +428,7 @@ def test_the_folder_chooser_opens_at_the_engine(directory: pathlib.Path) -> None
 
     # The window hands its own folder: a launch may be pinned to another build tree.
     pinned = str(directory / "сборка")
-    assert SettingsDialog(settings, None, None, pinned)._engine_directory == pinned
+    assert SettingsDialog(settings, None, pinned)._engine_directory == pinned
 
     # The list of «Дополнительные каталоги ИМПОРТ» has no field to read a start from,
     # and opens at the engine as well — `examples/lib` and `stdlib` are there.
@@ -499,7 +488,7 @@ def main(argv: list[str]) -> int:
         test_the_folder_rows_and_the_insert_page(directory)
         test_the_insert_page_shows_the_settings_file_where_it_lies(directory)
         test_the_process_directory_rows(directory)
-        test_the_engine_rows_are_gated_by_the_engine(directory)
+        test_every_row_is_editable_and_its_label_is_plain(directory)
         test_the_process_directory_path_follows_its_choice(directory)
         test_the_folder_chooser_opens_at_the_engine(directory)
         test_the_button_row_and_the_shared_label_column(directory)

@@ -104,7 +104,7 @@ jobs:
             Select-Object -First 1
           if (-not $generator) { throw 'no Visual Studio generator on this runner' }
           Write-Host "generator: $generator"
-          cmake -S . -B build/windows-msvc -G $generator -A x64 -DBUILD_WITH_PROLOGD=ON
+          cmake -S . -B build/windows-msvc -G $generator -A x64
       - name: Create the Python environment
         shell: pwsh
         run: |
@@ -113,7 +113,7 @@ jobs:
           .venv\Scripts\python.exe -m pip install -r src/gui/requirements.txt -r src/gui/requirements-build.txt
       - name: Build the portable package
         shell: pwsh
-        run: .\tools\build_portable.ps1 -Engine both
+        run: .\tools\build_portable.ps1
       - name: Build the installer
         shell: pwsh
         run: .\tools\build_installer.ps1 -SkipPackage
@@ -144,7 +144,7 @@ jobs:
         run: brew install typst
       - name: Build the engines
         run: |
-          cmake --preset macos-release -DBUILD_WITH_PROLOGD=ON
+          cmake --preset macos-release
           cmake --build --preset macos-release
       - name: Build the manuals
         run: cmake --build --preset macos-release --target docs
@@ -187,8 +187,6 @@ jobs:
           app=dist/PrologD.app/Contents/MacOS
           test -d "$app"
           cp build/macos-release/src/cli/prologu "$app/"
-          test -x build/macos-release/src/cli/prologd
-          cp build/macos-release/src/cli/prologd "$app/"
           mkdir -p "$app/doc"
           cp doc/*.pdf doc/builtins.json "$app/doc/"
           cp -R examples stdlib "$app/"
@@ -196,13 +194,11 @@ jobs:
           python3 tools/macos_plist.py dist/PrologD.app/Contents/Info.plist "$version"
           plutil -lint dist/PrologD.app/Contents/Info.plist
           test "$(plutil -extract CFBundleShortVersionString raw dist/PrologD.app/Contents/Info.plist)" = "$version"
-          for engine in prologu prologd; do
-            test -x "$app/$engine"
-            if otool -L "$app/$engine" | grep -q "$PWD/build/"; then
-              echo "::error::$engine links the build tree"
-              exit 1
-            fi
-          done
+          test -x "$app/prologu"
+          if otool -L "$app/prologu" | grep -q "$PWD/build/"; then
+            echo "::error::prologu links the build tree"
+            exit 1
+          fi
       - name: Sign and check
         run: |
           set -e

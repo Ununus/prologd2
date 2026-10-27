@@ -1,7 +1,7 @@
 ﻿; -- prologd.iss --
 ; Установщик «Пролог-Д» для одного пользователя (task_116).
 ;
-; Ставится то же, что лежит в переносимом пакете: окно, оба движка, руководства и
+; Ставится то же, что лежит в переносимом пакете: окно, движок, руководства и
 ; примеры, — плюс, если попросят, связь файлов .pld с окном.
 ;
 ; Собирается из tools\build_installer.ps1, который передаёт версию:
@@ -118,17 +118,13 @@ Root: HKA; Subkey: "Software\Classes\{#ProgId}"; ValueType: string; ValueName: "
 Root: HKA; Subkey: "Software\Classes\{#ProgId}\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\pld.ico"; Tasks: associate
 Root: HKA; Subkey: "Software\Classes\{#ProgId}\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\prologd-gui.exe"" ""%1"""; Tasks: associate
 ; Второй глагол контекстного меню: тот же файл, но в консольном интерпретаторе.
-; Только если этот движок в пакете есть: сборка «только d» его не несёт.
 Root: HKA; Subkey: "Software\Classes\{#ProgId}\shell\console"; ValueType: string; ValueName: ""; ValueData: "{cm:ConsoleVerb}"; Tasks: associate; Check: FileExists(ExpandConstant('{app}\prologu.exe'))
 Root: HKA; Subkey: "Software\Classes\{#ProgId}\shell\console\command"; ValueType: string; ValueName: ""; ValueData: """{app}\prologu.exe"" -s ""%1"""; Tasks: associate; Check: FileExists(ExpandConstant('{app}\prologu.exe'))
 
-; App Paths: `prologu` и `prologd` находятся из любого каталога и из Win+R, хотя
-; PATH не правится. Каждая запись — только если файл действительно установлен:
-; пакет сборки «только d» не несёт prologu.exe.
+; App Paths: `prologu` находится из любого каталога и из Win+R, хотя
+; PATH не правится.
 Root: HKA; Subkey: "Software\Microsoft\Windows\CurrentVersion\App Paths\prologu.exe"; ValueType: string; ValueName: ""; ValueData: "{app}\prologu.exe"; Flags: uninsdeletekey; Check: FileExists(ExpandConstant('{app}\prologu.exe'))
 Root: HKA; Subkey: "Software\Microsoft\Windows\CurrentVersion\App Paths\prologu.exe"; ValueType: string; ValueName: "Path"; ValueData: "{app}"; Check: FileExists(ExpandConstant('{app}\prologu.exe'))
-Root: HKA; Subkey: "Software\Microsoft\Windows\CurrentVersion\App Paths\prologd.exe"; ValueType: string; ValueName: ""; ValueData: "{app}\prologd.exe"; Flags: uninsdeletekey; Check: FileExists(ExpandConstant('{app}\prologd.exe'))
-Root: HKA; Subkey: "Software\Microsoft\Windows\CurrentVersion\App Paths\prologd.exe"; ValueType: string; ValueName: "Path"; ValueData: "{app}"; Check: FileExists(ExpandConstant('{app}\prologd.exe'))
 
 [Run]
 Filename: "{app}\prologd-gui.exe"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent

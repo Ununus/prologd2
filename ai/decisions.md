@@ -1689,3 +1689,30 @@ lie.  The shortcut table is a separate gap: its Windows scan codes do not match
 the macOS key codes, and that is recorded in task_119.
 
 **Status.** Accepted 2026-10-25 (task_119).
+
+## ADR-052: one engine — the second one is gone
+
+**Context.**  task_78 built the original Пролог-Д beside ours as an `ExternalProject`
+pinned to a commit; the window was a *host of two programs* (task_79), with a switch on
+the toolbar, a `view/engine` key, a capability table (`Action.needs`,
+`settings.GATED_ROWS`) and a packaging flag `-Engine both|u|d`.  That second engine was
+a different dialect in a different encoding with its own command line, and all of it
+existed to run programs of the previous dialect — a need `--vars 1` already answers,
+because the naming modes are ours.
+
+**Decision.**  The repository builds **one** engine.  Removed: the CMake option and the
+pinned commit, `src/gui/prologd_gui/engines.py` with the capability table, the
+`view/engine` key, `-Engine` in both Windows scripts, `engine-1.x.png`, the `1.x` row of
+the state control, `doc/prologd-diff.typ`, and the `.deb`/`.dmg`/zip payload of the
+second binary.  The `/usr/bin` and App Paths entries for `prologd.exe` went with it.
+
+**What survives on purpose.**  The *naming modes* (`--vars 0|1`, `:- ИМЕНА(N).`) and
+the formatter's reverse direction: they read and write the previous dialect's names, and
+`examples/prologd/` — byte-for-byte upstream — is still the corpus those modes are
+checked against.  The state control stays, now with two rows, `ISO` and `PLD`.
+
+**Consequences.**  One `prologu` to search for, one feature set, no gating anywhere; a
+package is smaller and its layout is the same on every platform.  The prose that
+compared three «Пролог-Д» columns (`doc/help.typ`) now compares two modes of one engine
+against SWI and GNU Prolog.  Nothing in the repository can run `examples/prologd/`
+verbatim any more — that corpus is a reference, not a test.

@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Builds the Debian package of the window and both engines (task_118).
+# Builds the Debian package of the window and the engine (task_118).
 #
-#   tools/build_deb.sh                 engines -> tests -> docs -> freeze -> .deb
+#   tools/build_deb.sh                 engine -> tests -> docs -> freeze -> .deb
 #   tools/build_deb.sh --skip-tests    quick repack; the build tree is reused
 #   tools/build_deb.sh --skip-docs     reuse the PDFs already in doc/
 #   tools/build_deb.sh --skip-freeze   reuse dist/prologd-gui
 #   tools/build_deb.sh --no-trim       keep the Qt files the freeze produced
 #
 # The package mirrors the portable Windows folder, with Debian's own places: the
-# engines, the frozen window, doc/*.pdf, examples and stdlib live together in
+# engine, the frozen window, doc/*.pdf, examples and stdlib live together in
 # /opt/prologd, because the engine searches stdlib beside itself and the window
-# looks for the engines beside itself.  /usr carries the command, the menu entry,
+# looks for the engine beside itself.  /usr carries the command, the menu entry,
 # the MIME type, the hicolor icons and the package's copyright.
 #
 # Every message here is ASCII, like the Windows twins: one style for the
@@ -32,7 +32,7 @@ TREE="$ROOT/build/deb-tree"
 PRESET="linux-release"
 PYTHON=${PYTHON:-$ROOT/.venv/bin/python}
 JOBS=${JOBS:-$(nproc 2>/dev/null || echo 2)}
-DOCUMENTS=(help technical prologd-diff gui lessons library)
+DOCUMENTS=(help technical gui lessons library)
 
 #: Qt pieces the window never loads, relative to /opt/prologd (task_118).  Freezing
 #: keeps them whatever `--exclude-module` says: PySide6 ships its Qt libraries as
@@ -114,13 +114,11 @@ for icon in installer/linux/icons/hicolor/16x16/apps/prologd.png \
 done
 echo "python : $PYTHON"
 
-step '2/8 Build the engines'
-cmake --preset "$PRESET" -DBUILD_WITH_PROLOGD=ON
+step '2/8 Build the engine'
+cmake --preset "$PRESET"
 cmake --build "$BUILD" -j "$JOBS"
 PROLOGU="$BUILD/src/cli/prologu"
-PROLOGD="$BUILD/src/cli/prologd"
 [ -x "$PROLOGU" ] || fail "the build left no $PROLOGU"
-[ -x "$PROLOGD" ] || fail "the build left no $PROLOGD (BUILD_WITH_PROLOGD=ON?)"
 
 VERSION=$("$PROLOGU" --version | head -n 1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1 || true)
 [ -n "$VERSION" ] || fail "prologu --version printed no version number"
@@ -198,7 +196,6 @@ else
 fi
 
 install -m 0755 "$PROLOGU" "$TREE/opt/prologd/prologu"
-install -m 0755 "$PROLOGD" "$TREE/opt/prologd/prologd"
 for name in "${DOCUMENTS[@]}"; do
     install -m 0644 "doc/$name.pdf" "$TREE/opt/prologd/doc/$name.pdf"
 done
@@ -223,12 +220,11 @@ install -m 0644 installer/linux/lintian-overrides "$TREE/usr/share/lintian/overr
 # mode as non-standard).
 find "$TREE" -type d -exec chmod 0755 {} +
 find "$TREE" -type f -exec chmod 0644 {} +
-chmod 0755 "$TREE/opt/prologd/prologu" "$TREE/opt/prologd/prologd" \
+chmod 0755 "$TREE/opt/prologd/prologu" \
            "$TREE/opt/prologd/prologd-gui" "$TREE/usr/bin/prologd-gui"
 
 step '7/8 Check the tree and the frozen window'
 [ -x "$TREE/opt/prologd/prologu" ] || fail 'the tree has no prologu'
-[ -x "$TREE/opt/prologd/prologd" ] || fail 'the tree has no prologd'
 [ -x "$TREE/usr/bin/prologd-gui" ] || fail 'the tree has no prologd-gui command'
 [ -f "$TREE/usr/share/icons/hicolor/48x48/apps/prologd.png" ] || fail 'the hicolor icons were not copied'
 if command -v desktop-file-validate >/dev/null 2>&1; then
@@ -238,8 +234,8 @@ if command -v xmllint >/dev/null 2>&1; then
     xmllint --noout "$TREE/usr/share/mime/packages/prologd.xml"
 fi
 "$TREE/opt/prologd/prologu" --version >/dev/null
-legacy_keywords=$(cd "$TREE/opt/prologd" && ./prologd --list-keywords | wc -l)
-[ "$legacy_keywords" -ge 40 ] || fail "prologd lists only $legacy_keywords keyword lines"
+keywords=$("$TREE/opt/prologd/prologu" --list-keywords | wc -l)
+[ "$keywords" -ge 100 ] || fail "prologu lists only $keywords keyword lines"
 (cd "$TREE/opt/prologd" && ./prologu -s examples/lessons/lesson_01.pld >/dev/null)
 status=0
 QT_QPA_PLATFORM=offscreen timeout 8 "$TREE/opt/prologd/prologd-gui" >/dev/null 2>&1 || status=$?
@@ -262,7 +258,7 @@ if [ "$skip_trim" -eq 0 ]; then
         done)
     [ -z "$still_wanted" ] || fail "the package still asks for the trimmed $still_wanted"
 fi
-echo "engines : prologu $VERSION, prologd $legacy_keywords keyword lines"
+echo "engine  : prologu $VERSION, $keywords keyword lines"
 echo 'window  : the frozen prologd-gui starts offscreen'
 
 step '8/8 Build the .deb'

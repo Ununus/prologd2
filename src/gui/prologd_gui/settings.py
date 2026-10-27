@@ -26,7 +26,6 @@ from pathlib import Path
 
 from PySide6.QtCore import QSettings, QStandardPaths
 
-from . import engines
 from . import theme
 
 ORGANIZATION = "PrologD"
@@ -52,12 +51,6 @@ RESTORE_SPLIT = "view/restore_split"
 #: `MACHINE_KEYS`.
 GRAPHICS_VISIBLE = "view/graphics_visible"
 GRAPHICS_GEOMETRY = "view/graphics_geometry"
-#: Which engine a run starts (task_79): `u` is «Пролог-У», our own, `d` «Пролог-Д»,
-#: the original one built beside it by task_78.  Written by the button at the right
-#: end of the toolbar, not by a row of the dialog — the choice is made while
-#: looking at the program, like the formatter's mode — so it is listed in
-#: `MACHINE_KEYS`.
-ENGINE = "view/engine"
 #: Where the *main* window stood (task_49).  The graphics window remembered its
 #: own since task_45 and the main window — the one the user moves first — did not,
 #: which is what the user ran into.  A machine key for the same reason: it is a
@@ -154,13 +147,11 @@ TIMEOUT_MILLISECONDS = "execution/timeout_milliseconds"
 #: the process.
 MAX_OUTPUT_EVENTS = "execution/max_output_events"
 #: The row of task_46 that named a `prologu` by hand — «Выполнение →
-#: Интерпретатор».  Removed from the dialog in task_79, when the window became a
-#: host of two engines: which engine runs is the button on the toolbar
-#: (`ENGINE`), and a *particular build* is `--exe`.  The old value is still
-#: **read**, because a file that names another build has to keep naming it — it
-#: is the folder the engines are looked for in, and its name picks the engine —
-#: and it is emptied by the first press of the engine button, which is a newer
-#: answer than the row.  Not a row any more, so it lives in `MACHINE_KEYS`.
+#: Интерпретатор».  Removed from the dialog in task_79: a *particular build* is
+#: `--exe` now.  The old value is still **read**, because a file that names another
+#: build has to keep naming it — it is the folder the interpreter is looked for in
+#: — and `--exe` is a newer answer than the row.  Not a row any more, so it lives in
+#: `MACHINE_KEYS`.
 LEGACY_INTERPRETER = "execution/interpreter"
 #: Where the *process* starts (task_46): `ЗАПИСЬ_В`, `ЧТЕНИЕ_ИЗ` and the other
 #: relative paths open from this folder.  Three answers: the running file's
@@ -174,9 +165,6 @@ PROCESS_DIRECTORY_PATH = "execution/process_directory_path"
 DEFAULT_FONT_FAMILY = "Cascadia Mono"
 DEFAULT_FONT_SIZE = 11.0
 DEFAULT_THEME = "light"
-
-#: The engine a window starts with when the file says nothing (task_79).
-DEFAULT_ENGINE = engines.DEFAULT.key
 
 #: Where the output panel sits: to the right of the editor or under it.  `Ctrl+F4`
 #: moves it, `F4` hides it.  The bottom is the default (task_50): a log is read
@@ -424,10 +412,9 @@ SETTINGS: tuple[Setting, ...] = (
             hint="Как читать имена в файле.\nСтрока «:- ИМЕНА(N).» первой строкой файла важнее этой настройки"),
     Setting(IMPORT_PATHS, "Дополнительные каталоги ИМПОРТ", "Выполнение", "dirs", (),
             hint="Каталоги, в которых ИМПОРТ ищет файлы; передаются интерпретатору как -I, в этом порядке"),
-    # task_79: the «Интерпретатор» row stood here.  The engine is chosen by the
-    # button on the toolbar (`ENGINE`), a particular build by `--exe`, and the
-    # value an old file holds is still read (`LEGACY_INTERPRETER`) — a row that
-    # silently stopped mattering was the one thing it could not be.
+    # task_79: the «Интерпретатор» row stood here.  A particular build is `--exe`
+    # now, and the value an old file holds is still read (`LEGACY_INTERPRETER`) —
+    # a row that silently stopped mattering was the one thing it could not be.
     Setting(PROCESS_DIRECTORY, "Рабочий каталог процесса", "Выполнение", "choice",
             DEFAULT_PROCESS_DIRECTORY,
             choices=(("file", "каталог файла программы"),
@@ -448,22 +435,6 @@ SETTINGS: tuple[Setting, ...] = (
 
 #: The key of a record, for the callers that have one and not the other.
 BY_KEY: dict[str, Setting] = {setting.key: setting for setting in SETTINGS}
-
-#: The rows of the dialog that are the **engine's**, not the window's (task_79):
-#: a capability of `engines` and the keys whose effect depends on it.  With an
-#: engine that does not have the capability the row is disabled and its label
-#: says whose it is (`SettingsDialog._apply_engine`) — a row that is editable and
-#: does nothing is worse than one that is not there at all.
-#:
-#: The format rows are missing on purpose: the *command* is disabled with the
-#: engine that cannot format, so its rows are unreachable in practice, and the
-#: graphics window's *own* two rows are the window's (the picture keeps its size
-#: even when the engine that drew it is no longer running).
-GATED_ROWS: dict[str, tuple[str, ...]] = {
-    engines.LIMITS: (MAX_STEPS, MAX_DEPTH, MAX_FINDALL),
-    engines.NAMING: (VARIABLE_MODE,),
-    engines.GRAPHICS: (SCREEN_WIDTH, SCREEN_HEIGHT),
-}
 
 #: A record looked up by key, for a property that wants the bounds of that record
 #: rather than a number written out a second time (`input_mode`).
@@ -492,7 +463,6 @@ MACHINE_KEYS = (
     SYNTAX_DARK,
     SESSION_TABS,
     SESSION_CURRENT,
-    ENGINE,
     LEGACY_INTERPRETER,
 )
 
@@ -1345,31 +1315,16 @@ class Settings:
     def import_paths(self, paths) -> None:
         self._write(IMPORT_PATHS, [str(path) for path in paths if str(path)])
 
-    # -- the engine, and the process directory (task_46, task_79) -------------
-    @property
-    def engine(self) -> str:
-        """The key of the engine a run starts (task_79)."""
-        return engines.by_key(self._text(ENGINE, DEFAULT_ENGINE)).key
-
-    @engine.setter
-    def engine(self, value: object) -> None:
-        self._write(ENGINE, engines.by_key(value).key)
-
+    # -- the process directory (task_46) --------------------------------------
     @property
     def legacy_interpreter(self) -> str:
         """What task_46's «Интерпретатор» row named, when the file still has it.
 
         Read by `main.py` and the window as *this launch's* build folder — the
-        name picks the engine, the folder is where both are looked for
-        (`paths.engine_executable`) — and emptied by the first press of the
-        engine button, which says the same thing more recently.
+        folder the interpreter is looked for in — and `--exe` says the same thing
+        more recently.
         """
         return self._text(LEGACY_INTERPRETER, "").strip()
-
-    def clear_legacy_interpreter(self) -> None:
-        """Drops the old row's value once the user has answered with the button."""
-        if self.legacy_interpreter:
-            self._write(LEGACY_INTERPRETER, "")
 
     @property
     def process_directory(self) -> str:

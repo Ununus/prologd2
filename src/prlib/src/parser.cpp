@@ -503,7 +503,7 @@ Term Parser::parsePrimary() {
       // not an ordinary identifier, and a predicate named `'Вася'` is then an
       // ordinary compound (task_96).  Only the atom may do this — in ISO a string
       // constant is a list of character codes, and a list is not a functor; the
-      // original dialect's capitalised heads are its own rule (`prologd-diff.typ`).
+      // previous dialect's capitalised heads are its own rule.
       if (check(TokenKind::LParen)) {
         return parseArguments(atom);
       }

@@ -25,8 +25,6 @@ import subprocess
 import sys
 from collections.abc import Iterable
 
-from . import engines
-
 #: Variables PyInstaller and PySide set for the frozen window.  A desktop program
 #: started with them loads the bundled Qt instead of its own and fails with a
 #: plugin error, so they are removed for anything outside this process.
@@ -90,11 +88,11 @@ def reveal(path: str) -> None:
     subprocess.Popen(reveal_command(path), env=external_environment())
 
 
-#: The engine of this repository inside a `data_root()`: «Пролог-У» (task_75).
-#: The two names, their titles and their pictures live in `engines`, which is
-#: where the *choice* between them is described (task_79); this is only where a
-#: file is looked for.
-EXECUTABLE_NAME = engines.OURS.file_name
+#: The interpreter of this repository inside a `data_root()`: «Пролог-У» (task_75).
+EXECUTABLE_NAME = "prologu.exe" if os.name == "nt" else "prologu"
+
+#: The name for the user: the status bar and the «пределы» note.
+ENGINE_TITLE = "Пролог-У"
 
 #: The settings file of a packaged build: beside the window, so the folder stays
 #: portable (task_61).  A checkout keeps its settings in AppData, as before.
@@ -249,20 +247,18 @@ def writable(directory: pathlib.Path | str) -> bool:
     return True
 
 
-def interpreter(file_name: str = EXECUTABLE_NAME) -> str:
-    """The file `file_name` to run, as the string `--exe` wants.
+def interpreter(folder: str = "") -> str:
+    """The interpreter to run, as the string `--exe` wants.
 
-    A package carries the engines beside the window and that is the whole point:
-    the machine it is copied to has no `build/` directory.  A checkout keeps
-    exactly the search it always had, so working from the sources is unchanged.
-
-    The search is by **one** file name at a time, deliberately.  Until task_78
-    the original engine was a tempting fallback — a tree built before task_75 has
-    a `prologd.exe` in every one of these folders, so falling back to it would run
-    the wrong engine without saying so.  Which engine to start is the user's
-    choice now (`view/engine`, and the button on the toolbar), and
-    `engine_executable` resolves the file of *that* engine.
+    A package carries the interpreter beside the window and that is the whole
+    point: the machine it is copied to has no `build/` directory.  A checkout
+    keeps exactly the search it always had, so working from the sources is
+    unchanged.  `folder` is what `--exe` (or the `execution/interpreter` key of a
+    file written by an older window) named: «here is my build», which is looked
+    for there and nowhere else.
     """
+    if folder:
+        return str(pathlib.Path(folder) / EXECUTABLE_NAME)
     if frozen():
         places = [data_root()]
     else:
@@ -275,80 +271,11 @@ def interpreter(file_name: str = EXECUTABLE_NAME) -> str:
             root / "build" / "src" / "cli" / "Release",
             root / "build" / "src" / "cli",
         ]
-    candidates = [place / file_name for place in places]
+    candidates = [place / EXECUTABLE_NAME for place in places]
     for candidate in candidates:
         if candidate.is_file():
             return str(candidate)
     return str(candidates[0])
-
-
-def engine_executable(engine: engines.Engine, *, folder: str = "") -> str:
-    """The file of `engine` the next run starts (task_79).
-
-    Two answers, and the difference matters.  `folder` is the folder `--exe` (or
-    task_46's removed «Интерпретатор» row) named — «here are my builds»: the
-    engines were built together, so the chosen one is looked for **there and
-    nowhere else**, and a file that is missing is reported in the pane by
-    `window._start_session` rather than quietly answered by another build tree.
-    Without a folder, `interpreter` searches the usual places for that engine.
-    """
-    if folder:
-        return str(pathlib.Path(folder) / engine.file_name)
-    return interpreter(engine.file_name)
-
-
-def engine_present(engine: engines.Engine, *, folder: str = "") -> bool:
-    """Whether `engine`'s file is where a run would look for it."""
-    return pathlib.Path(engine_executable(engine, folder=folder)).is_file()
-
-
-def shipped_engines() -> tuple[engines.Engine, ...] | None:
-    """The engines a **package** carries; `None` in a checkout (part 144).
-
-    A package is its own folder and searches nowhere else (`interpreter`), so «what
-    this build ships» is exactly «which of the two files lies beside the window».
-    A checkout answers `None` on purpose: there the choice belongs to the developer,
-    `--exe` names a build tree, and a tree with one engine built is not a package of
-    one engine.
-    """
-    if not frozen():
-        return None
-    return tuple(engine for engine in engines.ENGINES if engine_present(engine))
-
-
-def starting_engine(
-    engine: engines.Engine, *, folder: str = ""
-) -> tuple[engines.Engine, str, bool]:
-    """The engine a window can really start, the folder it starts from, and the swap.
-
-    A package may carry **one** engine (part 143): «Пролог-Д» only, whose window has
-    no «Пролог-У» beside it and nothing to switch to.  Refusing to open over the one
-    engine file that *is* there helps nobody, so a choice whose file is missing gives
-    way to the other engine when its file is present — and the window says so
-    (`window._announce_engine`), which is what keeps this from being the silent
-    wrong-engine fallback `interpreter` refuses to be.
-
-    A package with one engine answers that engine **whatever the settings say**
-    (part 144): a `gui.ini` copied from another machine, or task_46's old
-    `execution/interpreter` row still naming a build tree that is not there, must not
-    make the window open on an engine its folder does not have — which is exactly
-    what the window of the 1.27 package did when a stale row named an old
-    `prologu.exe`.  The folder is dropped with the choice: a package looks beside
-    itself, and that is where the engine it carries has just been found.
-
-    `(engine, folder, False)` when the choice can start as it is, and as well when
-    *neither* file is there — that is `main.py`'s «not found» report.
-    """
-    shipped = shipped_engines()
-    if shipped is not None and len(shipped) == 1:
-        only = shipped[0]
-        return only, "", only is not engine
-    if engine_present(engine, folder=folder):
-        return engine, folder, False
-    other = engines.other(engine)
-    if engine_present(other, folder=folder):
-        return other, folder, True
-    return engine, folder, False
 
 
 def example_library() -> pathlib.Path:

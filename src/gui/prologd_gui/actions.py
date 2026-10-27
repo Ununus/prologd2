@@ -21,8 +21,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from . import engines
-
 #: The recent-files entry is a submenu, not a command: it is built by the window
 #: and named here so the icon audit sees it.
 RECENT_ICON = "file-recent"
@@ -63,20 +61,19 @@ THEME_ICON = "view-theme"
 ADD_ICON = "settings-add"
 REMOVE_ICON = "settings-remove"
 
-#: The three states of the right-hand toolbar control (task_93): which engine runs
-#: and, for our own, in which dialect it reads a name the file does not spell out.
-#: It replaced the two controls of task_79 — a picture of an `И` and a picture of a
-#: `Д`, which asked the reader to know what the letters stood for, and `Д` was in
-#: fact read as «Пролог-Д 2.0», the name of the whole product rather than the
-#: original engine.  These three pictures carry their words themselves.
+#: The two states of the right-hand toolbar control (task_93): in which dialect the
+#: engine reads a name the file does not spell out.  It replaced the two controls of
+#: task_79 — a picture of an `И` and a picture of a `Д`, which asked the reader to
+#: know what the letters stood for, and `Д` was in fact read as «Пролог-Д 2.0», the
+#: name of the whole product.  These pictures carry their words themselves.
 @dataclass(frozen=True)
 class State:
-    """One state of «which program, and how it reads names»."""
+    """One state of «how the engine reads names»."""
 
     #: The name the window and the tests use for it.
     key: str
-    #: The words of the menu entry — the version line the manual uses for the two
-    #: engines («Пролог-Д (1.x)», «Пролог-Д (2.x)», `doc/help.typ`).
+    #: The words of the menu entry — the naming mode the manual describes
+    #: (`doc/help.typ`).
     label: str
     #: The picture in `assets/`, which is the same words drawn.
     icon: str
@@ -86,21 +83,14 @@ class State:
 
 STATE_ISO = "iso"
 STATE_PLD = "pld"
-STATE_ORIGINAL = "original"
 
 STATES: tuple[State, ...] = (
-    State(STATE_ISO, "2.x ISO", "engine-iso", "новый движок, имена ISO"),
+    State(STATE_ISO, "ISO", "engine-iso", "имена переменных как в стандарте ISO"),
     State(
         STATE_PLD,
-        "2.x PLD",
+        "PLD",
         "engine-pld",
-        "новый движок, имена совместимые с оригинальным Д",
-    ),
-    State(
-        STATE_ORIGINAL,
-        "1.x",
-        "engine-1.x",
-        "оригинальный движок, не совместимый с именами ISO",
+        "имена переменных прежнего диалекта",
     ),
 )
 
@@ -138,10 +128,9 @@ CONVERSIONS: tuple[str, ...] = NAMES_CONVERSIONS + (SEPARATOR,) + DIALECT_CONVER
 FORMAT_MODE = "#format-mode"
 
 #: The state control (task_93): the *right end* of the toolbar, the counterpart of
-#: `FORMAT_MODE`, and the one control that answers «which program runs, and how does
-#: it read names» — the two questions of task_79 asked together, because they are the
-#: same three answers in practice (`STATES`).  It is not a command of the program but
-#: a property of the whole window; the window builds it
+#: `FORMAT_MODE`, and the one control that answers «how does the engine read a name
+#: the file does not spell out» (`STATES`).  It is not a command of the program but a
+#: property of the whole window; the window builds it
 #: (`window._build_state_button`).
 STATE = "#state"
 
@@ -163,11 +152,6 @@ class Action:
     implemented: bool = True
     #: What a disabled entry waits for, verbatim in its tooltip.
     waiting_for: str = ""
-    #: The capability of the *engine* the command needs (`engines` constants,
-    #: task_79).  Empty means any engine answers it: the window disables the
-    #: entry while the current engine does not have it, and its tooltip says so
-    #: instead of letting the click go nowhere.
-    needs: str = ""
 
     def tooltip(self) -> str:
         """The whole tooltip: the title, its keys, and why it may be disabled."""
@@ -223,8 +207,7 @@ ACTIONS: tuple[Action, ...] = (
     # drawn and thrown away in task_58 — it read as something other than «clear the
     # output» — so the command went word-only until a glyph of its own arrived.
     Action("clear_output", "Очистить вывод", "execution-clear", ("Ctrl+L",)),
-    Action("format", "Форматировать", "edit-format", ("Ctrl+I",),
-           needs=engines.FORMAT),
+    Action("format", "Форматировать", "edit-format", ("Ctrl+I",)),
     # «Настройки…» was the last disabled entry that named a task file (task_29).
     # No key of its own: the menu is where it is looked for, and every `Ctrl`
     # chord on the main row belongs to the insert table of task_31.
@@ -281,11 +264,9 @@ ACTIONS: tuple[Action, ...] = (
     Action("full_screen", "Полный экран", "view-full-screen", ("F11",), checkable=True),
     # -- execution
     Action("run", "Запустить", "execution-execute", ("F5", "Ctrl+R")),
-    Action("run_trace", "Запустить с трассировкой", "execution-tracing",
-           needs=engines.TRACE),
-    Action("step", "Шаг", "execution-step-into", ("F10",), needs=engines.STEP),
-    Action("step_over", "Шаг с обходом", "execution-step-over", ("Shift+F10",),
-           needs=engines.STEP),
+    Action("run_trace", "Запустить с трассировкой", "execution-tracing"),
+    Action("step", "Шаг", "execution-step-into", ("F10",)),
+    Action("step_over", "Шаг с обходом", "execution-step-over", ("Shift+F10",)),
     Action("stop", "Остановить", "execution-abort", ("Shift+F5",)),
     Action("save_before_run", "Сохранять перед запуском", None, checkable=True),
     # The answer table (task_59): the answer of a *single* goal — a goal typed into
@@ -307,22 +288,21 @@ ACTIONS: tuple[Action, ...] = (
     # so the picture can go to a second screen and does not take space from the
     # code.  Checkable, like the output panel: its state is the window's
     # visibility, and both survive a restart (`view/graphics_visible`).
-    Action("graphics", "Графическое окно", "view-graphics", checkable=True,
-           needs=engines.GRAPHICS),
+    Action("graphics", "Графическое окно", "view-graphics", checkable=True),
     # -- scripts
     # The window's own tools (ADR-036): «Сконвертировать картинку…» runs
     # `tools/image_to_pld.py` and puts what it printed into a new tab.  It is not
     # part of running a program, so it gets a menu of its own.
     Action("script_image", "Сконвертировать картинку…", None),
     # The other conversion: the same text with its names spelled the other way
-    # (task_99).  It rides the formatter's request, so it needs what
-    # «Форматировать» needs — our engine and not the original one.
-    Action("names_iso", "Имена: PLD в ISO", None, needs=engines.FORMAT),
-    Action("names_pld", "Имена: ISO в PLD", None, needs=engines.FORMAT),
+    # (task_99).  Both ride the formatter's request, which is why they live in the
+    # same menu as «Форматировать».
+    Action("names_iso", "Имена: PLD в ISO", None),
+    Action("names_pld", "Имена: ISO в PLD", None),
     # And the same text with its built-ins in the other language (task_101): the
     # ISO spelling where this dialect has one (`write`, `findall`, `=`, `is`).
-    Action("dialect_en", "Диалект: Русский в Английский", None, needs=engines.FORMAT),
-    Action("dialect_ru", "Диалект: Английский в Русский", None, needs=engines.FORMAT),
+    Action("dialect_en", "Диалект: Русский в Английский", None),
+    Action("dialect_ru", "Диалект: Английский в Русский", None),
     # -- help
     # The reference of a predicate (task_37): the same help picture, because it
     # is the same «справка» — only the answer comes from `doc/builtins.json`
@@ -458,11 +438,8 @@ MENUS: tuple[tuple[str, tuple[str, ...]], ...] = (
 #: the tab in front of the user (task_48).
 #:
 #: The state control (task_93) is the last control of all: it is not a command of the
-#: program but the choice of *which program runs and how it reads names* — the two
-#: things the toolbar's buttons above it are about — so it stands apart, after a
-#: separator, at the right edge, where the eye looks for it.  It is one control and
-#: not the two of task_79 (task_93): a row of three states is fewer words than two
-#: buttons whose pictures have to be deciphered.
+#: program but the naming mode the whole window reads by, so it stands apart, after a
+#: separator, at the right edge, where the eye looks for it.
 TOOLBAR: tuple[str, ...] = (
     "new",
     "open",

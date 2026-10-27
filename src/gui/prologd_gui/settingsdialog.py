@@ -58,7 +58,6 @@ from PySide6.QtWidgets import (
 )
 
 from . import actions, assets
-from . import engines
 from . import paths
 from . import settings as settings_module
 from . import shortcuts
@@ -231,24 +230,18 @@ class SettingsDialog(QDialog):
         self,
         settings: settings_module.Settings,
         parent: QWidget | None = None,
-        engine: engines.Engine | None = None,
         engine_directory: str = "",
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Настройки")
         self.resize(680, 460)
         self._settings = settings
-        #: Which engine the window runs, for the rows that are its rather than the
-        #: window's (task_79).  The caller passes its own: the stored choice can
-        #: differ from it for one launch (`--exe`, and the removed «Интерпретатор»
-        #: row), and the rows must follow the engine that runs.
-        self._engine = engine or engines.by_key(settings.engine)
         #: Where a *folder* chooser opens when its row says nothing (task_80): the
-        #: folder of the engine — `stdlib`, the examples and a course's own files lie
-        #: there, and «свой каталог процесса» is a folder beside the interpreter in
-        #: nine cases out of ten.  The window passes its own, because a launch may be
-        #: pinned to another build tree (`--exe`); a dialog built on its own asks
-        #: `paths`, the same search the window makes.
+        #: folder of the interpreter — `stdlib`, the examples and a course's own
+        #: files lie there, and «свой каталог процесса» is a folder beside the
+        #: interpreter in nine cases out of ten.  The window passes its own, because
+        #: a launch may be pinned to another build tree (`--exe`); a dialog built on
+        #: its own asks `paths`, the same search the window makes.
         self._engine_directory = str(engine_directory or "") or str(
             pathlib.Path(paths.interpreter()).parent
         )
@@ -260,8 +253,8 @@ class SettingsDialog(QDialog):
         #: «…» button — keyed the same way as `_widgets`, so a row that follows
         #: another can be enabled and disabled as one piece (task_46).
         self._row_holders: dict[str, QWidget] = {}
-        #: The label of a row, keyed like the widgets: a row that belongs to an
-        #: engine the current one does not have says so in its label (task_79).
+        #: The label of a row, keyed like the widgets — every check of the dialog
+        #: reads a row's words from here.
         self._row_labels: dict[str, QLabel] = {}
         self._sections: dict[str, int] = {}
         self._build()
@@ -312,9 +305,6 @@ class SettingsDialog(QDialog):
             if section == "Вид":
                 self._build_syntax_page()
         self._build_inserts_page()
-        # Whose rows these are (task_79) comes before the columns are measured:
-        # a label that gained «(движок Пролог-У)» is wider than it was.
-        self._apply_engine()
         self._align_columns()
         # «Свой каталог процесса» follows the choice above it: inactive until
         # «свой каталог» is selected, and `reload` (which fills the combo) then
@@ -367,37 +357,6 @@ class SettingsDialog(QDialog):
 
     def _rows(self, section: str) -> list[settings_module.Setting]:
         return [entry for entry in settings_module.SETTINGS if entry.section == section]
-
-    def _apply_engine(self) -> None:
-        """Rows that belong to an engine rather than to the window (task_79).
-
-        The window is a host of two engines and they are not interchangeable: the
-        original has no step, no trace, no formatter, no graphics, no `limits` at
-        all, and it reads variable names the old way because that *is* the old
-        dialect.  A row there would be editable and would do nothing, which is the
-        one thing a settings row must not be — so it is disabled, and its label
-        names the engine it belongs to.  The label and not a tooltip: a disabled
-        widget is not shown a tooltip at all.
-
-        Which rows these are is `settings.GATED_ROWS` — the same table the window
-        greys its commands out from — and the engine is the one handed to the
-        constructor, which is the engine that runs.  The dialog is built fresh
-        every time it is opened, so it cannot be stale either.
-        """
-        engine = self._engine
-        self.setWindowTitle(f"Настройки — движок {engine.title}")
-        for capability, keys in settings_module.GATED_ROWS.items():
-            if engine.has(capability):
-                continue
-            owner = next((one for one in engines.ENGINES if one.has(capability)), engine)
-            for key in keys:
-                field = self._widgets.get(key)
-                if field is not None:
-                    field.setEnabled(False)
-                label = self._row_labels.get(key)
-                if label is not None:
-                    label.setText(f"{settings_module.BY_KEY[key].label} "
-                                  f"(движок {owner.title}):")
 
     def _sync_process_directory_path(self) -> None:
         """`«Свой каталог процесса»` is editable only for the `custom` answer.
@@ -905,7 +864,7 @@ class SettingsDialog(QDialog):
         """The chooser of a `file` row (task_46's interpreter row, since removed).
 
         No record asks for a file any more (`execution/interpreter` left with
-        task_79), but the `kind` is still part of the table's vocabulary, and a seam
+        task_79), but the `kind` stays part of the table's vocabulary, and a seam
         without a caller is cheaper than a kind that cannot be browsed.
         """
         path, _ = QFileDialog.getOpenFileName(

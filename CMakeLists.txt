@@ -145,96 +145,6 @@ if(PROLOGD_BUILD_TESTS)
 endif()
 
 # ---------------------------------------------------------------------------
-# The original engine (optional)
-# ---------------------------------------------------------------------------
-# The old dialect is not a mode of *this* engine: it is an engine of its own, kept in
-# `Ununus/prologd`, which serves a live web service and is not ours to change
-# (task_78).  It is built as a *nested* CMake project rather than pulled into this
-# graph, and that is deliberate: its targets are named `prlib` and `prologd_json` —
-# both names this tree already uses — it is C++17 where this tree is C++23, and its
-# sources are CP1251 where this tree is UTF-8.  In one graph, `target_link_libraries`
-# could quietly pick the wrong `prlib`; in two, nothing of ours can.
-#
-# Its console interpreter is told to write to *this* tree's runtime directory, so the
-# two engines land side by side — `src/cli/<config>/prologu.exe` and `prologd.exe` —
-# which is where the window looks for an engine and where the portable layout copies
-# them from.
-#
-# Off by default, and worth saying why: it needs the network once (a clone of the
-# pinned commit) and half a minute of building, and a build that only has our engine
-# downloads nothing.  A machine with no network points `PROLOGD_ENGINE_SOURCE` at a
-# clone it already has, and then nothing is fetched at all.
-option(BUILD_WITH_PROLOGD
-  "Build the original prologd — the old dialect, a second engine — beside prologu" OFF)
-
-if(BUILD_WITH_PROLOGD)
-  if(NOT PROLOGD_BUILD_CLI)
-    message(FATAL_ERROR
-      "BUILD_WITH_PROLOGD=ON builds a console engine: set PROLOGD_BUILD_CLI=ON too")
-  endif()
-  set(PROLOGD_ENGINE_REPOSITORY "https://github.com/Ununus/prologd.git"
-      CACHE STRING "Where the original engine is taken from")
-  # A commit, never a branch: `master` moves, and the engine a front-end is checked
-  # against must not change under our feet.  The pinned one answers protocol 13 — a
-  # *documented subset* of ours (its own `src/protocol.cpp` says so): the requests
-  # and events both engines share exist, stepping, tracing, formatting and graphics
-  # do not.
-  #
-  # The pin is also what makes the old engine usable beside this one: it reads UTF-8
-  # paths, `'атомы'` in quotes and `_имя` variables the way we do.  Its comparison
-  # predicates keep their own semantics (`БОЛЬШЕ`, `СОРТИРОВКА/2`), which ours do not
-  # copy — that difference is deliberate (task_90).  Every move of the pin has its
-  # part in `ai/status.md` (133, 139, 140, 143, 164); this file carries the rule, not
-  # the history.
-  #
-  # Not a cache variable on purpose: a cache entry is written once, by the first
-  # configure, and every later bump of the pin would then be invisible in a tree that
-  # has already been built.  To build against another commit, point
-  # `PROLOGD_ENGINE_SOURCE` at a clone of it — that is the override this file
-  # documents.  A tree configured before this rule may still carry
-  # `PROLOGD_ENGINE_COMMIT` in `CMakeCache.txt`: the ordinary `set()` below shadows
-  # that entry, so the number in the cache means nothing and is not the pin.
-  set(PROLOGD_ENGINE_COMMIT "daf6b1bf60a68200268adc81f8e7e4cb9ce65603")
-  set(PROLOGD_ENGINE_SOURCE ""
-      CACHE PATH "An existing clone of the original engine; skips the download")
-
-  include(ExternalProject)
-  if(PROLOGD_ENGINE_SOURCE)
-    set(prologd_engine_origin
-      SOURCE_DIR "${PROLOGD_ENGINE_SOURCE}"
-      DOWNLOAD_COMMAND ""
-      UPDATE_COMMAND "")
-  else()
-    set(prologd_engine_origin
-      GIT_REPOSITORY "${PROLOGD_ENGINE_REPOSITORY}"
-      GIT_TAG "${PROLOGD_ENGINE_COMMIT}"
-      GIT_SHALLOW FALSE      # a commit needs the history, not the tip
-      UPDATE_COMMAND "")     # and it is never fetched again: the pin is the point
-  endif()
-
-  # `Release` whatever this build is, and not `$<CONFIG>`: this engine is built to be
-  # the artifact the package ships and the front-end is checked against, and one
-  # answer to «which binary is the reference» is worth more than a matching Debug.
-  ExternalProject_Add(prologd_engine
-    ${prologd_engine_origin}
-    PREFIX "${CMAKE_BINARY_DIR}/prologd-engine"
-    BINARY_DIR "${CMAKE_BINARY_DIR}/prologd-engine/build"
-    CMAKE_ARGS
-      "-DCMAKE_BUILD_TYPE=Release"
-      "-DPROLOGD_BUILD_FOR_GUI=ON"   # the JSON session a front-end speaks
-      "-DPROLOGD_BUILD_TESTS=OFF"    # its suite is not ours to run
-      # Our JSON header, not theirs.  The original downloads `json.hpp` at configure
-      # time; this tree already keeps `json-3.11.3` in exactly the layout it looks
-      # for, so the download is skipped and there is no second copy of a 900 KB file.
-      "-DPROLOGD_THIRDPARTY_DIR=${CMAKE_SOURCE_DIR}/src/3rdparty"
-      "-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=${CMAKE_BINARY_DIR}/src/cli"
-    BUILD_COMMAND
-      ${CMAKE_COMMAND} --build <BINARY_DIR> --config Release --target prologd
-    INSTALL_COMMAND ""
-    COMMENT "Building the original prologd (the old dialect)")
-endif()
-
-# ---------------------------------------------------------------------------
 # Documentation (optional: requires the `typst` binary)
 # ---------------------------------------------------------------------------
 # The PDFs are written next to their sources, in the source tree: they are what
@@ -247,7 +157,7 @@ add_custom_target(prologd_docs
 if(TYPST_EXECUTABLE)
   # Only the documents are listed here: doc/style.typ is a shared style file that
   # each of them imports, not a document of its own.
-  foreach(doc IN ITEMS help technical prologd-diff gui lessons library)
+  foreach(doc IN ITEMS help technical gui lessons library)
     add_custom_command(TARGET prologd_docs POST_BUILD
       COMMAND ${TYPST_EXECUTABLE} compile
               "${CMAKE_SOURCE_DIR}/doc/${doc}.typ"

@@ -49,7 +49,6 @@ from . import (
     assets,
     definitions,
     documents,
-    engines,
     findbar,
     formatter,
     geometry,
@@ -81,18 +80,17 @@ STOP_GRACE_MS = 500
 #: (task_112).  The owner wrote it as a cheat sheet — the most useful commands, one
 #: line each, and a program whose every line shows something.
 #:
-#: It lives in the intersection of the two dialects, so it answers **whoever** is
-#: running (task_79):
+#: It is written so that both naming modes read it the same way, because the reader
+#: may have «Имена переменных» set either way:
 #:
-#: * atoms are lower-case and *unquoted* — the old dialect has no quoted atoms at
-#:   all (`студент('Вова', …)` is a parse error there), and in the ISO reading a
-#:   lower-case name is an atom either way;
+#: * atoms are lower-case and *unquoted*, which is an atom in the ISO reading and
+#:   a name in the previous one;
 #: * the variables are **single** capital letters — `Имя` is a variable in the ISO
-#:   reading and a string constant in the old one, while a one-letter name is a
-#:   variable in both (one letter of either register is a variable by the old rule);
-#: * no `—`, `…` or `№` anywhere, comments included: the original dialect refuses
-#:   them, and the text is a program a reader may save as `.pld`.
-WELCOME_COMMON = """\
+#:   reading and a string constant in the previous one, while a one-letter name is
+#:   a variable in both;
+#: * no quotes, dashes or ellipses anywhere, so nothing depends on how either
+#:   reading treats punctuation.
+WELCOME = """\
 % F5 или Ctrl+R - запуск; Shift+F5 - остановить счёт (красная кнопка)
 %   или выгрузить базу из памяти (синяя кнопка)
 % Ctrl+N или двойной клик по пустому месту вкладок - новая вкладка
@@ -108,32 +106,19 @@ WELCOME_COMMON = """\
 ?студент(И, Ф).
 """
 
-#: What a build with **our** engine adds above it: the standard library and the two
-#: things only that engine has — `ИМПОРТ` and the ISO `length` (task_112).  A build
-#: with the original one alone shows `WELCOME_COMMON`: `ИМПОРТ` there is not a
-#: statement of the language, and the first thing a welcome must do is run.
+#: What the first tab holds: the standard library and the two things it shows —
+#: `ИМПОРТ` and the ISO `length` (task_112).
 #:
-#: The chosen engine sees no marker line, so `Д` is read the way the window's
-#: «Имена переменных» says — and it is a variable in both readings, which is why the
-#: text needs no `:- ИМЕНА(0).`.
-WELCOME_OURS = (
+#: The text carries no marker line, so `Д` is read the way the window's «Имена
+#: переменных» says — and it is a variable in both readings, which is why the text
+#: needs no `:- ИМЕНА(0).`.
+WELCOME_TEXT = (
     ':- ИМПОРТ("iso.pld"). % подключает стандартные предикаты ISO\n'
     "% F12 над ИМПОРТ откроет файл\n"
     "% F12 над символом откроет первое определение\n"
     "?length([1, 2, 3], Д).\n"
-    "\n" + WELCOME_COMMON
+    "\n" + WELCOME
 )
-
-
-def welcome_text(ours_present: bool) -> str:
-    """The program the first tab holds, chosen by what the build carries (task_112).
-
-    `ours_present` is `paths.engine_present(engines.OURS)` — the window knows it
-    before the first buffer exists, so the choice is a fact about this build and not
-    a guess.  The package `d` has the original engine alone and gets the common
-    text; `both` and `u` get the whole map.
-    """
-    return WELCOME_OURS if ours_present else WELCOME_COMMON
 
 
 #: The three answers to "save before closing?".
@@ -157,25 +142,12 @@ class MainWindow(QMainWindow):
         #: Preferences; tests pass a file of their own so a run cannot touch the
         #: user's real settings.
         self._settings = settings if settings is not None else Settings()
-        #: Which engine this window runs (task_79).  The window is a *host* of two
-        #: programs — our own «Пролог-У» and the original «Пролог-Д» (task_75,
-        #: task_78) — and the choice between them is `view/engine`.  Two things
-        #: outrank it for one launch: `--exe`, and task_46's removed
-        #: «Интерпретатор» row, still read from the file.  `engines.launch` is the
-        #: one rule for all of it — `main.py` asks the same function before it lets
-        #: the window open at all.
+        #: The folder `--exe` (or task_46's «Интерпретатор» row, still read from the
+        #: file) named: «here is my build», which is looked for there and nowhere
+        #: else.  `main.py` resolves the same thing before it lets the window open at
+        #: all, so the file it checked is the file the first run starts.
         launch = str(executable or "").strip() or self._settings.legacy_interpreter
-        self._engine, self._engine_folder = engines.launch(launch, self._settings.engine)
-        #: Whether the choice had to make way for the only engine this build has
-        #: (part 143): a package with «Пролог-Д» alone starts it, and the window
-        #: says so in the pane instead of leaving the user to guess.
-        self._engine, self._engine_folder, self._engine_swapped = paths.starting_engine(
-            self._engine, folder=self._engine_folder
-        )
-        #: A build with one engine and no names to choose writes that answer into the
-        #: row (part 148) — before the first buffer exists, so nothing is coloured by
-        #: the other dialect for a moment.
-        self._adopt_engine_dialect()
+        self._engine_folder = self._launch_folder(launch)
         #: The built-in reference (`doc/builtins.json`), read once for the whole
         #: window: the popup's detail label and `F1` read the same object, and a
         #: checkout without the file is an empty reference, not a failure.
@@ -380,12 +352,9 @@ class MainWindow(QMainWindow):
             self.open_path(path)
         if not self._buffers:
             # The welcome program goes into the first tab and is *not* unsaved work
-            # — the flag is left clear, so closing it asks nothing.  Which text it
-            # is depends on the engines this build carries (task_112).
+            # — the flag is left clear, so closing it asks nothing (task_112).
             welcome = documents.Document.untitled(documents.untitled_name([]))
-            welcome.text = welcome_text(
-                paths.engine_present(engines.OURS, folder=self._engine_folder)
-            )
+            welcome.text = WELCOME_TEXT
             self._add_buffer(welcome)
         # No interpreter yet: it is started by the first run (or by a query typed
         # into the query line).  A window that has been opened but not used has
@@ -652,6 +621,9 @@ class MainWindow(QMainWindow):
         self._build_actions()
         self._build_toolbar()
         self._build_menus()
+        # The naming control wears the state in force before anything can be
+        # clicked: the picture and the tooltip are read off the settings.
+        self._sync_state_button()
 
         self._status = QLabel("запуск…")
         self.statusBar().addWidget(self._status)
@@ -662,123 +634,32 @@ class MainWindow(QMainWindow):
 
         # The first pane, always: the window never has no place to edit in.
         self._add_pane()
-        # Which engine runs decides what is offered at all (task_79), so the state
-        # of the gated entries is settled before anything else can be clicked.
-        self._apply_engine()
         self._sync_actions()
         self._update_details()
-        self._announce_engine()
 
-    def _announce_engine(self) -> None:
-        """Says in the pane when the stored choice was not there to start (part 143).
+    @staticmethod
+    def _launch_folder(launch: str) -> str:
+        """The folder `--exe` named, `""` when it named none.
 
-        A one-engine package has nothing to choose: the file it carries is the one
-        that runs, and the opening line of the pane is where that is written down —
-        the control that would say it is not on the toolbar at all
-        (`_sync_state_button`).
+        `--exe` may be the file itself or the folder holding it; both mean «look for
+        the interpreter there and nowhere else» (`paths.interpreter`).
         """
-        if not self._engine_swapped:
-            return
-        missing = engines.other(self._engine)
-        self._append_note(
-            f"--- движок: {self._engine.title} ({self._engine.file_name}); "
-            f"{missing.title} ({missing.file_name}) в этой сборке нет ---\n"
-        )
-
-    # -- the engine (task_79) ----------------------------------------------
-    def engine(self) -> engines.Engine:
-        """The engine the next run starts (the tests and the toolbar ask)."""
-        return self._engine
+        text = str(launch or "").strip()
+        if not text:
+            return ""
+        path = pathlib.Path(text)
+        parent = str(path.parent)
+        return "" if parent in ("", ".") else parent
 
     def _interpreter_path(self) -> str:
-        """The file the next run starts: the chosen engine, in the launch's folder.
+        """The file the next run starts.
 
-        `--exe` names a *folder* — «here are my builds», because the two engines
-        were built together — and task_46's removed «Интерпретатор» row did the
-        same.  A file that is not there is reported by `_start_session`, before a
-        process is asked to start, rather than being answered by another build tree.
+        `--exe` names a *folder* — «here is my build» — and task_46's removed
+        «Интерпретатор» row did the same.  A file that is not there is reported by
+        `_start_session`, before a process is asked to start, rather than being
+        answered by another build tree.
         """
-        return paths.engine_executable(self._engine, folder=self._engine_folder)
-
-    def _engine_available(self, engine: engines.Engine) -> bool:
-        """Whether `engine`'s file is where a run would look for it."""
-        return pathlib.Path(
-            paths.engine_executable(engine, folder=self._engine_folder)
-        ).is_file()
-
-    def _only_engine(self) -> bool:
-        """True when this build has no second engine, so nothing to choose (parts 143–148).
-
-        The test the three «one engine» rules share: the naming control hides with it,
-        the names row takes the old dialect with it, and `_announce_engine` explains a
-        choice that had to give way to it.
-        """
-        return not self._engine_available(engines.other(self._engine))
-
-    def _adopt_engine_dialect(self) -> None:
-        """Writes «PLD» into the names row when this build has nothing to choose.
-
-        The row belongs to our own engine: the original has no modes and always reads
-        names the old way (`_default_variable_mode`).  A build that carries **only**
-        that engine therefore keeps a row that cannot be changed and, left as it is,
-        says «ISO» while the engine reads «PLD» — a setting that lies about what
-        happens is worse than one written down once (part 148).  So the first start
-        of such a build stores the old dialect.
-
-        The condition is the one that hides the two state controls: no naming modes on
-        the engine *and* no second engine to switch to.  A two-engine build keeps the
-        stored choice — there the row is our engine's, and switching to the original
-        is a visit, not a new home.
-        """
-        if self._engine.has(engines.NAMING):
-            return
-        if not self._only_engine():
-            return
-        if self._settings.variable_mode != "1":
-            self._settings.variable_mode = "1"
-
-    def choose_engine(self, target: engines.Engine) -> None:
-        """Runs `target`: the one door every engine change goes through.
-
-        A row of the state control ends up here (task_93), and the order is the
-        reason this is not one line.  A live child process goes on sending its
-        events, and after the choice changed they would arrive as the output of a
-        run that belongs to another binary — so the stop comes first.
-
-        And it is the *session* that goes, not just the run: the process belongs to
-        the engine being left, the base it holds is of no use to the other one, and
-        the polite request of «Остановить» would leave it idle and alive under a
-        window that now says it runs the other engine.  So it ends the way the grace
-        deadline ends a run (`_stop_now`), and the pane says why.
-
-        What the choice writes is `view/engine`, so the next window starts on the
-        same engine.  The folder the engines are looked for in is not touched — a
-        build tree is where both of them lie — and the value task_46's removed row
-        left in the file is dropped, because otherwise it would name the engine again
-        on the next start and outlive the click.  The reserved names are re-read as
-        well: the two engines answer `--list-keywords` with different tables (66
-        names against our 131), and completion, colouring and the cheat sheet are all
-        built from them.
-
-        Asking for the engine that already runs does nothing: the menu has three
-        rows, and the one in force must not end a session when it is clicked.
-        """
-        if target is self._engine:
-            return
-        if self._session.is_running():
-            self._stop_now("движок изменён")
-        self._engine = target
-        self._settings.engine = self._engine.key
-        self._settings.clear_legacy_interpreter()
-        self._session.set_executable(self._interpreter_path())
-        self._session.keywords = read_keywords(self._interpreter_path())
-        self._apply_keywords()
-        self._apply_engine()
-        self._append_note(
-            f"--- движок: {self._engine.title} ({self._engine.file_name}) ---\n"
-        )
-        self._status.setText(f"движок: {self._engine.title}")
-        self._update_details()
+        return paths.interpreter(self._engine_folder)
 
     def _process_working_directory(self) -> str:
         """Where the child process starts; `ЗАПИСЬ_В`/`ЧТЕНИЕ_ИЗ` are relative to it.
@@ -944,36 +825,18 @@ class MainWindow(QMainWindow):
                 self._state_action = self._toolbar.addWidget(self._build_state_button())
             else:
                 self._toolbar.addAction(self._actions[key])
-        #: The two controls of the toolbar that stand for a *capability* of the
-        #: engine, each as the pair `addWidget` returns: the action it answers with
-        #: and the widget inside it.  Hiding has to go through the action (part 145) —
-        #: the toolbar lays its items out on show and calls `setVisible` on the widget
-        #: by the action's visibility, so a bare `widget.setVisible(False)` lives only
-        #: until the window appears.  One table, one setter (`_show_toolbar_control`),
-        #: so no call site can forget half of the pair.
-        self._toolbar_controls: dict[str, tuple[QAction, QToolButton]] = {
-            "format": (self._format_action, self._format_button),
-            "state": (self._state_action, self._state_button),
-        }
         self._toolbar.setVisible(self._settings.toolbar_visible)
         self.addToolBar(self._toolbar)
 
-    def _show_toolbar_control(self, key: str, visible: bool) -> None:
-        """Shows or hides a toolbar control — the action **and** the widget (part 145)."""
-        action, widget = self._toolbar_controls[key]
-        action.setVisible(visible)
-        widget.setVisible(visible)
-
     def _build_state_button(self) -> QToolButton:
-        """«Which program runs, and how it reads names» — the last control (task_93).
+        """«How names are read» — the last control (task_93).
 
-        One `QToolButton` with a menu of three states, in place of the two controls
-        of task_79.  Those carried a picture of an `И` and a picture of a `Д`, so the
+        One `QToolButton` with a menu of two states, in place of the two controls of
+        task_79.  Those carried a picture of an `И` and a picture of a `Д`, so the
         reader had to know what the letters stood for — and `Д` was taken for
-        «Пролог-Д 2.0», the name of the whole product, rather than for the original
-        engine.  The three pictures (`engine-iso`, `engine-pld`, `engine-1.x`) are the
-        words themselves, so the state is read off the toolbar without a click, and
-        the menu spells each one out.
+        «Пролог-Д 2.0», the name of the whole product.  The two pictures
+        (`engine-iso`, `engine-pld`) are the words themselves, so the state is read
+        off the toolbar without a click, and the menu spells each one out.
 
         Everything about the button follows from the state of the window
         (`_sync_state_button`).
@@ -985,9 +848,9 @@ class MainWindow(QMainWindow):
         return button
 
     def _build_state_menu(self) -> QMenu:
-        """The three states, word for word as the dialog and the manual name them.
+        """The two states, word for word as the dialog and the manual name them.
 
-        The two `2.x` entries are the «Имена переменных» row, so their words are read
+        Both entries are the «Имена переменных» row, so their words are read
         from the `Setting` record itself — from the part after its own `ISO:`/`PLD:`,
         which the state label already carries — and a renamed row renames the menu with
         it.  A second copy of those words is exactly what would drift.
@@ -1014,11 +877,9 @@ class MainWindow(QMainWindow):
     def _state_detail(self, state: actions.State) -> str:
         """The words after the state label in its menu row.
 
-        «2.x ISO: переменная с большой буквы» is assembled from the label and the
+        «ISO: переменная с большой буквы» is assembled from the label and the
         settings row itself, so the menu says what the dialog says.
         """
-        if state.key == actions.STATE_ORIGINAL:
-            return "оригинальный движок"
         value = "0" if state.key == actions.STATE_ISO else "1"
         for choice, title in settings.BY_KEY[settings.VARIABLE_MODE].choices:
             if choice == value:
@@ -1026,31 +887,17 @@ class MainWindow(QMainWindow):
         return ""
 
     def _current_state(self) -> str:
-        """Which of the three rows is in force: the engine first, then the dialect."""
-        if self._engine is engines.ORIGINAL:
-            return actions.STATE_ORIGINAL
+        """Which of the two rows is in force."""
         if self._settings.variable_mode == "1":
             return actions.STATE_PLD
         return actions.STATE_ISO
 
     def _sync_state_button(self) -> None:
-        """The picture, the tooltip and the availability of the state control.
+        """The picture and the tooltip of the naming control.
 
-        The control answers two questions at once, so it is hidden only when neither
-        has an answer: a build whose only engine is the original has no other program
-        to start and no dialects to choose (`_only_engine`, parts 143 and 148) — the
-        package of «Пролог-Д» alone.  Every other build keeps the control on either
-        engine: on the original the two `2.x` rows are the way back, which the old
-        naming button could not offer at all.
-
-        A row that would start an engine this build does not carry is *greyed out*
-        rather than hidden: the menu is a map of three states, and a hole in it says
-        less than a row that names what is missing.
+        It answers one question — how a name the file does not spell out is read —
+        and both answers are always available, so the control is always shown.
         """
-        other_available = self._engine_available(engines.other(self._engine))
-        self._show_toolbar_control(
-            "state", other_available or self._engine.has(engines.NAMING)
-        )
         state = actions.STATE_BY_KEY[self._current_state()]
         found = assets.icon(state.icon)
         if found is None:
@@ -1068,71 +915,24 @@ class MainWindow(QMainWindow):
         self._sync_state_menu()
 
     def _sync_state_menu(self) -> None:
-        """Shows the state in force, and greys out what this build cannot start."""
+        """Shows the state in force."""
         if not hasattr(self, "_state_menu"):
             return
         current = self._current_state()
         for state in actions.STATES:
             entry = self._state_actions[state.key]
-            target = (
-                engines.ORIGINAL if state.key == actions.STATE_ORIGINAL else engines.OURS
-            )
-            entry.setEnabled(target is self._engine or self._engine_available(target))
             entry.blockSignals(True)
             entry.setChecked(state.key == current)
             entry.blockSignals(False)
 
     def _choose_state(self, key: str) -> None:
-        """A row of the menu: the light answer and the heavy one, told apart.
+        """A row of the menu: the naming mode, and nothing else.
 
-        `2.x ISO` and `2.x PLD` differ only in the dialect — a stored value and the
-        colouring of the open buffers — so on our own engine they cost nothing and a
-        live session is left alone.  `1.x`, and either `2.x` row while the original
-        runs, changes *which program* answers: that is `choose_engine`, and it stops
-        the session first.  Choosing `1.x` leaves the stored dialect untouched, so
-        coming back to `2.x` restores the one the user picked last.
+        The two rows differ only in the dialect — a stored value and the colouring of
+        the open buffers — so the click costs nothing and a live session is left
+        alone.
         """
-        if key == actions.STATE_ORIGINAL:
-            self.choose_engine(engines.ORIGINAL)
-            return
-        self.choose_engine(engines.OURS)
         self._set_variable_mode("0" if key == actions.STATE_ISO else "1")
-
-    def _apply_engine(self) -> None:
-        """Everything that follows from *which* engine runs (task_79).
-
-        The window is a host of two programs that are not interchangeable, and the
-        protocol number cannot tell them apart: the original answers `13` as well,
-        and its own sources call that a sub-set of our 13.  So what a command needs
-        of the engine is written once, in the tables — `actions.Action.needs` for a
-        menu or toolbar entry, `settings.GATED_ROWS` for a row of the dialog — and
-        this is the one place that asks.  An entry the engine cannot answer is
-        *disabled*, with the reason in its tooltip; and the format mode control
-        beside «Форматировать» goes with the command it belongs to.
-        """
-        for spec in actions.ACTIONS:
-            if not spec.implemented or not spec.needs:
-                continue
-            action = self._actions[spec.key]
-            allowed = self._engine.has(spec.needs)
-            action.setEnabled(allowed)
-            hint = spec.tooltip()
-            if not allowed:
-                hint = f"{hint} — {self._engine.title} этого не умеет"
-            action.setToolTip(hint)
-            action.setStatusTip(hint)
-        # The two controls that stand for a *capability* of the engine go with it.  The
-        # format mode control is *hidden*: it belongs to a command that does not exist
-        # on that engine (a hidden widget takes no room, so no hole is left), and the
-        # command itself is greyed out beside it.  The state control stays **visible**
-        # on the original — two of its three rows are the way back to our own engine —
-        # and a row it cannot offer is greyed out instead (`_sync_state_menu`).
-        formats = self._engine.has(engines.FORMAT)
-        self._show_toolbar_control("format", formats)
-        self._sync_state_button()
-        # `run`, `stop`, the two steps and the traced run are computed with the
-        # state of the session as well, and that formula lives in one place.
-        self._sync_run_actions()
 
     def _build_format_button(self) -> QToolButton:
         """The formatter's mode, on the toolbar beside «Форматировать» (task_47).
@@ -1396,15 +1196,10 @@ class MainWindow(QMainWindow):
         # Blue only where it will really unload: a disabled button, and a run to
         # break, both keep the red octagon.
         self._stop_picture(in_flight or not enabled)
-        # A step and a traced run need a second thing beyond a program that may be
-        # started: an engine that answers the request (task_79).  «Запустить» above
-        # is deliberately not gated — running a program is what both engines do.
-        # The list is read from the table, so the reason a key is here and the
-        # reason `_apply_engine` greys the entry out are one fact, not two.
+        # A step and a traced run need a program that may be started, like
+        # «Запустить» above, and nothing else.
         for key in ("run_trace", "step", "step_over"):
-            self._actions[key].setEnabled(
-                free and self._engine.has(actions.BY_KEY[key].needs)
-            )
+            self._actions[key].setEnabled(free)
 
     def _refresh_navigation_actions(self) -> None:
         """Offers `F12` only where it does something: on the `ИМПОРТ` line of the caret,
@@ -1476,12 +1271,11 @@ class MainWindow(QMainWindow):
         else:
             state = "интерпретатор запущен"
         parts = [state]
-        # Which engine the next run starts, and — when the build was named by hand
-        # (task_79: `--exe`, or task_46's «Интерпретатор» row that is still read
-        # from the file) — the file itself.  A window that runs another build than
-        # the one beside it has to say so, and which of the two *engines* it is
-        # matters even more: the same click means different things under them.
-        parts.append(f"движок: {self._engine.title}")
+        # Which interpreter the next run starts, and — when the build was named by
+        # hand (`--exe`, or task_46's «Интерпретатор» row that is still read from
+        # the file) — the file itself.  A window that runs another build than the one
+        # beside it has to say so.
+        parts.append(f"движок: {paths.ENGINE_TITLE}")
         if self._engine_folder:
             parts.append(self._interpreter_path())
         buffer = self.current_buffer()
@@ -2370,14 +2164,12 @@ class MainWindow(QMainWindow):
         self._status.setText(f"рисунок получен ({width}×{height})")
 
     def _engine_limits(self) -> dict | None:
-        """The `limits` object of a `load`, for the engine that reads it (task_79).
+        """The `limits` object of a `load` (protocol 9).
 
-        The original engine knows no caps at all — the object is ours (protocol 9)
-        — so under it a request would only be a line the engine skips.  The
-        window's own two guards are not here: the clock and the event counter are
-        kept in this process, and they work under both engines.
+        The window's own two guards are not here: the clock and the event counter
+        are kept in this process.
         """
-        return self._settings.limits() if self._engine.has(engines.LIMITS) else None
+        return self._settings.limits()
 
     def _limits_note(self) -> str:
         """The limits a run goes with, in the words of their rows (task_46).
@@ -2393,11 +2185,9 @@ class MainWindow(QMainWindow):
         A value equal to the default is not a choice the user made, and a run of a
         lesson would otherwise report the same two numbers for ever.
 
-        Three of the five rows are the *engine's* (task_79), and the original does
-        not read them: promising them there would be a promise nobody keeps.  A row
-        the user did raise is still said out loud, in a line of its own — under
-        Пролог-Д it is a row that does nothing, and that is exactly the kind of
-        thing the note exists to make findable.
+        Three of the five rows are the *engine's* (they travel in the `load`) and two
+        are the window's own guards; the note names the first three first, and the
+        line it prints says where they live.
         """
         engine_rows = (
             (self._settings.max_steps, settings.DEFAULT_MAX_STEPS, "«Предел шагов»"),
@@ -2412,23 +2202,15 @@ class MainWindow(QMainWindow):
              "«Предел вывода»"),
         )
         named: list[str] = []
-        unread: list[str] = []
-        for rows, into in (
-            (engine_rows, named if self._engine.has(engines.LIMITS) else unread),
-            (window_rows, named),
-        ):
+        for rows in (engine_rows, window_rows):
             for value, default, label in rows:
                 if value == default:
                     continue
-                into.append(f"{label} {value}" if value else f"{label} — без предела")
-        lines = []
-        if named:
-            lines.append("--- пределы: " + ", ".join(named) +
-                         " — строки в «Выполнении» настроек ---\n")
-        if unread:
-            lines.append(f"--- {self._engine.title} их не читает: " + ", ".join(unread) +
-                         " — эти строки действуют только на Пролог-У ---\n")
-        return "".join(lines)
+                named.append(f"{label} {value}" if value else f"{label} — без предела")
+        if not named:
+            return ""
+        return ("--- пределы: " + ", ".join(named) +
+                " — строки в «Выполнении» настроек ---\n")
 
     def _arm_timeout(self) -> None:
         """Starts the «Предел времени» clock of a run, if one is set (task_46).
@@ -2650,31 +2432,19 @@ class MainWindow(QMainWindow):
         self._status.setText("отформатировано")
 
     def _default_variable_mode(self) -> int:
-        """How a file that says nothing about names is read by the engine that runs.
-
-        The row («Имена переменных») is the answer for our own engine.  The original
-        has no modes at all — no `variables` field, no idea that an ISO reading
-        exists — it reads one-letter variables and unquoted string constants because
-        that *is* the old dialect.  So under it a marker-less file is coloured,
-        completed and sent as the old one: otherwise the window would call a name a
-        variable that the engine prints as a string constant, and the row is
-        disabled in the dialog for exactly this reason (`GATED_ROWS`).
+        """How a file that says nothing about names is read: the row's answer.
 
         A file that declares `:- ИМЕНА(N).` in its first line keeps its own mode
-        either way: the dialect belongs to the file (task_67), even where the engine
-        running it would not read the marker.
+        instead — the dialect belongs to the file (task_67).
         """
-        if not self._engine.has(engines.NAMING):
-            return tokens.MODE_OLD
         return self._settings.variable_mode_number
 
     def _apply_dialect(self) -> None:
         """Gives every open buffer the mode a file that declares none is read in.
 
-        Two things move that answer: the «Имена переменных» row (the dialog's
-        «Применить») and the engine (task_79).  One door for both, because a buffer
-        that kept the old answer would colour one dialect while the engine reads
-        another.
+        The «Имена переменных» row (the dialog's «Применить» or the toolbar control)
+        moves that answer, and one door for the whole window is what keeps a buffer
+        from colouring one dialect while the engine reads another.
         """
         mode = self._default_variable_mode()
         for buffer in self._buffers:
@@ -2684,8 +2454,7 @@ class MainWindow(QMainWindow):
         """How the program in front of the user reads names (task_67).
 
         The file's own `:- ИМЕНА(N).` first line, else the window's answer for a file
-        that says nothing — the row, or the old dialect under an engine that has no
-        other one (`_default_variable_mode`).  This is the same answer the
+        that says nothing (`_default_variable_mode`).  This is the same answer the
         highlighter is given.  A run and a formatting request carry it, and so does a
         question of its own: a statement typed into the goal line or clicked on a
         margin marker arrives *without* the file's first line, so the interpreter
@@ -3447,7 +3216,8 @@ class MainWindow(QMainWindow):
         buffer.document.redoAvailable.connect(self._sync_undo_actions)
         # The reserved names arrive with `ready`; a buffer opened after that gets
         # them here, and a buffer created before it is served by `_on_ready`.  The
-        # dialect of a file that declares none is the engine's answer too (task_79).
+        # dialect of a file that declares none comes from the row, and a restart may
+        # have changed it.
         buffer.set_keywords(self._session.keywords)
         buffer.set_fallback_variable_mode(self._default_variable_mode())
         buffer.set_reference(self._reference)
@@ -4307,13 +4077,12 @@ class MainWindow(QMainWindow):
     def _apply_keywords(self) -> None:
         """Hands the reserved names to everything that colours or completes.
 
-        One door for the two places they change: the engine that answered `ready`
-        (task_50), and the switch of task_79, where the same window starts talking
-        to another engine — whose table is not the same one (66 names against our
-        131), so colouring, completion and the cheat sheet have to be rebuilt.
+        One door for the places they change: the engine that answered `ready`
+        (task_50) and a restart of the session, so colouring, completion and the
+        cheat sheet are rebuilt from the same table.
 
-        The dialect a marker-less file is read in travels with them: it is the
-        engine's, not the row's, and it changes at the same moment.
+        The dialect a marker-less file is read in travels with them, because a
+        restart may also have changed the row (`--vars` on a new launch).
         """
         for buffer in self._buffers:
             buffer.set_keywords(self._session.keywords)
@@ -4418,9 +4187,8 @@ class MainWindow(QMainWindow):
         dialog = settingsdialog.SettingsDialog(
             self._settings,
             self,
-            self._engine,
-            # The choosers of the dialog open where the engine is (task_80) — and the
-            # window is the one that knows *which* engine, folders and all.
+            # The choosers of the dialog open where the interpreter is (task_80) —
+            # and the window is the one that knows where it was looked for.
             engine_directory=str(pathlib.Path(self._interpreter_path()).parent),
         )
         # «Применить» must be *visible*: the window behind a modal dialog still
@@ -4504,20 +4272,14 @@ class MainWindow(QMainWindow):
         self._sync_format_menu()
         self._sync_theme_menu()
         self._sync_actions()
-        # The engine too (task_79): the button, the format mode control and the
-        # entries a disabled engine cannot answer are states like the checkable
-        # ones, and a settings file edited by hand may name another engine.
-        self._apply_engine()
         # «Имена переменных» is a *fallback* (task_67), so the rows of this dialog
-        # reach the buffers directly — the engine's answer included (task_79).
+        # reach the buffers directly.
         self._apply_dialect()
         self._status.setText("настройки применены")
 
         # Where the child process starts is a row of this dialog (task_46), and a
         # changed value cannot reach a live process — the working directory is
-        # fixed when it comes up — so a live session is restarted.  Which *engine*
-        # runs is no longer a row here: that is the button on the toolbar
-        # (task_79), and it needs no restart because it stops the session first.
+        # fixed when it comes up — so a live session is restarted.
         directory = self._process_working_directory()
         if directory != self._session.working_directory():
             live = self._session.is_running()

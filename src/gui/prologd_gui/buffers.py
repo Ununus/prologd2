@@ -65,10 +65,8 @@ class Buffer(QObject):
         self._first_line = ""
         self._variable_mode = 0
         #: How a file that says nothing is read (task_67): the *window's* answer,
-        #: handed to every buffer as they appear (`set_fallback_variable_mode`) — a
-        #: row for our own engine, the old dialect for one that has no modes at all
-        #: (task_79).  The row is only the starting point: the window knows which
-        #: engine runs, this object does not.
+        #: handed to every buffer as they appear (`set_fallback_variable_mode`).  The
+        #: row is only the starting point: the window owns it, this object does not.
         self._fallback_mode = self._settings.variable_mode_number
         self.document.contentsChanged.connect(self._on_contents_changed)
         self.refresh_variable_mode()
@@ -176,13 +174,12 @@ class Buffer(QObject):
         self.highlighter.set_mode(self._variable_mode)
 
     def set_fallback_variable_mode(self, mode: int) -> None:
-        """What a file that declares nothing about names is read in (task_79).
+        """What a file that declares nothing about names is read in (task_67).
 
-        The window answers, not this object: only the window knows *which engine*
-        runs, and an engine with no modes of its own reads names the old way, so a
-        marker-less file is colouring-, completing- and sending-wise the old one
-        under it.  A file that declares `:- ИМЕНА(N).` is not touched — the dialect
-        belongs to the file — and the colouring follows at once.
+        The window answers, not this object: the «Имена переменных» row is the
+        window's, and it is changed from the dialog and from the toolbar.  A file
+        that declares `:- ИМЕНА(N).` is not touched — the dialect belongs to the
+        file — and the colouring follows at once.
         """
         self._fallback_mode = int(mode)
         self.refresh_variable_mode()

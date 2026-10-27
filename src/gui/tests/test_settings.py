@@ -362,48 +362,36 @@ def test_the_new_keys_have_the_documented_defaults(directory: pathlib.Path) -> N
     assert settings.output_font_size == settings_module.MAXIMUM_FONT_SIZE
     settings.autosave_minutes = -5
     assert settings.autosave_minutes == 0
-    # task_46's row for the interpreter is gone (task_79): the engine is chosen by
-    # the button on the toolbar, and the value an old file holds is still read —
-    # `legacy_interpreter` — while the choice itself is `view/engine`.
-    assert settings.engine == "u", "our own engine runs until the button says otherwise"
+    # task_46's row for the interpreter is gone: `--exe` names a build now, and the
+    # value an old file holds is still read as `legacy_interpreter`.
     assert settings.legacy_interpreter == "", "no old row in a fresh file"
     assert settings.process_directory == "file"
     assert settings.process_directory_path == ""
     print("ok: the new preferences start where the task says they start")
 
 
-def test_the_engine_and_process_directory_round_trip(directory: pathlib.Path) -> None:
+def test_the_pinned_row_and_the_process_directory_round_trip(directory: pathlib.Path) -> None:
     path = directory / "interp.ini"
     settings = Settings(path)
-    settings.engine = "d"
     settings.process_directory = "custom"
     settings.process_directory_path = "C:/курс"
 
     reopened = Settings(path)
-    assert reopened.engine == "d"
     assert reopened.process_directory == "custom"
     assert reopened.process_directory_path == "C:/курс"
 
-    # A choice the rows do not know falls back like every other choice, and the
-    # setter writes the fallback rather than a value the switch could not show.
+    # A choice the rows do not know falls back like every other choice.
     settings.process_directory = "каталог"
     assert settings.process_directory == "file", "an unknown answer reads as `file`"
-    settings.engine = "D"
-    assert settings.engine == "d", "the key is read without case"
-    settings.engine = "марсианский"
-    assert settings.engine == "u", "an engine this build does not know is our own"
 
-    # The row of task_46 that the button replaced: its value is read as the build
-    # folder of this launch, and emptied once the button answers (task_79).  The
-    # key has no record any more, so the file is written the way a hand edit
-    # would — which is also the case the reader exists for.
+    # The row of task_46 that `--exe` replaced: its value is read as the build
+    # folder of this launch.  The key has no record any more, so the file is written
+    # the way a hand edit would — which is also the case the reader exists for.
     raw = QSettings(str(path), QSettings.Format.IniFormat)
-    raw.setValue("execution/interpreter", "C:/старый/prologu.exe")
+    raw.setValue("execution/interpreter", "C:/сборка/prologu.exe")
     raw.sync()
-    assert Settings(path).legacy_interpreter == "C:/старый/prologu.exe"
-    reopened.clear_legacy_interpreter()
-    assert Settings(path).legacy_interpreter == "", "the press of the button outlives the row"
-    print("ok: the engine choice, the old row and the process directory round-trip")
+    assert Settings(path).legacy_interpreter == "C:/сборка/prologu.exe"
+    print("ok: the pinned row and the process directory round-trip")
 
 
 def test_syntax_overrides_round_trip_and_reach_the_palette(directory: pathlib.Path) -> None:
@@ -449,7 +437,7 @@ def main() -> int:
         test_unknown_keys_survive(directory)
         test_the_retired_naming_mode_reads_as_the_old_dialect(directory)
         test_the_new_keys_have_the_documented_defaults(directory)
-        test_the_engine_and_process_directory_round_trip(directory)
+        test_the_pinned_row_and_the_process_directory_round_trip(directory)
         test_syntax_overrides_round_trip_and_reach_the_palette(directory)
         test_every_row_round_trips_and_resets(directory)
         test_set_value_clamps_and_survives_junk(directory)

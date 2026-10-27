@@ -265,64 +265,6 @@ def test_a_package_without_the_interpreter_names_the_expected_place() -> None:
     print("ok: a package missing its interpreter still names the expected path")
 
 
-def test_a_build_with_one_engine_starts_that_one() -> None:
-    """Part 143: a package of one engine runs it instead of refusing to open.
-
-    The stored choice says «Пролог-У» on a fresh machine, and the package of the
-    original engine carries no `prologu.exe` at all — so the choice gives way to the
-    file that is there, and the flag says the window has to explain itself.
-    Neither file present answers the choice unchanged: that is `main.py`'s report.
-
-    Part 144 adds the other half: a package with one engine answers it even when the
-    settings name a file somewhere else entirely (an old `prologu.exe` on a network
-    drive, as in the 1.27 package that opened on «Пролог-У» and could not start it),
-    and the folder of that stale name is dropped with the choice.
-    """
-    from prologd_gui import engines
-
-    with tempfile.TemporaryDirectory(prefix="prologd_one_engine_") as name:
-        folder = pathlib.Path(name)
-        (folder / engines.ORIGINAL.file_name).write_bytes(b"MZ")
-        assert paths.starting_engine(engines.OURS, folder=str(folder)) == (
-            engines.ORIGINAL,
-            str(folder),
-            True,
-        )
-        assert paths.starting_engine(engines.ORIGINAL, folder=str(folder)) == (
-            engines.ORIGINAL,
-            str(folder),
-            False,
-        ), "the engine that is there is not a substitution"
-        nothing = folder / "пусто"
-        nothing.mkdir()
-        assert paths.starting_engine(engines.OURS, folder=str(nothing)) == (
-            engines.OURS,
-            str(nothing),
-            False,
-        ), "with neither file the choice is left alone, and the report names it"
-    # The package case, where the search is «beside the window» and nothing else: a
-    # package of the original carries no `prologu.exe` at all.
-    with tempfile.TemporaryDirectory(prefix="prologd_one_engine_") as name:
-        package = make_package(pathlib.Path(name), with_executable=False)
-        (package / engines.ORIGINAL.file_name).write_bytes(b"MZ")
-        with packaged(package):
-            assert paths.starting_engine(engines.OURS) == (engines.ORIGINAL, "", True)
-            assert paths.starting_engine(engines.ORIGINAL) == (
-                engines.ORIGINAL,
-                "",
-                False,
-            )
-            # A `gui.ini` from another machine names an old build: the package still
-            # answers the one engine it carries, and looks for it beside itself.
-            stale = str(package.parent / "старый" / engines.OURS.file_name)
-            assert paths.starting_engine(engines.OURS, folder=str(package.parent)) == (
-                engines.ORIGINAL,
-                "",
-                True,
-            ), f"a stale folder must not decide the engine: {stale}"
-    print("ok: a build with one engine starts it, and nothing is swapped when neither is there")
-
-
 def test_the_icons_come_from_the_same_answer() -> None:
     """The constant the icon loader uses is `paths.resource`, computed once."""
     assert assets.DEFAULT_DIRECTORY == paths.resource("assets")

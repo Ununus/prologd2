@@ -7168,3 +7168,47 @@ of the package».  Отдельно: 25 оконных наборов и `protoc
 * **Проверки.**  `cmake --preset linux-release -DBUILD_WITH_PROLOGD=ON` зелёный,
   сборка - «no work to do» плюс пересборка вложенного движка, `ctest --preset
   linux-release` - 425/425.  Правка только в комментариях.
+
+### 211. Второй движок удалён целиком
+
+* **Просьба владельца.**  Убрать поддержку старого движка: таргет из CMake, флаги
+  `-Engine both|u|d` из `tools/*`, `engine-1.x.png`, настройки и переключение в
+  окне, `doc/prologd-diff.typ`, упоминания в `help.typ` и `gui.typ`, тесты.
+* **CMake.**  Удалены `option(BUILD_WITH_PROLOGD)`, `PROLOGD_ENGINE_REPOSITORY`,
+  `PROLOGD_ENGINE_COMMIT`, `PROLOGD_ENGINE_SOURCE`, весь блок `ExternalProject` и
+  `prologd-diff` из списка документов.  Конфигурация чистая.
+* **Упаковка.**  `build_deb.sh`: один движок, проверка `prologu --list-keywords`
+  вместо `prologd`, пять PDF вместо шести.  `build_portable.ps1`: убраны параметр
+  `-Engine`, таблица `$kinds`, `Copy-EngineDocuments`, версия всегда из
+  `prologu --version`.  `build_installer.ps1`: убраны `-Engine`,
+  `Test-PackageEngine` и выбор пакета по движку — берётся самый свежий.
+  `installer/prologd.iss`: записи `App Paths\prologd.exe` удалены, BOM сохранён.
+  `release.yml`: без `-DBUILD_WITH_PROLOGD=ON`, без второго бинарника в `.app`.
+* **Окно.**  `engines.py` удалён; `paths.EXECUTABLE_NAME`/`ENGINE_TITLE` заменили
+  его; `paths.starting_engine`/`shipped_engines`/`engine_executable`/
+  `engine_present` удалены, `paths.interpreter(folder)` ищет один файл.  Из
+  `actions.py` ушли поле `needs` и состояние `1.x`; из `settings.py` — ключ
+  `view/engine`, `DEFAULT_ENGINE`, `GATED_ROWS` и свойство `engine`; из
+  `settingsdialog.py` — `_apply_engine` и параметр `engine`; из `window.py` —
+  `choose_engine`, `_apply_engine`, `_announce_engine`, `_only_engine`,
+  `_adopt_engine_dialect`, `welcome_text` (один `WELCOME_TEXT`), проверки
+  возможностей и скрытие кнопки режима.  Переключатель состояния стал
+  переключателем имён: `ISO`/`PLD`, всегда виден, синхронизируется при сборке окна.
+* **Тесты.**  `test_engines.py` удалён.  В `test_window.py` вместо тестов второго
+  движка — `test_the_launch_binary_names_the_build_folder`,
+  `test_a_missing_interpreter_is_reported_not_half_started`,
+  `test_the_welcome_program_runs`,
+  `test_the_state_control_switches_the_names_and_remembers`,
+  `test_the_settings_dialog_opens_where_the_launch_points`.  В `test_paths.py`
+  удалён мёртвый (никогда не вызывавшийся) тест одного движка; в
+  `test_settingsdialog.py` проверка «выключенных строк» заменена на обратную —
+  каждая строка редактируема и подпись не называет движок.
+* **Документация.**  `doc/prologd-diff.typ` и его PDF удалены; `doc/README.md` —
+  четыре документа.  В `help.typ` таблица сравнения осталась с пятью столбцами
+  (два режима имён вместо трёх движков), в `gui.typ` переписаны разделы 6.3, 8, 9.1 и
+  9.2.  Обновлены `README.md`, `src/gui/README.md`, `AGENTS.md`,
+  `examples/prologd/README.md`.
+* **Проверки.**  Чистая пересборка `linux-release`: 425/425.  Все 29 скриптов окна
+  и `protocol_smoke.py` зелены.  `docs` собирает пять PDF; первые страницы
+  `help.pdf` просмотрены — таблица читается.  `tools/build_deb.sh` целиком:
+  `dist/prologd_2.6.1_amd64.deb` 49 320 288 байт, внутри один `prologu` и пять PDF.

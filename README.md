@@ -161,18 +161,6 @@ leaving out the Qt modules the window never loads), lays out the folder as
 checks it (`tools/check_dependencies.py`, plus the interpreter and the window itself)
 and writes the zip.
 
-#### The original engine (optional)
-
-The old dialect is not a mode of this engine: it is an engine of its own, kept in
-[`Ununus/prologd`](https://github.com/Ununus/prologd), where a live service runs it.
-`-DBUILD_WITH_PROLOGD=ON` builds a pinned commit of it as a *nested* project and
-writes its `prologd.exe` beside `prologu.exe`:
-
-```powershell
-cmake -S . -B build -G "Visual Studio 18 2026" -A x64 -DBUILD_WITH_PROLOGD=ON
-cmake --build build --config Release
-```
-
 ## Command line
 
 ```
@@ -270,8 +258,8 @@ highlighting that tells Latin names from Cyrillic ones, completion built from
 the reserved names and the program's own, run/stop with a fresh interpreter per
 run, and the usual file handling (save prompts, line endings and encodings kept).
 Documentation is in `doc/` (`help.typ`, `library.typ`, `gui.typ`, `technical.typ`,
-`prologd-diff.typ`, `lessons.typ`); `cmake --build build --target docs` writes the
-PDFs into the same directory when Typst is installed.
+`lessons.typ`); `cmake --build build --target docs` writes the PDFs into the same
+directory when Typst is installed.
 
 CI builds and tests on Linux (GCC), Windows (MSVC) and macOS (AppleClang); see
 `.github/workflows/ci.yml`, `.github/workflows/macos.yml` and `CMakePresets.json`.

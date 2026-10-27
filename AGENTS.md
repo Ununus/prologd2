@@ -6,18 +6,17 @@ This file stays short on purpose: it is loaded into every request.
 
 ## What this repository is
 
-A Prolog-D implementation with **two engines**: ours, «Пролог-У» (`src/prlib`,
-`prologu`), and the original «Пролог-Д» (`prologd`) built from the commit pinned in
-`CMakeLists.txt` (`PROLOGD_ENGINE_COMMIT`, option `BUILD_WITH_PROLOGD`).  Windows
-appends `.exe` to both names.  The PySide6 window (`src/gui`) hosts both; `doc/*.typ`
-are the Russian manuals.  `ai/` is the agent's journal, not user documentation.
+A Prolog-D implementation, «Пролог-У»: the engine in `src/prlib`, the console
+front-end `prologu`, and the PySide6 window in `src/gui`.  Windows appends `.exe` to
+the program names.  `doc/*.typ` are the Russian manuals; `ai/` is the agent's journal,
+not user documentation.
 
 ## Build and test
 
 One command shape everywhere; only the preset name differs:
 
 ```sh
-cmake --preset linux-release -DBUILD_WITH_PROLOGD=ON
+cmake --preset linux-release
 cmake --build --preset linux-release
 ctest --preset linux-release
 ```
@@ -52,11 +51,9 @@ Packages, one script per platform:
 
 * Linux: `tools/build_deb.sh` (`--skip-tests`, `--skip-docs`, `--skip-freeze`,
   `--no-trim`) → `dist/prologd_<version>_amd64.deb`.
-* Windows: `tools/build_portable.ps1 -Engine both|u|d`, then
-  `tools/build_installer.ps1 -SkipPackage` → `dist\prologd-<version>-win64.zip` and
-  `dist\prologd-<version>-setup.exe`.  `d` is the original engine alone
-  (`dist\prologd-1.27-win64`); what each kind carries is the `$kinds` table at the top
-  of the script.
+* Windows: `tools/build_portable.ps1`, then `tools/build_installer.ps1
+  -SkipPackage` → `dist\prologd-<version>-win64.zip` and
+  `dist\prologd-<version>-setup.exe`.
 * macOS: the `.dmg` is built by `.github/workflows/release.yml` on a runner, not by
   hand.
 
@@ -68,8 +65,10 @@ release; `ci.yml` (Linux, Windows) and `macos.yml` test every push to `main`.
 * Sources are UTF-8 with **LF**.  Check after editing: `git ls-files --eol <file>`.
   The exception is `installer/prologd.iss`, which must keep its **BOM**: Inno reads a
   BOM-less script as ANSI and the Cyrillic turns to rubbish.
-* `.pld` programs stay within the alphabet the *original* engine reads: no `—`, `–`,
-  `−`, `…`, `№`, `§` — it refuses them even inside comments.  Write `-` and `...`.
+* `.pld` programs under `examples/` and `stdlib/` stay within the alphabet of the
+  previous dialect: no `—`, `–`, `−`, `…`, `№`, `§`.  Write `-` and `...`.  (The
+  engine itself reads them anywhere; the rule keeps the corpus comparable with the
+  upstream snapshot in `examples/prologd/`.)
 * PowerShell scripts here print **ASCII only** (PowerShell 5.1 reads a BOM-less script
   as ANSI).
 * Do not edit `examples/prologd/` (byte-for-byte upstream), `src/3rdparty/` or
