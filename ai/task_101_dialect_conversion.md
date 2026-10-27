@@ -1,6 +1,8 @@
 # task_101 — converting a source between the two dialects (Russian ↔ English)
 
-**Status:** done (2026-10-23) — ADR-039, part 168
+**Status:** superseded (part 212) — the conversion was removed from the engine,
+the protocol is back to 14 and the menu entry is gone; kept as the record of the
+work.  Was: done (2026-10-23) — ADR-039, part 168
 **Depends on:** task_39 (the English alias table), task_52/92 (`=`/`is`/`<`/`>`/
 `=:=` are sugar over the Russian built-ins), task_55 (`\+` is the second spelling
 of `НЕ/1`), task_99 (the same request already carries a conversion)

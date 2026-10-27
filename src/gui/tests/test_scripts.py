@@ -56,25 +56,10 @@ def test_the_menu_holds_the_converter_before_the_help() -> None:
     assert "Скрипты" in titles, titles
     assert titles.index("Скрипты") + 1 == titles.index("Справка"), titles
     entries = dict(actions.MENUS)["Скрипты"]
-    # The picture converter, and then the submenu of the conversions (task_99).
-    assert entries == ("script_image", actions.SEPARATOR, actions.NAMES_SUBMENU), entries
+    assert entries == ("script_image",), entries
     action = actions.BY_KEY["script_image"]
     assert action.title == "Сконвертировать картинку…", action.title
-    conversions = [actions.BY_KEY[key] for key in actions.NAMES_CONVERSIONS]
-    assert [entry.title for entry in conversions] == ["Имена: PLD в ISO", "Имена: ISO в PLD"], (
-        conversions
-    )
-    # The other axis: the language of the built-in names, with the signs each of
-    # them has a spelling for (task_101).
-    dialect = [actions.BY_KEY[key] for key in actions.DIALECT_CONVERSIONS]
-    assert [entry.title for entry in dialect] == [
-        "Диалект: Русский в Английский",
-        "Диалект: Английский в Русский",
-    ], dialect
-    assert actions.CONVERSIONS == actions.NAMES_CONVERSIONS + (
-        actions.SEPARATOR,
-    ) + actions.DIALECT_CONVERSIONS
-    print("ok: «Скрипты» стоит перед «Справкой» и держит конвертер и перевод имён")
+    print("ok: «Скрипты» стоит перед «Справкой» и держит конвертер")
 
 
 def test_the_dialog_turns_its_fields_into_the_tool_s_arguments(directory: pathlib.Path) -> None:

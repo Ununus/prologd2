@@ -1228,6 +1228,8 @@ prints LF rather than the platform's CRLF, because the answer lands in a tab.
 
 ## ADR-038: the naming conversion is the formatter's token pass, and it names its mode
 
+**Superseded by ADR-053** (part 212): the conversion is gone from the engine.
+
 **Context.**  The dialect reads names two ways (`--vars 0|1`, the file's own
 `:- ИМЕНА(N).`) but prints them as written, so a program written for the original
 engine stays unreadable to the ISO reader and back.  A Python port
@@ -1290,6 +1292,8 @@ Protocol 15 is written down in four places (`protocol.cpp`, `protocol.py`,
 renaming of the two menu entries are part of it (part 167).
 
 ## ADR-039: the dialect conversion trades a call for the sign it already is
+
+**Superseded by ADR-053** (part 212): the conversion is gone from the engine.
 
 **Context.**  The dialect answers to two sets of names — the Russian built-ins and
 their English aliases (task_39) — and to two spellings of four of them: `=`, `is`,
@@ -1716,3 +1720,40 @@ package is smaller and its layout is the same on every platform.  The prose that
 compared three «Пролог-Д» columns (`doc/help.typ`) now compares two modes of one engine
 against SWI and GNU Prolog.  Nothing in the repository can run `examples/prologd/`
 verbatim any more — that corpus is a reference, not a test.
+
+## ADR-053: the engine reads both naming modes but does not rewrite a program for you
+
+**Context.**  task_99 and task_101 taught `--format` to answer with a *different* program:
+`--names 0|1` respelled the variables between the two naming modes, `--dialect ru|en`
+swapped the built-in names and their sign spellings, and the window offered both under
+«Скрипты → Сконвертировать исходник».  The two passes worked, but they made the formatter
+answer for things it does not own: the `format` request carried two more fields, the
+protocol went to 16 for a front-end feature, and every rule of the *reader* had to be
+written a second time, backwards, in the writer — numbered variables (`Х_1`), quotes
+around a one-letter atom, an apostrophe after a long name, and a list of which built-ins
+have a sign.  Both commits were the last two of the release, so removing them was also
+how the owner wanted the record to read: the naming modes stay, the automatic translation
+goes.
+
+**Decision.**  `formatSource` only lays text out.  Removed with the passes: `Dialect`,
+`FormatOptions::names_out`, `FormatOptions::dialect_out`, `variableNames`,
+`planNames`, the `replacements_` map the printer consulted, `DialectConverter` and the
+whole sign-and-alias machinery behind it, `withModeMarker`, `src/prlib/utf8.*` (added for
+the renaming) and the `variables` spelling in `lexer.cpp`.  The `format` request is the
+one it was at protocol 14; `--names` and `--dialect` are gone from the command line; the
+submenu is gone from the window.  This supersedes ADR-038, ADR-039, and the sentence in
+ADR-052 that expected «the formatter's reverse direction» to stay.
+
+**Why remove rather than hide.**  The conversion produced a *new program* that then had to
+be read, debugged and run: a wrong apostrophe is a silent change of meaning (`а` the atom
+became a variable), which is exactly the class of bug a convenience pass must not have.
+Two of the rules were already known to be approximate — numbering had to be global to the
+file, and a call with a comment inside could not be turned into a sign — and the owner
+would rather rewrite the few programs that need it by hand than trust a partly-correct
+rewriter.
+
+**What still answers the need.**  `--vars 0|1` and a file's own `:- ИМЕНА(N).` line read
+either naming mode directly, so an old program runs as it is; the state control switches
+the mode for a file that declares none.  The ISO *reading* is unaffected: English built-in
+names, `=`, `is`, `>`, `\+` are still understood and still parsed as sugar over the
+Russian built-ins (ADR-039's premise holds), only the printing of them is gone.

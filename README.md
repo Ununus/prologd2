@@ -182,9 +182,6 @@ Usage: prologu [options] [files...]
     --format-width N  soft mode: what has to fit on one line (default 80)
     --format-indent N continuation indent in units (default 1)
     --format-unit U   indent unit: tab (default) or spaces
-    --names 0|1|2     print the source with its names in the other mode and exit
-    --dialect ru|en   print the built-in names and their signs in the other
-                      language and exit
     --protocol FORM   front-end protocol: text (default) or json
     --list-keywords   print the reserved names as name/arity and exit
 -h, --help            show help and exit

@@ -273,8 +273,7 @@ Token Lexer::lexIdentifier(DiagnosticSink* sink) {
     }
     return makeToken(TokenKind::Identifier, std::move(text), start);
   }
-  const bool starts_upper = first.valid && isUpperCaseLetter(first.code_point);
-  if (starts_upper) {
+  const bool starts_upper = first.valid && isUpperCaseLetter(first.code_point);  if (starts_upper) {
     return makeToken(TokenKind::Variable, std::move(text), start);
   }
   return makeToken(TokenKind::Identifier, std::move(text), start);

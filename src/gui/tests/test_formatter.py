@@ -173,49 +173,9 @@ def test_ready_names_the_new_version(executable: str) -> None:
     code, events = run_session(executable, [])
     assert code == 0, f"exit code {code}"
     ready = find(events, "ready")
-    assert ready["protocol"] == protocol.PROTOCOL_VERSION == 16
-    print("ok: ready announces protocol 16")
+    assert ready["protocol"] == protocol.PROTOCOL_VERSION == 14
+    print("ok: ready announces protocol 14")
 
-
-def test_the_names_convert_over_the_same_request(executable: str) -> None:
-    """`names` is the mode to *print* in: the answer is the same program, spelled
-    the other way, marker line and all (protocol 15, task_99)."""
-    old = ":- ИМЕНА(1).\nпример(Х,х):-функ(Str,атом).\n"
-    code, events = run_session(executable, [protocol.format_text(old, names=0)])
-    assert code == 0, f"exit code {code}"
-    text = find(events, "formatted")["text"]
-    # `Х` and `х` are two variables in the old dialect and both want `Х` in ISO, so
-    # they are numbered; `Str` was a string constant there and gets its quotes.
-    assert text == ":- ИМЕНА(0).\nпример(Х_1,Х_2):-функ(\"Str\",атом).\n", ascii(text)
-    # And back: a long ISO name gets the apostrophe that makes it a variable in the
-    # old dialect, while `X_` is a variable in both and stays as it is.
-    iso = ":- ИМЕНА(0).\nпример(Сумма,X_):-функ(\"Str\").\n"
-    code, events = run_session(executable, [protocol.format_text(iso, names=1)])
-    assert code == 0, f"exit code {code}"
-    back = find(events, "formatted")["text"]
-    assert back == ":- ИМЕНА(1).\nпример(Сумма',X_):-функ(\"Str\").\n", ascii(back)
-    print("ok: the names convert over the format request, both ways")
-
-
-def test_the_dialect_converts_over_the_same_request(executable: str) -> None:
-    """`dialect` is the language to *print* in: the built-ins and the signs each of
-    them has a spelling for (protocol 16, task_101)."""
-    ru = ":- ИМЕНА(0).\nцель(X) :- ВЫВОД(X), БОЛЬШЕ(X, 1), НЕ(РАВНО(X, #2 + 0#)).\n"
-    code, events = run_session(executable, [protocol.format_text(ru, dialect="en")])
-    assert code == 0, f"exit code {code}"
-    text = find(events, "formatted")["text"]
-    assert text == (
-        ":- ИМЕНА(0).\n"
-        "цель(X):-write(X), X > 1, \\+ X is 2 + 0.\n"
-    ), ascii(text)
-    # And back: the signs become the calls this dialect spells them with, and `is`
-    # puts its operand back where the expression wrapper lives.
-    en = ":- ИМЕНА(0).\nцель(X) :- write(X), X is 2 + 0.\n"
-    code, events = run_session(executable, [protocol.format_text(en, dialect="ru")])
-    assert code == 0, f"exit code {code}"
-    back = find(events, "formatted")["text"]
-    assert back == ":- ИМЕНА(0).\nцель(X):-ВЫВОД(X), РАВНО(X, #2 + 0#).\n", ascii(back)
-    print("ok: the dialect converts over the format request, both ways")
 
 def test_the_caret_carries_over_from_the_old_text_to_the_new() -> None:
     """The window's side of the formatter: old offsets onto the new text."""
@@ -240,8 +200,6 @@ def main(argv: list[str]) -> int:
     test_a_selection_is_formatted_up_to_its_last_complete_goal(executable)
     test_a_broken_source_answers_with_an_error_and_the_session_lives_on(executable)
     test_a_hard_layout_is_turned_back_by_the_soft_mode(executable)
-    test_the_names_convert_over_the_same_request(executable)
-    test_the_dialect_converts_over_the_same_request(executable)
     test_ready_names_the_new_version(executable)
     print("all formatter checks passed")
     return 0

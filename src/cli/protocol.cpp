@@ -51,11 +51,7 @@ using Json = nlohmann::json;
 //    and `height`), and `ready` carries the engine's own screen (task_73).
 // 14: `screen` is also an *event*: the canvas a program names with
 //    `:- ХОЛСТ(Высота, Ширина).` (ADR-035).
-// 15: `format` takes `names`: the mode to *print* the names in, so the same
-//    request converts a program between the two dialects (task_99).
-// 16: `format` takes `dialect`: the language to print the built-in names and
-//    their sign spellings in, `en` or `ru` (task_101).
-constexpr int kProtocolVersion = 16;
+constexpr int kProtocolVersion = 14;
 
 /// The screen a front-end may ask for: small enough to stay cheap both in memory
 /// and on the wire (a snapshot is `width × height × 4` bytes), large enough for a
@@ -549,29 +545,6 @@ class Session {
       return;
     }
     options.variables = *naming;
-    // The mode to *print* the names in (task_99): absent keeps them as they are.
-    if (request.contains("names")) {
-      const int target = request.at("names").get<int>();
-      const std::optional<VariableMode> printed = variableModeFromNumber(target);
-      if (!printed.has_value()) {
-        fail("format", "format: режим имён на выходе должен быть 0, 1 или 2");
-        return;
-      }
-      options.names_out = *printed;
-    }
-    // The language to print the built-in names in (task_101): absent keeps them as
-    // they are written.
-    if (request.contains("dialect")) {
-      const std::string language = request.at("dialect").get<std::string>();
-      if (language == "en") {
-        options.dialect_out = Dialect::English;
-      } else if (language == "ru") {
-        options.dialect_out = Dialect::Russian;
-      } else {
-        fail("format", "format: диалект должен быть ru или en, не " + language);
-        return;
-      }
-    }
     const FormatResult formatted =
         formatSource(request.at("text").get<std::string>(), options);
     if (!formatted.ok()) {

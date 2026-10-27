@@ -24,15 +24,6 @@ enum class IndentUnit {
   Spaces,  ///< four spaces per step
 };
 
-/// The language the built-in names are printed in (task_101).  It is a
-/// *conversion*, not a mode of reading: the engine reads both spellings of every
-/// built-in in every naming mode, so a file keeps working whichever language it is
-/// printed in.
-enum class Dialect : std::uint8_t {
-  Russian = 0,  ///< `ВЫВОД`, `НАЙТИВСЕ`, `РАВНО`, `БОЛЬШЕ`, `НЕ`, `ИМПОРТ`…
-  English = 1,  ///< `write`, `findall`, `=`, `is`, `>`, `\+`, `import`…
-};
-
 /// Everything the formatter is allowed to do, as the settings spell it.
 struct FormatOptions {
   FormatMode mode = FormatMode::Soft;
@@ -53,23 +44,6 @@ struct FormatOptions {
   /// may end in the middle of a body — it is then formatted up to its last
   /// complete goal and the rest is copied as it stands.
   bool selection_only = false;
-  /// The mode to *print* names in (task_99); empty prints them as the file reads
-  /// them.  `Iso` writes an old-dialect program in the ISO spelling — numbered
-  /// variables, `"…"` for the bare capitalised constants — and `Old` writes an ISO
-  /// one back (`Сумма'`, while `X` and `X_` stay as they are, and a one-letter atom
-  /// takes the quotes the old dialect needs: `а` → `'а'`).  The marker line of
-  /// the answer always says which mode it is in, whether the source had one or not.
-  /// A fragment (`selection_only`) keeps its names: the numbering needs the whole
-  /// program.
-  std::optional<VariableMode> names_out;
-  /// The language to *print* the built-in names and the operator spellings in
-  /// (task_101); empty prints them as they are written.  `English` spells out
-  /// what ISO spells: `РАВНО(A, B)` → `A = B`, `РАВНО(A, #B#)` → `A is B`,
-  /// `БОЛЬШЕ(A, B)` → `A > B`, `МЕНЬШЕ(A, B)` → `A < B`, `НЕ(A)` → `\+ A`, and
-  /// every built-in that has an English name gets it.  `Russian` is the way back.
-  /// It is a rewrite of words, not of layout, and it composes with the other two:
-  /// the conversion runs first, then the names, then the layout.
-  std::optional<Dialect> dialect_out;
 };
 
 /// What `formatSource` made of the input.

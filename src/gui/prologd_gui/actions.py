@@ -104,18 +104,6 @@ STATE_ICONS: tuple[str, ...] = tuple(state.icon for state in STATES)
 SEPARATOR = "-"
 RECENT = "recent"
 
-#: «Скрипты → Сконвертировать исходник» (task_99, task_101): the ways a program
-#: can be rewritten into the other spelling of itself.  A submenu rather than
-#: entries of the menu itself, because the sources are one command with a
-#: direction and the menu has room for more of them later.
-NAMES_SUBMENU = "#names-submenu"
-NAMES_MENU_TITLE = "Сконвертировать исходник"
-#: The naming modes (task_99) and the languages of the built-in names (task_101),
-#: in the order the submenu lists them.
-NAMES_CONVERSIONS: tuple[str, ...] = ("names_iso", "names_pld")
-DIALECT_CONVERSIONS: tuple[str, ...] = ("dialect_en", "dialect_ru")
-CONVERSIONS: tuple[str, ...] = NAMES_CONVERSIONS + (SEPARATOR,) + DIALECT_CONVERSIONS
-
 #: The formatter's mode (task_30, moved back to the toolbar in task_47): a
 #: control of the toolbar, right after «Форматировать» — it carries the mode and
 #: the «только выделенное» switch the action reads.  It lived in the «Правка»
@@ -294,15 +282,6 @@ ACTIONS: tuple[Action, ...] = (
     # `tools/image_to_pld.py` and puts what it printed into a new tab.  It is not
     # part of running a program, so it gets a menu of its own.
     Action("script_image", "Сконвертировать картинку…", None),
-    # The other conversion: the same text with its names spelled the other way
-    # (task_99).  Both ride the formatter's request, which is why they live in the
-    # same menu as «Форматировать».
-    Action("names_iso", "Имена: PLD в ISO", None),
-    Action("names_pld", "Имена: ISO в PLD", None),
-    # And the same text with its built-ins in the other language (task_101): the
-    # ISO spelling where this dialect has one (`write`, `findall`, `=`, `is`).
-    Action("dialect_en", "Диалект: Русский в Английский", None),
-    Action("dialect_ru", "Диалект: Английский в Русский", None),
     # -- help
     # The reference of a predicate (task_37): the same help picture, because it
     # is the same «справка» — only the answer comes from `doc/builtins.json`
@@ -419,7 +398,7 @@ MENUS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ),
     (
         "Скрипты",
-        ("script_image", SEPARATOR, NAMES_SUBMENU),
+        ("script_image",),
     ),
     (
         "Справка",

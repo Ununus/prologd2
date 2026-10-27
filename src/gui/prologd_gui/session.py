@@ -343,8 +343,6 @@ class PrologSession(QObject):
         selection: bool = False,
         name: str = "<format>",
         variable_mode: int = 0,
-        names: int | None = None,
-        dialect: str | None = None,
     ) -> None:
         """Asks the interpreter to lay the text out; `formatted` answers it.
 
@@ -352,17 +350,11 @@ class PrologSession(QObject):
         so the request travels over the protocol like everything else (protocol
         6).  It needs no engine and is answered between queries; the reply is
         either a `formatted` event or `error` events of kind `format`.
-
-        `names` asks for the same text with its names spelled in another mode
-        (protocol 15, task_99), and `dialect` the same text with its built-in
-        names in the other language (protocol 16, task_101): with either the
-        answer is a converted program, not just the same one laid out.
         """
         self._send(
             protocol.format_text(
                 text, mode=mode, width=width, indent=indent, unit=unit,
                 selection=selection, name=name, variable_mode=variable_mode,
-                names=names, dialect=dialect,
             )
         )
 

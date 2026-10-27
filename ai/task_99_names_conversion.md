@@ -1,6 +1,8 @@
 # task_99 — converting a source between the name modes (PLD ↔ ISO)
 
-**Status:** done (2026-10-23) — ADR-038, part 166
+**Status:** superseded (part 212) — the conversion was removed from the engine,
+the protocol is back to 14 and the menu entry is gone; kept as the record of the
+work.  Was: done (2026-10-23) — ADR-038, part 166
 **Depends on:** task_67 (two name modes), task_77 (`2` merged into `1`), the
 formatter (`--format`)
 **Milestone:** 2.6.0

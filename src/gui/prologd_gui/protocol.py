@@ -39,11 +39,7 @@ from typing import Any, Iterator
 #: 14: `screen` is also an *event*: the canvas a program names with
 #:    `:- ХОЛСТ(Высота, Ширина).`, sent as soon as the directive is applied, so a
 #:    window can take the size before the first primitive (ADR-035).
-#: 15: `format` takes `names`: the mode to *print* the names in, so the same
-#:    request converts a program between the two dialects (task_99).
-#: 16: `format` takes `dialect`: the language to print the built-in names and
-#:    their sign spellings in, `en` or `ru` (task_101).
-PROTOCOL_VERSION = 16
+PROTOCOL_VERSION = 14
 
 #: Event names the interpreter emits.
 EVENTS = ("ready", "output", "result", "input_request", "step", "trace", "graphics",
@@ -202,8 +198,6 @@ def format_text(
     selection: bool = False,
     name: str = "<format>",
     variable_mode: int = 0,
-    names: int | None = None,
-    dialect: str | None = None,
 ) -> bytes:
     """Asks the interpreter to lay `text` out; the answer is `formatted`.
 
@@ -211,11 +205,7 @@ def format_text(
     window sends the buffer and receives the laid-out text back.  `selection`
     tells it the text is a fragment: one that breaks off in the middle of a body
     comes back formatted up to its last complete goal, the rest untouched
-    (task_30).  `names` is the mode to *print* the names in — the same request
-    then converts a program between the two dialects (protocol 15, task_99);
-    `dialect` is the language to print the built-in names and their sign
-    spellings in, `en` or `ru` (protocol 16, task_101).  `variable_mode` stays
-    «how the text is read».  Flags that are the defaults are left off the wire.
+    (task_30).  Flags that are the defaults are left off the wire.
     """
     if mode not in ("line", "soft", "hard"):
         raise ValueError(f"unknown format mode: {mode!r}")
@@ -230,10 +220,6 @@ def format_text(
         fields["selection"] = True
     if name != "<format>":
         fields["name"] = name
-    if names is not None:
-        fields["names"] = int(names)
-    if dialect is not None:
-        fields["dialect"] = str(dialect)
     fields.update(_variable_mode(variable_mode))
     return encode_request(**fields)
 
