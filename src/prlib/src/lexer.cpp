@@ -20,8 +20,9 @@ const std::unordered_set<std::string> kReservedBuiltins = {
     "quiet", "version", "nl",
     // Arithmetic
     "БОЛЬШЕ", "МЕНЬШЕ", "СЛОЖЕНИЕ", "УМНОЖЕНИЕ", "СЛУЧ", "float", "mod", "div",
+    "rem", "sign", "pi", "floor", "ceiling", "round", "truncate",
     "greater", "less", "plus", "mul", "random", "abs", "sqrt", "sin",
-    "cos", "tan", "exp", "is_whole", "is_number",
+    "cos", "tan", "exp", "log", "is_whole", "is_number",
     // I/O
     "ЧТЕНИЕ_ИЗ", "ЗАПИСЬ_В", "ВВКОД", "ВВОДЦЕЛ", "ВВОДВЕЩ", "ВВОДСИМВ",
     "ВВОДСТР", "ВЫВОД", "ВЫВОДПС", "ЖДИ",
@@ -419,7 +420,18 @@ std::vector<Token> Lexer::tokenizeImpl(DiagnosticSink* sink) {
           tokens.push_back(makeToken(TokenKind::Minus, "-", start));
         }
         break;
-      case '*': advanceByte(1); tokens.push_back(makeToken(TokenKind::Star, "*", start)); break;
+      case '*':
+        // `**` is ISO's power and a sign of its own: `2**3` must not read as
+        // two multiplications.  `/` does the same for `//`, and `/*` never
+        // reaches either case — block comments are read before this switch.
+        if (peek(1) == '*') {
+          advanceByte(2);
+          tokens.push_back(makeToken(TokenKind::StarStar, "**", start));
+        } else {
+          advanceByte(1);
+          tokens.push_back(makeToken(TokenKind::Star, "*", start));
+        }
+        break;
       case '^':
         // `^` is ISO's existential quantifier (task_91): `ВСЕРЕШ(Х, У^Ц, С)` says
         // «У of the goal does not matter», so the bag is not split by it.  It is
@@ -427,7 +439,18 @@ std::vector<Token> Lexer::tokenizeImpl(DiagnosticSink* sink) {
         advanceByte(1);
         tokens.push_back(makeToken(TokenKind::Caret, "^", start));
         break;
-      case '/': advanceByte(1); tokens.push_back(makeToken(TokenKind::Slash, "/", start)); break;
+      case '/':
+        // `//` is ISO's integer division, and `/*` never reaches this switch —
+        // block comments are read before it.  Two signs, one token: `6 // 2` is
+        // not `6 / / 2`, and `//` must not be read as two divisions.
+        if (peek(1) == '/') {
+          advanceByte(2);
+          tokens.push_back(makeToken(TokenKind::SlashSlash, "//", start));
+        } else {
+          advanceByte(1);
+          tokens.push_back(makeToken(TokenKind::Slash, "/", start));
+        }
+        break;
       case '(': advanceByte(1); tokens.push_back(makeToken(TokenKind::LParen, "(", start)); break;
       case ')': advanceByte(1); tokens.push_back(makeToken(TokenKind::RParen, ")", start)); break;
       case '[': advanceByte(1); tokens.push_back(makeToken(TokenKind::LBracket, "[", start)); break;

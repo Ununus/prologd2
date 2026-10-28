@@ -186,6 +186,35 @@ TEST_CASE("a dot ends a number, not a float") {
   }
 }
 
+TEST_CASE("`//` is one token, and `/` keeps its own") {
+  // ISO's integer division is a sign of its own: `6 // 2` must not read as two
+  // divisions.  A block comment is `/*`, which the lexer reads before it ever
+  // looks at a slash, so `//` cannot be mistaken for a comment either.
+  DiagnosticSink sink;
+  const auto tokens = lex("6 // 2 / 3 /* пояснение */ 4", sink);
+  REQUIRE_FALSE(sink.hasErrors());
+  REQUIRE(tokens[1].kind == TokenKind::SlashSlash);
+  REQUIRE(tokens[1].text == "//");
+  REQUIRE(tokens[3].kind == TokenKind::Slash);
+  REQUIRE(tokens[3].text == "/");
+  // The block comment is one gap: the token after it is the `4`.
+  REQUIRE(tokens[5].kind == TokenKind::Integer);
+  REQUIRE(tokens[5].text == "4");
+}
+
+TEST_CASE("`**` is one token, and `*` keeps its own") {
+  // ISO's power is a sign of its own: `2**3` must not read as two
+  // multiplications.  A block comment ends with `*/`, which never reaches the
+  // switch — the lexer reads the comment before it looks at a star.
+  DiagnosticSink sink;
+  const auto tokens = lex("2**3 * 4", sink);
+  REQUIRE_FALSE(sink.hasErrors());
+  REQUIRE(tokens[1].kind == TokenKind::StarStar);
+  REQUIRE(tokens[1].text == "**");
+  REQUIRE(tokens[3].kind == TokenKind::Star);
+  REQUIRE(tokens[3].text == "*");
+}
+
 TEST_CASE("the comparison signs are one token each") {
   // task_52: `=`, `<`, `>`, `=<`, `>=` are the sugar of the comparison layer.
   const struct {

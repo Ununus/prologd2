@@ -205,6 +205,17 @@ def test_comparison_signs() -> None:
     assert kinds("1 =:= 1") == [(INTEGER, "1"), (OPERATOR, "=:="), (INTEGER, "1")]
     assert kinds("2 =\\= 3") == [(INTEGER, "2"), (OPERATOR, "=\\="), (INTEGER, "3")]
     assert kinds("X \\= Y") == [(VARIABLE, "X"), (OPERATOR, "\\="), (VARIABLE, "Y")]
+    # `//` is ISO's integer division: one token, so it is not coloured as two
+    # signs with a gap between them.
+    assert kinds("6 // 2") == [(INTEGER, "6"), (PUNCTUATION, "//"), (INTEGER, "2")]
+    # `**` is ISO's power, one token for the same reason.
+    assert kinds("2**3 * 4") == [
+        (INTEGER, "2"),
+        (PUNCTUATION, "**"),
+        (INTEGER, "3"),
+        (PUNCTUATION, "*"),
+        (INTEGER, "4"),
+    ]
     print("ok: the comparison signs")
 
 

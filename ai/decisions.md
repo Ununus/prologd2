@@ -1834,3 +1834,61 @@ the console, «which dialect is this» of the program.
 named `prologd`, so `/opt/prologd/prologd` is no longer a name that could be confused
 with the original engine's `prologd.exe` — the original is not built any more
 (ADR-052).
+
+## ADR-056: `/` is the real quotient, `//` and `div` the whole one
+
+**Context.**  The dialect's `/` truncated when both operands were integers: `1/2`
+was `0`, and a real average needed a real operand somewhere.  That is C's rule, not
+ISO's, and it was the last arithmetic operation whose *type* depended on the operands
+rather than on the operator.  `mod` and `div` already existed; `rem` did not, and the
+functions of ISO existed only as two-argument predicates (`sqrt(X, Y)`), so an
+expression could not say `sqrt(2)`.
+
+**Decision.**  Arithmetic follows ISO where the two differ:
+
+* `/` is always the *real* quotient — `1 / 2` is `0.5`, `6 / 3` is `2.0`;
+* `//` (a sign of its own) and `div` are the whole quotient, truncating toward zero:
+  `-7 // 2` is `-3`, `-5 div 3` is `-1`;
+* `rem` and `mod` answer the remainder *with the sign of the dividend*: `-5 rem 3`
+  is `-2`.  ISO's `mod` takes the divisor's sign and would answer `1`; the owner
+  asked to keep ours for now, so `mod` and `rem` are the same operation and the
+  difference is written down in the manual and in the tests instead of being
+  silently «fixed» in one of them;
+* the four integer operators refuse real operands with a type error naming the
+  operator — a truncation nobody asked for is worse than a diagnostic.
+
+The expressions also gained ISO's *functions*: `abs(X)`, `sign(X)`, `sqrt(X)`,
+`sin(X)`, `cos(X)`, `tan(X)`, `exp(X)`, `log(X)`, the four rounding ones
+`floor(X)`, `ceiling(X)`, `round(X)`, `truncate(X)` and the constant `pi`.  `abs`
+and `sign` keep the type of the argument, the root and the five transcendental ones
+always answer a real, the four rounding ones answer a whole number (an integer
+argument comes back untouched — through `double` it would lose digits past 2^53).  A
+function call
+is recognised in the expression grammar by name, so `abs(2 - 5)` is parsed with the
+arithmetic rules — the term grammar has no `-` and cannot take that argument.  A
+value the function does not have (the root of a negative number, the logarithm of
+zero, an overflow) is a *runtime error*, because an expression must produce a
+number; the two-argument predicates of the same names keep answering `НЕТ` instead.
+`log` has no two-argument twin at all: it is a function only.
+
+`**` is ISO's power, with ISO's shape: tighter than the unary sign (`-2 ** 2` is
+`-4`, `2 * 3 ** 2` is `18`) and non-associative, so `2 ** 3 ** 4` asks for the
+brackets instead of guessing one of two readings that differ by a factor of
+`2 ** 74`.  A whole base with a whole exponent that is not negative stays whole and
+exact — `2 ** 100` keeps all thirty-one digits — and every other combination goes
+through `pow` and answers a real (`2 ** -1` is `0.5`).  Two liberties are taken and
+written down: a sign is read after `**` (`2 ** -1`, which ISO spells `2 ** (-1)`),
+and a power whose answer would have more than twenty thousand digits is refused
+with a message — ISO sets no such limit, but `2 ** 1000000000` would occupy every
+byte the machine has, and a diagnostic is better than a hunt for the power button.
+
+**Consequences.**  A program that used `/` on integers for whole division has to say
+`//` or `div`; the repository's own programs were four lines (lesson 3, `iso/arith`,
+`drawing.pld`, one test fixture) and all four were rewritten.  `sign`, `pi`, `log`
+and the four rounding names are reserved names of a new kind (`function`): they are
+not callable goals, and a goal named after them says so.  `**` is a sign of its own
+in the lexer, so `2**3` is a power and never two multiplications; `^` stays the
+quantifier of `ВСЕРЕШ`, which is why ISO's other spelling of the power is not
+available here.  A student coming from ISO finds the arithmetic they know; a reader
+of the previous dialect finds that `mod` still keeps the dividend's sign — the one
+place where the two readings still differ, and it is documented rather than hidden.

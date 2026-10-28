@@ -11,7 +11,11 @@ namespace prologd {
 /// only the callable ones in a completion list.
 enum class KeywordKind : std::uint8_t {
   Predicate,  ///< callable: registered in the built-in dispatch table
-  Operator,   ///< infix arithmetic operator: `mod`, `div`
+  Operator,   ///< infix arithmetic operator: `mod`, `div`, `rem`
+  /// A name that is only an arithmetic function or constant, written inside
+  /// `#…#`/`is` and never called as a goal: `sign`, `pi`.  The functions that
+  /// are also predicates (`abs`, `sqrt`, `sin`…) are `Predicate`.
+  Function,
   Directive,  ///< statement form the loader handles: `ИМПОРТ`
 };
 

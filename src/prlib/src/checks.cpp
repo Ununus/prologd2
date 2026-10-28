@@ -21,6 +21,7 @@ struct NameInfo {
   bool variadic = false;
   bool reserved = false;
   bool operatorName = false;
+  bool functionName = false;
   bool directive = false;
 };
 
@@ -50,6 +51,10 @@ std::map<std::string, NameInfo> knownNames(const ParsedProgram& program,
     NameInfo& info = known[std::string(keyword.name)];
     if (keyword.kind == KeywordKind::Operator) {
       info.operatorName = true;
+      continue;
+    }
+    if (keyword.kind == KeywordKind::Function) {
+      info.functionName = true;
       continue;
     }
     if (keyword.kind == KeywordKind::Directive) {
@@ -416,6 +421,8 @@ void checkCallSites(const ParsedProgram& program, const Database& database,
     std::string message(name);
     if (info.operatorName) {
       message += " — оператор, а не предикат";
+    } else if (info.functionName) {
+      message += " — пишется в арифметическом выражении, а не в цели";
     } else if (info.directive) {
       message += " — директива, а не предикат";
     } else if (info.reserved) {

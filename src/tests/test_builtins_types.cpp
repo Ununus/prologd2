@@ -50,7 +50,8 @@ TEST_CASE("the integer test is true for an integer or an expression that gives o
       "?ЦЕЛ(#2+3#).\n"
       "?ЦЕЛ(#10 div 3#).\n"
       "?ЦЕЛ(#10 mod 3#).\n"
-      "?ЦЕЛ(#1/2#).\n"                  // `/` on two integers truncates: this is 0
+      "?ЦЕЛ(#1//2#).\n"                 // `//` is the integer quotient: this is 0
+      "?ЦЕЛ(#1/2#).\n"                  // `/` on two integers is a *real*: 0.5
       "?ЦЕЛ(5.0).\n"                    // a real is a real, even a whole one
       "?ЦЕЛ(5.5).\n"
       "?ЦЕЛ(#1.0/2#).\n"                // one real operand makes the result real
@@ -62,7 +63,7 @@ TEST_CASE("the integer test is true for an integer or an expression that gives o
       "?ЦЕЛ(X).\n");
   REQUIRE(result.loaded);
   REQUIRE(result.output == "ДА\nДА\nДА\nДА\nДА\nДА\nДА\nДА\n"
-                           "НЕТ\nНЕТ\nНЕТ\nНЕТ\nНЕТ\nНЕТ\nНЕТ\nНЕТ\nНЕТ\n");
+                           "НЕТ\nНЕТ\nНЕТ\nНЕТ\nНЕТ\nНЕТ\nНЕТ\nНЕТ\nНЕТ\nНЕТ\n");
 }
 
 TEST_CASE("the real test is true for a real or an expression that gives one") {
@@ -72,16 +73,17 @@ TEST_CASE("the real test is true for a real or an expression that gives one") {
       "?ВЕЩ(-0.5).\n"
       "?ВЕЩ(#2.0+3#).\n"
       "?ВЕЩ(#1/2.0#).\n"
+      "?ВЕЩ(#1/2#).\n"          // `/` is float division whatever the operands are
       "?ВЕЩ(5).\n"
       "?ВЕЩ(100000000000000000000).\n"
       "?ВЕЩ(#2+3#).\n"
-      "?ВЕЩ(#1/2#).\n"
+      "?ВЕЩ(#10 div 3#).\n"
       "?ВЕЩ(\"5.0\").\n"
       "?ВЕЩ(a).\n"
       "?ВЕЩ([]).\n"
       "?ВЕЩ(X).\n");
   REQUIRE(result.loaded);
-  REQUIRE(result.output == "ДА\nДА\nДА\nДА\nДА\n"
+  REQUIRE(result.output == "ДА\nДА\nДА\nДА\nДА\nДА\n"
                            "НЕТ\nНЕТ\nНЕТ\nНЕТ\nНЕТ\nНЕТ\nНЕТ\nНЕТ\n");
 }
 
@@ -134,12 +136,13 @@ TEST_CASE("an integer and a real unify when they are the same number") {
       "?РАВНО(10000000000, 10000000000.0).\n"
       "?РАВНО(#2+3#, 5.0).\n"
       "?РАВНО(#2.0+3#, 5).\n"
-      "?РАВНО(#1/2#, 0.5).\n"                                    // this is 0, not 0.5
+      "?РАВНО(#1/2#, 0.5).\n"                                    // `/` is float division
+      "?РАВНО(#1//2#, 0).\n"                                     // `//` is the integer one
       "?РАВНО(5, 5).\n"
       "?РАВНО(\"5\", 5).\n");                                    // a string is not a number
   REQUIRE(result.loaded);
   REQUIRE(result.output == "ДА\nНЕТ\nДА\nДА\nДА\nДА\nНЕТ\nДА\nНЕТ\n"
-                           "НЕТ\nДА\nДА\nДА\nНЕТ\nДА\nНЕТ\n");
+                           "НЕТ\nДА\nДА\nДА\nДА\nДА\nДА\nНЕТ\n");
 }
 
 TEST_CASE("a cyclic term is written, not followed") {

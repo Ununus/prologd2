@@ -571,7 +571,9 @@ Term Parser::parsePrimary() {
     }
     case TokenKind::Plus:
     case TokenKind::Star:
+    case TokenKind::StarStar:
     case TokenKind::Slash:
+    case TokenKind::SlashSlash:
       advance();
       report(ErrorCode::MisplacedSign, token.location);
       return makeAtom("<error>");
@@ -711,10 +713,14 @@ Term Parser::parseMultiplicative() {
   Term left = parseUnaryArithmetic();
   while (!failed_) {
     std::string op;
-    if (check(TokenKind::Star) || check(TokenKind::Slash)) {
+    if (check(TokenKind::Star) || check(TokenKind::Slash) ||
+        check(TokenKind::SlashSlash)) {
       op = advance().text;
     } else if (check(TokenKind::Identifier) &&
-               (peek().text == "mod" || peek().text == "div")) {
+               (peek().text == "mod" || peek().text == "div" || peek().text == "rem")) {
+      // The three named operators of ISO's arithmetic.  They are reserved names,
+      // so the lexer hands them over as identifiers, and the expression grammar
+      // is the only place they mean anything.
       op = advance().text;
     } else {
       break;
@@ -732,7 +738,54 @@ Term Parser::parseUnaryArithmetic() {
   if (match(TokenKind::Plus)) {
     return parseUnaryArithmetic();
   }
+  return parsePower();
+}
+
+Term Parser::parsePower() {
+  Term base = parsePrimaryArithmetic();
+  if (failed_ || !check(TokenKind::StarStar)) {
+    return base;
+  }
+  const Token op = advance();
+  Term exponent = parsePowerOperand();
+  if (failed_) {
+    return base;
+  }
+  // ISO gives `**` the `xfx` shape: it binds tighter than the unary sign — the
+  // `-` of `-2**2` is outside the power, and the answer is `-4` — and it does
+  // not chain.  A chain has two readings, so it is reported rather than guessed;
+  // the message gives both bracketings.
+  if (check(TokenKind::StarStar)) {
+    report(ErrorCode::InvalidArithmeticExpression, peek().location,
+           "«**» — не цепочка: поставьте скобки, «(A**B)**C» или «A**(B**C)»");
+    skipToTerminator();
+    return base;
+  }
+  return makeCompound(op.text, {std::move(base), std::move(exponent)});
+}
+
+/// The right operand of `**`: a primary, with a sign allowed in front.  ISO
+/// wants the brackets of `2**(-1)`; a sign is read here anyway, because the same
+/// expression is written `2**-1` by every student.
+Term Parser::parsePowerOperand() {
+  if (match(TokenKind::Minus)) {
+    return makeCompound("neg", {parsePowerOperand()});
+  }
+  if (match(TokenKind::Plus)) {
+    return parsePowerOperand();
+  }
   return parsePrimaryArithmetic();
+}
+
+/// The arithmetic functions of ISO that are written with one argument:
+/// `abs(2 - 5)` is a function call, not the compound `abs/2` the same name forms
+/// as a goal.  The name is enough to tell them apart here, because the
+/// expression grammar is the only place such a term is evaluated.
+bool isArithmeticFunctionName(std::string_view name) {
+  return name == "abs" || name == "sign" || name == "sqrt" || name == "sin" ||
+         name == "cos" || name == "tan" || name == "exp" || name == "log" ||
+         name == "floor" || name == "ceiling" || name == "round" ||
+         name == "truncate";
 }
 
 Term Parser::parsePrimaryArithmetic() {
@@ -743,6 +796,21 @@ Term Parser::parsePrimaryArithmetic() {
     case TokenKind::Float:
       return parsePrimary();
     case TokenKind::Variable:
+      return parsePrimary();
+    case TokenKind::Identifier:
+      if (isArithmeticFunctionName(token.text) &&
+          peek(1).kind == TokenKind::LParen) {
+        // The argument is an *arithmetic* operand, not a term: `abs(2 - 5)` has
+        // a subtraction in it, and the term grammar has no `-`.
+        const Token name = advance();
+        advance();  // '('
+        Term argument = parseAdditive();
+        if (!match(TokenKind::RParen)) {
+          report(ErrorCode::InvalidArithmeticExpression, peek().location,
+                 "Не закрыта скобка в арифметическом выражении");
+        }
+        return makeCompound(name.text, {std::move(argument)});
+      }
       return parsePrimary();
     case TokenKind::Hash:
       // `X is #1 + 1#` — the marked form still works inside an arithmetic

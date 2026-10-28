@@ -739,33 +739,93 @@ namespace {
 
 ArithValue evaluateNode(Engine& engine, const Term& node);
 
+/// True for the operators that want whole numbers on both sides.
+bool isIntegerDivision(std::string_view op) {
+  return op == "div" || op == "//" || op == "mod" || op == "rem";
+}
+
+/// True for the two that answer a remainder rather than a quotient.
+bool isRemainder(std::string_view op) { return op == "mod" || op == "rem"; }
+
+/// The largest whole answer `**` will compute, in decimal digits.  Nothing about
+/// ISO sets such a limit — the integers have no fixed width — but `2 ** 10^9`
+/// would occupy every byte the machine has, so a power that cannot answer in
+/// reasonable time is refused instead.  Twenty thousand digits is far past
+/// anything a program of this dialect writes down, and still fast to compute.
+constexpr double kMaxPowerDigits = 20000.0;
+
+/// `base ** exponent` for a whole base and a whole exponent, by squaring: the
+/// answer is exact, so `2 ** 100` keeps every one of its thirty-one digits.
+BigInt integerPower(Engine& engine, const BigInt& base, const BigInt& exponent) {
+  if (exponent.isZero()) {
+    return BigInt(1);
+  }
+  if (base.isZero()) {
+    return base;
+  }
+  if (base.abs() == BigInt(1)) {
+    // `1 ** n` is 1 and `(-1) ** n` alternates; neither grows, so neither is
+    // measured against the limit.
+    const bool odd = !(exponent % BigInt(2)).isZero();
+    return base.isNegative() && odd ? BigInt(-1) : BigInt(1);
+  }
+  if (exponent == BigInt(1)) {
+    return base;
+  }
+  // `base` has `digitCount` digits, so `base ** exponent` has at most
+  // `digitCount * exponent` of them — enough to refuse the hopeless cases before
+  // the first multiplication.
+  const double digits = static_cast<double>(base.digitCount()) * exponent.toDouble();
+  if (!(digits <= kMaxPowerDigits)) {
+    engine.raise(ErrorCode::ArithmeticError,
+                 "**: результат слишком велик — больше 20000 цифр");
+  }
+  BigInt result(1);
+  BigInt factor = base;
+  std::int64_t remaining = exponent.toInt64();
+  while (remaining > 0) {
+    if ((remaining & 1) != 0) {
+      result *= factor;
+    }
+    remaining >>= 1;
+    if (remaining > 0) {
+      factor *= factor;
+    }
+  }
+  return result;
+}
+
 ArithValue evaluateBinary(Engine& engine, std::string_view op, const Term& left,
                           const Term& right) {
   const ArithValue a = evaluateNode(engine, left);
   const ArithValue b = evaluateNode(engine, right);
   const bool floatResult = a.is_float || b.is_float;
-  if (op == "mod" || op == "div") {
+  if (isIntegerDivision(op)) {
+    // ISO's `div`, `//`, `mod` and `rem` are defined on integers only; a real
+    // operand is a type error, not a silent truncation.
     if (floatResult) {
-      engine.raise(op == "mod" ? ErrorCode::ArithmeticType
-                               : ErrorCode::ArithmeticType);
+      engine.raise(ErrorCode::ArithmeticType,
+                   std::string("операция «") + std::string(op) +
+                       "» определена только для целых, а получено вещественное");
     }
     if (b.integer.isZero()) {
       engine.raise(ErrorCode::DivisionByZero);
     }
-    return op == "mod" ? ArithValue::ofInteger(a.integer % b.integer)
-                       : ArithValue::ofInteger(a.integer / b.integer);
+    // `BigInt` divides the magnitudes and keeps the sign of the dividend for a
+    // remainder, which is exactly ISO: the quotient truncates toward zero
+    // (`-5 div 3` is `-1`) and `rem` takes the sign of the dividend
+    // (`-5 rem 3` is `-2`).  `mod` is the same as `rem` here for now.
+    return isRemainder(op) ? ArithValue::ofInteger(a.integer % b.integer)
+                           : ArithValue::ofInteger(a.integer / b.integer);
   }
   if (op == "/") {
-    if (floatResult) {
-      if (b.asDouble() == 0.0) {
-        engine.raise(ErrorCode::DivisionByZero);
-      }
-      return ArithValue::ofFloat(a.asDouble() / b.asDouble());
-    }
-    if (b.integer.isZero()) {
+    // ISO's `/` is *float* division: `1 / 2` is `0.5` and `6 / 3` is `2.0`, and
+    // the integer quotient is `//` or `div`.  A zero divisor is an error even
+    // when the dividend is a float.
+    if (b.asDouble() == 0.0) {
       engine.raise(ErrorCode::DivisionByZero);
     }
-    return ArithValue::ofInteger(a.integer / b.integer);
+    return ArithValue::ofFloat(a.asDouble() / b.asDouble());
   }
   if (op == "+") {
     return floatResult ? ArithValue::ofFloat(a.asDouble() + b.asDouble())
@@ -779,7 +839,128 @@ ArithValue evaluateBinary(Engine& engine, std::string_view op, const Term& left,
     return floatResult ? ArithValue::ofFloat(a.asDouble() * b.asDouble())
                        : ArithValue::ofInteger(a.integer * b.integer);
   }
+  if (op == "**") {
+    // ISO's power.  A whole base with a whole exponent that is not negative
+    // stays whole and exact (`2 ** 100` has all 31 digits); every other
+    // combination goes through `pow` and answers a real (`2 ** -1` is `0.5`).
+    if (!floatResult && !b.integer.isNegative()) {
+      return ArithValue::ofInteger(integerPower(engine, a.integer, b.integer));
+    }
+    // `0 ** -1` is a division by zero, as ISO names it.
+    if (a.asDouble() == 0.0 && b.asDouble() < 0.0) {
+      engine.raise(ErrorCode::DivisionByZero);
+    }
+    const double result = std::pow(a.asDouble(), b.asDouble());
+    if (std::isnan(result)) {
+      engine.raise(ErrorCode::ArithmeticError,
+                   "**: отрицательное число в дробной степени не имеет значения");
+    }
+    if (!std::isfinite(result)) {
+      engine.raise(ErrorCode::ArithmeticError, "**: результат не представим числом");
+    }
+    return ArithValue::ofFloat(result);
+  }
   engine.raise(ErrorCode::InvalidArithmeticExpression);
+}
+
+/// π to the precision a `double` holds.  The constant is written out rather
+/// than taken from `<cmath>`'s `M_PI`, which is not standard C++.
+constexpr double kPi = 3.14159265358979323846;
+
+/// The four rounding functions of ISO, each answering a *whole* number.
+///
+/// An integer argument comes back as it is — going through `double` would lose
+/// digits past 2^53, and `floor` of a whole number is that number.  A real one is
+/// rounded by the rule of its name and becomes an integer.  `round` is
+/// `std::round`: the nearest of the two, and a half goes away from zero, which is
+/// what ISO's `round` says.
+bool isRoundingFunction(std::string_view name) {
+  return name == "floor" || name == "ceiling" || name == "round" || name == "truncate";
+}
+
+double roundBy(std::string_view name, double value) {
+  if (name == "floor") {
+    return std::floor(value);
+  }
+  if (name == "ceiling") {
+    return std::ceil(value);
+  }
+  if (name == "round") {
+    return std::round(value);
+  }
+  return std::trunc(value);
+}
+
+/// One of the arithmetic functions of ISO (`sqrt`, `sin`, …) applied to `x`.
+///
+/// The root and the five transcendental ones answer a real whatever they are
+/// given; `abs` keeps the type of its argument, `sign` answers `-1`, `0` or `1` in
+/// that type, and the four rounding ones answer a whole number.  A value the
+/// function does not have — the root of a negative number, the logarithm of zero,
+/// an overflow — is a *runtime error* here: an expression has to produce a number,
+/// and there is no «failure» to fall back on inside `#…#` (the two-argument
+/// predicates of the same names answer `НЕТ` instead).
+ArithValue evaluateFunction(Engine& engine, std::string_view name, const ArithValue& x) {
+  if (name == "abs") {
+    return x.is_float ? ArithValue::ofFloat(std::fabs(x.real))
+                      : ArithValue::ofInteger(x.integer.abs());
+  }
+  if (name == "sign") {
+    const int sign = x.is_float ? (x.real > 0.0 ? 1 : (x.real < 0.0 ? -1 : 0))
+                                : x.integer.sign();
+    return x.is_float ? ArithValue::ofFloat(static_cast<double>(sign))
+                      : ArithValue::ofInteger(BigInt(sign));
+  }
+  if (isRoundingFunction(name)) {
+    if (!x.is_float) {
+      return x;  // a whole number is its own floor, ceiling, round and truncation
+    }
+    const double rounded = roundBy(name, x.real);
+    if (!std::isfinite(rounded)) {
+      engine.raise(ErrorCode::ArithmeticError,
+                   std::string(name) + ": результат не представим числом");
+    }
+    return ArithValue::ofInteger(BigInt::fromDouble(rounded));
+  }
+  const double argument = x.asDouble();
+  double result = 0.0;
+  if (name == "sqrt") {
+    if (argument < 0.0) {
+      engine.raise(ErrorCode::ArithmeticError,
+                   "sqrt: корень из отрицательного числа не существует");
+    }
+    result = std::sqrt(argument);
+  } else if (name == "sin") {
+    result = std::sin(argument);
+  } else if (name == "cos") {
+    result = std::cos(argument);
+  } else if (name == "tan") {
+    result = std::tan(argument);
+  } else if (name == "exp") {
+    result = std::exp(argument);
+  } else if (name == "log") {
+    // ISO's `log` is the natural logarithm, and it has no value at zero or
+    // below — the same kind of runtime error as `sqrt` of a negative.
+    if (argument <= 0.0) {
+      engine.raise(ErrorCode::ArithmeticError,
+                   "log: логарифм неположительного числа не существует");
+    }
+    result = std::log(argument);
+  } else {
+    engine.raise(ErrorCode::InvalidArithmeticExpression);
+  }
+  if (!std::isfinite(result)) {
+    engine.raise(ErrorCode::ArithmeticError,
+                 std::string(name) + ": результат не представим числом");
+  }
+  return ArithValue::ofFloat(result);
+}
+
+/// True for the function names `evaluateFunction` answers.
+bool isArithmeticFunction(std::string_view name) {
+  return name == "abs" || name == "sign" || name == "sqrt" || name == "sin" ||
+         name == "cos" || name == "tan" || name == "exp" || name == "log" ||
+         isRoundingFunction(name);
 }
 
 ArithValue evaluateNode(Engine& engine, const Term& node) {
@@ -792,6 +973,13 @@ ArithValue evaluateNode(Engine& engine, const Term& node) {
       return ArithValue::ofInteger(resolved.integer);
     case TermKind::Float:
       return ArithValue::ofFloat(resolved.real);
+    case TermKind::Atom:
+      // `pi` is ISO's arithmetic constant.  It is a plain atom everywhere else,
+      // which is why it is read here and not in the lexer.
+      if (resolved.text == "pi") {
+        return ArithValue::ofFloat(kPi);
+      }
+      break;
     case TermKind::Compound: {
       if (resolved.compound == nullptr) {
         engine.raise(ErrorCode::InvalidArithmeticExpression);
@@ -803,15 +991,19 @@ ArithValue evaluateNode(Engine& engine, const Term& node) {
         return value.is_float ? ArithValue::ofFloat(-value.real)
                               : ArithValue::ofInteger(-value.integer);
       }
+      if (arguments.size() == 1 && isArithmeticFunction(name)) {
+        return evaluateFunction(engine, name, evaluateNode(engine, arguments[0]));
+      }
       if (arguments.size() == 2) {
         return evaluateBinary(engine, name, arguments[0], arguments[1]);
       }
-      engine.raise(ErrorCode::InvalidArithmeticExpression);
+      break;
     }
     default:
-      engine.raise(ErrorCode::InvalidArithmeticExpression,
-                   "Нечисловой операнд арифметического выражения");
+      break;
   }
+  engine.raise(ErrorCode::InvalidArithmeticExpression,
+               "Нечисловой операнд арифметического выражения");
 }
 
 }  // namespace

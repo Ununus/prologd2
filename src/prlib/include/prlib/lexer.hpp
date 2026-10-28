@@ -46,7 +46,9 @@ enum class TokenKind : std::uint8_t {
   Plus,
   Minus,
   Star,
-  Slash,
+  StarStar,    ///< `**`, ISO's power
+  Slash,       ///< `/`, ISO's float division
+  SlashSlash,  ///< `//`, ISO's integer division
   Percent,  // unused, reserved for future operators
   LParen,
   RParen,

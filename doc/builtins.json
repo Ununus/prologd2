@@ -724,7 +724,8 @@
       "group": "arith",
       "section": "5.5",
       "summary": "Y = |X|; при свободной X берётся |Y|",
-      "variants": ["abs(X, Y) — Y = |X|; при свободной X: X = |Y| для неотрицательного Y"]
+      "variants": ["abs(X, Y) — Y = |X|; при свободной X: X = |Y| для неотрицательного Y",
+                     "abs(X) — модуль как функция выражения: abs(-5) равно 5"]
     },
     {
       "name": "sqrt",
@@ -734,7 +735,8 @@
       "group": "arith",
       "section": "5.5",
       "summary": "Y = корень X; при целых результат целый, свободная X получает Y*Y; нет значения — неудача",
-      "variants": ["sqrt(X, Y) — Y = корень X; свободная X получает Y*Y"]
+      "variants": ["sqrt(X, Y) — Y = корень X; свободная X получает Y*Y",
+                     "sqrt(X) — корень как функция выражения: sqrt(9) равно 3.0"]
     },
     {
       "name": "sin",
@@ -744,7 +746,8 @@
       "group": "arith",
       "section": "5.6",
       "summary": "Y = sin X; при связанной Y вычисляется обратная функция asin",
-      "variants": ["sin(X, Y) — Y = sin X; свободная X получает asin Y"]
+      "variants": ["sin(X, Y) — Y = sin X; свободная X получает asin Y",
+                     "sin(X) — синус как функция выражения (радианы)"]
     },
     {
       "name": "cos",
@@ -754,7 +757,8 @@
       "group": "arith",
       "section": "5.6",
       "summary": "Y = cos X; при связанной Y вычисляется обратная функция acos",
-      "variants": ["cos(X, Y) — Y = cos X; свободная X получает acos Y"]
+      "variants": ["cos(X, Y) — Y = cos X; свободная X получает acos Y",
+                     "cos(X) — косинус как функция выражения (радианы)"]
     },
     {
       "name": "tan",
@@ -764,7 +768,8 @@
       "group": "arith",
       "section": "5.6",
       "summary": "Y = tg X; при связанной Y вычисляется обратная функция atan",
-      "variants": ["tan(X, Y) — Y = tg X; свободная X получает atan Y"]
+      "variants": ["tan(X, Y) — Y = tg X; свободная X получает atan Y",
+                     "tan(X) — тангенс как функция выражения (радианы)"]
     },
     {
       "name": "exp",
@@ -774,7 +779,8 @@
       "group": "arith",
       "section": "5.6",
       "summary": "Y = e в степени X; при связанной Y вычисляется натуральный логарифм",
-      "variants": ["exp(X, Y) — Y = e в степени X; свободная X получает ln Y"]
+      "variants": ["exp(X, Y) — Y = e в степени X; свободная X получает ln Y",
+                     "exp(X) — экспонента как функция выражения"]
     },
     {
       "name": "is_whole",
@@ -803,8 +809,18 @@
       "arities": [],
       "group": "arith",
       "section": "3.3",
-      "summary": "Остаток от деления; только внутри арифметического выражения",
-      "variants": ["mod — остаток от деления (в выражении #…#)"]
+      "summary": "Остаток от деления со знаком делимого; только внутри арифметического выражения",
+      "variants": ["mod — остаток от деления (в выражении #…#): -5 mod 3 равно -2"]
+    },
+    {
+      "name": "rem",
+      "aliases": [],
+      "kind": "operator",
+      "arities": [],
+      "group": "arith",
+      "section": "3.3",
+      "summary": "Остаток от деления со знаком делимого; то же, что mod",
+      "variants": ["rem — остаток от деления (в выражении #…#): -5 rem 3 равно -2"]
     },
     {
       "name": "div",
@@ -813,8 +829,78 @@
       "arities": [],
       "group": "arith",
       "section": "3.3",
-      "summary": "Целочисленное деление; только внутри арифметического выражения",
-      "variants": ["div — целочисленное деление (в выражении #…#)"]
+      "summary": "Целочисленное деление с усечением к нулю; короткая запись — //",
+      "variants": ["div — целочисленное деление (в выражении #…#): -5 div 3 равно -1"]
+    },
+    {
+      "name": "sign",
+      "aliases": [],
+      "kind": "function",
+      "arities": [],
+      "group": "arith",
+      "section": "3.3",
+      "summary": "Знак числа как функция выражения: sign(-3) равно -1",
+      "variants": ["sign(X) — -1, 0 или 1 в типе аргумента (в выражении #…#)"]
+    },
+    {
+      "name": "floor",
+      "aliases": [],
+      "kind": "function",
+      "arities": [],
+      "group": "arith",
+      "section": "3.3",
+      "summary": "Округление вниз до целого: floor(-3.7) равно -4",
+      "variants": ["floor(X) — наибольшее целое не больше X (в выражении #…#)"]
+    },
+    {
+      "name": "ceiling",
+      "aliases": [],
+      "kind": "function",
+      "arities": [],
+      "group": "arith",
+      "section": "3.3",
+      "summary": "Округление вверх до целого: ceiling(3.2) равно 4",
+      "variants": ["ceiling(X) — наименьшее целое не меньше X (в выражении #…#)"]
+    },
+    {
+      "name": "round",
+      "aliases": [],
+      "kind": "function",
+      "arities": [],
+      "group": "arith",
+      "section": "3.3",
+      "summary": "Округление к ближайшему целому: round(-3.5) равно -4",
+      "variants": ["round(X) — ближайшее целое, половина идёт от нуля (в выражении #…#)"]
+    },
+    {
+      "name": "truncate",
+      "aliases": [],
+      "kind": "function",
+      "arities": [],
+      "group": "arith",
+      "section": "3.3",
+      "summary": "Отбрасывание дробной части: truncate(-3.9) равно -3",
+      "variants": ["truncate(X) — целая часть X, с усечением к нулю (в выражении #…#)"]
+    },
+    {
+      "name": "log",
+      "aliases": [],
+      "kind": "function",
+      "arities": [],
+      "group": "arith",
+      "section": "3.3",
+      "summary": "Натуральный логарифм как функция выражения: log(1) равно 0.0",
+      "variants": ["log(X) — натуральный логарифм, при X <= 0 значения нет (в выражении #…#)"]
+    },
+    {
+      "name": "pi",
+      "aliases": [],
+      "kind": "function",
+      "arities": [],
+      "group": "arith",
+      "section": "3.3",
+      "summary": "Вещественная константа π в арифметическом выражении",
+      "variants": ["pi — 3.141592653589793 (в выражении #…#)"]
     }
   ]
 }

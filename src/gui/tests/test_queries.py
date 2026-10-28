@@ -117,7 +117,7 @@ PINNED: dict[str, int] = {
     "lessons/appendix_debug.pld": 7,
     "lessons/lesson_01.pld": 9,
     "lessons/lesson_02.pld": 12,
-    "lessons/lesson_03.pld": 37,
+    "lessons/lesson_03.pld": 45,
     "lessons/lesson_04.pld": 27,
     "lessons/lesson_05.pld": 26,
     "lessons/lesson_06.pld": 37,

@@ -15,7 +15,15 @@ namespace {
 
 /// Reserved names that are not predicates: the infix arithmetic operators have
 /// no dispatch entry, and `ИМПОРТ` is a statement form the loader handles.
-const std::unordered_set<std::string> kReservedOperators = {"mod", "div"};
+const std::unordered_set<std::string> kReservedOperators = {"mod", "div", "rem"};
+
+/// Names that live inside an arithmetic expression only — the functions
+/// `sign/1` and `log/1` and the constant `pi` of ISO.  They are reserved so that
+/// `--list-keywords`, the reference panel and the completer know them, and so
+/// that a goal with one of them as its name says what it is instead of «не
+/// найдено».
+const std::unordered_set<std::string> kReservedFunctions = {
+    "sign", "pi", "log", "floor", "ceiling", "round", "truncate"};
 const std::unordered_set<std::string> kReservedDirectives = {"ИМПОРТ", "import", "ХОЛСТ", "canvas"};
 
 /// Callable names the *engine* answers before it consults the dispatch table
@@ -38,6 +46,8 @@ std::string_view keywordKindName(KeywordKind kind) noexcept {
       return "predicate";
     case KeywordKind::Operator:
       return "operator";
+    case KeywordKind::Function:
+      return "function";
     case KeywordKind::Directive:
       return "directive";
   }
@@ -65,6 +75,8 @@ std::vector<KeywordInfo> reservedKeywords() {
       info.variadic = true;
     } else if (kReservedOperators.count(name) != 0) {
       info.kind = KeywordKind::Operator;
+    } else if (kReservedFunctions.count(name) != 0) {
+      info.kind = KeywordKind::Function;
     } else if (kReservedDirectives.count(name) != 0) {
       info.kind = KeywordKind::Directive;
     } else {

@@ -152,6 +152,8 @@ class Parser {
   Term parseAdditive();
   Term parseMultiplicative();
   Term parseUnaryArithmetic();
+  Term parsePower();
+  Term parsePowerOperand();
   Term parsePrimaryArithmetic();
 
   VarId variableFor(std::string_view name, bool anonymous, const SourceLocation& location);

@@ -426,10 +426,187 @@ TEST_CASE("arithmetic expressions evaluate with precedence") {
   REQUIRE(result.output == "X=14\nX=6.6\nДА\nX=-5\nX=3\nX=1\n");
 }
 
-TEST_CASE("division by zero is a runtime error") {
-  const auto result = runProgram("?РАВНО(X, #1/0#).\n");
+TEST_CASE("`/` is float division and `//` the integer one") {
+  // ISO's `/` always answers a real: `1 / 2` is `0.5` and `6 / 3` is `2.0`.  The
+  // integer quotient is `//` (or `div`), which truncates toward zero.
+  const auto result = runProgram(
+      "?X is 1 / 2.\n"
+      "?X is 6 / 3.\n"
+      "?X is 1 // 2.\n"
+      "?X is 7 // 2.\n"
+      "?X is -7 // 2.\n"
+      "?X is 6 // 3.\n"
+      "?X is 6 div 3.\n"
+      "?ВЕЩ(#1/2#).\n"
+      "?ЦЕЛ(#1//2#).\n");
   REQUIRE(result.loaded);
-  REQUIRE(result.error.find("деление на ноль") != std::string::npos);
+  REQUIRE(result.output == "X=0.5\nX=2.0\nX=0\nX=3\nX=-3\nX=2\nX=2\nДА\nДА\n");
+}
+
+TEST_CASE("`rem` and `mod` answer the remainder with the dividend's sign") {
+  // ISO's `rem` takes the sign of the dividend and `div` truncates toward zero,
+  // so `-5 rem 3` is `-2` while `-5 div 3` is `-1`.  ISO's `mod` would answer 1
+  // — that difference is on purpose here, so it is written down as a check.
+  const auto result = runProgram(
+      "?X is -5 rem 3.\n"
+      "?X is -5 mod 3.\n"
+      "?X is -5 div 3.\n"
+      "?X is 5 rem 3.\n"
+      "?X is -5 rem -3.\n"
+      "?X is 5 mod -3.\n"
+      "?X is 7 // 2 * 2 + 7 rem 2.\n");
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "X=-2\nX=-2\nX=-1\nX=2\nX=-2\nX=2\nX=7\n");
+}
+
+TEST_CASE("the arithmetic functions of ISO work inside an expression") {
+  // A function is written with its name and one argument: `abs(-5)` — not
+  // `abs(-5, X)`, which is the two-argument predicate of the same name.  `abs`
+  // and `sign` keep the type of the argument, the other four always answer a
+  // real, and `pi` is the constant.
+  const auto result = runProgram(
+      "?X is abs(-5).\n"
+      "?X is abs(-5.5).\n"
+      "?X is abs(5).\n"
+      "?X is sign(-3).\n"
+      "?X is sign(0).\n"
+      "?X is sign(2.5).\n"
+      "?X is sign(-0.5).\n"
+      "?X is sqrt(9).\n"
+      "?X is sin(0).\n"
+      "?X is cos(0).\n"
+      "?X is tan(0).\n"
+      "?X is exp(0).\n"
+      "?X is pi.\n"
+      "?X is abs(2 - 5) + 1.\n"
+      "?X is -abs(-2).\n");
+  REQUIRE(result.loaded);
+  REQUIRE(result.output ==
+          "X=5\nX=5.5\nX=5\nX=-1\nX=0\nX=1.0\nX=-1.0\nX=3.0\nX=0.0\n"
+          "X=1.0\nX=0.0\nX=1.0\nX=3.141593\nX=4\nX=-2\n");
+}
+
+TEST_CASE("the rounding functions answer whole numbers") {
+  // ISO's four rounding functions, each with its own rule: `floor` down,
+  // `ceiling` up, `round` to the nearest (a half goes away from zero) and
+  // `truncate` toward zero.  A whole argument comes back untouched — going
+  // through `double` would lose digits past 2^53.
+  const auto result = runProgram(
+      "?X is floor(3.7).\n"
+      "?X is floor(-3.7).\n"
+      "?X is ceiling(3.2).\n"
+      "?X is ceiling(-3.2).\n"
+      "?X is round(3.5).\n"
+      "?X is round(-3.5).\n"
+      "?X is round(2.4).\n"
+      "?X is truncate(3.9).\n"
+      "?X is truncate(-3.9).\n"
+      "?X is floor(5).\n"
+      "?X is truncate(100000000000000000000).\n"
+      "?ЦЕЛ(#round(2.4)#).\n"
+      "?ВЕЩ(#floor(2.4)#).\n");
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "X=3\nX=-4\nX=4\nX=-3\nX=4\nX=-4\nX=2\nX=3\nX=-3\n"
+                            "X=5\nX=100000000000000000000\nДА\nНЕТ\n");
+}
+
+TEST_CASE("`**` is ISO's power, and it binds tighter than the sign") {
+  // ISO's `**` is `xfx`: tighter than the unary sign, so `-2**2` is `-(2**2)`
+  // and the answer is -4, and tighter than `*`.  A whole base with a whole
+  // exponent stays whole and exact, a negative exponent turns the answer real.
+  const auto result = runProgram(
+      "?X is 2 ** 10.\n"
+      "?X is 2 ** 100.\n"
+      "?X is -2 ** 2.\n"
+      "?X is 2 ** 3 + 1.\n"
+      "?X is 2 * 3 ** 2.\n"
+      "?X is (2 ** 3) ** 2.\n"
+      "?X is 2 ** (3 ** 2).\n"
+      "?X is 2 ** -1.\n"
+      "?X is 4 ** 0.5.\n"
+      "?X is 0 ** 0.\n"
+      "?X is (-2) ** 3.\n"
+      "?X is 2 ** 0.5 * 2 ** 0.5.\n"
+      "?X is #2 ** 3#.\n"
+      "?2 ** 3 =:= 8.\n"
+      "?ВЕЩ(#2 ** 2#).\n"
+      "?ЦЕЛ(#2 ** 2#).\n");
+  REQUIRE(result.loaded);
+  REQUIRE(result.output ==
+          "X=1024\nX=1267650600228229401496703205376\nX=-4\nX=9\nX=18\nX=64\n"
+          "X=512\nX=0.5\nX=2.0\nX=1\nX=-8\nX=2.0\nX=8\nДА\nНЕТ\nДА\n");
+}
+
+TEST_CASE("`**` refuses a chain and a number it cannot hold") {
+  // `**` is not associative even in ISO, and the two readings of `2**3**4`
+  // differ by a factor of `2**74`: the brackets are asked for, not guessed.
+  const auto chain = runProgram("?X is 2 ** 3 ** 4.\n");
+  REQUIRE_FALSE(chain.loaded);
+  REQUIRE(chain.error.find("не цепочка") != std::string::npos);
+  // The integers have no fixed width, but a power that would run for hours is
+  // refused instead of attempted, and the message says why.
+  const auto tooBig = runProgram("?X is 2 ** 100000.\n");
+  REQUIRE(tooBig.loaded);
+  REQUIRE(tooBig.runtimeError);
+  REQUIRE(tooBig.error.find("слишком велик") != std::string::npos);
+  for (const auto& [query, expected] :
+       {std::pair{"?X is 0 ** -1.\n", "деление на ноль"},
+        std::pair{"?X is (-8) ** 0.5.\n", "дробной степени"},
+        std::pair{"?X is 2.0 ** 1024.\n", "не представим"}}) {
+    INFO("query: " << query);
+    const auto answer = runProgram(query);
+    REQUIRE(answer.loaded);
+    REQUIRE(answer.runtimeError);
+    REQUIRE(answer.error.find(expected) != std::string::npos);
+  }
+}
+
+TEST_CASE("`log` is the natural logarithm") {
+  const auto result = runProgram(
+      "?X is log(exp(1)).\n"
+      "?X is log(1).\n"
+      "?X is log(exp(2)).\n");
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "X=1.0\nX=0.0\nX=2.0\n");
+  // The logarithm has no value at zero or below: a real number cannot come out,
+  // and an expression cannot answer «нет» — so it is a runtime error.
+  for (const char* query : {"?X is log(0).\n", "?X is log(-1).\n"}) {
+    INFO("query: " << query);
+    const auto answer = runProgram(query);
+    REQUIRE(answer.loaded);
+    REQUIRE(answer.runtimeError);
+    REQUIRE(answer.error.find("логарифм") != std::string::npos);
+  }
+}
+
+TEST_CASE("a function of a value it does not have is an error") {
+  // Inside an expression there is no «failure» to answer `НЕТ` with: a root of a
+  // negative number and an overflow are runtime errors, and the message names
+  // the function.
+  for (const auto& [query, expected] :
+       {std::pair{"?X is sqrt(-1).\n", "корень из отрицательного числа"},
+        std::pair{"?X is exp(1000).\n", "результат не представим числом"}}) {
+    INFO("query: " << query);
+    const auto result = runProgram(query);
+    REQUIRE(result.loaded);
+    REQUIRE(result.runtimeError);
+    REQUIRE(result.error.find(expected) != std::string::npos);
+  }
+  // A non-number where a function wants one is the usual type error.
+  const auto wrong = runProgram("?X is sqrt(\"4\").\n");
+  REQUIRE(wrong.loaded);
+  REQUIRE(wrong.error.find("Нечисловой операнд") != std::string::npos);
+}
+
+TEST_CASE("division by zero is a runtime error") {
+  for (const char* query : {"?РАВНО(X, #1/0#).\n", "?РАВНО(X, #1//0#).\n",
+                            "?РАВНО(X, #1 mod 0#).\n", "?РАВНО(X, #1 rem 0#).\n",
+                            "?РАВНО(X, #1.0/0#).\n"}) {
+    INFO("query: " << query);
+    const auto result = runProgram(query);
+    REQUIRE(result.loaded);
+    REQUIRE(result.error.find("деление на ноль") != std::string::npos);
+  }
 }
 
 TEST_CASE("long arithmetic") {

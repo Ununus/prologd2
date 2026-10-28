@@ -244,6 +244,13 @@ def scan_line(
             continue
 
         pair = line[index : index + 2]
+        if pair in ("//", "**"):
+            # ISO's integer division and its power are one sign each, as in the
+            # lexer: two slashes or two stars with nothing between them are not
+            # two operations.
+            tokens.append(Token(PUNCTUATION, pair, index, index + 2))
+            index += 2
+            continue
         if pair in (":-", "<-", "->", "\\+"):
             # `->` is a sign of its own since task_85 (ISO's if-then): without this
             # line the tokenizer would read `-` and `>`, and every front-end rule
