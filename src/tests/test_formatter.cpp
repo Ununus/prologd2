@@ -133,6 +133,17 @@ TEST_CASE("the bytes of every token are copied verbatim") {
   REQUIRE_FALSE(result.changed);
 }
 
+TEST_CASE("a string escape keeps its two bytes of source") {
+  // The lexer decodes `\n` into one character, so the formatter has to measure
+  // the raw span again — otherwise it would cut the literal short and change
+  // the program it was asked to lay out.
+  const std::string source = "текст(\"1\\n2\\\\3\\t4\\\"5\").\n";
+  const FormatResult result = format(source);
+  REQUIRE(result.ok());
+  REQUIRE(result.text == source);
+  REQUIRE_FALSE(result.changed);
+}
+
 TEST_CASE("a semicolon keeps the spaces the corpus gives it") {
   const std::string source = "выбор(Х):-РАВНО(Х, 1);РАВНО(Х, 2).\n?цена(Т, 40) ; цена(Т, 500).\n";
   const FormatResult result = format(source);

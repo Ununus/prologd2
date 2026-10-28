@@ -109,8 +109,10 @@ std::size_t rawLength(std::string_view source, std::size_t begin, const Token& t
           i += 2;
           continue;
         }
-      } else if (ch == '\\' && i + 1 < source.size() &&
-                 (source[i + 1] == '"' || source[i + 1] == '\\')) {
+      } else if (ch == '\\' && i + 1 < source.size() && source[i + 1] != '\n') {
+        // `\n`, `\t`, `\r`, `\\`, `\"` — and an unknown escape is still two
+        // characters to the lexer, which reports it and reads on.  A backslash
+        // before the line break escapes nothing and does not swallow the break.
         i += 2;
         continue;
       }

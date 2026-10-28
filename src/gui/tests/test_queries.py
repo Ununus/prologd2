@@ -120,7 +120,7 @@ PINNED: dict[str, int] = {
     "lessons/lesson_03.pld": 45,
     "lessons/lesson_04.pld": 27,
     "lessons/lesson_05.pld": 26,
-    "lessons/lesson_06.pld": 37,
+    "lessons/lesson_06.pld": 39,
     "lessons/lesson_07.pld": 21,
     "lessons/lesson_08.pld": 8,
     "lessons/lesson_09.pld": 10,

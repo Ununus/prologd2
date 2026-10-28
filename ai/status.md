@@ -77,8 +77,12 @@ stop button lit only while a run is in flight (part 119).
   run-length limit that report instead of crashing.
 * Arithmetic: hand-written `BigInt`, `#expr#`, `БОЛЬШЕ`/`МЕНЬШЕ`, `СЛОЖЕНИЕ`,
   `УМНОЖЕНИЕ/3,4`, `abs`, `sqrt`, `sin`, `cos`, `tan`, `exp`, `is_whole`, `is_number`,
-  `СЛУЧ`, `ЦЕЛВЕЩ`, `СТРЦЕЛ`, `СТРВЕЩ`, `СТРСПИС`.
-* Strings (code-point based): `БУКВА`, `ЦИФРА`, `СЦЕП`, `КОПИЯ`, `ДЛИНА` and the rest.
+  `СЛУЧ`, `ЦЕЛВЕЩ`, `СТРЦЕЛ`, `СТРВЕЩ`, `СТРСПИС`.  Since part 215 the expressions
+  follow ISO: `/` is the real quotient, `//` and `div` the whole one, `rem`, the
+  functions `sign`, `log` and the four rounding ones, the constant `pi` and the power
+  `**`.
+* Strings (code-point based): `БУКВА`, `ЦИФРА`, `СЦЕП`, `КОПИЯ`, `ДЛИНА` and the rest;
+  inside a string the five escapes `\n`, `\t`, `\r`, `\\` and `\"` (ADR-057).
 * Lists: `СОРТИРОВКА/2` (`sort`) — ascending, repeats dropped, in the dialect's own
   order; `ПОЛНЫЙ/1` (`ground`) — no free variable anywhere, cycle-safe; `ДЛЯВСЕХ/2`
   (`forall`) — no solution of the condition fails the action (ADR-025).  Since
@@ -224,16 +228,15 @@ entries of the session log below and in `ai/task_*.md`.
 
 ## Test suite
 
-422 tests, about six seconds: 398 Catch2 cases plus 24 command-line and integration
-tests (23 `cli_*` ones — the option spellings, the three `--vars` readings,
-`--format`, `--list-keywords`, the engine limits and the diagnostics — and the JSON
-protocol session, which now expects protocol 15).  Groups: BigInt, lexer, keywords,
-parser, unification, engine, every built-in
-group, `НАЙТИВСЕ`, the module loader (including the import search report), the I/O seams,
-the typical tasks (factorial, Fibonacci, GCD, insertion sort, 4-queens, knapsack), the
-ported lesson and example programs (golden output) and the CLI.  Every built-in is covered
-branch by branch — see `ai/task_34_builtin_branches.md`, which also lists what the sweep
-found.
+418 tests, about six seconds: 399 Catch2 cases plus 19 `cli_*` ones — the option
+spellings, the Cyrillic paths, the import search report, `--list-keywords`,
+`--format`, the engine limits, the diagnostics and the JSON protocol session, which
+now expects protocol 15.  Groups: BigInt, lexer, keywords, parser, unification,
+engine, every built-in group, `НАЙТИВСЕ`, the module loader (including the import
+search report), the I/O seams, the typical tasks (factorial, Fibonacci, GCD,
+insertion sort, 4-queens, knapsack), the ported lesson and example programs (golden
+output) and the CLI.  Every built-in is covered branch by branch — see
+`ai/task_34_builtin_branches.md`, which also lists what the sweep found.
 
 The front end has its own headless checks, run by hand (they need PySide6, so CI does not
 run them yet): 29 scripts in `src/gui/tests/` plus `protocol_smoke.py`.  They cover the
@@ -7419,4 +7422,40 @@ of the package».  Отдельно: 25 оконных наборов и `protoc
   ноль» для всех четырёх делящих знаков и `/ 0.0`, `//` и `**` как один токен в
   лексере и в окне.
 * **Проверки.**  `linux-release` и `linux-werror`: 415/415 в обоих.  Все 28
+  скриптов окна и `protocol_smoke.py` зелены.  `docs` собирает пять PDF.
+
+### 216. Escape-последовательности в строках
+
+* **Просьба владельца.**  Сделать escape-последовательности в тексте — пример
+  `?ВЫВОД("1\n2\n\n3").`  До этого `\n` был двумя буквами, а вывести перевод
+  строки можно было только через `ПС`.
+* **Набор.**  Пять последовательностей: `\n`, `\t`, `\r`, `\\` и `\"`.  Больше
+  нет: неизвестная (`\q`) — ошибка `InvalidStringLiteral` с перечнем того, что
+  есть, и одна на литерал, а не на каждый слэш; обратный слэш перед концом
+  строки — «escape-последовательность не закончена».
+* **Где работают.**  Только в строках.  У имён в одинарных кавычках остаётся
+  удвоение (`'Иван''ы'`) — так их писал ещё оригинальный Пролог-Д, и менять это
+  значило бы переписать смысл существующих атомов.
+* **Лексер и форматтер.**  Декодирование — в `Lexer::lexString`; значение токена
+  приходит уже с настоящими символами.  Форматтер меряет сырой span тем же
+  правилом (`rawLength`), иначе литерал обрезался бы по первому `\n`, — а он
+  обязан копировать исходные байты.  Окно (`_scan_delimited`) считает `\X` двумя
+  символами: закрывающей кавычкой такой символ быть не может.
+* **Печать не изменилась.**  Строка по-прежнему печатается своим текстом (её
+  никто не переэкранирует), поэтому `X = "кот\nпёс"` занимает в ответе две
+  строки.  Это то же правило, что у `ВЫВОД`: строка — это текст, а не запись
+  терма.
+* **Документация.**  `help.typ` §3.4 — список из пяти, пример с `1\n2\n\n3`,
+  оговорки про `"C:\temp"` (там табуляция) и про удвоение у атомов; §6.1 уже
+  говорит, что строки печатаются без кавычек, — на него теперь ссылается §3.4.
+  `technical.typ` §7.1 — то же для лексера: разбор идёт до закрывающей кавычки,
+  `\"` строку не закрывает.
+* **Данные.**  Урок 6: `?ДЛИНА("a\tb", Длина)` обещает `Длина=3` (символ один, а
+  не два) и `?ВЫВОД("1\n2\n\n3")` — с пустой строкой в обещаниях, записанной
+  голым `%!`.  Пин вопросов 37 → 39.
+* **Тесты.**  Лексер: пять последовательностей, `\q` (одно сообщение, в нём
+  перечень) и слэш перед концом строки.  Вывод: `ВЫВОД` с `\n` и `ДЛИНА` с `\t`.
+  Форматтер: литерал с четырьмя разными последовательностями переживает разбор
+  байт в байт.  Окно: `"1\n2\\3"` — один токен.
+* **Проверки.**  `linux-release` и `linux-werror`: 418/418 в обоих.  Все 28
   скриптов окна и `protocol_smoke.py` зелены.  `docs` собирает пять PDF.

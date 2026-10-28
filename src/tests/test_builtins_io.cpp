@@ -63,6 +63,15 @@ TEST_CASE("output prints strings unquoted and lists") {
   REQUIRE(result.output == "Ёё[1,2]\nДА\n");
 }
 
+TEST_CASE("a string escape writes the character it names") {
+  // The text of the string is what `ВЫВОД` prints, so `\n` breaks the line and
+  // `\t` moves to the next tab stop; `ДЛИНА` counts one character for each.
+  const auto result =
+      runProgram("?ВЫВОД(\"1\\n2\\n\\n3\"), ПС, ВЫВОД(\"a\\tb\").\n?ДЛИНА(\"a\\tb\", Д).\n");
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "1\n2\n\n3\na\tb\nДА\nД=3\n");
+}
+
 TEST_CASE("writes a newline") {
   const auto result = runProgram("?ВЫВОД(а), ПС, ВЫВОД(б).\n");
   REQUIRE(result.loaded);

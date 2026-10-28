@@ -268,13 +268,45 @@ Token Lexer::lexString(DiagnosticSink* sink) {
       terminated = true;
       break;
     }
-    if (ch == '\\' && (peek(1) == '"' || peek(1) == '\\')) {
-      value.push_back(peek(1));
-      advanceByte(2);
-      continue;
-    }
     if (ch == '\n') {
       break;
+    }
+    if (ch == '\\') {
+      const char escaped = peek(1);
+      const char* decoded = nullptr;
+      switch (escaped) {
+        case 'n': decoded = "\n"; break;
+        case 't': decoded = "\t"; break;
+        case 'r': decoded = "\r"; break;
+        case '\\': decoded = "\\"; break;
+        case '"': decoded = "\""; break;
+        default: break;
+      }
+      if (decoded == nullptr) {
+        // A backslash that escapes nothing, which is almost always a typo.  The
+        // message lists what there is, and one message per literal is enough:
+        // three typos in a row are the same lesson.
+        if (sink != nullptr) {
+          PrologError error;
+          error.code = ErrorCode::InvalidStringLiteral;
+          if (escaped == '\0' || escaped == '\n') {
+            error.message = "escape-последовательность не закончена: после «\\» нужен символ";
+          } else {
+            error.message = std::string("неизвестная escape-последовательность «\\") +
+                            escaped + "»: в строке есть только \\n, \\t, \\r, \\\\ и \\\"";
+          }
+          error.location = here();
+          error.isParseError = true;
+          sink->report(std::move(error));
+          sink = nullptr;
+        }
+        value.push_back(ch);
+        advanceByte(1);
+        continue;
+      }
+      value.push_back(*decoded);
+      advanceByte(2);
+      continue;
     }
     value.push_back(ch);
     advanceByte(1);

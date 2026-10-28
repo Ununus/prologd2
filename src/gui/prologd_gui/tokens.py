@@ -348,7 +348,10 @@ def _scan_delimited(
                 index += 2
                 continue
             return index + 1
-        if backslash and ch == "\\" and index + 1 < length and line[index + 1] in ('"', "\\"):
+        if backslash and ch == "\\":
+            # Any character after a backslash belongs to the escape — `\n`, `\t`,
+            # `\r`, `\\`, `\"` — so it can never close the literal: neither a
+            # quote nor the second half of `\\`.
             index += 2
             continue
         if ch == "\n":

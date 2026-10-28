@@ -107,6 +107,14 @@ def test_strings_and_quoted_atoms() -> None:
     # An unterminated string is coloured to the end of its own line: the lexer
     # rejects it, so there is no state to carry into the next line.
     assert kinds('ВЫВОД("аб') == [(KEYWORD, "ВЫВОД"), (PUNCTUATION, "("), (STRING, '"аб')]
+    # A backslash takes the next character with it, so `\n`, `\t` and `\\` are
+    # two characters of source each and none of them ends the literal.
+    assert kinds('ВЫВОД("1\\n2\\\\3")') == [
+        (KEYWORD, "ВЫВОД"),
+        (PUNCTUATION, "("),
+        (STRING, '"1\\n2\\\\3"'),
+        (PUNCTUATION, ")"),
+    ]
     # A doubled quote is the escape inside a quoted atom.
     assert kinds("'Иван''ы'") == [(QUOTED_ATOM, "'Иван''ы'")]
     print("ok: strings and quoted atoms")

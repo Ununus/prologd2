@@ -353,6 +353,47 @@ TEST_CASE("lexer reports unterminated strings") {
   REQUIRE(sink.diagnostics().front().code == ErrorCode::InvalidStringLiteral);
 }
 
+TEST_CASE("a string escape stands for one character, and an unknown one is named") {
+  // `\n`, `\t` and `\r` are the characters the escape names; `\\` and `\"` are
+  // the two that would otherwise end the literal or vanish from it.
+  const struct {
+    std::string source;
+    std::string expected;
+  } cases[] = {{"\"a\\nb\"", "a\nb"},
+               {"\"a\\tb\"", "a\tb"},
+               {"\"a\\rb\"", "a\rb"},
+               {"\"a\\\\b\"", "a\\b"},
+               {"\"a\\\"b\"", "a\"b"}};
+  for (const auto& item : cases) {
+    INFO("source: " << item.source);
+    DiagnosticSink sink;
+    const auto tokens = lex(item.source, sink);
+    REQUIRE_FALSE(sink.hasErrors());
+    REQUIRE(tokens[0].kind == TokenKind::String);
+    REQUIRE(tokens[0].text == item.expected);
+  }
+  // `\q` is a typo, so the literal is refused and the message lists what the
+  // language has — one message for the literal, not one per backslash.
+  {
+    DiagnosticSink sink;
+    lex("\"a\\qb\\qc\"", sink);
+    REQUIRE(sink.hasErrors());
+    REQUIRE(sink.diagnostics().size() == 1);
+    const PrologError& error = sink.diagnostics().front();
+    REQUIRE(error.code == ErrorCode::InvalidStringLiteral);
+    REQUIRE(error.message.find("\\q") != std::string::npos);
+    REQUIRE(error.message.find("\\n") != std::string::npos);
+  }
+  // A backslash with the line break behind it escapes nothing.
+  {
+    DiagnosticSink sink;
+    lex("\"a\\\n", sink);
+    REQUIRE(sink.hasErrors());
+    REQUIRE(sink.diagnostics().size() == 1);
+    REQUIRE(sink.diagnostics().front().message.find("не закончена") != std::string::npos);
+  }
+}
+
 TEST_CASE("lexer handles UTF-8 identifiers and strings") {
   DiagnosticSink sink;
   const auto tokens = lex("Ёжик(Пёс,\"Привет, мир\")", sink);
