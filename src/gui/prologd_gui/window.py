@@ -488,6 +488,8 @@ class MainWindow(QMainWindow):
         self._reference_dock.setWidget(self._reference_pane)
         self._reference_dock.setVisible(False)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self._reference_dock)
+        #: True once `F1` has given the dock its default width (part 231).
+        self._reference_sized = False
 
         # The cheat sheet of the insert chords (task_31): the same shape as the
         # reference dock, and it zooms with everything else.
@@ -794,7 +796,7 @@ class MainWindow(QMainWindow):
         The icons are 64 px files drawn at 24: the size is set explicitly so the
         layout does not depend on the style or the display's scaling.
         """
-        self._toolbar = QToolBar("Управление", self)
+        self._toolbar = QToolBar("Панель инструментов", self)
         self._toolbar.setIconSize(QSize(24, 24))
         for key in actions.TOOLBAR:
             if key == actions.SEPARATOR:
@@ -805,6 +807,32 @@ class MainWindow(QMainWindow):
                 self._toolbar.addAction(self._actions[key])
         self._toolbar.setVisible(self._settings.toolbar_visible)
         self.addToolBar(self._toolbar)
+        # Qt can hide the toolbar behind the window's back — a floated one is closed
+        # with its own window button — so the entry follows the widget itself, not
+        # only the click.  `isHidden`, not `isVisible`: a toolbar of a window that was
+        # never shown is not visible either (part 232).
+        self._toolbar.visibilityChanged.connect(self._sync_toolbar_entry)
+
+    def _sync_toolbar_entry(self, _visible: bool) -> None:
+        """`Вид → Панель инструментов` shows the toolbar's state, whoever changed it."""
+        self._set_checked("toolbar", not self._toolbar.isHidden())
+
+    def createPopupMenu(self) -> QMenu:
+        """The menu Qt shows on a right click over the toolbar or a dock.
+
+        Qt builds it from the toolbars' and docks' *own* view actions, and the
+        toolbar's entry was therefore a second switch for one pane: hiding the
+        toolbar from here left «Вид → Панель инструментов» checked and
+        `toolbar_visible` untouched, so the toolbar came back on the next start
+        (part 232).  The menu is built from the window's own entries instead, so
+        both places flip the very same action.
+        """
+        menu = QMenu(self)
+        menu.addAction(self._actions["toolbar"])
+        menu.addSeparator()
+        menu.addAction(self._reference_dock.toggleViewAction())
+        menu.addAction(self._shortcut_dock.toggleViewAction())
+        return menu
 
     def _build_format_button(self) -> QToolButton:
         """The formatter's mode, on the toolbar beside «Форматировать» (task_47).
@@ -3744,6 +3772,16 @@ class MainWindow(QMainWindow):
                 text = self._reference_text(record)
         self._reference_pane.setPlainText(text)
         self._reference_dock.setVisible(True)
+        if not self._reference_sized:
+            # The record is read *next to* the program, and a dock the width of its
+            # own text left no room for either: half the window the first time, and
+            # a drag of the user's own wins from then on (part 231).
+            self._reference_sized = True
+            self.resizeDocks(
+                [self._reference_dock],
+                [max(1, self.width() // 2)],
+                Qt.Orientation.Horizontal,
+            )
         self._reference_dock.raise_()
 
     @staticmethod

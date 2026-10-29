@@ -2044,6 +2044,55 @@ def test_view_switches_are_stored(executable: str) -> None:
     print("ok: view switches are remembered")
 
 
+def test_the_toolbar_menu_and_the_view_entry_are_one_switch(executable: str) -> None:
+    """A right click over the toolbar offered «Управление» — a *second* switch.
+
+    Qt builds that menu from the widgets' own view actions, and the toolbar is
+    titled «Управление» for it: hiding the toolbar from there left «Вид → Панель
+    инструментов» checked and `toolbar_visible` untouched, so the entry and the
+    pane disagreed and the toolbar came back on the next start.  The menu is the
+    window's own now, and its entry is the same action the `Вид` menu shows.
+    """
+    window = empty_window(executable)
+    try:
+        window.show()
+        QApplication.processEvents()
+        menu = window.createPopupMenu()
+        entries = [action for action in menu.actions() if not action.isSeparator()]
+        titles = [action.text() for action in entries]
+        assert titles == [
+            "Панель инструментов",
+            "Справка по предикату",
+            "Шпаргалка по вставкам",
+        ], titles
+
+        entry = window._actions["toolbar"]
+        assert entry in menu.actions(), "one action for both places, not a copy"
+        assert entry.isChecked() is True
+
+        # Hiding from the menu reaches the `Вид` entry and the stored preference.
+        entry.trigger()
+        QApplication.processEvents()
+        assert window._toolbar.isHidden() is True
+        assert entry.isChecked() is False, "«Вид → Панель инструментов» disagrees"
+        assert window._settings.toolbar_visible is False, "the next start would show it"
+        assert window.createPopupMenu().actions()[0].isChecked() is False, "and the menu"
+
+        entry.trigger()
+        QApplication.processEvents()
+        assert window._toolbar.isHidden() is False
+        assert window._settings.toolbar_visible is True
+
+        # A toolbar Qt itself hides — a floated one closed by its own button — leaves
+        # the entry telling the truth as well.
+        window._toolbar.hide()
+        QApplication.processEvents()
+        assert entry.isChecked() is False, "the entry stopped following the widget"
+    finally:
+        discard_changes(window)
+    print("ok: the toolbar's menu and «Вид → Панель инструментов» are one switch")
+
+
 def test_the_recent_menu_lists_what_is_still_there(
     executable: str, directory: pathlib.Path
 ) -> None:
@@ -3176,6 +3225,40 @@ def press_ctrl_key(window, scan: int) -> bool:
     )
     QApplication.sendEvent(window.editor(), event)
     return event.isAccepted()
+
+
+def test_the_reference_opens_on_half_the_window(executable: str) -> None:
+    """`F1` used to open a dock as narrow as the text it holds.
+
+    A record is read *next to* the program it belongs to, so the first `F1` gives
+    the dock half the window.  From then on the width is the user's: neither `Esc`
+    nor the next `F1` takes a drag back.
+    """
+    from PySide6.QtCore import Qt
+
+    window = empty_window(executable)
+    try:
+        window.resize(1200, 800)
+        window.show()
+        QApplication.processEvents()
+
+        window.show_reference()
+        QApplication.processEvents()
+        dock = window._reference_dock
+        assert not dock.isHidden()
+        assert abs(dock.width() - window.width() // 2) <= 8, (dock.width(), window.width())
+
+        # A drag of the user's own outlives the dock being closed and asked for again.
+        window.resizeDocks([dock], [300], Qt.Orientation.Horizontal)
+        QApplication.processEvents()
+        assert dock.width() < window.width() // 2, dock.width()
+        dock.setVisible(False)
+        window.show_reference()
+        QApplication.processEvents()
+        assert abs(dock.width() - 300) <= 8, dock.width()
+    finally:
+        discard_changes(window)
+    print("ok: F1 opens the reference on half the window, and a drag of the user's stays")
 
 
 def test_the_cheat_sheet_lists_the_insert_table(executable: str) -> None:
@@ -5179,6 +5262,7 @@ def main(argv: list[str]) -> int:
         test_the_table_follows_the_output_font(executable)
         test_copy_over_the_table_takes_the_cells(executable)
         test_view_switches_are_stored(executable)
+        test_the_toolbar_menu_and_the_view_entry_are_one_switch(executable)
         test_the_recent_menu_lists_what_is_still_there(executable, files)
         test_the_recent_menu_and_the_window_carry_the_pictures(executable, files)
         test_the_title_and_the_tabs_show_the_file_state(executable, files)
@@ -5220,6 +5304,7 @@ def main(argv: list[str]) -> int:
         test_the_directive_is_inserted_as_a_whole_statement(executable)
         test_running_programs_without_questions_finishes(executable)
         test_f1_shows_the_record_of_the_word_under_the_caret(executable)
+        test_the_reference_opens_on_half_the_window(executable)
         test_the_cheat_sheet_lists_the_insert_table(executable)
         test_a_remapped_table_decides_what_ctrl_key_inserts(executable)
         test_the_output_can_be_saved(executable, files)
