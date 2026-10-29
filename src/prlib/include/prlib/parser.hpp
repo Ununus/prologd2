@@ -103,6 +103,9 @@ class Parser {
   /// Warn about every variable of the clause just parsed that appears exactly
   /// once — in the head that usually means a constant was meant.
   void warnSingletonVariables(bool has_body);
+  /// Warns about two variables of one statement — a clause or a question — whose
+  /// names differ only in alphabet: `C` and `С` (part 230).
+  void warnConfusableVariables();
   /// Skip forward to (and including) the statement terminator.
   void recoverToStatementEnd();
   /// Skip forward to the statement terminator, leaving it for the caller: the

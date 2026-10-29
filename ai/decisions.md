@@ -1986,3 +1986,43 @@ predicate and `abs` as a function, which is exactly the distinction a reader of 
 manual needs.  English names of the other built-ins stay lowercase (`is_whole`,
 `findall`): only the arithmetic ones had a lowercase twin inside expressions, and only
 they needed the case to tell them apart.
+
+## ADR-060: a look-alike variable is a pair, and only of one letter
+
+**Context.**  A program of this dialect is written in two alphabets at once — the
+keywords and many predicates are Russian, the ISO names and most variables are Latin —
+and a keyboard switches alphabets with one keystroke.  `С` (Cyrillic es) and `C` (Latin
+cee) are the same shape on the screen and different variables to the engine, so
+`БОЛЬШЕ(С, 0)` after `СЛОЖЕНИЕ(C, 1, С)` is a program that *looks* right and answers
+wrong.  Nothing in the engine noticed: the singleton warning fires only for a variable
+used once, and both spellings here are used.
+
+**Decision.**  A new warning, `ErrorCode::ConfusableVariable`, for two names of one
+clause that differ only in alphabet.  Its scope is deliberately narrow:
+
+* **one code point only** — `Сумма` and `Cумма` are different names too, but a longer
+  name has a meaning of its own, and guessing which spelling the author meant is not
+  the engine's business;
+* **one statement only** — each statement has its own scope, so `С` in one fact and
+  `C` in another never share a variable and are not a typo.  A *question* is a
+  statement too and is checked the same way: it is typed by hand, where the slip is
+  likelier than anywhere else.  The singleton warning, by contrast, stays clause-only,
+  because a variable used once in a question is how one asks;
+* **a closed table of twelve** — `А В Е К М Н О Р С Т Х У` → `A B E K M H O P C T X Y`,
+  the Cyrillic capitals drawn exactly like a Latin one.  This is not UTS #39
+  confusables: a generated skeleton (`l`, `1` and `I` fold together) would flag names
+  that are honest, and the twelve are the ones a Russian keyboard actually produces;
+* **the warning stands at the second spelling** and names both, with the alphabet of
+  each in words — «переменные «C» (латиница) и «С» (кириллица) выглядят одинаково, но
+  это разные переменные» — because the second is where the reader has to look, and
+  because the two letters themselves are indistinguishable in the message.
+
+`_C` and `_С` are silent: a name with a leading underscore says "I meant to leave this
+out", and the underscore already tells them apart at a glance.
+
+**Consequences.**  It is a warning, so no program changes meaning and no exit code
+changes; `--no-warnings` silences it as it does the others.  The check runs after
+`warnSingletonVariables` on the same `usages_` table, so a body singleton gets both
+messages — «встречается один раз» and «выглядят одинаково» — which is the truth: one
+of the two spellings is a typo *and* the mistyped name is used once.  The test corpus
+(`examples/`, `stdlib/`) had no such pair, so no lesson text changed.

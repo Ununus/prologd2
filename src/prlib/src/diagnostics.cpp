@@ -45,6 +45,8 @@ std::string_view errorCodeText(ErrorCode code) {
       return "неверное использование \"!\"";
     case ErrorCode::SingletonVariable:
       return "переменная встречается один раз";
+    case ErrorCode::ConfusableVariable:
+      return "похожие имена переменных";
 
     // Runtime.
     case ErrorCode::TypeMismatch:

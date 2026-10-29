@@ -1,7 +1,13 @@
 #include "prlib/parser.hpp"
 
 #include <cstdlib>
+#include <map>
+#include <optional>
 #include <stdexcept>
+#include <string>
+#include <string_view>
+
+#include "prlib/utf8.hpp"
 
 namespace prologd {
 
@@ -218,6 +224,77 @@ void Parser::warn(ErrorCode code, const SourceLocation& location, std::string me
   warning.message = std::move(message);
   warning.isParseError = true;
   sink_->report(std::move(warning));
+}
+
+namespace {
+
+/// The Cyrillic capitals that are drawn exactly like a Latin one.
+///
+/// `А В Е К М Н О Р С Т Х У` are the letters that make a name look like another
+/// name.  The table is small and closed on purpose: it is not an attempt at
+/// Unicode confusables (UTS #39), which needs a generated skeleton and would be
+/// noise here — a single letter is what a variable in a program of this dialect
+/// usually is.
+struct LookAlike {
+  char32_t cyrillic;
+  char latin;
+};
+
+constexpr LookAlike kLookAlikes[] = {
+    {U'А', 'A'}, {U'В', 'B'}, {U'Е', 'E'}, {U'К', 'K'}, {U'М', 'M'}, {U'Н', 'H'},
+    {U'О', 'O'}, {U'Р', 'P'}, {U'С', 'C'}, {U'Т', 'T'}, {U'Х', 'X'}, {U'У', 'Y'},
+};
+
+/// `"C"` and `"С"` (a Cyrillic es) fold to the same text — to `"C"`.  Only a
+/// name of exactly one letter folds: a longer name is a different question, and
+/// a different check.
+std::optional<std::string> foldedName(std::string_view name) {
+  const DecodeResult first = decodeCodePoint(name, 0);
+  if (!first.valid || first.length != name.size()) {
+    return std::nullopt;  // not one code point, or not UTF-8 at all
+  }
+  for (const LookAlike& pair : kLookAlikes) {
+    if (first.code_point == pair.cyrillic) {
+      return std::string(1, pair.latin);
+    }
+  }
+  return std::string(name);
+}
+
+/// The alphabet a one-letter name is written in, as a word for the message.
+const char* alphabetOf(std::string_view name) {
+  const DecodeResult first = decodeCodePoint(name, 0);
+  if (first.valid && first.code_point >= 0x400 && first.code_point <= 0x4FF) {
+    return "кириллица";
+  }
+  return "латиница";
+}
+
+}  // namespace
+
+void Parser::warnConfusableVariables() {
+  // A pair, not a name: one `С` on its own is fine, and only two spellings in one
+  // statement mean a typo.  The warning stands at the *second* spelling — that is
+  // where the reader has to look — and names both (part 230).
+  std::map<std::string, std::size_t> first_with_folded_name;
+  for (std::size_t index = 0; index < usages_.size(); ++index) {
+    const VarUsage& usage = usages_[index];
+    const std::optional<std::string> folded = foldedName(usage.name);
+    if (!folded) {
+      continue;
+    }
+    const auto [place, fresh] = first_with_folded_name.emplace(*folded, index);
+    if (fresh) {
+      continue;
+    }
+    // `usages_` holds one entry per spelling, so the earlier one is the other
+    // spelling of the same shape.
+    const VarUsage& earlier = usages_[place->second];
+    warn(ErrorCode::ConfusableVariable, usage.first,
+         "переменные «" + earlier.name + "» (" + alphabetOf(earlier.name) +
+             ") и «" + usage.name + "» (" + alphabetOf(usage.name) +
+             ") выглядят одинаково, но это разные переменные");
+  }
 }
 
 void Parser::warnSingletonVariables(bool has_body) {
@@ -994,6 +1071,7 @@ bool Parser::parseClause(ParsedProgram& out) {
   }
   advance();  // terminator
   warnSingletonVariables(!body.empty());
+  warnConfusableVariables();
   Clause clause;
   clause.head = std::move(head);
   clause.body = std::move(body);
@@ -1080,6 +1158,12 @@ bool Parser::parseQueryOrDirective(ParsedProgram& out) {
                                           canvas.args[1].integer.toInt64(), location});
     return true;
   }
+
+  // A question is a statement of its own, and `?БОЛЬШЕ(X, 1), МЕНЬШЕ(С, 5)` with
+  // two spellings of one letter is the same typo as in a rule — the question is
+  // typed by hand, so the slip is likelier.  A *singleton* is not reported here:
+  // in a question a variable used once is how one asks.
+  warnConfusableVariables();
 
   Query query;
   query.goals = std::move(goals);

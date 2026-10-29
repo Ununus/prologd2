@@ -39,6 +39,9 @@ enum class ErrorCode {
   MisplacedCut,
   /// A variable that appears once in a clause; see `Parser::warnSingletonVariables`.
   SingletonVariable,
+  /// Two variables of one clause whose names differ only in alphabet
+  /// (`C` and `С`); see `Parser::warnConfusableVariables`.
+  ConfusableVariable,
 
   // Runtime.
   TypeMismatch,

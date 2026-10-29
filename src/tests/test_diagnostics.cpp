@@ -55,6 +55,17 @@ std::vector<const PrologError*> withSeverity(const std::vector<PrologError>& dia
   return result;
 }
 
+std::vector<const PrologError*> withCode(const std::vector<PrologError>& diagnostics,
+                                         ErrorCode code) {
+  std::vector<const PrologError*> result;
+  for (const PrologError& diagnostic : diagnostics) {
+    if (diagnostic.code == code) {
+      result.push_back(&diagnostic);
+    }
+  }
+  return result;
+}
+
 }  // namespace
 
 TEST_CASE("an unclosed bracket is reported at the opening bracket") {
@@ -132,6 +143,43 @@ TEST_CASE("an unclosed string points at its opening quote") {
   REQUIRE(error.code == ErrorCode::InvalidStringLiteral);
   REQUIRE(error.location.line == 1);
   REQUIRE(error.location.column == 13);  // the opening `"`
+}
+
+TEST_CASE("two variables that differ only in alphabet are reported") {
+  // `C` is Latin, the second name is a Cyrillic es: one shape, two variables.
+  // The warning stands at the second spelling and names both alphabets.
+  const std::vector<PrologError> diagnostics = diagnosticsOf("a(C, С).\n");
+  const std::vector<const PrologError*> confusable =
+      withCode(diagnostics, ErrorCode::ConfusableVariable);
+  REQUIRE(confusable.size() == 1);
+  REQUIRE(confusable.front()->severity == Severity::Warning);
+  REQUIRE(confusable.front()->location.line == 1);
+  REQUIRE(confusable.front()->location.column == 6);  // the second name, in bytes
+  REQUIRE(confusable.front()->message ==
+          "переменные «C» (латиница) и «С» (кириллица) выглядят одинаково, "
+          "но это разные переменные");
+
+  // A question is a statement too, and there the slip is likelier still.
+  const std::vector<PrologError> question = diagnosticsOf("?a(C, С).\n");
+  const std::vector<const PrologError*> asked =
+      withCode(question, ErrorCode::ConfusableVariable);
+  REQUIRE(asked.size() == 1);
+  REQUIRE(asked.front()->location.line == 1);
+  REQUIRE(asked.front()->location.column == 7);  // past the `?`, in bytes
+}
+
+TEST_CASE("a look-alike is silent without the pair in one clause") {
+  // One Cyrillic letter on its own is a name like any other, `_C` and `_С`
+  // are wildcards, and two clauses never share a variable: no pair, no warning.
+  const std::vector<PrologError> lone = diagnosticsOf("r(С).\n");
+  REQUIRE(withCode(lone, ErrorCode::ConfusableVariable).empty());
+
+  const std::vector<PrologError> wildcards = diagnosticsOf("q(_C, _С).\n");
+  REQUIRE(wildcards.empty());
+
+  const std::vector<PrologError> clauses =
+      diagnosticsOf("a(С, С).\nb(C, C).\n");
+  REQUIRE(clauses.empty());
 }
 
 TEST_CASE("a reserved name with an arity it does not have is an error") {
