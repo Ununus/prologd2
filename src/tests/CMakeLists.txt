@@ -48,8 +48,15 @@ endif()
 # console (the OEM one when the build has none), so a Russian test name is stored
 # double encoded in `prlib_tests-*_tests.cmake`; `ctest` then reports "No test
 # cases matched" for it even though the binary runs the test fine.  The test
-# *goals* are Russian throughout — only the names have to stay ASCII.
+# *goals* are Russian throughout — only the names have to stay ASCII.  That rule
+# was a comment until part 223, when two Russian names slipped in and cost a
+# Windows run; the check below makes it fail here instead.
 catch_discover_tests(prlib_tests)
+
+add_test(NAME test_case_names_are_ascii
+  COMMAND "${CMAKE_COMMAND}"
+          "-DSOURCES_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+          -P "${CMAKE_CURRENT_SOURCE_DIR}/check_test_case_names.cmake")
 
 # ---------------------------------------------------------------------------
 # Command-line integration tests

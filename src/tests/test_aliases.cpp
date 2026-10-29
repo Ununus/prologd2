@@ -109,7 +109,7 @@ TEST_CASE("the original dialect's or-word is the two-goal spelling of the choice
   REQUIRE(prologd::findBuiltin("ИЛИ", 3) == nullptr);
 }
 
-TEST_CASE("the copy predicate answers to no English name, sub_string belongs to ПОДСТРОКА") {
+TEST_CASE("the copy predicate answers to no English name, sub_string belongs to the Russian one") {
   // task_84: `substring` was the English spelling of `КОПИЯ/4`, and it is gone —
   // the ISO predicate of the same family takes five arguments and counts from
   // zero, so it is a predicate of its own.  In Russian it is `ПОДСТРОКА` (part

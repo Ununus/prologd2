@@ -131,7 +131,11 @@ Tests are written **together with** the feature, never after.
   `execute_process`, which decodes the child's stdout with the **console** code page.  A
   Cyrillic `TEST_CASE` name comes back as mojibake, and ctest then reports the case as
   failed because the name it passes back does not match.  The body may be Russian; the
-  name is Latin.
+  name is Latin.  It bit twice (part 223), so it is a test now, not only a note:
+  `test_case_names_are_ascii` runs `src/tests/check_test_case_names.cmake` over the
+  sources.  That script reads each file whole — `file(STRINGS)` silently cuts a line
+  at the first non-ASCII byte and a line-by-line check would pass on the very names
+  it exists to catch.
 
 ## Versioning
 

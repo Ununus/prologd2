@@ -228,7 +228,8 @@ entries of the session log below and in `ai/task_*.md`.
 
 ## Test suite
 
-422 tests, about six seconds: 402 Catch2 cases plus 20 `cli_*` ones — the option
+423 tests, about six seconds: 402 Catch2 cases plus 20 `cli_*` ones and the
+`test_case_names_are_ascii` guard (part 223) — the option
 spellings, the Cyrillic paths, the import search report, `--list-keywords`,
 `--format`, the engine limits, the diagnostics and the JSON protocol session, which
 now expects protocol 15.  Groups: BigInt, lexer, keywords, parser, unification,
@@ -7668,3 +7669,34 @@ of the package».  Отдельно: 25 оконных наборов и `protoc
   покрытие глобов проверены по списку `git ls-files`.  Кода изменения не
   касаются, поэтому тесты не гонялись повторно (422/422 держатся с прошлого
   прогона).
+
+### 223. Имена тестов латиницей — теперь это тест, а не заметка
+
+* **Что случилось.**  На Windows упали два теста: «the copy predicate answers to no
+  English name, sub_string belongs to ПОДСТРОКА» и «sub_string answers to
+  ПОДСТРОКА, the Russian name».  На Linux те же тесты проходили.  В логе видно,
+  что тело не выполнялось вовсе: `Filters: "…belongs to ╨ƒ╨₧╨ö╨í╨ó╨á╨₧╨Ü╨É"` →
+  «No test cases matched».
+* **Причина.**  `catch_discover_tests` регистрирует каждый `TEST_CASE` отдельным
+  тестом CTest и передаёт имя обратно как `--test-case "<имя>"`.  В Windows
+  аргумент доходит до процесса через кодовую страницу консоли, и UTF-8 байты
+  `ПОДСТРОКА` превращаются в мусор — фильтр не совпадает ни с чем, тест падает,
+  хотя сам он цел.  На Linux байты проходят как есть, поэтому там всё зелено.
+* **Это было записано.**  `ai/conventions.md` (task_95) и комментарий у
+  `catch_discover_tests` говорят ровно это.  Я нарушил правило дважды за сессию,
+  называя тесты по-русски, — заметка не сработала.
+* **Исправление.**  Оба имени переименованы в латиницу
+  («…sub_string belongs to the Russian one», «sub_string answers to the Russian
+  name too»); тела по-прежнему русские.
+* **Страж.**  `src/tests/check_test_case_names.cmake` + тест
+  `test_case_names_are_ascii` (423-й): скрипт читает `src/tests/test_*.cpp`,
+  находит объявления `TEST_CASE("…")` и падает, если в имени есть байт вне
+  печатного ASCII, с именем файла и номером строки.
+* **Ловушка, найденная по дороге.**  Первая версия стража читала файлы через
+  `file(STRINGS)` и **молча проходила** на том самом имени, ради которого
+  написана: `file(STRINGS)` обрезает строку на первом байте выше ASCII, без
+  ошибки.  Страж проверен в обе стороны: на нынешних исходниках проходит, на
+  подсунутом русском имени падает с `test_aliases.cpp:112`.  Причина записана в
+  самом скрипте, чтобы следующий не переписал его «проще».
+* **Проверки.**  `linux-release` и `linux-werror`: 423/423 в обоих.  Настоящая
+  проверка — следующий прогон Windows-задания.

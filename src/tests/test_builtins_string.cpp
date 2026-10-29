@@ -215,7 +215,7 @@ TEST_CASE("sub_string walks over every answer on backtracking") {
                             "L=0\nA=3\n");
 }
 
-TEST_CASE("sub_string answers to ПОДСТРОКА, the Russian name") {
+TEST_CASE("sub_string answers to the Russian name too") {
   // The ISO spelling is what a reader of ordinary Prolog looks for; the Russian
   // one is what the rest of this dialect's built-ins are called.  It is one
   // predicate: same arity, same walk, same errors — and those keep naming the ISO
