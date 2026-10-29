@@ -19,6 +19,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
+from PySide6.QtCore import Qt  # noqa: E402
 from PySide6.QtGui import QFont, QTextDocument  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
@@ -58,7 +59,9 @@ class Coloured:
         self.document.setPlainText(line)
         self.highlighter.rehighlight()
 
-    def ranges(self) -> list[tuple[int, int, str, int]]:
+    def ranges(self) -> list[tuple[int, int, str, int, str, str]]:
+        from PySide6.QtGui import QTextCharFormat
+
         block = self.document.firstBlock()
         layout = block.layout()
         assert layout is not None, "the document was never laid out"
@@ -68,6 +71,14 @@ class Coloured:
                 item.length,
                 item.format.foreground().color().name(),
                 int(item.format.fontWeight()),
+                # `noBrush` (an empty string) when the token has no band behind it.
+                item.format.background().color().name()
+                if item.format.background().style() != Qt.BrushStyle.NoBrush
+                else "",
+                # The wavy line's colour, `""` when the text is not underlined.
+                item.format.underlineColor().name()
+                if item.format.underlineStyle() != QTextCharFormat.UnderlineStyle.NoUnderline
+                else "",
             )
             for item in layout.formats()
         ]
@@ -76,10 +87,28 @@ class Coloured:
         """The colour and weight of the *first* occurrence of `snippet`."""
         assert snippet in self.line, f"{snippet!r} is not in {self.line!r}"
         offset = self.line.index(snippet)
-        for start, length, colour, weight in self.ranges():
+        for start, length, colour, weight, _band, _underline in self.ranges():
             if start <= offset < start + length:
                 return colour, weight
         return None, None
+
+    def background(self, snippet: str) -> str:
+        """The band behind the first occurrence of `snippet`, `""` for none."""
+        assert snippet in self.line, f"{snippet!r} is not in {self.line!r}"
+        offset = self.line.index(snippet)
+        for start, length, _colour, _weight, band, _underline in self.ranges():
+            if start <= offset < start + length:
+                return band
+        return ""
+
+    def underline(self, snippet: str) -> str:
+        """The wavy line under the first occurrence of `snippet`, `""` for none."""
+        assert snippet in self.line, f"{snippet!r} is not in {self.line!r}"
+        offset = self.line.index(snippet)
+        for start, length, _colour, _weight, _band, underline in self.ranges():
+            if start <= offset < start + length:
+                return underline
+        return ""
 
     def colour(self, snippet: str) -> str | None:
         return self.at(snippet)[0]
@@ -88,13 +117,13 @@ class Coloured:
 def test_colours_by_kind() -> None:
     coloured = Coloured("член(X) :- member(X), X = 1, НАЙТИВСЕ(Y, цель(Y), L), ПС. % привет")
 
-    # Names: atoms and variables have a colour each, shared by both alphabets —
-    # the Russian and English spellings look alike since task_50's colour round.
-    assert coloured.colour("член") == THEME.atom_cyrillic
-    assert coloured.colour("member") == THEME.atom_latin
-    assert coloured.colour("цель") == THEME.atom_cyrillic
-    assert coloured.colour("X") == THEME.variable_latin
-    assert coloured.colour("L") == THEME.variable_latin
+    # Names: atom and variable have a colour each, and the alphabet does not
+    # matter — one role, one colour (part 226).
+    assert coloured.colour("член") == THEME.atom
+    assert coloured.colour("member") == THEME.atom
+    assert coloured.colour("цель") == THEME.atom
+    assert coloured.colour("X") == THEME.variable
+    assert coloured.colour("L") == THEME.variable
 
     # Reserved names, comments and punctuation.
     assert coloured.colour("НАЙТИВСЕ") == THEME.keyword
@@ -127,10 +156,10 @@ def test_colours_on_a_query_line() -> None:
     coloured = Coloured('?цель("строка", 12, 1.5, #Н-1#)')
 
     assert coloured.colour("?") == THEME.query
-    assert coloured.colour("цель") == THEME.atom_cyrillic
+    assert coloured.colour("цель") == THEME.atom
     assert coloured.colour('"строка"') == THEME.string
-    assert coloured.colour("12") == THEME.integer
-    assert coloured.colour("1.5") == THEME.float
+    assert coloured.colour("12") == THEME.number
+    assert coloured.colour("1.5") == THEME.number
     assert coloured.colour("#") == THEME.expression
     print("ok: `?`, strings, numbers and `#` on a query line")
 
@@ -140,19 +169,21 @@ def test_the_comment_is_not_tokenized_further() -> None:
     coloured = Coloured("цель(X). % НАЙТИВСЕ(X) и \"строка\"")
     assert coloured.colour("% НАЙТИВСЕ(X) и \"строка\"") == THEME.comment
     # The code before the comment still is.
-    assert coloured.colour("цель") == THEME.atom_cyrillic
-    assert coloured.colour("X") == THEME.variable_latin
+    assert coloured.colour("цель") == THEME.atom
+    assert coloured.colour("X") == THEME.variable
     print("ok: a trailing comment keeps its own colour to the end of the line")
 
 
-def test_a_parked_question_is_coloured_as_a_question() -> None:
-    """`%   ?ВЕРСИЯ.` is a question the margin runs, not a note about one."""
-    assert Coloured("%   ?ВЕРСИЯ.").colour("%") == THEME.query_comment
-    # A comment that is not a question, and a question that does not start the
-    # line, both keep the comment colour.
+def test_a_parked_question_is_coloured_as_the_comment_it_stands_in() -> None:
+    """`%   ?ВЕРСИЯ.` is prose with a question in it, and reads as one colour.
+
+    It used to have a colour of its own (part 226 removed that row): a comment is
+    a comment, and the margin's marker is what tells a parked question apart.
+    """
+    assert Coloured("%   ?ВЕРСИЯ.").colour("%") == THEME.comment
     assert Coloured("% привет").colour("%") == THEME.comment
     assert Coloured("факт(1). % ?факт(X).").colour("%") == THEME.comment
-    print("ok: a question parked in a comment is coloured as a question")
+    print("ok: a question parked in a comment is coloured as the comment")
 
 
 def test_builtins_are_bold_and_names_are_not() -> None:
@@ -167,7 +198,7 @@ def test_builtins_are_bold_and_names_are_not() -> None:
 def test_changing_the_table_recolours() -> None:
     """An interpreter older than protocol 2 sends no names — and that is visible."""
     coloured = Coloured("НАЙТИВСЕ(X)", keywords=Keywords())
-    assert coloured.colour("НАЙТИВСЕ") == THEME.variable_cyrillic
+    assert coloured.colour("НАЙТИВСЕ") == THEME.variable
 
     # The session then says `ready` and the same text is a built-in again.
     coloured.highlighter.set_keywords(TABLE)
@@ -177,30 +208,61 @@ def test_changing_the_table_recolours() -> None:
 
 def test_changing_the_theme_recolours() -> None:
     coloured = Coloured("член(X)")
-    assert coloured.colour("член") == THEME.atom_cyrillic
-    coloured.highlighter.set_theme(Theme(atom_cyrillic="#123456", variable_latin="#654321"))
+    assert coloured.colour("член") == THEME.atom
+    coloured.highlighter.set_theme(Theme(atom="#123456", variable="#654321"))
     assert coloured.colour("член") == "#123456"
     assert coloured.colour("X") == "#654321"
     print("ok: the theme is data and re-applies without touching the text")
+
+
+def test_a_mixed_alphabet_name_carries_a_band_while_the_box_is_ticked() -> None:
+    """`abc_где` mixes the two alphabets, which is usually a typo (parts 226, 227).
+
+    The mark is a *band*, as `#highlight[…]` paints one: the name keeps the colour
+    of its role — an atom stays an atom, a variable stays a variable — and the
+    band is what catches the eye.  It is a switch, not a colour: turning it off
+    leaves a plain name, because to the interpreter the name is not wrong.
+    """
+    coloured = Coloured("член(abc_где, X_где, Y).")
+    assert coloured.colour("abc_где") == THEME.atom
+    assert coloured.colour("X_где") == THEME.variable
+    assert coloured.background("abc_где") == THEME.mixed_background
+    assert coloured.background("X_где") == THEME.mixed_background
+    # The band alone is not enough: the current line is painted over the text's
+    # background (part 228), so the wavy line is what stays visible there.
+    assert coloured.underline("abc_где") == THEME.mixed_underline
+    assert coloured.underline("X_где") == THEME.mixed_underline
+
+    coloured.highlighter.set_flag_mixed(False)
+    assert coloured.colour("abc_где") == THEME.atom
+    assert coloured.background("abc_где") == "", "the band survived the switch"
+    assert coloured.underline("abc_где") == "", "the wavy line survived the switch"
+
+    # A name of one alphabet carries neither mark, whatever the switch says.
+    coloured.highlighter.set_flag_mixed(True)
+    for plain in ("член", "Y"):
+        assert coloured.background(plain) == "", plain
+        assert coloured.underline(plain) == "", plain
+    print("ok: a name of two alphabets carries a band and a wavy line")
 
 
 def test_astral_characters_do_not_shift_the_rest_of_the_line() -> None:
     """Qt counts UTF-16 units, Python counts code points; the offsets are mapped."""
     coloured = Coloured('член(😀). % привет')
     assert coloured.colour("привет") == THEME.comment
-    assert coloured.colour("член") == THEME.atom_cyrillic
+    assert coloured.colour("член") == THEME.atom
     print("ok: an astral character in a comment does not shift the colours")
 
 
 def test_quoted_atoms_and_underscore_names() -> None:
-    """A quoted constant is coloured as one, and a name with `_` is a variable.
+    """A quoted constant is coloured as an atom — one role, one colour (part 226).
 
     An apostrophe opens a quoted atom and never ends a name: `_Пер'` is the
     variable `_Пер` and then a quote, which is what the old naming mode used to
     read as one token.
     """
     coloured = Coloured("пункт('атом', _Пер, _пер)")
-    assert coloured.colour("'атом'") == THEME.quoted_atom
+    assert coloured.colour("'атом'") == THEME.atom
     assert coloured.colour("_Пер") == THEME.color_for(VARIABLE, CYRILLIC)
     assert coloured.colour("_пер") == THEME.color_for(VARIABLE, CYRILLIC)
     print("ok: атомы в кавычках и имена с подчёркиванием красятся")
@@ -239,9 +301,9 @@ def test_a_block_comment_is_coloured_on_every_line() -> None:
     # The opening line still has the code in front of the comment.  Qt merges
     # neighbouring spans of one format, so `)` and `.` arrive as one span.
     assert first == [
-        ("p", THEME.atom_latin),
+        ("p", THEME.atom),
         ("(", THEME.punctuation),
-        ("X", THEME.variable_latin),
+        ("X", THEME.variable),
         (").", THEME.punctuation),
         ("/* начало", THEME.comment),
     ]
@@ -251,9 +313,9 @@ def test_a_block_comment_is_coloured_on_every_line() -> None:
     # The comment ends where `*/` closes it, and code follows on the same line.
     assert last == [
         ("конец */", THEME.comment),
-        ("q", THEME.atom_latin),
+        ("q", THEME.atom),
         ("(", THEME.punctuation),
-        ("X", THEME.variable_latin),
+        ("X", THEME.variable),
         (").", THEME.punctuation),
         ("% хвост", THEME.comment),
     ]
@@ -266,11 +328,12 @@ def main() -> int:
     test_a_directive_is_bold_like_any_reserved_name()
     test_colours_on_a_query_line()
     test_the_comment_is_not_tokenized_further()
-    test_a_parked_question_is_coloured_as_a_question()
+    test_a_parked_question_is_coloured_as_the_comment_it_stands_in()
     test_builtins_are_bold_and_names_are_not()
     test_changing_the_table_recolours()
     test_changing_the_theme_recolours()
     test_quoted_atoms_and_underscore_names()
+    test_a_mixed_alphabet_name_carries_a_band_while_the_box_is_ticked()
     test_astral_characters_do_not_shift_the_rest_of_the_line()
     test_a_block_comment_is_coloured_on_every_line()
     print("all highlighter checks passed")

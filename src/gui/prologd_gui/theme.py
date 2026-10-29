@@ -22,73 +22,102 @@ _BOLD_KINDS = frozenset({tokens.KEYWORD, tokens.DIRECTIVE})
 
 @dataclass(frozen=True)
 class Theme:
-    """The colours of the editor.
+    """The colours of the editor: one per role, in the order the dialog shows them.
 
-    One colour per role.  The Russian and English spellings of a name share one
-    colour by default (task_50's colour round): the two alphabets used to be
-    told apart, and a reader who wants that back can set the two fields apart
-    again in «Настройки → Подсветка» — the fields stay, they are just equal out
-    of the box.
+    A *role* is what a reader sees, not what the tokenizer knows (part 226): a
+    quoted atom is painted as an atom, a question parked in a comment as a
+    comment, and both alphabets of a name share one colour — telling them apart
+    was a leftover of the naming modes that are gone.  Whole and real numbers
+    share one colour for the same reason.
+
+    An empty string means «do not paint this kind at all», which no role uses
+    today but `color_for` still allows.
+
+    `mixed_background` is the one field that is not a role: it is the band drawn
+    *behind* a name that mixes the two alphabets, and it exists in both themes
+    because a background has to be chosen against its own page.  It has no row in
+    the settings dialog — the flag is a switch, not a colour (part 227) — which is
+    why `syntax_rows` walks `SYNTAX_LABELS` and not the fields of this record.
     """
 
     comment: str = "#0d6a0d"
-    # A question parked in a comment (`%   ?ВЕРСИЯ.`): a question to the reader,
-    # and the margin will run it — the same green as a comment, so it reads as
-    # part of the prose until the marker is asked for (task_50's colour round).
-    query_comment: str = "#0d6a0d"
+    #: Reserved names: built-ins, `mod`/`div`, `ИМПОРТ`, and the signs `=`, `<`, `>`.
+    keyword: str = "#0a22d6"
+    atom: str = "#4f1473"
+    variable: str = "#b62222"
     string: str = "#986801"
-    quoted_atom: str = "#986801"  # the same brown as a string: one "quoted" colour
-    keyword: str = "#0a22d6"  # reserved: built-ins, `mod`/`div`, `ИМПОРТ`, `=`, `<`, `>`
-    integer: str = "#505000"
-    float: str = "#505000"
+    number: str = "#505000"
     punctuation: str = "#3f3f3f"
     query: str = "#0a22d6"
     expression: str = "#0a22d6"
-    atom_latin: str = "#4f1473"
-    atom_cyrillic: str = "#4f1473"  # the same violet as the Latin atom (task_50)
-    variable_latin: str = "#b62222"
-    variable_cyrillic: str = "#b62222"  # the same red as the Latin variable (task_50)
-    mixed: str = "#e30004"  # a name that mixes the two alphabets: a bright red flag
+    #: The band behind a mixed-alphabet name, as `#highlight[…]` in a word
+    #: processor paints one: the text keeps its role's colour and the band is what
+    #: catches the eye.
+    mixed_background: str = "#ffd0d0"
+    #: The wavy line under it.  The band alone is not enough: the current line is
+    #: painted over the text's own background, so on the line the caret stands on
+    #: the band disappears.  An underline is drawn *with* the text run and survives
+    #: that, and a wavy line is what a typo looks like in every editor (part 228).
+    mixed_underline: str = "#c62828"
 
-    def color_for(self, kind: str, alphabet: str = "") -> str:
-        """The colour of a token; an empty string means "leave it alone"."""
-        if kind == tokens.COMMENT:
+    def color_for(self, kind: str, alphabet: str = "", *, flag_mixed: bool = True) -> str:
+        """The colour of a token; an empty string means "leave it alone".
+
+        The colour is the role's own: a mixed-alphabet name is a name like any
+        other as far as the *text* goes.  What marks it is `background_for` — the
+        band behind it (part 227).
+        """
+        if kind in (tokens.COMMENT, tokens.QUERY_COMMENT):
+            # A question parked in a comment (`%   ?ВЕРСИЯ.`) is prose: the margin
+            # will run it, and until the marker is asked for it reads as part of
+            # the sentence it stands in.
             return self.comment
-        if kind == tokens.QUERY_COMMENT:
-            return self.query_comment
-        if kind == tokens.STRING:
-            return self.string
-        if kind == tokens.QUOTED_ATOM:
-            return self.quoted_atom
         if kind in (tokens.KEYWORD, tokens.DIRECTIVE, tokens.OPERATOR):
             return self.keyword
-        if kind == tokens.INTEGER:
-            return self.integer
-        if kind == tokens.FLOAT:
-            return self.float
+        if kind in (tokens.ATOM, tokens.QUOTED_ATOM):
+            return self.atom
+        if kind == tokens.VARIABLE:
+            return self.variable
+        if kind == tokens.STRING:
+            return self.string
+        if kind in (tokens.INTEGER, tokens.FLOAT):
+            return self.number
         if kind == tokens.PUNCTUATION:
             return self.punctuation
         if kind == tokens.QUERY:
             return self.query
         if kind == tokens.EXPRESSION:
             return self.expression
-        if kind == tokens.ATOM:
-            return self._name_colour(self.atom_latin, self.atom_cyrillic, alphabet)
-        if kind == tokens.VARIABLE:
-            return self._name_colour(self.variable_latin, self.variable_cyrillic, alphabet)
+        return ""
+
+    def underline_for(self, kind: str, alphabet: str, *, flag_mixed: bool = True) -> str:
+        """The colour of the wavy line under a marked name; `""` for none.
+
+        Same rule as `background_for`, and the same reason for existing: the band
+        is hidden on the current line, the line under the text is not.
+        """
+        if not flag_mixed or alphabet != tokens.MIXED:
+            return ""
+        if kind in (tokens.ATOM, tokens.QUOTED_ATOM, tokens.VARIABLE):
+            return self.mixed_underline
+        return ""
+
+    def background_for(self, kind: str, alphabet: str, *, flag_mixed: bool = True) -> str:
+        """The band behind a token; an empty string means «no band».
+
+        Today there is one band, and one reason for it: a name of two alphabets
+        (`abc_где`) is almost always a typo, and a band is what a reader notices
+        without the name's *colour* being taken away from its role.  It is painted
+        only while the «Выделять имя из двух алфавитов» box is ticked.
+        """
+        if not flag_mixed or alphabet != tokens.MIXED:
+            return ""
+        if kind in (tokens.ATOM, tokens.QUOTED_ATOM, tokens.VARIABLE):
+            return self.mixed_background
         return ""
 
     def is_bold(self, kind: str) -> bool:
         return kind in _BOLD_KINDS
-
-    def _name_colour(self, latin: str, cyrillic: str, alphabet: str) -> str:
-        if alphabet == tokens.CYRILLIC:
-            return cyrillic
-        if alphabet == tokens.MIXED:
-            return self.mixed
-        # Latin by default: a name without letters at all (say `_`) is not worth
-        # a third colour.
-        return latin
 
     def colors(self) -> list[str]:
         """Every colour of the palette, for checks and the settings dialog."""
@@ -104,26 +133,22 @@ class Theme:
 #: caller that has no palette — gets exactly what it had before.
 LIGHT_SYNTAX = Theme()
 
-#: The dark syntax palette (task_29).  Same roles, same alphabet merge, chosen
-#: against `#1e1e1e`.  Every field but `mixed` clears WCAG AA on that page — the
-#: mixed-alphabet flag is bright red on purpose, a signal rather than body text
-#: (task_50's colour round).
+#: The dark syntax palette (task_29), chosen against `#1e1e1e`.  Every colour
+#: clears WCAG AA on that page, and so does the text on the mixed-name band: the
+#: band is chosen light enough to be seen and dark enough to keep the name legible
+#: (`test_appearance.py` measures both).
 DARK_SYNTAX = Theme(
     comment="#6a9955",
-    query_comment="#6a9955",
-    string="#ce9178",
-    quoted_atom="#ce9178",
     keyword="#4fc1ff",
-    integer="#b5cea8",
-    float="#b5cea8",
+    atom="#d47bdc",
+    variable="#ff7878",
+    string="#ce9178",
+    number="#b5cea8",
     punctuation="#a6a6a6",
     query="#4fc1ff",
     expression="#4fc1ff",
-    atom_latin="#d47bdc",
-    atom_cyrillic="#d47bdc",
-    variable_latin="#ff7878",
-    variable_cyrillic="#ff7878",
-    mixed="#e30004",
+    mixed_background="#5a1f26",
+    mixed_underline="#ff6b6b",
 )
 
 #: What each syntax colour is, in the words of the settings dialog (task_50).
@@ -131,21 +156,15 @@ DARK_SYNTAX = Theme(
 #: themselves — so a colour added to `Theme` gets a row in the dialog once its
 #: label is here.
 SYNTAX_LABELS: dict[str, str] = {
-    "comment": "Комментарий",
-    "query_comment": "Вопрос в комментарии",
-    "string": "Строка",
-    "quoted_atom": "Атом в кавычках",
+    "comment": "Комментарии",
     "keyword": "Служебное имя",
-    "integer": "Целое число",
-    "float": "Вещественное число",
+    "atom": "Атом",
+    "variable": "Переменная",
+    "string": "Строка",
+    "number": "Числа",
     "punctuation": "Знаки препинания",
-    "query": "Вопрос (?цель)",
-    "expression": "Выражение (#…)",
-    "atom_latin": "Атом латиницей",
-    "atom_cyrillic": "Атом кириллицей",
-    "variable_latin": "Переменная латиницей",
-    "variable_cyrillic": "Переменная кириллицей",
-    "mixed": "Имя из двух алфавитов",
+    "query": "Вопрос",
+    "expression": "Выражение",
 }
 
 
@@ -158,12 +177,8 @@ def syntax_rows() -> list[tuple[str, str, str]]:
     them.
     """
     return [
-        (
-            SYNTAX_LABELS[field.name],
-            getattr(LIGHT_SYNTAX, field.name),
-            getattr(DARK_SYNTAX, field.name),
-        )
-        for field in fields(Theme)
+        (label, getattr(LIGHT_SYNTAX, field), getattr(DARK_SYNTAX, field))
+        for field, label in SYNTAX_LABELS.items()
     ]
 
 
@@ -268,17 +283,23 @@ class Palette:
         so a colour added to a palette is measured without the test being touched,
         which is the only way a dark theme stays honest.  A few pairs are
         deliberately *not* in it: the margin's inactive numbers and the placeholder
-        text are chrome, quiet on purpose (the margin is 3.03 in the light theme),
-        and `mixed` is a bright-red *flag* for a name that mixes two alphabets —
-        a signal the reader must notice, not body text (task_50's colour round).
+        text are chrome, quiet on purpose (the margin is 3.03 in the light theme).
+
+        The mixed-name band is measured the other way round: not the band against
+        the page (it is a background, and 1.3–1.4 is what a highlight looks like),
+        but the *name* against the band — a marked name has to stay readable the
+        same way an unmarked one does (part 227).
         """
         pairs = [("текст на странице", self.foreground, self.background)]
+        band = self.syntax.mixed_background
         for field in fields(self.syntax):
-            if field.name == "mixed":
+            if field.name in ("mixed_background", "mixed_underline"):
                 continue
             pairs.append(
                 (f"подсветка: {field.name}", getattr(self.syntax, field.name), self.background)
             )
+        for name in ("atom", "variable"):
+            pairs.append((f"имя на полосе: {name}", getattr(self.syntax, name), band))
         for name in ("echo", "note", "error", "warning", "trace"):
             pairs.append((f"вывод: {name}", getattr(self, name), self.background))
         pairs.append(("номер строки с ошибкой", self.error_text, self.error_background))

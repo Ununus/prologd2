@@ -226,6 +226,10 @@ class Buffer(QObject):
         for view in self._views:
             view.set_palette(palette)
 
+    def set_flag_mixed(self, flag: bool) -> None:
+        """The red flag on mixed-alphabet names (part 226), for the buffer and its views."""
+        self.highlighter.set_flag_mixed(flag)
+
     def set_completion(self, enabled: bool, after: int, match_case: bool) -> None:
         """The three completion switches of task_29, in one call per view."""
         for view in self._views:

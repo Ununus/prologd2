@@ -3937,6 +3937,7 @@ class MainWindow(QMainWindow):
             buffer.set_indent(self._settings.indent_character, self._settings.indent_width)
             buffer.set_auto_indent(self._settings.auto_indent)
             buffer.set_palette(self._settings.palette)
+            buffer.set_flag_mixed(self._settings.mixed_names)
             buffer.set_completion(
                 self._settings.completion,
                 self._settings.auto_complete_after,

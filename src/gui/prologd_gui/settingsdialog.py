@@ -356,7 +356,18 @@ class SettingsDialog(QDialog):
         return self._label_column
 
     def _rows(self, section: str) -> list[settings_module.Setting]:
-        return [entry for entry in settings_module.SETTINGS if entry.section == section]
+        """The rows of one section page.
+
+        «Выделять имя из двух алфавитов» is a row of «Вид» in the settings table
+        but is not drawn there: it belongs to the colour table it switches, so
+        `_build_syntax_page` makes its checkbox and leaves the section pages alone
+        (part 226).
+        """
+        return [
+            entry
+            for entry in settings_module.SETTINGS
+            if entry.section == section and entry.key != settings_module.MIXED_NAMES
+        ]
 
     def _sync_process_directory_path(self) -> None:
         """`«Свой каталог процесса»` is editable only for the `custom` answer.
@@ -439,13 +450,6 @@ class SettingsDialog(QDialog):
         """
         page = QWidget(self)
         layout = QVBoxLayout(page)
-        note = QLabel(
-            "Одна и та же роль в двух темах.  Нажмите на цвет, чтобы изменить его "
-            "для этой темы; выбранный hex хранится в файле настроек и применяется "
-            "сразу.  «Вид → Оформление» по-прежнему выбирает тему целиком."
-        )
-        note.setWordWrap(True)
-        layout.addWidget(note)
 
         table = QTableWidget(0, 3, page)
         table.setHorizontalHeaderLabels(["Что подсвечено", "Светлая", "Тёмная"])
@@ -461,7 +465,10 @@ class SettingsDialog(QDialog):
         self._syntax_fields: list[str] = []
         self._syntax_light_buttons: dict[str, ColorButton] = {}
         self._syntax_dark_buttons: dict[str, ColorButton] = {}
-        for row, field in enumerate(theme_module.Theme.__dataclass_fields__):
+        # The rows are `SYNTAX_LABELS`, not the fields of `Theme`: the mixed-name
+        # band is a colour of the palette too, but it is not a role and has no row
+        # (the checkbox below the table is its switch — part 227).
+        for row, field in enumerate(theme_module.SYNTAX_LABELS):
             self._syntax_fields.append(field)
             table.insertRow(row)
             table.setItem(row, 0, QTableWidgetItem(theme_module.SYNTAX_LABELS[field]))
@@ -483,11 +490,35 @@ class SettingsDialog(QDialog):
             self._syntax_dark_buttons[field] = table.cellWidget(row, 2)
 
         layout.addWidget(table, 1)
+
+        # The one switch of the page: the red flag on a name that mixes the two
+        # alphabets (part 226).  It is a *setting* — stored, reset and exported
+        # with the rest — but it is drawn here, beside the table, because that is
+        # what it changes; `_rows` keeps it off the «Вид» page.
+        mixed_setting = next(
+            entry for entry in settings_module.SETTINGS
+            if entry.key == settings_module.MIXED_NAMES
+        )
+        self._mixed_box = self._make_widget(mixed_setting)
+        self._mixed_box.setText(mixed_setting.label)
+        self._mixed_box.setToolTip(mixed_setting.hint)
+        self._widgets[mixed_setting.key] = self._mixed_box
+        layout.addWidget(self._mixed_box)
+
         revert = QPushButton("Вернуть встроенные цвета", page)
         revert.clicked.connect(self.restore_syntax_colors)
         layout.addWidget(revert)
         self._sections[SYNTAX_PAGE] = self._pages.addWidget(page)
         self._nav.addItem(SYNTAX_PAGE)
+
+    def mixed_names_box(self):
+        """The «Выделять имя из двух алфавитов» switch on the «Подсветка» page.
+
+        A row like any other for the settings table — `apply`, `reload` and
+        `reset` reach it through `_widgets` — but drawn here, so the test that
+        reads the page can find it (part 226).
+        """
+        return self._mixed_box
 
     def syntax_rows(self) -> list[tuple[str, str, str]]:
         """The «Подсветка» page as `(what, light hex, dark hex)` rows (task_50).

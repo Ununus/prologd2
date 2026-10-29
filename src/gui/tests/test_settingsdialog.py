@@ -57,6 +57,11 @@ def test_a_page_per_section_and_a_widget_per_row(directory: pathlib.Path) -> Non
         page = dialog._pages.currentWidget()
         labels = {label.text().rstrip(":") for label in page.findChildren(QLabel)}
         for setting in settings_module.SETTINGS:
+            if setting.key == settings_module.MIXED_NAMES:
+                # Part 226: a row of «Вид» in the table, drawn on «Подсветка»
+                # instead — the switch belongs beside the colour table it changes.
+                assert setting.label not in labels, (section, setting.label)
+                continue
             if setting.section == section:
                 assert setting.label in labels, (section, setting.label)
     print(f"ok: {len(widgets)} rows over {len(dialog.section_names())} pages, from the table alone")
@@ -69,9 +74,29 @@ def test_the_syntax_page_lists_every_colour_in_both_themes(directory: pathlib.Pa
     dialog = dialog_for(directory)
     assert dialog.show_section("Подсветка") is True
     rows = dialog.syntax_rows()
-    assert len(rows) == len(theme.SYNTAX_LABELS) == len(theme.Theme.__dataclass_fields__), len(rows)
+    # One row per *role* — `SYNTAX_LABELS` — and not per field: `Theme` also holds
+    # the mixed-name band and its wavy line, which are the checkbox's marks and not
+    # roles (parts 226, 227).
+    assert len(rows) == len(theme.SYNTAX_LABELS), len(rows)
+    assert len(theme.Theme.__dataclass_fields__) > len(theme.SYNTAX_LABELS)
     # The first row is the comment, in the light palette's and the dark one's hex.
-    assert rows[0] == ("Комментарий", theme.LIGHT_SYNTAX.comment, theme.DARK_SYNTAX.comment), rows[0]
+    assert rows[0] == ("Комментарии", theme.LIGHT_SYNTAX.comment, theme.DARK_SYNTAX.comment), rows[0]
+    # Part 226's switch lives on this page, not on «Вид».
+    assert dialog.mixed_names_box() is not None
+    assert dialog.mixed_names_box().isChecked() is True
+    # The order is the user's list (part 226), and it is the field order of the
+    # palette, so a row added to `Theme` lands where its field is declared.
+    assert [label for label, _light, _dark in rows] == [
+        "Комментарии",
+        "Служебное имя",
+        "Атом",
+        "Переменная",
+        "Строка",
+        "Числа",
+        "Знаки препинания",
+        "Вопрос",
+        "Выражение",
+    ], [label for label, _light, _dark in rows]
     for label, light, dark in rows:
         assert len(light) == 7 and light.startswith("#"), light
         assert len(dark) == 7 and dark.startswith("#"), dark
@@ -342,6 +367,12 @@ def test_every_row_is_editable_and_its_label_is_plain(directory: pathlib.Path) -
     for setting in settings_module.SETTINGS:
         if setting.key.startswith("shortcuts/"):
             continue      # the insert table's own rows are built from its JSON
+        if setting.key == settings_module.MIXED_NAMES:
+            # Part 226: the switch carries its own words, so there is no label
+            # beside it — the checkbox *is* the label.  Its place on «Подсветка»
+            # is checked by `test_the_syntax_page_lists_every_colour_in_both_themes`.
+            assert dialog._widgets[setting.key].text() == setting.label, setting.key
+            continue
         # The process directory's path follows the choice above it (task_46) and is
         # inactive while «каталог файла программы» is chosen — that rule has its
         # own check (`test_the_process_directory_path_follows_its_choice`).

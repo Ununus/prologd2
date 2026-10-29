@@ -49,11 +49,16 @@ class PrologHighlighter(QSyntaxHighlighter):
         document,
         keywords: Keywords | None = None,
         theme: Theme | None = None,
+        flag_mixed: bool = True,
     ) -> None:
         super().__init__(document)
         self._keywords = keywords or Keywords()
         self._theme = theme or Theme()
-        self._formats: dict[tuple[str, bool], QTextCharFormat] = {}
+        #: «Выделять имя из двух алфавитов» (part 226): the checkbox on the
+        #: «Подсветка» page.  It is a switch, not a colour, so it lives beside the
+        #: palette rather than in it.
+        self._flag_mixed = flag_mixed
+        self._formats: dict[tuple[str, str, str, bool], QTextCharFormat] = {}
 
     # -- configuration ------------------------------------------------------
     def set_keywords(self, keywords: Keywords) -> None:
@@ -66,9 +71,21 @@ class PrologHighlighter(QSyntaxHighlighter):
         self._formats.clear()
         self.rehighlight()
 
+    def set_flag_mixed(self, flag: bool) -> None:
+        """Turns the red flag on mixed-alphabet names on or off (part 226)."""
+        if bool(flag) == self._flag_mixed:
+            return
+        self._flag_mixed = bool(flag)
+        self._formats.clear()
+        self.rehighlight()
+
     @property
     def theme(self) -> Theme:
         return self._theme
+
+    @property
+    def flag_mixed(self) -> bool:
+        return self._flag_mixed
 
     @property
     def keywords(self) -> Keywords:
@@ -94,14 +111,27 @@ class PrologHighlighter(QSyntaxHighlighter):
 
     def _format_for(self, kind: str, alphabet: str) -> QTextCharFormat | None:
         color = self._theme.color_for(kind, alphabet)
+        background = self._theme.background_for(kind, alphabet, flag_mixed=self._flag_mixed)
+        underline = self._theme.underline_for(kind, alphabet, flag_mixed=self._flag_mixed)
         if not color:
             return None
-        key = (color, self._theme.is_bold(kind))
+        key = (color, background, underline, self._theme.is_bold(kind))
         char_format = self._formats.get(key)
         if char_format is None:
             char_format = QTextCharFormat()
             char_format.setForeground(QColor(color))
-            if key[1]:
+            if background:
+                # A band, not a colour of the text: `#highlight[…]` in a word
+                # processor.  The name keeps the colour of its role, so it is
+                # still an atom or a variable — the band is what catches the eye.
+                char_format.setBackground(QColor(background))
+            if underline:
+                # The current line is painted over the text's background, so the
+                # band is hidden on the line the caret stands on; a wavy line is
+                # drawn with the text and stays visible there (part 228).
+                char_format.setUnderlineColor(QColor(underline))
+                char_format.setUnderlineStyle(QTextCharFormat.UnderlineStyle.WaveUnderline)
+            if key[3]:
                 char_format.setFontWeight(QFont.Weight.Bold)
             self._formats[key] = char_format
         return char_format

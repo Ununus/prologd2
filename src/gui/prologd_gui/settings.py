@@ -78,6 +78,11 @@ SHORTCUTS_TABLE = "shortcuts/table"
 #: keys, one per *actual* palette — the `system` theme resolves to one of them,
 #: so its override follows whichever page the desktop chose.
 SYNTAX_LIGHT = "syntax/light"
+#: «Выделять имя из двух алфавитов» (parts 226, 227): a name that mixes Cyrillic
+#: and Latin is usually a typo, so while this is on it carries the band and the
+#: wavy line of `Theme.mixed_background`/`mixed_underline`.  It is a *switch*, not
+#: a colour — neither mark is a role, and the palette table does not offer them.
+MIXED_NAMES = "syntax/mixed_names"
 SYNTAX_DARK = "syntax/dark"
 #: The output panel has a size of its own since task_29: a log is read at a
 #: different distance from the program, and the two used to share one number.
@@ -322,6 +327,12 @@ SETTINGS: tuple[Setting, ...] = (
             "bool", True,
             hint="С выключенным: «най» предлагает и «НАЙТИВСЕ», и «найти»"),
     # -- view
+    # Rendered on the «Подсветка» page, beside the colour table it belongs to, and
+    # not on «Вид»: `SettingsDialog._rows` leaves it out of the section pages for
+    # exactly that reason.
+    Setting(MIXED_NAMES, "Выделять имя из двух алфавитов", "Вид", "bool", True,
+            hint="Имя, где смешаны кириллица и латиница, — чаще всего опечатка; "
+                 "такое имя подсвечивается красным"),
     Setting(THEME, "Оформление", "Вид", "choice", DEFAULT_THEME,
             choices=(("light", "светлое"), ("dark", "тёмное"),
                      ("system", "системное")),
@@ -680,6 +691,15 @@ class Settings:
         return min(high, max(low, number))
 
     # -- editor -------------------------------------------------------------
+    @property
+    def mixed_names(self) -> bool:
+        """Whether a mixed-alphabet name is flagged red (part 226)."""
+        return self._flag(MIXED_NAMES, True)
+
+    @mixed_names.setter
+    def mixed_names(self, value: bool) -> None:
+        self._write(MIXED_NAMES, bool(value))
+
     @property
     def font_family(self) -> str:
         return self._text(FONT_FAMILY, DEFAULT_FONT_FAMILY)
