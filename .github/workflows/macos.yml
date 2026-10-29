@@ -3,11 +3,28 @@ name: macos
 # The engine had never been built on macOS before this workflow.  The `test` job
 # answers «does it compile and pass its tests there?» on every push; the release
 # workflow builds the .app/.dmg (task_119).
+#
+# Prose only — `doc/`, `ai/`, markdown — compiles nothing here either, and a macOS
+# runner is the slowest of the three to wait for (`ci.yml` says the same).
+#
+# The path filter applies to *any* push, a tag included: the docs say a `push` with
+# both a branch/tag filter and a path filter runs only when both match, and a push
+# with no changed files does not run at all.  A tag on a docs-only commit can
+# therefore skip this workflow — and that is why `release.yml` carries no path
+# filter whatsoever: a release always builds what it was tagged on.
 on:
   push:
     branches: [main]
     tags: ['v*']
+    paths-ignore:
+      - 'doc/**'
+      - 'ai/**'
+      - '**.md'
   pull_request:
+    paths-ignore:
+      - 'doc/**'
+      - 'ai/**'
+      - '**.md'
   workflow_dispatch:
 
 concurrency:

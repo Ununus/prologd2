@@ -3,10 +3,28 @@ name: ci
 # A push to `main` and a pull request are the two events that matter: an
 # unfiltered `push` also ran for every branch, so a PR from a branch of this
 # repository was built twice for the same commit.
+#
+# A change that touches only prose is not compiled: the manual, the journal and
+# the markdown files are built by nothing here (the `docs` target runs on a
+# release and in `macos.yml`'s packaging job), so `paths-ignore` keeps three
+# platforms from spinning up for a typo in a lesson.  The filter has to be on
+# `pull_request` as well — otherwise a docs-only PR would still start all of it.
+# Such a PR reports no checks at all rather than a green tick, and with required
+# status checks a docs-only PR would stay «pending» forever — `main` has no branch
+# protection today, so nothing is blocked; if that ever changes, this filter has to
+# go or the checks have to be made path-aware.
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'doc/**'
+      - 'ai/**'
+      - '**.md'
   pull_request:
+    paths-ignore:
+      - 'doc/**'
+      - 'ai/**'
+      - '**.md'
 
 # A newer push to the same branch or PR cancels the run it supersedes — the older
 # answer is about code nobody is looking at any more.
