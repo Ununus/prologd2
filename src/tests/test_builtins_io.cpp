@@ -12,7 +12,9 @@
 #include "test_helpers.hpp"
 
 using prologd::fromUtf8Path;
+using prologd::test::prologStringLiteral;
 using prologd::test::runProgram;
+using prologd::toUtf8Path;
 using prologd::toUtf8PathGeneric;
 
 namespace {
@@ -130,11 +132,15 @@ TEST_CASE("reads tokens and lines") {
 }
 
 TEST_CASE("file write and read round-trip") {
-  const auto path = (std::filesystem::temp_directory_path() / "prologd_io_test.txt").string();
-  const std::string source = ":- ЗАПИСЬ_В(\"" + path + "\").\n" +
+  // The path is the machine's own, and on Windows it is `C:\Users\…`: every
+  // backslash in it is doubled by `prologStringLiteral`, or `\r` of
+  // `\runneradmin` would arrive as a carriage return (part 217).
+  const std::string path = prologStringLiteral(
+      toUtf8Path(std::filesystem::temp_directory_path() / "prologd_io_test.txt"));
+  const std::string source = ":- ЗАПИСЬ_В(" + path + ").\n" +
                              ":- ВЫВОД(\"данные\").\n" +
                              ":- ЗАПИСЬ_В(\"\").\n" +
-                             ":- ЧТЕНИЕ_ИЗ(\"" + path + "\").\n" +
+                             ":- ЧТЕНИЕ_ИЗ(" + path + ").\n" +
                              "?ВВОДСТР(X).\n" +
                              ":- ЧТЕНИЕ_ИЗ(\"\").\n";
   const auto result = runProgram(source);
@@ -149,11 +155,12 @@ TEST_CASE("a file named by the program may have a Cyrillic name") {
   const std::filesystem::path dir =
       std::filesystem::temp_directory_path() / fromUtf8Path("prologd_ввод_вывод");
   std::filesystem::create_directories(dir);
-  const std::string path = toUtf8PathGeneric(dir / fromUtf8Path("файл.txt"));
-  const std::string source = ":- ЗАПИСЬ_В(\"" + path + "\").\n" +
+  const std::string path =
+      prologStringLiteral(toUtf8PathGeneric(dir / fromUtf8Path("файл.txt")));
+  const std::string source = ":- ЗАПИСЬ_В(" + path + ").\n" +
                              ":- ВЫВОД(\"данные\").\n" +
                              ":- ЗАПИСЬ_В(\"\").\n" +
-                             ":- ЧТЕНИЕ_ИЗ(\"" + path + "\").\n" +
+                             ":- ЧТЕНИЕ_ИЗ(" + path + ").\n" +
                              "?ВВОДСТР(X).\n" +
                              ":- ЧТЕНИЕ_ИЗ(\"\").\n";
   const auto result = runProgram(source);
@@ -228,18 +235,44 @@ TEST_CASE("a byte order mark at the start of an answer is not data") {
 }
 
 TEST_CASE("a byte order mark at the start of a data file is not data") {
-  const auto path = (std::filesystem::temp_directory_path() / "prologd_io_bom_test.txt");
+  const std::filesystem::path file_path =
+      std::filesystem::temp_directory_path() / "prologd_io_bom_test.txt";
   {
-    std::ofstream file(path, std::ios::binary | std::ios::trunc);
+    std::ofstream file(file_path, std::ios::binary | std::ios::trunc);
     file << "\xEF\xBB\xBF" << "строка\n";
   }
-  const std::string source = "?ТИХО, ЧТЕНИЕ_ИЗ(\"" + path.string() +
-                             "\"), ВВОДСТР(С), ВЫВОД(С), ПС, ЧТЕНИЕ_ИЗ(\"\").\n";
+  const std::string path = prologStringLiteral(toUtf8Path(file_path));
+  const std::string source = "?ТИХО, ЧТЕНИЕ_ИЗ(" + path + "), ВВОДСТР(С), ВЫВОД(С), ПС, "
+                             "ЧТЕНИЕ_ИЗ(\"\").\n";
   const auto result = runProgram(source);
   REQUIRE(result.loaded);
   REQUIRE(result.output == "строка\n");
   std::error_code ignored;
-  std::filesystem::remove(path, ignored);
+  std::filesystem::remove(file_path, ignored);
+}
+
+TEST_CASE("a Windows path reaches the program whole when its backslashes are doubled") {
+  // The reason this rule is tested: on the Windows runner the temporary folder is
+  // `C:\Users\runneradmin\AppData\Local\Temp`, so a path written into a program
+  // as it stands carries `\U` (not an escape at all) and `\r` of `\runneradmin`
+  // (a carriage return).  A literal doubles its backslashes; `prologStringLiteral`
+  // is the helper that does it for a path a test builds itself.
+  const std::string path = R"(C:\Users\runneradmin\AppData\Local\Temp\данные.txt)";
+  const auto result = runProgram("?ВЫВОД(" + prologStringLiteral(path) + ").\n");
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == path + "\nДА\n");
+
+  // Written as it stands, the same path is refused: better a message than a tab
+  // where the folder was.
+  const auto raw = runProgram("?ВЫВОД(\"C:\\Users\").\n");
+  REQUIRE_FALSE(raw.loaded);
+  REQUIRE(raw.error.find("\\U") != std::string::npos);
+
+  // A quoted atom has no escapes at all, so a path fits there without doubling —
+  // the idiom the manual gives for Windows.
+  const auto atom = runProgram("?ВЫВОД('C:\\Users\\данные.txt').\n");
+  REQUIRE(atom.loaded);
+  REQUIRE(atom.output == "C:\\Users\\данные.txt\nДА\n");
 }
 
 TEST_CASE("the code writer writes the character of a code point") {
@@ -418,9 +451,10 @@ TEST_CASE("a failed redirect returns the output to the screen") {
   // interpreter's answers disappeared without a word until the next successful
   // `ЗАПИСЬ_В`.  A failed `ЧТЕНИЕ_ИЗ` returns the input to the keyboard; this is
   // the same rule for the output.
-  const auto path =
-      (std::filesystem::temp_directory_path() / "prologd_io_redirect_test.txt").string();
-  const std::string source = "?ЗАПИСЬ_В(\"" + path + "\").\n"                  // to the file
+  const std::filesystem::path file_path =
+      std::filesystem::temp_directory_path() / "prologd_io_redirect_test.txt";
+  const std::string path = prologStringLiteral(toUtf8Path(file_path));
+  const std::string source = "?ЗАПИСЬ_В(" + path + ").\n"                      // to the file
                              "?ЗАПИСЬ_В(\"нет_такого_каталога/файл.txt\").\n"  // fails
                              "?ЗАПИСЬ_В(Имя).\n"                               // no stream is open
                              "?ВЫВОД(\"после\"), ПС.\n"                        // the reader sees it
@@ -430,7 +464,7 @@ TEST_CASE("a failed redirect returns the output to the screen") {
   REQUIRE_FALSE(result.runtimeError);
   REQUIRE(result.output == "НЕТ\nИмя=\nпосле\nДА\nДА\n");
   std::error_code ignored;
-  std::filesystem::remove(path, ignored);
+  std::filesystem::remove(file_path, ignored);
 }
 
 TEST_CASE("the stream built-ins report the current stream, or fail") {

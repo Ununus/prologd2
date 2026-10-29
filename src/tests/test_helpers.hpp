@@ -4,11 +4,33 @@
 #include <memory>
 #include <sstream>
 #include <string>
+#include <string_view>
 
 #include "prlib/engine.hpp"
 #include "prlib/module_loader.hpp"
 
 namespace prologd::test {
+
+/// `text` as a double-quoted string literal of the dialect, ready to be glued
+/// into the source of a test program.  The two characters a literal cannot hold
+/// as they are, the backslash and the quote, are doubled — and the backslash is
+/// the one that bites: a Windows path like `C:\Users\runneradmin\a.txt` carries
+/// `\U` (unknown) and `\r` (a carriage return), so it must go through here.
+/// A line break is not escaped: a literal does not cross one, so text with a
+/// newline in it has no literal form and is not what a path needs.
+inline std::string prologStringLiteral(std::string_view text) {
+  std::string result;
+  result.reserve(text.size() + 2);
+  result.push_back('"');
+  for (const char ch : text) {
+    if (ch == '\\' || ch == '"') {
+      result.push_back('\\');
+    }
+    result.push_back(ch);
+  }
+  result.push_back('"');
+  return result;
+}
 
 struct RunResult {
   std::string output;

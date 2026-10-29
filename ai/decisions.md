@@ -1919,3 +1919,16 @@ place where the two readings still differ, and it is documented rather than hidd
 занимает несколько строк, что последовательно с правилом «строка — это текст», а
 не с записью терма в кавычках.  Урок 6 показывает обе стороны: `ДЛИНА("a\tb")`
 равна 3, а `ВЫВОД("1\n2\n\n3")` печатает четыре строки.
+
+**Part 217 — the Windows paths.**  The rule above has a price, and the first to pay it
+were three I/O tests: they pasted `temp_directory_path().string()` into the source of a
+test program, and on the Windows runner that path is
+`C:\Users\runneradmin\AppData\Local\Temp\…` — `\U` is then an unknown escape (an error)
+and `\r` of `\runneradmin` a carriage return.  The fix is in the tests, not in the
+language: `prologStringLiteral` (`src/tests/test_helpers.hpp`) doubles the backslash and
+the quote, and every path that goes into program *text* goes through it.  Not processing
+escapes inside `ИМПОРТ(...)` was considered and rejected: the lexer decodes the literal
+before the parser knows the goal, `ИМПОРТ(Имя)` may take a variable, and `ЗАПИСЬ_В` and
+`ЧТЕНИЕ_ИЗ` would need the same exception — a literal has to mean one thing everywhere.
+The idiom for a person writing a Windows path by hand is the quoted atom,
+`'C:\Users\имя\файл.txt'`: it has no escapes at all, and that is what `help.typ` says.

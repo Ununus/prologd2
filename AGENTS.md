@@ -70,6 +70,10 @@ release; `ci.yml` (Linux, Windows) and `macos.yml` test every push to `main`.
   (The engine reads them anywhere; the rule keeps the corpus plain ASCII-punctuated.)
 * PowerShell scripts here print **ASCII only** (PowerShell 5.1 reads a BOM-less script
   as ANSI).
+* A machine path that goes into the *text* of a test program is written through
+  `prologStringLiteral` (`src/tests/test_helpers.hpp`): a string literal doubles its
+  backslashes, and `C:\Users\runneradmin\…` carries `\U` (not an escape) and `\r`
+  (a carriage return).  Paths passed as C++ arguments need nothing.
 * Do not edit `src/3rdparty/` or `ai/_ref/`.
 * Never pass multi-line Python to `powershell -c` or a here-string: the shell mangles
   quotes and hanging strings.  Write the snippet to a file and run the file.
