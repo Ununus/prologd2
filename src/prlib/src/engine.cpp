@@ -339,16 +339,30 @@ bool Solver::selectClause(ChoicePoint& cp) {
 
 bool Solver::deliverBuiltinAnswer(ChoicePoint& cp) {
   BuiltinChoice& choice = *cp.payload;
-  while (choice.next < choice.answers.size()) {
+  for (;;) {
+    std::optional<BuiltinAnswer> produced;
+    const BuiltinAnswer* answer = nullptr;
+    if (choice.next < choice.answers.size()) {
+      answer = &choice.answers[choice.next];
+      ++choice.next;
+    } else if (choice.produce != nullptr) {
+      produced = choice.produce(engine_);
+      if (!produced) {
+        choice.produce = nullptr;  // the walk is over, and nothing is left to redo
+        return false;
+      }
+      answer = &*produced;
+    } else {
+      return false;
+    }
     const std::size_t mark = engine_.bindings().trailMark();
     bool fits = true;
-    for (const auto& [argument, value] : choice.answers[choice.next].unify) {
+    for (const auto& [argument, value] : answer->unify) {
       if (!engine_.unify(argument, value)) {
         fits = false;
         break;
       }
     }
-    ++choice.next;
     if (fits) {
       return true;
     }
@@ -356,7 +370,6 @@ bool Solver::deliverBuiltinAnswer(ChoicePoint& cp) {
     // a check — so a half-made unification is undone before the next one.
     engine_.bindings().unwind(mark);
   }
-  return false;
 }
 
 bool Solver::backtrack() {
@@ -382,7 +395,7 @@ bool Solver::backtrack() {
       if (!deliverBuiltinAnswer(cp)) {
         continue;
       }
-      if (cp.payload->next < cp.payload->answers.size()) {
+      if (cp.payload->hasMore()) {
         cps_.push_back(std::move(cp));
       }
       return true;
@@ -571,7 +584,7 @@ bool Solver::resolveGoal(const Term& goal) {
         return true;
       case BuiltinResult::Yield: {
         std::optional<BuiltinChoice> choice = engine_.takeBuiltinChoice();
-        if (!choice || choice->answers.empty()) {
+        if (!choice || !choice->hasMore()) {
           setEnv(advanceEnv(env_));
           return true;  // one answer and nothing to choose between
         }
@@ -586,7 +599,7 @@ bool Solver::resolveGoal(const Term& goal) {
         if (!deliverBuiltinAnswer(cp)) {
           return false;  // not one stored answer fits the call
         }
-        if (cp.payload->next < cp.payload->answers.size()) {
+        if (cp.payload->hasMore()) {
           cps_.push_back(std::move(cp));
         }
         setEnv(advanceEnv(env_));

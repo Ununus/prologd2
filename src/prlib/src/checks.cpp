@@ -171,8 +171,9 @@ constexpr RetiredName kRetiredNames[] = {
     // the same work is `sub_string/5`, and its positions count from zero — hence
     // a name of its own rather than an alias.
     {"substring", 4,
-     "«substring» снято: «КОПИЯ(Стр, Ц1, Ц2, Стр4)» считает позиции с 1, а "
-     "форма ISO — «sub_string(Стр, До, Длина, После, Подстрока)» с позиций с 0"},
+     "«substring» снято: «КОПИЯ(Стр, Ц1, Ц2, Стр4)» считает позиции с 1, а форма "
+     "ISO — «sub_string(Стр, До, Длина, После, Подстрока)» с позиций с 0; "
+     "по-русски она называется «ПОДСТРОКА»"},
     // The naming modes and the marker that declared them.  There is one way to
     // read a name now — ISO's — so there is nothing to declare, and a file that
     // still says it is told that instead of being answered «не найдено».

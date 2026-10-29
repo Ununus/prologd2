@@ -154,9 +154,20 @@ struct BuiltinAnswer {
 };
 
 /// The answers a built-in has left for the solver, with the position it got to.
+///
+/// `produce` is for an enumeration too large to hold: `sub_string/5` walks the
+/// string instead of materialising every piece, because the pieces of a string of
+/// n characters number n(n+1)/2 and their total length is n(n+1)(n+2)/6.  It is
+/// asked only after `answers` is used up, and `nullopt` means «no more» — the
+/// producer is dropped then, so `hasMore` turns false.
 struct BuiltinChoice {
   std::vector<BuiltinAnswer> answers;
   std::size_t next = 0;
+  std::function<std::optional<BuiltinAnswer>(Engine&)> produce;
+
+  [[nodiscard]] bool hasMore() const {
+    return next < answers.size() || produce != nullptr;
+  }
 };
 
 /// One group of `ВСЕРЕШ` (task_91): the values of the goal's free variables —

@@ -31,10 +31,10 @@ const std::unordered_set<std::string> kReservedBuiltins = {
     // Strings
     "БУКВА", "ЦИФРА", "СЦЕП", "КОПИЯ", "ДЛИНА",
     "is_letter", "is_digit", "concat", "strlen",
-    // `sub_string/5` is English on purpose (task_84): it is the ISO spelling of
-    // what `КОПИЯ/4` does, and ISO has no Russian word for it.  Its old English
-    // alias `substring` is retired below.
-    "sub_string",
+    // `sub_string/5` is ISO's name for the work `КОПИЯ/4` does from one, and
+    // `ПОДСТРОКА/5` is the same predicate in Russian (task_84): both are
+    // reserved, and its old English alias `substring` is retired below.
+    "ПОДСТРОКА", "sub_string",
     // Type tests and conversions
     "ПЕР", "ЦЕЛ", "ВЕЩ", "СИМВ", "СПИСОК", "ПОЛНЫЙ", "СТРСПИС", "СТРЦЕЛ",
     "СТРВЕЩ", "ЦЕЛВЕЩ",

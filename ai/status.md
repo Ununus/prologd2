@@ -216,7 +216,7 @@ entries of the session log below and in `ai/task_*.md`.
 | task_81_docs_two_languages | open | `help.typ` is retitled to Пролог-У (the language), `prologd-diff.typ` becomes the story of the two dialects, `gui.typ` says the shell hosts both engines, and the README carries the four readings of «У»; lessons and the standard library are left alone for now |
 | task_82_iso_compatibility | done | the policy (an ISO-compatible subset plus the teaching extras) and four stages, all done: `stdlib/iso.pld` (task_88), the standard order of terms (task_90), the missing spellings `is`, `=:=`, `=\=`, `\=`, `/* */` (task_92 — `->` turned out to be a sign of its own, task_85) and the documented refusals (parts 129–131: `catch`/`throw`, `:- module`, dicts, rationals — each with a message, and ADR-028; `bagof`/`setof` became a task of its own, task_91) — with six book examples kept as checks (`examples/iso/`, task_92) |
 | task_83_ili_name | done | `ИЛИ/2` — the original dialect's word — is callable again, with the behaviour its library definition had (`ИЛИ(X, _) :- ВЫП(X), !.` and `ИЛИ(_, X) :- ВЫП(X).`), which is `ПЕРВОЕ` with two goals: one function, two names, and the arity stays 2.  It is the one built-in **without an English spelling** — `or` stays retired, `first` is the English name of `ПЕРВОЕ` — the exception `test_aliases.cpp` names.  It could not be a library clause: a name starting with a capital letter is a variable in mode 0 and a string constant in mode 1, so no `.pld` file can define it (`--list-keywords` 130 → 131) |
-| task_84_sub_string | done | `sub_string(Стр, До, Длина, После, Подстрока)` — the ISO shape of a substring: five arguments, positions and lengths **from zero**, the three counts summing to the length of the string, each given or computed from the other two — and it is **English only**, like `abs`.  `КОПИЯ/4` lost its English alias with it: `substring` is retired with a message, since the ISO predicate of the same family is a name of its own and not a spelling of `КОПИЯ` (which counts from one and takes four arguments).  Known difference from ISO: one answer, not a walk over every occurrence — a built-in cannot hand a choice point back to the solver |
+| task_84_sub_string | done | `sub_string(Стр, До, Длина, После, Подстрока)` — the ISO shape of a substring: five arguments, positions and lengths **from zero**, the three counts summing to the length of the string, each given or computed from the other two.  Part 218 gave it the Russian name `ПОДСТРОКА/5` and the ISO walk over every answer, which removed the one difference from ISO it had — one answer instead of a walk.  `КОПИЯ/4` lost its English alias with it: `substring` is retired with a message, since the ISO predicate of the same family is a name of its own and not a spelling of `КОПИЯ` (which counts from one and takes four arguments).  The first version answered once, because a built-in could not hand a choice point back to the solver — part 218 removed that (`BuiltinResult::Yield` can now be fed by a producer) |
 | task_85_if_then | done | `->` is a sign of the language: `(Условие -> Тогда)` takes the *first* solution of the condition and runs the consequence, and `(Условие -> Тогда ; Иначе)` treats the `;` after it as «иначе» — once the condition has a solution the else branch is dropped for good, *even when the consequence fails*.  That was the one thing neither `;` with a cut (a cut in a branch is local to it) nor `ПЕРВОЕ(C), T ; E` (which falls back to `E`) could say.  `,` binds tighter than `->`, `->` tighter than `;`, both right-nested; the condition is solved in a machine of its own (`callOnce`), so a cut inside it stays there.  The advice that used to answer the sign («не оператор: пишите `ПЕРВОЕ`», task_52) is gone |
 | task_86_examples_folders | done | `examples/` gained two folders beside the current programs: `examples/prologd/` — the original PrologD's own example programs (14 files, byte for byte, from the pinned clone `7b7f46f…`), to be run by `prologd.exe` and compared with the port — and `examples/prologu/`, the two examples of the ISO additions (`sub_string_demo.pld`, `if_then_demo.pld`), formatted and checked like the other demos.  The original folder is **skipped** by the formatter walk and the question sweep, the way `lessons/_old` is: that dialect is not ours to police — and the skip compares the *first path component*, so a future `prologd2` cannot slip under it |
 | task_87_stop_button_idle | done | «Остановить» is lit for a run in flight and dark for an idle interpreter with a base loaded: a lit stop button reads as «the program is looping» (the user's report), and the base is loaded again by the next start, so that state has nothing to stop.  `_sync_run_actions` uses `self._busy` — a paused step and a wait for input count as a run, and keep the button usable.  Only the *button* changed: `stop_program` still unloads an idle interpreter for a caller that asks directly (the engine switch and a margin click stop the session through `_stop_now`) |
@@ -228,7 +228,7 @@ entries of the session log below and in `ai/task_*.md`.
 
 ## Test suite
 
-418 tests, about six seconds: 399 Catch2 cases plus 19 `cli_*` ones — the option
+421 tests, about six seconds: 401 Catch2 cases plus 20 `cli_*` ones — the option
 spellings, the Cyrillic paths, the import search report, `--list-keywords`,
 `--format`, the engine limits, the diagnostics and the JSON protocol session, which
 now expects protocol 15.  Groups: BigInt, lexer, keywords, parser, unification,
@@ -7492,3 +7492,42 @@ of the package».  Отдельно: 25 оконных наборов и `protoc
   `prologStringLiteral`.
 * **Проверки.**  `linux-release` и `linux-werror`: 419/419 в обоих.  Windows-CI
   прогоняется отдельно — здесь его нет.
+
+### 218. `ПОДСТРОКА/5`: русское имя и перебор всех ответов
+
+* **Просьба владельца.**  Сделать так, чтобы `sub_string/5` перебирал, и добавить
+  русский алиас `ПОДСТРОКА/5`.
+* **Механизм.**  `BuiltinResult::Yield` уже был (task_91, `ВСЕРЕШ`), но отдавал
+  только заранее собранные ответы.  У `BuiltinChoice` появился второй источник —
+  `produce`, функция `std::optional<BuiltinAnswer>(Engine&)`, которую решатель
+  зовёт, когда список кончился; `nullopt` снимает её, и `hasMore()` становится
+  ложным.  Так перебор не обязан быть материализован.
+* **Почему перебор, а не таблица.**  У строки из n символов n(n+1)/2 подстрок, а
+  их суммарная длина n(n+1)(n+2)/6: для страницы текста это гигабайт.  Поэтому
+  `SubStringWalk` идёт по одной подстроке, а заданные числа не отсеивают готовые
+  ответы, а сужают сам перебор (`lengthsAt` пересекает три условия).
+* **Порядок.**  ISO-шный: «До» снаружи, «Длина» внутри, поэтому первым ответом
+  идёт пустая подстрока в начале строки.  Первые ответы у всех прежних запросов
+  не изменились, так что тесты, отрезавшие первый ответ, просто получили `!`.
+* **Имя.**  `ПОДСТРОКА` — основное, `sub_string` — английское (строка в
+  `kEnglishNames`), оба резервируются лексером.  Сообщения об ошибках остались с
+  ISO-именем (`sub_string: До меньше нуля (-1)`): это оно стоит в справке.
+  В `builtins.json` запись стала `ПОДСТРОКА` с алиасом `sub_string` — так таблица
+  пар в §17 печатает русское имя слева.
+* **Данные.**  `examples/iso/sub_string.pld` переписан: русское имя, `!` на
+  первом вхождении, `НАЙТИВСЕ` для всех вхождений и для порядка перебора.  Пины
+  вопросов 7 → 10.
+* **Документация.**  `help.typ` §7.4: заголовок с `ПОДСТРОКА`, абзац про перебор
+  вместо «перебора нет», примеры с `!` и `НАЙТИВСЕ`, оговорка про память и про
+  отличие от `КОПИЯ/4`; §17 — `sub_string` больше не в списке «только
+  английских», обратных случаев стало два.  `technical.typ` §5.5.2 — про
+  `produce` и `SubStringWalk`.  `builtins.json` — запись переименована.
+* **Тесты.**  Новые: перебор через `НАЙТИВСЕ` (все вхождения, порядок «до»
+  снаружи и «длина» внутри, пустая подстрока на каждой позиции, `!` = первый
+  ответ) и `ПОДСТРОКА` как то же самое, включая сообщение об ошибке.
+  `test_aliases.cpp` — `englishOf("ПОДСТРОКА") == "sub_string"` и совпадение
+  адресов обоих имён.
+* **Проверки.**  `linux-release` и `linux-werror`: 421/421 в обоих.  Все 28
+  скриптов окна и `protocol_smoke.py` зелены.  `docs` собирает пять PDF; страницы
+  §7.4 и §5.5.2 посмотрел — длинные строки в примерах §7.4 заодно укорочены,
+  чтобы не вылезать за рамку.

@@ -1932,3 +1932,31 @@ before the parser knows the goal, `ИМПОРТ(Имя)` may take a variable, an
 `ЧТЕНИЕ_ИЗ` would need the same exception — a literal has to mean one thing everywhere.
 The idiom for a person writing a Windows path by hand is the quoted atom,
 `'C:\Users\имя\файл.txt'`: it has no escapes at all, and that is what `help.typ` says.
+
+## ADR-058: a built-in can walk, and the walk belongs to `ПОДСТРОКА/5`
+
+**Context.**  `sub_string/5` was written as a deterministic built-in and answered the
+first solution of ISO's order, because `BuiltinResult` had been one outcome and a
+built-in could not hand a choice point to the solver — `ВСЕРЕШ` (task_91) changed that,
+but only for answers collected up front.  Meanwhile the predicate was English-only,
+which left `sub_string` the one ISO name in the string group with no Russian spelling.
+
+**Decision.**  The built-in yields answers one at a time: `BuiltinChoice` grew a
+`produce` callback, asked only when the stored answers are used up, and `nullopt` from
+it means «no more» and drops the callback.  `sub_string/5` uses it for the whole
+enumeration in ISO's order — «До» from zero up, «Длина» from zero up inside it — so a
+string of n characters costs n(n+1)/2 answers computed one at a time instead of
+n(n+1)(n+2)/6 bytes of pieces held at once.  Bound counts narrow the walk
+(`lengthsAt` intersects the three conditions) rather than filtering a list.  The
+Russian name is `ПОДСТРОКА/5`, registered with `sub_string` as its English spelling;
+the error messages keep naming the ISO form, which is the one the manual quotes, and
+`builtins.json` carries the Russian name so the pair table in §17 prints it in the
+Russian column.
+
+**Consequences.**  `?sub_string("абаба", До, Длина, После, "ба")` now has two answers
+and `?sub_string("ПРОЛОГ", До, Длина, После, Подстрока)` twenty-eight; a query that
+wants the first says `!`, and `НАЙТИВСЕ` collects them all.  The tests that pinned one
+answer gained the cut, the example program shows both, and the manual's «перебора
+вхождений нет» paragraph became an explanation of the order.  `ПОДСТРОКА` is a new
+reserved name — i.e. a program may not define its own `ПОДСТРОКА/5`, the same rule as
+for every other built-in.

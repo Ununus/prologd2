@@ -526,6 +526,7 @@ constexpr std::pair<std::string_view, std::string_view> kEnglishNames[] = {
     {"СТРЦЕЛ", "str_to_int"},    {"СТРВЕЩ", "str_to_float"},
     {"СТРСПИС", "str_to_list"},   {"БУКВА", "is_letter"},
     {"ЦИФРА", "is_digit"},      {"СЦЕП", "concat"},
+    {"ПОДСТРОКА", "sub_string"},
     // `КОПИЯ` has no English spelling any more (task_84): the ISO predicate for
     // the same work is `sub_string/5`, whose positions count from zero, so it is
     // a name of its own and not an alias.  `substring/4` is retired with a
@@ -675,9 +676,10 @@ const BuiltinTable& builtinTable() {
     add("СЦЕП", 3, builtinConcat);
     add("КОПИЯ", 4, builtinCopy);
     // The ISO predicate of the same family (task_84): five arguments, positions
-    // and lengths from zero, and no Russian name — it is English by design, like
-    // `abs` or `is_whole`.
-    add("sub_string", 5, builtinSubString);
+    // and lengths from zero.  It answers `ПОДСТРОКА` as well — the ISO name is
+    // the spelling a reader of ordinary Prolog looks for, and the Russian one is
+    // what the rest of the dialect's built-ins are called.
+    add("ПОДСТРОКА", 5, builtinSubString);
     add("ДЛИНА", 2, builtinStringLength);
 
     // Input/output.

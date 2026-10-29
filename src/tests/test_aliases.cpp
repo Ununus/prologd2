@@ -109,13 +109,16 @@ TEST_CASE("the original dialect's or-word is the two-goal spelling of the choice
   REQUIRE(prologd::findBuiltin("ИЛИ", 3) == nullptr);
 }
 
-TEST_CASE("the copy predicate answers to no English name, sub_string is its own") {
+TEST_CASE("the copy predicate answers to no English name, sub_string belongs to ПОДСТРОКА") {
   // task_84: `substring` was the English spelling of `КОПИЯ/4`, and it is gone —
   // the ISO predicate of the same family takes five arguments and counts from
-  // zero, so it is registered as a name in its own right (`sub_string/5`).
+  // zero, so it is a predicate of its own.  In Russian it is `ПОДСТРОКА` (part
+  // 218), and `sub_string` is *its* English spelling, not a name of `КОПИЯ`.
   REQUIRE(englishOf("КОПИЯ").empty());
   REQUIRE(prologd::findBuiltin("substring", 4) == nullptr);
+  REQUIRE(englishOf("ПОДСТРОКА") == "sub_string");
   REQUIRE(prologd::findBuiltin("sub_string", 5) != nullptr);
+  REQUIRE(prologd::findBuiltin("ПОДСТРОКА", 5) == prologd::findBuiltin("sub_string", 5));
   REQUIRE(prologd::builtinArities("sub_string").arities == std::vector<std::size_t>{5});
   REQUIRE(prologd::findBuiltin("sub_string", 4) == nullptr);
 }

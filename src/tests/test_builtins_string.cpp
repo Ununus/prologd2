@@ -143,16 +143,18 @@ TEST_CASE("sub_string: ISO's five arguments, positions from zero") {
   // `КОПИЯ/4` (§7.4 of the manual): «before, length, after» count from **zero**,
   // each of them is either given or follows from the other two, and the piece is
   // a string.  `_` is «anything», so the free arguments are the ones computed.
+  // A query that has several answers keeps the first with `!`: the walk itself is
+  // the subject of its own test below.
   const auto result = runProgram(
-      "?sub_string(\"hello\", 1, 3, A, S).\n"      // A=1, S=ell
-      "?sub_string(\"hello\", 1, L, 1, S).\n"      // L=3, S=ell
+      "?sub_string(\"hello\", 1, 3, A, S).\n"        // A=1, S=ell
+      "?sub_string(\"hello\", 1, L, 1, S).\n"        // L=3, S=ell
       "?sub_string(\"hello\", 0, 5, 0, \"hello\").\n"  // ДА: everything given
-      "?sub_string(\"hello\", B, L, A, S).\n"      // B=0, L=0, A=5, S=
-      "?sub_string(\"hello\", B, 3, A, S).\n"      // B=0, A=2, S=hel
-      "?sub_string(\"hello\", B, L, 1, S).\n"      // B=0, L=4, S=hell
-      "?sub_string(\"hello\", 1, L, A, S).\n"      // L=0, A=4, S=
-      "?sub_string(\"hello\", B, 2, 2, S).\n"      // B=1, S=el
-      "?sub_string(\"hello\", 5, 0, A, S).\n"      // A=0, S=
+      "?sub_string(\"hello\", B, L, A, S), !.\n"      // B=0, L=0, A=5, S=
+      "?sub_string(\"hello\", B, 3, A, S), !.\n"      // B=0, A=2, S=hel
+      "?sub_string(\"hello\", B, L, 1, S), !.\n"      // B=0, L=4, S=hell
+      "?sub_string(\"hello\", 1, L, A, S), !.\n"      // L=0, A=4, S=
+      "?sub_string(\"hello\", B, 2, 2, S).\n"        // B=1, S=el
+      "?sub_string(\"hello\", 5, 0, A, S).\n"        // A=0, S=
   );
   REQUIRE(result.loaded);
   REQUIRE_FALSE(result.runtimeError);
@@ -163,16 +165,15 @@ TEST_CASE("sub_string: ISO's five arguments, positions from zero") {
 
 TEST_CASE("sub_string: a known piece says where it is, and which one") {
   // The third and the fifth of the six shapes: the piece is given, the counts
-  // are not.  The one answer is the *first* solution of ISO's order — the
-  // earliest position — the one difference from SWI's `sub_string/5`, which
-  // walks over every occurrence on backtracking.
+  // are not.  A piece that occurs twice has two answers, and a query that wants
+  // the first keeps it with `!` — the walk is the subject of the test below.
   const auto result = runProgram(
       "?sub_string(\"hello\", B, L, A, \"ell\").\n"                     // B=1, L=3, A=1
       // SWI's own example: the two halves of `<name>=<value>`…
       "?sub_string(\"alpha bravo charlie\", B, L, A, \"bravo\").\n"     // B=6, L=5, A=8
-      // …and the same piece twice: the first occurrence is the answer.
-      "?sub_string(\"alpha bravo charlie bravo delta\", B, L, A, \"bravo\").\n"  // B=6, L=5, A=20
-      "?sub_string(\"hello\", B, L, A, \"\").\n"                        // B=0, L=0, A=5
+      // …and the same piece twice: the first occurrence is the one `!` keeps.
+      "?sub_string(\"alpha bravo charlie bravo delta\", B, L, A, \"bravo\"), !.\n"  // B=6, L=5, A=20
+      "?sub_string(\"hello\", B, L, A, \"\"), !.\n"                      // B=0, L=0, A=5
       "?sub_string(\"hello\", 1, 3, 1, \"ell\").\n"                    // ДА
       // Positions are code points, like everywhere else in this dialect.
       "?sub_string(\"ёжик\", 1, 1, A, S).\n"                          // A=2, S=ж
@@ -184,6 +185,55 @@ TEST_CASE("sub_string: a known piece says where it is, and which one") {
   REQUIRE_FALSE(result.runtimeError);
   REQUIRE(result.output == "B=1\nL=3\nA=1\nB=6\nL=5\nA=8\nB=6\nL=5\nA=20\n"
                             "B=0\nL=0\nA=5\nДА\nA=2\nS=ж\nНЕТ\nНЕТ\n");
+}
+
+TEST_CASE("sub_string walks over every answer on backtracking") {
+  // ISO's `sub_string/5` is a *relation*: with a free piece it hands out every
+  // substring, and with a known one every occurrence.  `НАЙТИВСЕ` is what asks for
+  // all of them — the answers come out of the walk in ISO's order, «До» first and
+  // «Длина» inside it (`[0,1,2,0,1,0]` for `ab`: three pieces from 0, two from 1,
+  // one from 2).
+  const auto result = runProgram(
+      "?НАЙТИВСЕ(Д, sub_string(\"abc\", Д, 1, _, _), Все).\n"                 // [0,1,2]
+      "?НАЙТИВСЕ(Л, sub_string(\"ab\", _, Л, _, _), Все).\n"                  // [0,1,2,0,1,0]
+      "?НАЙТИВСЕ(Д, sub_string(\"aba\", Д, _, _, \"a\"), Все).\n"            // [0,2]
+      "?НАЙТИВСЕ(Д, sub_string(\"abc\", Д, _, _, \"bc\"), Все).\n"           // [1]
+      "?НАЙТИВСЕ(Д, sub_string(\"hello\", Д, 0, _, _), Все).\n"               // [0,1,2,3,4,5]
+      // The same five answers of the empty piece come out of a plain query too —
+      // and the cut keeps the first, exactly like any other predicate.
+      "?sub_string(\"hello\", B, L, A, \"\"), !.\n"                          // B=0, L=0, A=5
+      "?sub_string(\"hello\", 2, L, A, \"\"), !.\n"                          // L=0, A=3
+  );
+  REQUIRE(result.loaded);
+  REQUIRE_FALSE(result.runtimeError);
+  REQUIRE(result.output == "Д=_1\nВсе=[0,1,2]\n"
+                            "Л=_1\nВсе=[0,1,2,0,1,0]\n"
+                            "Д=_1\nВсе=[0,2]\n"
+                            "Д=_1\nВсе=[1]\n"
+                            "Д=_1\nВсе=[0,1,2,3,4,5]\n"
+                            "B=0\nL=0\nA=5\n"
+                            "L=0\nA=3\n");
+}
+
+TEST_CASE("sub_string answers to ПОДСТРОКА, the Russian name") {
+  // The ISO spelling is what a reader of ordinary Prolog looks for; the Russian
+  // one is what the rest of this dialect's built-ins are called.  It is one
+  // predicate: same arity, same walk, same errors — and those keep naming the ISO
+  // form, which is the one the manual quotes.
+  const auto result = runProgram(
+      "?ПОДСТРОКА(\"hello\", 1, 3, A, S).\n"                // A=1, S=ell
+      "?ПОДСТРОКА(\"hello\", 0, 5, 0, \"hello\").\n"       // ДА: everything given
+      "?НАЙТИВСЕ(Д, ПОДСТРОКА(\"aba\", Д, _, _, \"a\"), Все).\n");  // [0,2]
+  REQUIRE(result.loaded);
+  REQUIRE_FALSE(result.runtimeError);
+  REQUIRE(result.output == "A=1\nS=ell\nДА\nД=_1\nВсе=[0,2]\n");
+
+  // The error names the ISO form whichever spelling was called: one predicate,
+  // one message.
+  const auto negative = runProgram("?ПОДСТРОКА(\"hello\", -1, 1, _B, _S).\n");
+  REQUIRE(negative.loaded);
+  REQUIRE(negative.runtimeError);
+  REQUIRE(negative.error.find("sub_string: До меньше нуля (-1)") != std::string::npos);
 }
 
 TEST_CASE("sub_string: outside the string is a failure, not an error") {

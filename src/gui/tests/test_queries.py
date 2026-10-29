@@ -113,7 +113,7 @@ PINNED: dict[str, int] = {
     "iso/if_then.pld": 8,
     "iso/lists.pld": 10,
     "iso/order.pld": 13,
-    "iso/sub_string.pld": 7,
+    "iso/sub_string.pld": 10,
     "lessons/appendix_debug.pld": 7,
     "lessons/lesson_01.pld": 9,
     "lessons/lesson_02.pld": 12,

@@ -1,5 +1,7 @@
 #include <algorithm>
+#include <array>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
 
@@ -76,15 +78,6 @@ BuiltinResult classifyCharacter(Engine& engine, std::span<const Term> args,
 
 bool isLetterCodePoint(CodePoint code_point) { return isLetter(code_point); }
 bool isDigitCodePoint(CodePoint code_point) { return isAsciiDigit(code_point); }
-
-/// Where `piece` occurs first in `source`, as a code-point index.
-std::optional<std::size_t> firstOccurrence(std::string_view source, std::string_view piece) {
-  const std::size_t byte_index = source.find(piece);
-  if (byte_index == std::string_view::npos) {
-    return std::nullopt;
-  }
-  return codePointIndexAt(source, byte_index);
-}
 
 /// One of the three counts of `sub_string/5`: free, or a whole number from zero.
 struct SubStringCount {
@@ -303,120 +296,149 @@ BuiltinResult builtinCopy(Engine& engine, std::span<const Term> args) {
   badArguments(engine, "КОПИЯ");
 }
 
-/// `sub_string(Стр, До, Длина, После, Подстрока)` — the ISO shape of `КОПИЯ/4`
-/// (task_84): positions and lengths count from **zero**, the three numbers are
-/// «сколько до, сколько взять, сколько осталось», and the piece is a string.
+namespace {
+
+/// The walk over the answers of `sub_string/5`, in ISO's order: «До» from zero
+/// up and, at each position, «Длина» from zero up — the order `КОПИЯ/4` gives
+/// when its position and length are both free, so the first answer of the two is
+/// the same.
 ///
-/// One answer, and not a walk over all of them: ISO leaves *which* of the three
-/// numbers is free to the caller and enumerates on backtracking when the piece is
-/// known but its place is not, while a built-in here answers once
-/// (`BuiltinResult` is one outcome, and a built-in cannot hand a choice point
-/// back to the solver).  What it answers is the *first* solution in ISO's own
-/// order — the earliest position, and the shortest piece at that position — which
-/// is also what `КОПИЯ/4` does when its position and length are free.  The
-/// difference is written down in §7.4 of the manual.
+/// Why a walk and not a table: a string of n characters has n(n+1)/2 substrings
+/// and their total length is n(n+1)(n+2)/6, so pieces made in advance would cost
+/// a megabyte for a phrase of a hundred characters and a gigabyte for a page.
+/// A bound count narrows the walk instead of filtering it (`lengthsAt` keeps the
+/// intersection of what the three counts allow), so a shape that has one answer
+/// still costs one answer.
+struct SubStringWalk {
+  SubStringWalk(std::string text, const SubStringCount& beforeCount,
+                const SubStringCount& lengthCount, const SubStringCount& afterCount,
+                std::optional<std::string> wantedPiece, const std::array<Term, 4>& arguments)
+      : source(std::move(text)),
+        piece(std::move(wantedPiece)),
+        before(beforeCount),
+        length(lengthCount),
+        after(afterCount),
+        targets(arguments),
+        total(utf8Length(source)),
+        piece_length(this->piece ? utf8Length(*this->piece) : 0) {
+    start = before.bound ? before.value : 0;
+    start_to = before.bound ? before.value : total;
+    if (after.bound) {
+      if (after.value > total) {
+        start_to = 0;
+        start = 1;  // «После» alone is longer than the string: nothing fits
+      } else {
+        start_to = std::min(start_to, total - after.value);
+      }
+    }
+    start_to = std::min(start_to, total);
+  }
+
+  /// False when no answer can exist — a count that is out of range on its own.
+  [[nodiscard]] bool walking() const { return start <= start_to; }
+
+  [[nodiscard]] std::optional<BuiltinAnswer> next() {
+    while (walking()) {
+      const auto [from, to] = lengthsAt(start);
+      if (count < from) {
+        count = from;
+      }
+      while (count <= to) {
+        const std::size_t taken = count++;
+        if (!piece || utf8Substr(source, start, taken) == *piece) {
+          return answerAt(start, taken);
+        }
+      }
+      ++start;
+      count = 0;
+    }
+    return std::nullopt;
+  }
+
+ private:
+  /// The lengths worth trying at `at`: what the three counts allow, intersected
+  /// with the room the string has left.  `at` never exceeds `total` here — the
+  /// position was clamped — so `total - at - after.value` cannot go below zero.
+  [[nodiscard]] std::pair<std::size_t, std::size_t> lengthsAt(std::size_t at) const {
+    std::size_t from = 0;
+    std::size_t to = total - at;
+    if (length.bound) {
+      from = std::max(from, length.value);
+      to = std::min(to, length.value);
+    }
+    if (after.bound) {
+      const std::size_t fixed = total - at - after.value;
+      from = std::max(from, fixed);
+      to = std::min(to, fixed);
+    }
+    if (piece) {
+      from = std::max(from, piece_length);
+      to = std::min(to, piece_length);
+    }
+    return {from, to};
+  }
+
+  [[nodiscard]] BuiltinAnswer answerAt(std::size_t at, std::size_t taken) const {
+    const std::size_t rest = total - at - taken;
+    BuiltinAnswer answer;
+    answer.unify = {{targets[0], makeInt(static_cast<std::int64_t>(at))},
+                    {targets[1], makeInt(static_cast<std::int64_t>(taken))},
+                    {targets[2], makeInt(static_cast<std::int64_t>(rest))},
+                    {targets[3], makeString(utf8Substr(source, at, taken))}};
+    return answer;
+  }
+
+  std::string source;
+  std::optional<std::string> piece;
+  SubStringCount before;
+  SubStringCount length;
+  SubStringCount after;
+  std::array<Term, 4> targets;  // «До», «Длина», «После», «Подстрока»
+  std::size_t total = 0;
+  std::size_t piece_length = 0;
+  std::size_t start = 0;     // the position being tried
+  std::size_t start_to = 0;  // the last one worth trying
+  std::size_t count = 0;     // the length being tried at `start`
+};
+
+}  // namespace
+
+/// `sub_string(Стр, До, Длина, После, Подстрока)` — the ISO shape of `КОПИЯ/4`
+/// (task_84; the Russian name `ПОДСТРОКА` came later): positions and lengths
+/// count from **zero**, the three numbers are «сколько до, сколько взять, сколько
+/// осталось», and the piece is a string.
+///
+/// Every combination the counts allow is an answer, handed out on backtracking —
+/// that is what ISO's `sub_string/5` does, and the difference from the first
+/// version of this built-in (one answer, the first of the walk) is gone.  The
+/// answers are produced one at a time rather than collected (`SubStringWalk`).
 BuiltinResult builtinSubString(Engine& engine, std::span<const Term> args) {
-  const auto source = asText(engine, args[0]);
+  auto source = asText(engine, args[0]);
   if (!source) {
     badArgument(engine, args[0], "sub_string", 1, ArgKind::Text);
   }
-  const std::size_t total = utf8Length(*source);
   const SubStringCount before = subStringCount(engine, args, 1, "До");
   const SubStringCount length = subStringCount(engine, args, 2, "Длина");
   const SubStringCount after = subStringCount(engine, args, 3, "После");
 
-  std::optional<std::string> wanted;
+  std::optional<std::string> piece;
   if (!isUnbound(engine, args[4])) {
-    wanted = asText(engine, args[4]);
-    if (!wanted) {
+    piece = asText(engine, args[4]);
+    if (!piece) {
       badArgument(engine, args[4], "sub_string", 5, ArgKind::Text);
     }
   }
 
-  std::size_t start = 0;
-  std::size_t count = 0;
-  if (wanted) {
-    // A known piece: the bound counts say where to look for it, and with neither
-    // a position nor a tail given, its first occurrence is the answer.
-    count = utf8Length(*wanted);
-    if (before.bound) {
-      start = before.value;
-    } else if (after.bound) {
-      if (after.value + count > total) {
-        return BuiltinResult::Fail;
-      }
-      start = total - after.value - count;
-    } else {
-      const auto found = firstOccurrence(*source, *wanted);
-      if (!found) {
-        return BuiltinResult::Fail;
-      }
-      start = *found;
-    }
-  } else {
-    // No piece to look for: the counts themselves say what to take out, and a
-    // free one follows from the two that are known — the sum of the three is the
-    // length of the string.  So the free counts are only chosen where the
-    // arithmetic leaves a choice, and then ISO's first solution is taken: the
-    // earliest position, and at that position an empty piece.
-    if (before.bound && after.bound) {
-      if (before.value + after.value > total) {
-        return BuiltinResult::Fail;
-      }
-      start = before.value;
-      count = total - before.value - after.value;
-    } else if (length.bound) {
-      count = length.value;
-      if (count > total) {
-        return BuiltinResult::Fail;
-      }
-      if (before.bound) {
-        start = before.value;
-      } else if (after.bound) {
-        if (after.value + count > total) {
-          return BuiltinResult::Fail;
-        }
-        start = total - after.value - count;
-      }
-    } else if (before.bound) {
-      start = before.value;
-    } else if (after.bound) {
-      if (after.value > total) {
-        return BuiltinResult::Fail;
-      }
-      count = total - after.value;
-    }
-  }
-
-  // Everything the arguments asked for has to hold of the one piece found.
-  if (start + count > total) {
+  auto walk = std::make_shared<SubStringWalk>(
+      std::move(*source), before, length, after, std::move(piece),
+      std::array<Term, 4>{args[1], args[2], args[3], args[4]});
+  if (!walk->walking()) {
     return BuiltinResult::Fail;
   }
-  if ((before.bound && before.value != start) || (length.bound && length.value != count) ||
-      (after.bound && total - start - count != after.value)) {
-    return BuiltinResult::Fail;
-  }
-  if (wanted && utf8Substr(*source, start, count) != *wanted) {
-    return BuiltinResult::Fail;
-  }
-
-  if (!before.bound &&
-      !unifyInteger(engine, args[1], BigInt(static_cast<std::int64_t>(start)))) {
-    return BuiltinResult::Fail;
-  }
-  if (!length.bound &&
-      !unifyInteger(engine, args[2], BigInt(static_cast<std::int64_t>(count)))) {
-    return BuiltinResult::Fail;
-  }
-  if (!after.bound &&
-      !unifyInteger(engine, args[3],
-                    BigInt(static_cast<std::int64_t>(total - start - count)))) {
-    return BuiltinResult::Fail;
-  }
-  if (!wanted && !unifyText(engine, args[4], utf8Substr(*source, start, count))) {
-    return BuiltinResult::Fail;
-  }
-  return BuiltinResult::Continue;
+  BuiltinChoice choice;
+  choice.produce = [walk](Engine&) { return walk->next(); };
+  engine.setBuiltinChoice(std::move(choice));
+  return BuiltinResult::Yield;
 }
 
 }  // namespace prologd
