@@ -86,6 +86,10 @@ or the next cut, so `Yield` is worth it only when backtracking is the point.
   form `<ПРЕДИКАТ>: <пояснение>`.
 * No exceptions for control flow inside the engine; exceptions are reserved for
   unrecoverable I/O and for engine-internal guards that must not be swallowed.
+* `QKeyEvent.nativeScanCode()` is whatever the platform numbers keys with — Windows
+  scan codes, X11 keycodes (8 higher) or the Mac's virtual keycodes.  Anything that
+  matches physical keys converts through `shortcuts.to_windows_scan_code`; the table
+  of `Ctrl`-inserts is written in Windows scan codes (part 224).
 * Every user-visible string is UTF-8; the process sets the UTF-8 code page on
   Windows (`SetConsoleOutputCP(CP_UTF8)` in the CLI).
 

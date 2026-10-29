@@ -13,8 +13,13 @@ Windows, which is why a chord never demands `Alt`.
 
 The table is data: it lives in the settings file (`shortcuts/table`, JSON), so a
 symbol on another physical key — or a keyboard without that key — is remapped
-without a code change.  This module is Qt-free and therefore testable headlessly;
-the editor matches `QKeyEvent.nativeScanCode()` against it.
+without a code change.  This module is Qt-free and therefore testable headlessly.
+
+The codes in the table are **Windows** scan codes, and Qt's
+`QKeyEvent.nativeScanCode()` is whatever the platform numbers keys with: Windows
+scan codes there, X11 keycodes (8 higher) on Linux, and the Mac's own virtual
+keycodes on macOS.  `to_windows_scan_code` is the one place that difference is
+handled; without it `Ctrl+X` on Linux matches the code of `/` (part 224).
 
 `|` in `insert` marks where the caret ends up, `{}` in `wrap` is the selection a
 bracket-like entry wraps (`(` + selection + `)`).
@@ -25,6 +30,40 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from typing import Any, Iterator
+
+#: How far an X11 (and Wayland) keycode stands from the Windows scan code of the
+#: same physical key: the X11 keycode is the evdev code plus 8, and the evdev code
+#: of the main keyboard block *is* the Windows scan code.
+#:
+#: This is why the table has to be converted at all.  Without it, `Ctrl+X` on
+#: Linux matches keyboard code 53, which the table reads as Windows `0x35` — the
+#: `/` key — so cutting text inserts a slash, and `Ctrl+E` (code 26) inserts `[]`
+#: (`0x1A`, the `[` key).  That is exactly how the bug was reported.
+X11_KEYCODE_OFFSET = 8
+
+#: Qt platform names whose `nativeScanCode()` is an X11 keycode.
+X11_PLATFORMS = frozenset({"xcb", "x11", "wayland"})
+
+#: The Mac numbers its keys its own way, so each entry here maps one virtual
+#: keycode to the Windows scan code of the same *physical* key.  Only the keys the
+#: table uses are listed; a key that is not here has no chord, which is the safe
+#: answer — a wrong one would insert the wrong character.
+MACOS_SCAN_CODES: dict[int, int] = {
+    0x12: 0x02,  # 1 !
+    0x14: 0x04,  # 3 #
+    0x16: 0x07,  # 6 ^
+    0x1A: 0x08,  # 7 &
+    0x1C: 0x09,  # 8 *
+    0x19: 0x0A,  # 9 (
+    0x1B: 0x0C,  # - _
+    0x18: 0x0D,  # = +
+    0x21: 0x1A,  # [ {
+    0x27: 0x28,  # ' "
+    0x29: 0x27,  # ; :
+    0x2B: 0x33,  # , <
+    0x2C: 0x35,  # / ?
+    0x2F: 0x34,  # . >
+}
 
 #: Where the caret ends up inside `Entry.insert`.
 CARET = "|"
@@ -120,6 +159,36 @@ DEFAULT_ENTRIES: tuple[Entry, ...] = (
     Entry("'" + CARET + "'", (Chord(0x28, False, "'"),), char="'"),
     Entry('"' + CARET + '"', (Chord(0x28, True, "'"),), char='"'),
 )
+
+def to_windows_scan_code(native: int, platform: str) -> int | None:
+    """The Windows scan code of the key this platform calls `native`, or `None`.
+
+    The table is written in Windows scan codes because they number *physical*
+    keys, which is what the whole feature is about — and each platform's
+    `nativeScanCode()` numbers them its own way:
+
+    * Windows hands out the scan code already;
+    * X11 and Wayland hand out an X11 keycode, which is the evdev code plus 8
+      (`x` is 45 by the scan codes and 53 as a keycode, and 53 is what Windows
+      calls `/` — see `X11_KEYCODE_OFFSET`);
+    * the Mac hands out its own virtual keycode (`MACOS_SCAN_CODES`).
+
+    `None` means «this platform's key is not one the table knows», and it fails
+    closed: an unmatched chord does nothing at all, where a *wrong* match would
+    insert the wrong character.  The `offscreen` platform — the one the tests run
+    on — takes the code as it is, because those tests post Windows scan codes:
+    that is the numbering the table is written in.
+    """
+    if platform == "windows":
+        return native
+    if platform in X11_PLATFORMS:
+        return native - X11_KEYCODE_OFFSET if native > X11_KEYCODE_OFFSET else None
+    if platform == "cocoa":
+        return MACOS_SCAN_CODES.get(native)
+    if platform == "offscreen":
+        return native
+    return None
+
 
 _HEADER = (
     "Ctrl и физическая клавиша — работает в любой раскладке.",

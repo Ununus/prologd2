@@ -22,6 +22,7 @@ from PySide6.QtCore import (
 from PySide6.QtGui import (
     QColor,
     QFont,
+    QGuiApplication,
     QKeyEvent,
     QPainter,
     QPalette,
@@ -1234,11 +1235,14 @@ class CodeEditor(ZoomablePlainTextEdit):
         """`Ctrl`+physical key inserts punctuation (task_31), or nothing.
 
         Matched on `nativeScanCode()`, never on `event.text()`: the character a
-        layout produces is exactly what differs between layouts.  Only `Ctrl`
-        (plus the `Shift` a chord asks for) is accepted — `Alt` alone reaches
-        the menu bar and `Ctrl+Alt` is `AltGr` on many layouts, so neither may
-        be swallowed here.  One `beginEditBlock` makes the insert one undo step,
-        exactly like typing the text by hand.
+        layout produces is exactly what differs between layouts.  That code is
+        the *platform's* numbering, so it goes through
+        `shortcuts.to_windows_scan_code` first — the table is written in Windows
+        scan codes, and on X11 `Ctrl+X` would otherwise match the code of `/`.
+        Only `Ctrl` (plus the `Shift` a chord asks for) is accepted — `Alt` alone
+        reaches the menu bar and `Ctrl+Alt` is `AltGr` on many layouts, so neither
+        may be swallowed here.  One `beginEditBlock` makes the insert one undo
+        step, exactly like typing the text by hand.
         """
         if self._shortcuts is None:
             return False
@@ -1256,7 +1260,12 @@ class CodeEditor(ZoomablePlainTextEdit):
             # `selectedText()` spells a paragraph break as U+2029, which is not
             # what the document holds.
             selection = cursor.selectedText().replace("\u2029", "\n")
-        insert = self._shortcuts.insert_for(event.nativeScanCode(), shift, selection)
+        scan = shortcuts_module.to_windows_scan_code(
+            event.nativeScanCode(), QGuiApplication.platformName()
+        )
+        if scan is None:
+            return False
+        insert = self._shortcuts.insert_for(scan, shift, selection)
         if insert is None:
             return False
         cursor.beginEditBlock()

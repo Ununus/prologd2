@@ -30,7 +30,12 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from prologd_gui import actions  # noqa: E402
-from prologd_gui.shortcuts import Shortcuts  # noqa: E402
+from prologd_gui.shortcuts import (  # noqa: E402
+    MACOS_SCAN_CODES,
+    Shortcuts,
+    X11_KEYCODE_OFFSET,
+    to_windows_scan_code,
+)
 
 #: Characters whose position in a layout is deliberately *not* a chord of its row,
 #: with the reason.  Every other symbol must be reachable in every layout that
@@ -88,6 +93,50 @@ def test_shift_decides_where_a_key_carries_two_inserts() -> None:
     for scan in (0x0A, 0x1A, 0x04, 0x08, 0x09, 0x02):
         assert table.find(scan, False) is table.find(scan, True), hex(scan)
     print("ok: Shift decides the insert where a key carries two, and is ignored where it does not")
+
+
+def test_a_key_is_read_in_the_windows_numbering_whatever_the_platform() -> None:
+    """The table is written in Windows scan codes, so every platform converts.
+
+    This is the bug of part 224, and the numbers are the bug: X11 numbers `x` as
+    53 and Windows numbers 53 as `/`, so the editor matched `Ctrl+X` against `/`
+    and inserted a slash instead of cutting.  `e` is 26 on X11 and 26 is `[` on
+    Windows, which is why `Ctrl+E` inserted `[]`.  The conversion is what the
+    fix is; the two pairs below are the report, kept as a check.
+    """
+    table = Shortcuts.default()
+
+    # X11: the keycode is the scan code plus 8.
+    assert X11_KEYCODE_OFFSET == 8
+    assert to_windows_scan_code(53, "xcb") == 0x2D, "x is not 45"
+    assert to_windows_scan_code(26, "xcb") == 0x12, "e is not 18"
+    assert to_windows_scan_code(61, "xcb") == 0x35, "/ is not 53"
+    for code, shift in ((53, False), (26, False)):
+        assert table.insert_for(to_windows_scan_code(code, "xcb"), shift) is None, (
+            f"key {code} still inserts something"
+        )
+    slash = table.insert_for(to_windows_scan_code(61, "xcb"), False)
+    assert slash is not None and slash.text == "/", slash
+
+    # Windows hands the scan code over as it is.
+    for chord_scan in (0x27, 0x0A, 0x35, 0x28):
+        assert to_windows_scan_code(chord_scan, "windows") == chord_scan
+
+    # The Mac numbers its own way, and every chord of the table must have an
+    # answer there: a chord missing from the map would silently do nothing on a
+    # Mac, which is a failure nobody would report as a bug in the map.
+    assert to_windows_scan_code(7, "cocoa") is None, "x is not a chord on the Mac"
+    assert to_windows_scan_code(44, "cocoa") == 0x35, "/ is 44 on the Mac"
+    chords = {chord.scan for entry in table for chord in entry.chords}
+    assert chords <= set(MACOS_SCAN_CODES.values()), (
+        "no Mac key for: " + ", ".join(hex(s) for s in sorted(chords - set(MACOS_SCAN_CODES.values())))
+    )
+
+    # An unknown platform fails closed: no insert at all rather than a wrong one.
+    assert to_windows_scan_code(0x27, "somefutureplatform") is None
+    # The offscreen platform is the tests' own, and speaks Windows scan codes.
+    assert to_windows_scan_code(0x27, "offscreen") == 0x27
+    print("ok: a physical key is read in the Windows numbering on every platform")
 
 
 def test_no_two_entries_share_a_key() -> None:
@@ -360,6 +409,39 @@ def test_a_selection_is_wrapped_and_one_ctrl_z_undoes_it() -> None:
     print("ok: a selection is wrapped, kept selected, and wrapped again in one undo step")
 
 
+def test_the_editor_reads_x11_keycodes_on_a_linux_desktop() -> None:
+    """The same bug, seen through the editor: `Ctrl+X` must not insert `/`.
+
+    The suite runs on `offscreen`, which speaks Windows scan codes; a Linux
+    desktop answers `xcb` and numbers the keys 8 higher.  The platform name is
+    what `_insert_shortcut` asks Qt for, so it is the one thing replaced here —
+    the events carry the *X11 keycodes* a real keyboard would send.
+    """
+    import types
+
+    from prologd_gui import editor as editor_module
+
+    saved = editor_module.QGuiApplication
+    editor_module.QGuiApplication = types.SimpleNamespace(platformName=lambda: "xcb")
+    try:
+        editor = make_editor()
+        # 53 is `x` on X11 and `/` in the Windows numbering: it must do nothing,
+        # so the window's own «Вырезать» handles the key.
+        assert not press(editor, 53), "Ctrl+X was swallowed again"
+        assert editor.toPlainText() == "", "Ctrl+X inserted something"
+        # 26 is `e` on X11 and `[` in the Windows numbering.
+        assert not press(editor, 26), "Ctrl+E was swallowed again"
+        assert editor.toPlainText() == "", "Ctrl+E inserted something"
+        # 61 is where `/` really stands, and 61 - 8 is the `0x35` of the table.
+        assert press(editor, 61), "the `/` key stopped working"
+        assert editor.toPlainText() == "/", editor.toPlainText()
+        # A key the table does not know is left alone as well.
+        assert not press(editor, 24), "Ctrl+Q inserted something"  # `q` on X11
+    finally:
+        editor_module.QGuiApplication = saved
+    print("ok: on X11 the editor converts keycodes and leaves Ctrl+X and Ctrl+E alone")
+
+
 def test_the_modifiers_the_feature_must_not_swallow() -> None:
     editor = make_editor("х")
     for shift in (False, True):
@@ -373,6 +455,7 @@ def test_the_modifiers_the_feature_must_not_swallow() -> None:
 def main(argv: list[str]) -> int:
     test_every_chord_inserts_its_text()
     test_shift_decides_where_a_key_carries_two_inserts()
+    test_a_key_is_read_in_the_windows_numbering_whatever_the_platform()
     test_no_two_entries_share_a_key()
     test_the_table_does_not_steal_a_window_command()
     test_a_selection_is_wrapped_where_the_table_says_so()
@@ -388,6 +471,7 @@ def main(argv: list[str]) -> int:
     application = QApplication(sys.argv[:1])
     test_the_editor_inserts_where_the_caret_should_be()
     test_a_selection_is_wrapped_and_one_ctrl_z_undoes_it()
+    test_the_editor_reads_x11_keycodes_on_a_linux_desktop()
     test_the_modifiers_the_feature_must_not_swallow()
     del application
     print("all shortcut checks passed")
