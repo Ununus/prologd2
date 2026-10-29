@@ -82,7 +82,10 @@ jobs:
           set -e
           app=dist/PrologD.app/Contents/MacOS
           test -d "$app"
-          cp build/macos-release/src/cli/prologd "$app/"
+          # `bin`, not `$app`: `PrologD` and `prologd` are one name on a Mac
+          # filesystem, and the second copy would be what Finder runs (part 221).
+          mkdir -p "$app/bin"
+          cp build/macos-release/src/cli/prologd "$app/bin/"
           codesign --force --deep --sign - dist/PrologD.app
           codesign --verify --deep --strict --verbose=2 dist/PrologD.app
       - name: Start the window

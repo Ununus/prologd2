@@ -205,6 +205,41 @@ def test_an_app_bundle_is_installed_and_a_loose_copy_is_portable() -> None:
     print("ok: a .app is installed, and a copy outside the bundle is portable")
 
 
+def test_a_macos_bundle_keeps_the_engine_in_bin() -> None:
+    """task_119, part 221: `PrologD` and `prologd` are one name on a Mac.
+
+    The window's own launcher is `Contents/MacOS/PrologD`; a copy of the engine
+    beside it under the name `prologd` overwrites it, because the filesystem does
+    not tell the two names apart — and then the icon double-clicked in Finder runs
+    the engine, which prints a usage line and exits: a bounce in the dock and no
+    window.  The engine therefore lives in `bin`, and that is where the window
+    looks first.
+    """
+    with tempfile.TemporaryDirectory(prefix="prologd_app_") as name:
+        base = pathlib.Path(name)
+        bundle = base / "PrologD.app" / "Contents" / "MacOS"
+        (bundle / "bin").mkdir(parents=True)
+        # The launcher and the engine: two files that a Mac would read as one name.
+        (bundle / "PrologD").write_bytes(b"the window")
+        (bundle / "bin" / paths.EXECUTABLE_NAME).write_bytes(b"the engine")
+        with on_platform("darwin"), packaged(bundle):
+            sys.executable = str(bundle / "PrologD")
+            assert paths.interpreter() == str(bundle / "bin" / paths.EXECUTABLE_NAME), (
+                paths.interpreter()
+            )
+
+        # A package of the older layout — the engine beside the launcher, as on
+        # Windows — is still found, so an existing folder keeps working.
+        flat = base / "старая" / "MacOS"
+        flat.mkdir(parents=True)
+        (flat / "PrologD").write_bytes(b"the window")
+        (flat / paths.EXECUTABLE_NAME).write_bytes(b"the engine")
+        with on_platform("darwin"), packaged(flat):
+            sys.executable = str(flat / "PrologD")
+            assert paths.interpreter() == str(flat / paths.EXECUTABLE_NAME), paths.interpreter()
+    print("ok: a .app looks for the engine in bin first, and a flat package still works")
+
+
 def test_a_checkout_finds_the_macos_release_build() -> None:
     """task_119: the source tree's macOS build is one of the places `interpreter` looks."""
     with tempfile.TemporaryDirectory(prefix="prologd_macos_build_") as name:
@@ -427,6 +462,7 @@ def main(argv: list[str]) -> int:
     test_an_installed_copy_keeps_its_settings_in_appdata()
     test_an_installed_copy_under_opt_keeps_its_settings_in_xdg()
     test_an_app_bundle_is_installed_and_a_loose_copy_is_portable()
+    test_a_macos_bundle_keeps_the_engine_in_bin()
     test_a_checkout_finds_the_macos_release_build()
     test_a_settings_file_that_is_already_there_is_kept()
     test_a_folder_that_cannot_be_written_falls_back_to_appdata()

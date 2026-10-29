@@ -260,7 +260,15 @@ def interpreter(folder: str = "") -> str:
     if folder:
         return str(pathlib.Path(folder) / EXECUTABLE_NAME)
     if frozen():
-        places = [data_root()]
+        # A macOS `.app` keeps the engine in `bin` beside the window: the window's
+        # own launcher is `Contents/MacOS/PrologD`, and a Mac filesystem does not
+        # tell that name from `prologd` — the two would be one file, and the one
+        # written second would run when the icon is double-clicked (part 221).
+        # The flat folder is still the other place, so a package laid out by an
+        # older build keeps working.  Windows and Linux have no such collision and
+        # look only where they always did.
+        root = data_root()
+        places = [root / "bin", root] if inside_app_bundle() else [root]
     else:
         root = source_root()
         places = [

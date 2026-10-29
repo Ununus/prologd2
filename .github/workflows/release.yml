@@ -186,15 +186,20 @@ jobs:
           echo "VERSION=$version" >> "$GITHUB_ENV"
           app=dist/PrologD.app/Contents/MacOS
           test -d "$app"
-          cp build/macos-release/src/cli/prologd "$app/"
+          # `bin`, not `$app`: a Mac filesystem does not tell `PrologD` (the
+          # window's own launcher) from `prologd` (the engine), and the copy that
+          # lands second would be the one Finder runs — a bounce and no window
+          # (part 221).
+          mkdir -p "$app/bin"
+          cp build/macos-release/src/cli/prologd "$app/bin/"
           mkdir -p "$app/doc"
           cp doc/*.pdf doc/builtins.json "$app/doc/"
           cp -R examples stdlib "$app/"
           python3 tools/macos_plist.py dist/PrologD.app/Contents/Info.plist "$version"
           plutil -lint dist/PrologD.app/Contents/Info.plist
           test "$(plutil -extract CFBundleShortVersionString raw dist/PrologD.app/Contents/Info.plist)" = "$version"
-          test -x "$app/prologd"
-          if otool -L "$app/prologd" | grep -q "$PWD/build/"; then
+          test -x "$app/bin/prologd"
+          if otool -L "$app/bin/prologd" | grep -q "$PWD/build/"; then
             echo "::error::prologd links the build tree"
             exit 1
           fi
@@ -203,7 +208,7 @@ jobs:
           set -e
           codesign --force --deep --sign - dist/PrologD.app
           codesign --verify --deep --strict --verbose=2 dist/PrologD.app
-          dist/PrologD.app/Contents/MacOS/prologd -s examples/lessons/lesson_01.pld >/dev/null
+          dist/PrologD.app/Contents/MacOS/bin/prologd -s examples/lessons/lesson_01.pld >/dev/null
       - name: Start the frozen window
         # A bundle can be signed and still die before its window appears — the
         # failure a person sees as a bounce in the dock and nothing else.  The

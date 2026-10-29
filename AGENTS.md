@@ -29,6 +29,11 @@ and the build folder (`build/<preset>`, gitignored), so no platform-specific fla
 needed; the multi-config Windows preset already passes `--config Release` through its
 build and test presets.
 
+A Clang build is the second compiler the CI checks — `PROLOGD_WERROR=ON` with
+`CXX=clang++` catches the warnings GCC does not have (`-Wunused-private-field`, an
+unused constant at namespace scope).  Locally: `CC=clang CXX=clang++ cmake -S . -B
+build/clang -G Ninja -DCMAKE_BUILD_TYPE=Release -DPROLOGD_WERROR=ON`.
+
 GUI checks — every `src/gui/tests/test_*.py` plus `protocol_smoke.py` is a script of
 its own (29 of them), and each needs a built interpreter:
 

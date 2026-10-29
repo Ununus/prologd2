@@ -111,7 +111,6 @@ class Lexer {
   std::size_t offset_ = 0;
   std::uint32_t line_ = 1;
   std::uint32_t column_ = 1;
-  bool reported_error_ = false;
 };
 
 }  // namespace prologd

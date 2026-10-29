@@ -42,6 +42,41 @@ jobs:
       - name: Test
         run: ctest --test-dir build --output-on-failure
 
+  # A second C++ compiler, with the same warning list and `-Werror` on top.  Clang
+  # reports a class of things GCC stays quiet about — an unused constant at
+  # namespace scope, a private field nobody reads (`-Wunused-private-field` is a
+  # Clang warning with no GCC twin) — and the only place those were being seen was
+  # the macOS run, which is slow and only says so after a push to `main`.  Part 221
+  # is what this job exists for: two such warnings were found by it and fixed.
+  clang:
+    name: Linux (Clang, warnings as errors)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache FetchContent sources
+        uses: actions/cache@v4
+        with:
+          path: |
+            src/3rdparty/catch2-src
+            src/3rdparty/cli11-src
+            src/3rdparty/json-*
+          key: fetchcontent-${{ runner.os }}-${{ hashFiles('CMakeLists.txt') }}
+      - name: Toolchain
+        run: |
+          clang++ --version | head -n 1
+          cmake --version | head -n 1
+      - name: Configure
+        env:
+          CC: clang
+          CXX: clang++
+        run: >
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          -DPROLOGD_WERROR=ON
+      - name: Build
+        run: cmake --build build
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
   windows:
     name: Windows (MSVC)
     runs-on: windows-latest

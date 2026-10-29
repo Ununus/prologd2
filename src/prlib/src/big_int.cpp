@@ -7,9 +7,9 @@
 
 namespace prologd {
 
-namespace {
-constexpr std::uint32_t kBase = 1'000'000'000u;
-}  // namespace
+// The base lives on the class (`BigInt::kBase`): an unqualified `kBase` inside a
+// member function finds that one, so a copy at namespace scope would be a
+// constant nothing reads — AppleClang reports it, GCC is silent about scope.
 
 BigInt::BigInt(int64_t value) {
   if (value == 0) {
