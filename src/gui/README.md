@@ -224,7 +224,9 @@ with `Enter`.  It has the two things a goal needs beside the language itself:
 * **The editor's completion** — `Ctrl+Space`, or typing, opens the same popup as
   the program editor: the reserved names and the *current document's* predicates,
   with their arities, and `Enter`/`Tab` insert the call form (`НАЙТИВСЕ(, , )`)
-  with the caret after the opening parenthesis.
+  with the caret after the opening parenthesis.  A bracket the user has already
+  typed is kept: `?НАЙТИ(` completes to `?НАЙТИВСЕ(` and not to `?НАЙТИВСЕ(, , )(`,
+  and the popup matches on the name before that bracket (part 238).
 
 The placeholder spells the three: `?цель(X). — Enter: выполнить · ↑/↓: история ·
 Ctrl+Пробел: подсказки`.

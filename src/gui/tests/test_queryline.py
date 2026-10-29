@@ -126,6 +126,16 @@ def test_completion_offers_the_editor_names() -> None:
     key(line, Qt.Key.Key_Return)
     assert line.text() == "НАЙТИВСЕ(, , )", line.text()
     assert line.cursorPosition() == len("НАЙТИВСЕ") + 1, line.cursorPosition()
+
+    # A bracket typed before accepting is kept (part 238): the form brings the name
+    # only, and the caret stops inside the call.
+    line.setText("")
+    type_text(line, "?НАЙТИ(")
+    assert line.completion_visible(), "typing `(` closed the popup"
+    assert line.completion_labels() == ["НАЙТИВСЕ/3"], line.completion_labels()
+    key(line, Qt.Key.Key_Return)
+    assert line.text() == "?НАЙТИВСЕ(", line.text()
+    assert line.cursorPosition() == len("?НАЙТИВСЕ("), line.cursorPosition()
     print("ok: the goal field offers the editor's names and inserts the call form")
 
 

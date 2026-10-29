@@ -1206,7 +1206,20 @@ class CodeEditor(ZoomablePlainTextEdit):
         if offer is None:
             return
         self._hide_completion()
-        self._insert_completion(*offer.call_form)
+        self._insert_completion(*self._form_for(offer))
+
+    def _form_for(self, offer) -> tuple[str, int]:
+        """`(text, caret)` for `offer` where it is about to be inserted.
+
+        A `(` the user has already typed — before the caret (`БОЛ(|`) or after it
+        (`БОЛ|(`) — is the bracket the call will use, so the form does not bring a
+        second one (part 238).
+        """
+        text = self.toPlainText()
+        position = self.textCursor().position()
+        start, end = completion.prefix_span(text, position)
+        following = "(" if end < position else text[position:position + 1]
+        return offer.call_form_after(following)
 
     def _accept_completion(self) -> bool:
         """`Enter`/`Tab`: takes the highlighted row.  False when there is none."""
@@ -1216,7 +1229,7 @@ class CodeEditor(ZoomablePlainTextEdit):
         self._hide_completion()
         if offer is None:
             return False
-        self._insert_completion(*offer.call_form)
+        self._insert_completion(*self._form_for(offer))
         return True
 
     def _insert_completion(self, text: str, caret_after: int | None = None) -> None:
@@ -1227,14 +1240,17 @@ class CodeEditor(ZoomablePlainTextEdit):
         the first argument at once (the arity in the label is never typed).
         """
         cursor = self.textCursor()
+        position = cursor.position()
         if self._file_prefix is not None:
             # A file name replaces the name part of the path only (task_104).
-            prefix = self._file_prefix
+            start = position - len(self._file_prefix) if self._file_prefix else position
+            end = position
         else:
-            prefix = completion.word_before(self.toPlainText(), cursor.position())
-        start = cursor.position() - len(prefix) if prefix else cursor.position()
+            # The span stops at a bracket the user has typed: it stays (part 238).
+            start, end = completion.prefix_span(self.toPlainText(), position)
         cursor.beginEditBlock()
-        if prefix:
+        if start != end:
+            cursor.setPosition(end)
             cursor.setPosition(start, QTextCursor.MoveMode.KeepAnchor)
         cursor.insertText(text)
         cursor.endEditBlock()
@@ -1533,11 +1549,12 @@ class QueryLine(QLineEdit):
     def _accept(self, offer: completion.Candidate) -> None:
         """Replaces the word being typed with the call form, caret after `(`."""
         self._completer.popup().hide()
-        text, caret = offer.call_form
-        prefix = completion.word_before(self.text(), self.cursorPosition())
-        start = self.cursorPosition() - len(prefix)
         whole = self.text()
-        self.setText(whole[:start] + text + whole[self.cursorPosition() :])
+        position = self.cursorPosition()
+        start, end = completion.prefix_span(whole, position)
+        following = "(" if end < position else whole[position:][:1]
+        text, caret = offer.call_form_after(following)
+        self.setText(whole[:start] + text + whole[end:])
         self.setCursorPosition(start + caret)
 
     def _move_popup(self, delta: int) -> None:

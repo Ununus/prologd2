@@ -147,6 +147,19 @@ class Candidate:
         skeleton = self.name + "(" + ", ".join([""] * self.arity) + ")"
         return skeleton, len(self.name) + 1
 
+    def call_form_after(self, following: str = "") -> tuple[str, int]:
+        """`(text, caret)` for accepting this offer where `following` stands next.
+
+        A name typed right before its own `(` — `БОЛ(`, with `БОЛЬШЕ` on offer — keeps
+        that bracket: only the name goes in and the caret stops inside the call, or the
+        text would read `БОЛЬШЕ(, )(` (part 238).  Anything else is `call_form`.
+        """
+        if following.startswith("(") and self.skeleton is None and (
+            self.variadic or (self.arity or 0) > 0
+        ):
+            return self.name, len(self.name) + 1
+        return self.call_form
+
 
 def _count_arguments(line_tokens: list[tokens.Token], start: int) -> int | None:
     """Arity of the call whose `(` is at `start`, or `None` if it does not close.
@@ -419,18 +432,36 @@ def at_statement_start(text: str, position: int, prefix: str = "") -> bool:
     return before.strip() == ""
 
 
+def prefix_span(text: str, position: int) -> tuple[int, int]:
+    """Where the name being completed starts, and where its text ends.
+
+    Usually the caret is the end: `БОЛ|` is a word ending there.  A name typed right
+    before its own bracket — `БОЛ(|` or `БОЛ|(` — is being completed too, and then
+    the name ends at the bracket, which the completion keeps: accepting must not
+    bring a second one (part 238).  An empty span means there is nothing to replace.
+    """
+    position = max(0, min(int(position), len(text)))
+    end = position
+    if position and text[position - 1] == "(":
+        end = position - 1
+    start = end
+    while start > 0 and tokens.is_name_character(text[start - 1]):
+        start -= 1
+    if start > 0 and text[start - 1] in _QUOTES:
+        start -= 1
+    if start == end:
+        return position, position
+    return start, end
+
+
 def word_before(text: str, position: int) -> str:
     """The name being typed at `position`, quotes included.
 
     Offsets are code points; the caller's `position` comes from Qt, which counts
     UTF-16 units.  They agree for every character a name can contain.
     """
-    start = position
-    while start > 0 and tokens.is_name_character(text[start - 1]):
-        start -= 1
-    if start > 0 and text[start - 1] in _QUOTES:
-        start -= 1
-    return text[start:position]
+    start, end = prefix_span(text, position)
+    return text[start:end]
 
 
 def is_code_position(text: str, position: int, keywords: Keywords | None = None) -> bool:

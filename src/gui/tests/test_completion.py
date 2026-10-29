@@ -111,6 +111,60 @@ def test_the_call_form_is_inserted_with_the_caret_after_the_paren() -> None:
     print("ok: accepting inserts the call form, with the caret after the opening parenthesis")
 
 
+def test_a_typed_bracket_is_not_inserted_twice() -> None:
+    """`БОЛ(` accepts as `БОЛЬШЕ(`, not `БОЛЬШЕ(, )(` (part 238).
+
+    The name ends at the bracket the user typed, so the span to replace stops there
+    and the form brings the name only; the caret stops inside the call.  The popup
+    also matches on that name — with an empty prefix it used to offer everything.
+    """
+    assert completion.prefix_span("пример :- БОЛ", 13) == (10, 13)
+    assert completion.prefix_span("пример :- БОЛ(", 14) == (10, 13), "the bracket stays"
+    assert completion.prefix_span("пример :- БОЛ(", 13) == (10, 13), "caret before it"
+    bracket = "пример :- ("
+    assert completion.prefix_span(bracket, len(bracket)) == (
+        len(bracket), len(bracket)
+    ), "nothing typed before it"
+    assert completion.word_before("пример :- БОЛ(", 14) == "БОЛ"
+
+    offers = {offer.name: offer for offer in completion.collect(DOCUMENT, RESERVED)}
+    assert offers["НАЙТИВСЕ"].call_form_after("(") == ("НАЙТИВСЕ", 9)
+    assert offers["НАЙТИВСЕ"].call_form_after("") == ("НАЙТИВСЕ(, , )", 9)
+    assert offers["ВЫВОД"].call_form_after("(") == ("ВЫВОД", 6)
+    # A directive is offered as the whole statement: nothing to shorten.
+    reserved = Keywords.from_event(
+        {"keywords": [{"name": "ИМПОРТ", "kind": "directive", "arities": []}]}
+    )
+    model = completion.CompletionModel(reserved)
+    model.update("")
+    directive = model.candidates("ИМП")[0]
+    assert directive.call_form_after("(") == directive.call_form
+    print("ok: a bracket the user typed is kept, and only the name goes in")
+
+
+def test_a_typed_bracket_survives_the_real_editor() -> None:
+    """The whole road in a real editor: two letters, the bracket, Enter (part 238)."""
+    from PySide6.QtCore import Qt
+    from PySide6.QtGui import QTextCursor
+    from PySide6.QtTest import QTest
+
+    from prologd_gui.editor import CodeEditor
+
+    editor = CodeEditor(auto_complete_after=2)
+    editor.set_completion_keywords(Keywords.from_list_lines("БОЛЬШЕ/2"))
+    editor.setPlainText("тест :- ")
+    editor.moveCursor(QTextCursor.MoveOperation.End)
+    type_text(editor, "БОЛ(")
+    assert editor.completion_visible(), editor.completion_labels()
+    assert editor.completion_labels() == ["БОЛЬШЕ/2"], editor.completion_labels()
+    QTest.keyClick(editor, Qt.Key.Key_Return)
+    assert editor.toPlainText() == "тест :- БОЛЬШЕ(", editor.toPlainText()
+    assert editor.textCursor().position() == len("тест :- БОЛЬШЕ("), (
+        editor.textCursor().position()
+    )
+    print("ok: the bracket survives in the real editor too")
+
+
 def test_matching_is_case_sensitive_by_default() -> None:
     """`Мод` is a different word from `мод`: matching it needs the option.
 
@@ -482,6 +536,7 @@ def main() -> int:
     test_lists_do_not_inflate_the_arity()
     test_reserved_names_come_with_their_arity()
     test_the_call_form_is_inserted_with_the_caret_after_the_paren()
+    test_a_typed_bracket_is_not_inserted_twice()
     test_matching_is_case_sensitive_by_default()
     test_the_same_alphabet_sorts_first()
     test_completion_is_suppressed_inside_comments_and_strings()
@@ -498,6 +553,7 @@ def main() -> int:
         return 0
     application = QApplication(sys.argv[:1])
     test_the_popup_opens_and_accepts()
+    test_a_typed_bracket_survives_the_real_editor()
     test_escape_closes_and_arrows_keep_working()
     test_ctrl_space_opens_on_demand()
     test_no_popup_inside_a_comment_or_a_string()
