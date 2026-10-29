@@ -110,21 +110,15 @@ def load_text(text: str, name: str = "<buffer>", *, step: bool = False,
               screen: tuple[int, int] | None = None) -> bytes:
     """Loads program text (the editor buffer).
 
-    `step` makes the run stop at its first step point and wait for a `step`
-    request; `trace` turns `ТРАССА` on, so the trace arrives as `trace` events.
-    `questions=False` loads the program *without* running its own
-    `?`-statements: what the editor's margin needs to answer one clicked query
-    alone (task_36).  `print_questions` echoes each run question (`?цель.`) as an
-    `output` event before its answer (protocol 11) — the two flags are apart
-    because running the lesson and seeing the questions on the pane are two
-    choices.  The flags are left off the wire when they are false, which keeps a
-    plain run looking exactly as it did before protocol 3.
+    `step` stops the run at its first step point, `trace` turns `ТРАССА` on (the
+    trace arrives as `trace` events).  `questions=False` loads without running the
+    program's own `?`-statements — what the margin needs to answer one clicked query
+    alone (task_36); `print_questions` echoes each run question before its answer
+    (protocol 11).  Both flags are left off the wire when false.
 
-    `limits` are the guards of the run (protocol 9): `maxSteps`, `maxDepth`,
-    `maxFindall`, each `0` for «без предела».  The *wall-clock* timeout is not
-    here — it is the front-end's own clock (task_46).
-
-    `screen` is the size of the picture the run draws on (protocol 13, task_73).
+    `limits` are the guards of the run (protocol 9) with `0` for «без предела»; the
+    wall-clock timeout is not here — it is the front-end's own clock (task_46).
+    `screen` is the size the picture is drawn on (protocol 13).
     """
     return encode_request(
         cmd="load", text=text, name=name,

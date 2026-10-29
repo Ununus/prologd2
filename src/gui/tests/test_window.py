@@ -643,13 +643,13 @@ def test_the_panel_has_five_tabs_with_counts(executable: str) -> None:
         # A warning alone is orange, an error turns it red — and each diagnostic
         # brings the «Проблемы» tab up (task_50's focus rule).
         window._on_failed("runtime", "warning", "совет", None)
-        window._flush_output()
+        window._feed.flush()
         assert window.panel_tabs().currentIndex() == problems, "a warning did not focus Проблемы"
         assert bar.tabText(problems) == "Проблемы:1", bar.tabText(problems)
         assert bar.tabTextColor(problems).name() == window._settings.palette.warning
 
         window._on_failed("runtime", "error", "сбой", None)
-        window._flush_output()
+        window._feed.flush()
         assert bar.tabText(problems) == "Проблемы:2", bar.tabText(problems)
         assert bar.tabTextColor(problems).name() == window._settings.palette.error
 
@@ -4370,7 +4370,7 @@ def test_the_theme_switch_reaches_the_text_and_the_widgets(executable: str) -> N
         window._append_output("ошибка выполнения\n", panels.ERROR)
         # The window hands its output over on the next turn of the event loop
         # (task_49), and this check reads the pane with no loop running.
-        window._flush_output()
+        window._feed.flush()
         assert colour_of(window._problems, 0) == panels.KIND_COLORS[panels.ERROR]
 
         window._settings.theme = theme.DARK.name

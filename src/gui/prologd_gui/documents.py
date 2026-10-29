@@ -228,17 +228,13 @@ SESSION_TEXT_BUDGET = 256 * 1024
 class TabRecord:
     """One tab as it is remembered between runs (task_29, task_49).
 
-    A file is remembered by its **path**: the next run reads the file, so the tab
-    shows the file on disk rather than what the editor held when the window
-    closed — a user who answered «не сохранять» meant it.  An untitled buffer has
-    no file to read, so its text travels with the record, up to the budget.
+    A file is remembered by its **path**: the next run reads the disk, not what the
+    editor held — «не сохранять» meant it.  An untitled buffer has no file, so its
+    text travels with the record.
 
-    `modified` is the «there are unsaved changes» flag the buffer had when the
-    session was written (task_49).  It matters for untitled tabs only: a file tab
-    is read from disk, so what comes back is not unsaved work whatever the flag
-    said.  Without it, *every* untitled tab came back starred — including one the
-    user had never touched, which is what the user ran into (`*Без имени` after a
-    restart, and a save question about a program nobody had edited).
+    `modified` matters for untitled tabs only (a file tab is read from disk):
+    without it every restored tab came back starred, which made closing ask about a
+    program nobody had edited (task_49).
     """
 
     path: str = ""
@@ -321,19 +317,13 @@ def session_records(
 ) -> tuple[list[TabRecord], int]:
     """What of the open tabs is worth remembering, and how many were dropped.
 
-    `tabs` are `(path, name, text, modified)` quadruples in tab-bar order.  The
-    flag is kept for untitled buffers only: a file tab comes back as the file on
-    disk, so whether its buffer had unsaved changes when the window closed is not
-    something the next run can honour.
+    `tabs` are `(path, name, text, modified)` quadruples in tab-bar order; the flag
+    is kept for untitled buffers only, because a file tab comes back as the disk.
 
-    Only an *untitled* buffer is measured, and each one is measured on its own
-    (task_108): the budget is the size above which closing the window has to ask,
-    so one big scratch tab must not cost the small one standing next to it.  A
-    buffer over the budget is dropped whole — a tab that comes back with half of
-    its text is worse than one that does not come back.  An empty untitled tab is
-    skipped altogether — it is the placeholder a first file would replace anyway,
-    and an empty tab that came back as unsaved work would ask a save question
-    about nothing.
+    Only untitled buffers are measured, each on its own (task_108): the budget is
+    where closing has to ask, so one big scratch tab must not cost the small one
+    beside it.  A buffer over the budget is dropped whole — half its text is worse
+    than no tab — and an empty one is skipped altogether.
     """
     records: list[TabRecord] = []
     dropped = 0

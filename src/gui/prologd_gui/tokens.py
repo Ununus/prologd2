@@ -1,25 +1,15 @@
 """Lexical rules of PrologD for highlighting, mirroring `src/prlib/src/lexer.cpp`.
 
-Qt-free on purpose: the rules are worth testing without a display, and the
-highlighter (`highlighter.py`) is then only a mapping from token kind to format.
+Qt-free: the rules are worth testing without a display, and `highlighter.py` is then
+only a mapping from token kind to format.  The interpreter owns the language, so this
+is a *second* implementation of the same rules — the worst a bug here can do is
+colour something wrong.
 
-The interpreter owns the language, so this module is *not* authoritative — it is
-a second implementation of the same rules, kept small and table-driven.  It never
-influences execution: the worst a bug here can do is colour something wrong.
-
-Differences from the lexer, both deliberate:
-
-* diagnostics are ignored — a malformed literal is highlighted as the text it
-  looks like rather than reported;
-* there is no carried state between lines for *strings* and `#…#`: neither may
-  span lines in PrologD (the lexer rejects an unterminated one), so a line-local
-  pass is enough and typing stays cheap: an unterminated string is simply coloured
-  to the end of its own line.  One thing *does* span lines — the standard's
-  `/* … */` comment (task_92) — so its state is carried explicitly: `scan_line`
-  takes it in and gives it back, and the highlighter keeps it per text block;
-* whitespace is not a token.  There is nothing to colour in it, and the sweep
-  test asserts the stronger property anyway: every other character of a line is
-  inside exactly one token.
+Deliberate differences from the lexer: diagnostics are ignored (a malformed literal
+is coloured as the text it looks like); a line-local pass is enough for strings and
+`#…#`, which may not span lines, while `/* … */` (task_92) carries its state in and
+out of `scan_line`; whitespace is not a token, and the sweep test still asserts that
+every other character is inside exactly one.
 """
 
 from __future__ import annotations
@@ -125,12 +115,10 @@ def alphabet_of(text: str) -> str:
     return ""
 
 
-#: The two Unicode separators Qt can put into a text, measured against the editor
-#: and against `prologd` on 2026-10-03: `U+2028` is drawn as a new line but *not*
-#: counted by `blockCount()`, so the line numbers and the question markers of the
-#: margin end up on the wrong lines (the report that started this), and `U+2029` is
-#: counted by the widget while the lexer rejects it outright.  A Prolog source has
-#: exactly one line break, and it is `\n`.
+#: The two Unicode separators Qt can put into a text: `U+2028` is drawn as a new
+#: line but *not* counted by `blockCount()`, so the numbers and the margin markers
+#: stand on wrong lines, while `U+2029` is counted and rejected by the lexer.  A
+#: Prolog source has one line break, and it is `\n`.
 LINE_SEPARATORS = ("\u2028", "\u2029")
 
 

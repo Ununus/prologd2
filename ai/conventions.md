@@ -101,6 +101,10 @@ or the next cut, so `Yield` is worth it only when backtracking is the point.
   importable without it so the wire format can be tested headlessly.
 * Comments and identifiers are English; strings the *user* sees in the GUI are
   Russian, like the interpreter's diagnostics and `doc/*.typ`.
+* A comment says **why this and not the obvious thing**: the trap, the ordering,
+  the platform quirk.  The story of how a thing came to be broken belongs to
+  `ai/status.md` — the code keeps the pointer (`task_58`, `part 226`) and drops the
+  retelling (ADR-062).
 * Tests: `src/gui/tests/*.py`, runnable with a bare interpreter
   (`python src/gui/tests/protocol_smoke.py`), not with a test framework.
 

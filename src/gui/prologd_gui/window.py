@@ -55,6 +55,8 @@ from . import (
     graphics,
     graphicswindow,
     imports,
+    marks,
+    outputfeed,
     panels,
     paths,
     reference,
@@ -76,13 +78,11 @@ from .settings import OUTPUT_FONT_SIZE, Settings
 #: before the process is taken down (`stop_program`).
 STOP_GRACE_MS = 500
 
-#: The first tab's program: a short map of the window, then a tiny program to try
-#: (task_112).  The owner wrote it as a cheat sheet — the most useful commands, one
-#: line each, and a program whose every line shows something.
-#:
-#: It is written plainly: atoms are lower-case and unquoted, variables start with a
-#: capital letter, and there are no quotes, dashes or ellipses anywhere.
-WELCOME = """\
+WELCOME_TEXT = """\
+:- ИМПОРТ("iso.pld"). % подключает стандартные предикаты ISO
+% F12 над ИМПОРТ откроет файл
+% F12 над символом откроет первое определение
+?length([1, 2, 3], Д).\n
 % F5 или Ctrl+R - запуск; Shift+F5 - остановить счёт (красная кнопка)
 %   или выгрузить базу из памяти (синяя кнопка)
 % Ctrl+N или двойной клик по пустому месту вкладок - новая вкладка
@@ -97,18 +97,6 @@ WELCOME = """\
 % Щелчок по метке у вопроса выполнит только его, ответ попадёт в «Таблицу»
 ?студент(И, Ф).
 """
-
-#: What the first tab holds: the standard library and the two things it shows —
-#: `ИМПОРТ` and the ISO `length` (task_112).  `Д` is a variable, the way ISO reads
-#: an upper-case name.
-WELCOME_TEXT = (
-    ':- ИМПОРТ("iso.pld"). % подключает стандартные предикаты ISO\n'
-    "% F12 над ИМПОРТ откроет файл\n"
-    "% F12 над символом откроет первое определение\n"
-    "?length([1, 2, 3], Д).\n"
-    "\n" + WELCOME
-)
-
 
 #: The three answers to "save before closing?".
 SAVE = "save"
@@ -159,13 +147,10 @@ class MainWindow(QMainWindow):
         self._command_line_includes = list(includes or [])
 
         self._session = PrologSession(self._interpreter_path(), self._import_directories(), self)
-        # Completion, colouring and the cheat sheet need the reserved names
-        # *before* anything is run — waiting for the first `ready` is why
-        # autocompletion used to work only after the first run.  A window that
-        # has only been opened must not keep an interpreter alive, so the table
-        # is fetched once with `--list-keywords` (the same query the CLI answers)
-        # and the first real session replaces it with the `ready` event's copy
-        # of the same data.
+        # Completion, colouring and the cheat sheet need the reserved names *before*
+        # anything is run (they used to work only after the first run): the table is
+        # fetched once with `--list-keywords`, and the first real session replaces it
+        # with the `ready` event's copy.
         self._session.keywords = read_keywords(self._interpreter_path())
         self._session.ready.connect(self._on_ready)
         self._session.output.connect(self._on_output)
@@ -270,12 +255,8 @@ class MainWindow(QMainWindow):
         #: may end in the middle of a line, so splitting belongs to `answers.parse`
         #: and not here — the list holds what the interpreter sent, verbatim.
         self._answer_text: list[str] | None = None
-        #: A question that is waiting for its load to answer (task_60): a margin
-        #: marker and a goal typed into an empty window both send the program first
-        #: and the question only once the load has succeeded.  Asking earlier meant
-        #: answering against an empty knowledge base — «НЕТ» and a «не найдено»
-        #: warning for a predicate that never loaded — and reporting one broken line
-        #: twice, as the buffer's and as the query's.
+        #: A question waiting for its load (task_60): asking earlier answered against
+        #: an empty base and reported one broken line twice.
         self._pending_query: str | None = None
         #: The picture of the graphics predicates (task_45).  The interpreter
         #: keeps its own pixels, so this canvas mirrors the screen: it is created
@@ -294,18 +275,6 @@ class MainWindow(QMainWindow):
         #: it came from and where the caret stood.  The answer arrives as an
         #: event, so this state outlives the call that started it.
         self._format_pending: dict | None = None
-
-        #: Output that the current turn has produced and the pane has not been
-        #: given yet (task_49), as `(kind, text)` in arrival order.  A trace of a
-        #: deep recursion arrives as hundreds of thousands of small events, and one
-        #: `feed` per event costs some 30 us of Python on top of the insertion —
-        #: enough to starve the window.  `_flush_output` joins the neighbours of one
-        #: kind, which is the whole trace, into a single call.
-        self._output_pending: list[tuple[str, str]] = []
-        self._output_timer = QTimer(self)
-        self._output_timer.setSingleShot(True)
-        self._output_timer.setInterval(0)
-        self._output_timer.timeout.connect(self._flush_output)
 
         self._build_ui()
         # The window's own size and place come back too (task_49): the graphics
@@ -330,18 +299,13 @@ class MainWindow(QMainWindow):
         if self._settings.restore_tabs:
             self._restore_session()
         if path:
-            # A file named on the command line is the document the window opens
-            # *on* (task_116): the shell passes one when a `.pld` is
-            # double-clicked, and that is the whole point of the association.
-            # Opened after the session, so a start with tabs restored gains one
-            # more instead of losing them; a file that is already among them
-            # comes to the front, because `open_path` looks for an open copy
-            # first.  A file that is not there leaves the note `open_path`
-            # writes and falls through to the welcome program below.
+            # A file named on the command line is the document the window opens *on*
+            # (task_116 — that is the point of the `.pld` association).  Opened after
+            # the session, so restored tabs are kept; an already open copy comes to
+            # the front, and a missing file falls through to the welcome program.
             self.open_path(path)
         if not self._buffers:
-            # The welcome program goes into the first tab and is *not* unsaved work
-            # — the flag is left clear, so closing it asks nothing (task_112).
+            # The welcome program goes into the first tab.
             welcome = documents.Document.untitled(documents.untitled_name([]))
             welcome.text = WELCOME_TEXT
             self._add_buffer(welcome)
@@ -362,13 +326,10 @@ class MainWindow(QMainWindow):
         self._reveal_path = paths.reveal
         self._editor_splitter = QSplitter(Qt.Orientation.Horizontal)
 
-        # The output panel (task_50): three read-only panes — Проблемы, Вывод,
-        # Система — and the Ввод tab with the prepared answers and, under them,
-        # the per-request console.  Вывод and Система are `OutputPane`s, so the
-        # bounded history, the colours per kind and the tail they hold reach both
-        # the same way; Проблемы is a *table* (part 88): a diagnostic arrives as
-        # fields — kind, severity, message, position — and a row is what a
-        # double-click can take the editor to the line of.
+        # The output panel (task_50): Проблемы is a *table* (part 88) — a diagnostic
+        # arrives as fields, and a row is what a double-click takes the editor to —
+        # while Вывод and Система are `OutputPane`s, so bounded history, colours per
+        # kind and the half-line they hold reach both the same way.
         self._problems = panels.ProblemsPane(
             font_family=self._settings.font_family,
             font_size=self._settings.output_font_size,
@@ -403,6 +364,17 @@ class MainWindow(QMainWindow):
         self._system.setPlaceholderText("сообщения окна: загрузка, пределы, остановка")
         self._system.zoomChanged.connect(self._on_output_zoom)
         self._system.fileDropped.connect(self.open_path)
+
+        # What the panes are given is one batch per turn of the event loop: a trace
+        # of a deep recursion arrives as hundreds of thousands of small events, and
+        # the queue joins them by kind (`outputfeed`, task_49).
+        self._feed = outputfeed.OutputFeed(
+            self._output,
+            self._problems,
+            self._system,
+            self._refresh_panel_tabs,
+            self,
+        )
 
         # The input queue: one line per answer the program will ask for, fed
         # automatically until the list runs out (`_input_lines`).  It is user
@@ -542,11 +514,8 @@ class MainWindow(QMainWindow):
         # (an answer box under nothing would be a puzzle — part 92).
         self._query_panel = QWidget()
         # A plain `QWidget` has no vertical wish of its own, and the editor column has
-        # room to spare: without this the strip shared that room with the editor and
-        # the goal line floated in the middle of a tall empty panel — the very defect
-        # the console had, which cured it with a policy of its own (task_50).
-        # `Maximum` means «as tall as the line, plus the console while a question
-        # waits, and not a pixel more».
+        # room to spare: `Maximum` keeps the strip «as tall as the line, plus the
+        # console while a question waits, and not a pixel more» (task_50).
         self._query_panel.setSizePolicy(
             QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum
         )
@@ -1021,40 +990,22 @@ class MainWindow(QMainWindow):
     def _sync_run_actions(self) -> None:
         """Three states for «Остановить», two for «Запустить».
 
-        `Запустить` is for a computation that is not in flight — it restarts the
-        whole file, whether the interpreter is idle with a base loaded or gone
-        altogether.
-
-        `Остановить` is the command with two meanings, and the button says which one
-        it will do (part 141, after task_87's two-state button): dark while there is
-        nothing to stop; red — `execution-abort` — while a run is in flight, because
-        then the click breaks a computation; blue — `execution-stop` — while the
-        interpreter is up and idle with its base, because then the click unloads the
-        base, which is the one act that is immediate.  A red button over an idle
-        session read as «the program is looping», and a dark one took away the only
-        way to unload a base that is waiting for input.
-
-        The deadline of a run (task_46) is dropped here as well: every path that
-        ends a run comes through this method, and a timer that outlived its run
-        would stop the *next* one.
+        `Остановить` says which meaning it has (part 141): dark with nothing to
+        stop, red (`execution-abort`) during a run, blue (`execution-stop`) on an
+        idle interpreter with a base, where the click unloads it.  The deadline of a
+        run is dropped here too: every path that ends a run comes through this
+        method, and a timer that outlived its run would stop the *next* one.
         """
         if not self._busy:
             self._timeout.stop()
-        # A *paused* step is a usable state, not a busy one: «Запустить» then
-        # means «продолжить», and «Шаг», «Шаг с обходом» and the traced run have
-        # to be live, or their keys are dead exactly when the user needs them — a
-        # disabled `QAction` fires no shortcut.  A run actually in flight is the
-        # blocked state.  (The paused case is written out here on purpose: it
-        # used to work only because the status of a *restart* cleared the busy
-        # flag, which the flag ordering of `run_program` then fixed.)
+        # A *paused* step is a usable state, not a busy one: «Запустить» then means
+        # «продолжить», and a disabled `QAction` fires no shortcut — its key would be
+        # dead exactly when the user needs it.  Only a run in flight blocks them.
         free = not self._busy or self._session.paused()
         self._actions["run"].setEnabled(free)
-        # «Остановить» has three states (part 141, after task_87's two): dark while
-        # there is nothing to stop; the red octagon while a run is in flight, because
-        # then the click breaks a computation; and the blue stop while the interpreter
-        # is up and idle with its base, because then the click only unloads the base.
-        # One picture for both acts was what made the red one misleading: over an
-        # idle session it read as «the program is looping».
+        # «Остановить» has three states (part 141): dark with nothing to stop, the red
+        # octagon while a run is in flight, the blue stop on an idle interpreter with
+        # its base.  One picture for both acts read as «the program is looping».
         in_flight = self._busy or self._session.paused()
         stop = self._actions["stop"]
         enabled = self._session.is_running() and (in_flight or self._loaded)
@@ -1682,33 +1633,20 @@ class MainWindow(QMainWindow):
                     questions: bool | None = None) -> bool:
         """Runs the current buffer in a fresh interpreter.
 
-        A run starts from a clean slate: a fresh interpreter (no clauses, RNG
-        seed or redirected files left from the previous run) and an empty
-        output pane.  Reusing the session accumulates clauses —
-        with a duplicated `факториал/2` the factorial example returns 64
-        solutions instead of one, which looks like a loop — so `start()` stops
-        a live process first.
+        A fresh session and an empty output pane every time: a reused one
+        accumulates clauses, and a duplicated `факториал/2` then answers 64 times
+        instead of once — which looks like an endless loop.
 
-        `trace` turns `ТРАССА` on for this run: the trace arrives as `trace`
-        events and is coloured apart from the program's own output.  `step` arms
-        the step hook, so the run stops at its first step point and waits for
-        `Шаг`/`Продолжить` — and, like `trace`, it goes on the *load*, because a
-        program's own `?`-statements and directives run there.
+        `trace` and `step` go on the *load*, because a program's own `?`-statements
+        and directives run there.  `questions=False` loads without them (task_36);
+        left out, it follows «Выполнять вопросы при запуске» (task_29).
 
-        `questions=False` loads the program without running its own `?`-statements:
-        that is what the editor's margin needs, so one clicked question is
-        answered *alone* instead of after the whole lesson (task_36).  Left out, it
-        follows the «Выполнять вопросы при запуске» switch (task_29), which is on
-        by default — a lesson is normally run to see its questions answered.
-
-        The result is True when the load was sent; a caller that wants to add a
-        query of its own (`_on_query_requested`) must not do it otherwise.
+        True when the load was sent — a caller that wants to add a query of its own
+        (`_on_query_requested`) must not do it otherwise.
         """
-        # A new run cancels the deadline of a polite stop that is still pending:
-        # the old process goes either way (`session.start` stops a live one).  The
-        # `_stopping` flag itself is *not* cleared here: the terminated process's
-        # `ended` event consumes it, and that event is delivered before this load
-        # reaches the new interpreter — clearing it early would report the
+        # A new run cancels a pending polite stop (`session.start` stops a live
+        # process anyway).  `_stopping` is *not* cleared: the terminated process's
+        # `ended` event consumes it, and clearing it early would report the
         # termination status as an exit code.
         self._stop_grace.stop()
         self._timeout.stop()
@@ -1732,7 +1670,7 @@ class MainWindow(QMainWindow):
                 return False
         # The panes start empty, and so does what has not reached them yet: a run
         # begins with its own output, never with the tail of the previous one.
-        self._discard_output()
+        self._feed.discard()
         self._reset_panels()
         # The panel shows the program's output while the run is going (task_50);
         # a diagnostic switches it to «Проблемы» later.  A run has output to show,
@@ -1820,15 +1758,10 @@ class MainWindow(QMainWindow):
                                     screen=self._settings.screen_size)
             self._status.setText(f"выполняется {pathlib.Path(path).name}")
         else:
-            # Otherwise the text comes from the editor, and the path, when there
-            # is one, is what the loader treats as the importing file.  The
-            # status line says which case is running, so a failing `ИМПОРТ` is
-            # not a mystery: without a path it searches only the working
-            # directory and the `-I` directories.
-            # The text comes from the editor, but the identity comes from the tab:
-            # a saved file is named by its path (so `ИМПОРТ` and the diagnostics
-            # point at the real file), an unnamed buffer by its title — the name
-            # the user sees in the tab and in the status bar of a diagnostic.
+            # The text comes from the editor; the identity comes from the tab — a
+            # saved file is named by its path (so `ИМПОРТ` and the diagnostics point
+            # at the real file), an unnamed buffer by its title.  Without a path the
+            # loader searches the working directory and the `-I` folders only.
             self._session.load_text(buffer.text(), path or buffer.title(), step=step,
                                     trace=trace, questions=questions,
                                     print_questions=self._settings.print_questions,
@@ -1863,15 +1796,10 @@ class MainWindow(QMainWindow):
     def show_graphics_window(self, visible: bool) -> None:
         """The «Графическое окно» entry: shows or hides the picture.
 
-        Opening a window that is *not* the interpreter's only subscriber is why
-        the snapshot exists: the program may have drawn half a picture while this
-        window did not exist, and the interpreter still holds every pixel of it.
-
-        Showing it also marks this run as «the window was brought up», whichever
-        way it was shown (the entry, the settings, or the first primitive of a
-        run): that is what keeps a window the user closed closed (task_48).  Hiding
-        it does not clear the mark — closing the window *is* the gesture that must
-        not be answered by reopening it.
+        Showing marks this run as «the window was brought up», whichever way it was
+        shown — that is what keeps a window the user closed closed (task_48), and
+        hiding does not clear the mark.  Opening asks for the snapshot: the pixels
+        live in the interpreter, which may have drawn while no window existed.
         """
         window = self.graphics_window()
         visible = bool(visible)
@@ -1890,6 +1818,7 @@ class MainWindow(QMainWindow):
             "графическое окно показано" if visible else "графическое окно скрыто"
         )
 
+    # -- the output of a run (task_65, task_66) ----------------------------
     def _count_output(self) -> None:
         """One output event of the run; stops it past «Предел вывода» (task_66).
 
@@ -1938,19 +1867,15 @@ class MainWindow(QMainWindow):
             f"--- программа выводит быстрее, чем окно успевает: {count} событий в секунду ---\n"
         )
 
+    # -- the picture inside the run (task_45) ------------------------------
     def _on_drawn(self, event: dict) -> None:
         """One primitive reached the window (protocol 10).
 
-        A program that draws without being asked shows its picture: the first
-        primitive of a run brings the window up (task_48).  The moment is the
-        first *primitive* rather than the start of the run because it is the first
-        moment there is something to see — a program that draws nothing must not
-        open a window — and the decision is taken once per run: a window the user
-        closed during an animation stays closed, and the next run opens it again.
-
-        What was drawn before this window existed is not lost: the program's
-        pixels live in the interpreter, and opening a window mid-run asks for the
-        snapshot (that is why `show_graphics_window` requests one).
+        The first primitive of a run brings the window up (task_48) — not the start
+        of the run, because a program that draws nothing must not open one — and the
+        decision is taken once per run: a window the user closed stays closed until
+        the next run.  What was drawn earlier is not lost: opening asks for the
+        snapshot.
         """
         if self._stopping:
             return
@@ -2027,6 +1952,7 @@ class MainWindow(QMainWindow):
             self._graphics_window.refresh()
         self._status.setText(f"рисунок получен ({width}×{height})")
 
+    # -- the limits of a run (task_46) -------------------------------------
     def _engine_limits(self) -> dict | None:
         """The `limits` object of a `load` (protocol 9).
 
@@ -2038,20 +1964,12 @@ class MainWindow(QMainWindow):
     def _limits_note(self) -> str:
         """The limits a run goes with, in the words of their rows (task_46).
 
-        This is the window's half of the answer a limit that fires leaves open.
-        The engine's message names the limit and its value («Превышен предел шагов
-        выполнения: 5000») and nothing else — it has no idea that a command line
-        or a settings dialog exists (ADR-020) — while the row that raises a limit
-        is *here*.  So a run whose limits differ from the shipped ones says so
-        before it starts, named the way the dialog names them: a limit nobody can
-        find is the mystery the message alone would leave.
-
-        A value equal to the default is not a choice the user made, and a run of a
-        lesson would otherwise report the same two numbers for ever.
-
-        Three of the five rows are the *engine's* (they travel in the `load`) and two
-        are the window's own guards; the note names the first three first, and the
-        line it prints says where they live.
+        The engine's message names the limit and its value and nothing else — it has
+        no idea a settings dialog exists (ADR-020) — while the row that raises it is
+        here.  So a run whose limits differ from the shipped ones says so first,
+        named the way the dialog names them; a value equal to the default is not a
+        choice and is not reported.  The engine's three rows come first, then the
+        window's two guards.
         """
         engine_rows = (
             (self._settings.max_steps, settings.DEFAULT_MAX_STEPS, "«Предел шагов»"),
@@ -2111,6 +2029,7 @@ class MainWindow(QMainWindow):
         self._stopping = True
         self._stop_grace.start(STOP_GRACE_MS)
 
+    # -- the formatter (task_30) -------------------------------------------
     def format_document(self) -> None:
         """Lays the current buffer — or the selection — out (task_30).
 
@@ -2214,6 +2133,7 @@ class MainWindow(QMainWindow):
         view.setTextCursor(restored)
         self._status.setText("отформатировано")
 
+    # -- a goal typed into the line (task_50) ------------------------------
     def _run_query(self) -> None:
         text = self._query_line.text().strip()
         if not text:
@@ -2246,6 +2166,7 @@ class MainWindow(QMainWindow):
         self._sync_run_actions()
         self._update_details()
 
+    # -- the menus of the tab bars (task_68, task_71) ----------------------
     def _on_panel_tab_context(self, point: QPoint) -> None:
         """Shows the panel's tab menu — nothing where there is no command (task_71)."""
         index = self._panel_tabs.tabBar().tabAt(point)
@@ -2297,6 +2218,7 @@ class MainWindow(QMainWindow):
             menu.addAction(self._actions[key])
         return menu
 
+    # -- a name in the program: where it is defined (task_69, task_103) ----
     def _import_under_cursor(self) -> str | None:
         """The file named by the `ИМПОРТ` line under the caret, if that is the line.
 
@@ -2448,21 +2370,17 @@ class MainWindow(QMainWindow):
         if path:
             self._reveal_path(path)
 
+    # -- a question asked from the margin (task_36, task_60) ---------------
     def _on_query_requested(self, statement: str) -> None:
         """Runs one question from the editor's margin — and the answer alone.
 
         The statement goes into the query line first, so what is running stays
-        visible while the answer arrives, and the program is loaded *quietly*
-        (`questions=False`): running its own `?`-statements would fill the pane
-        with the whole lesson before the clicked question's answer.
-
-        A click during a run stops that run first.  The margin marker is the way
-        out of a runaway query as much as it is a way to ask one, and after the
-        stop the clicked question is the one that answers (task_36).
-
-        The question itself goes out when the load has answered (`_ask_after_load`):
-        a file that does not parse has no base to ask, and asking anyway answered
-        «НЕТ» and repeated the file's own parse error as the query's (task_60).
+        visible, and the program is loaded quietly (`questions=False`): its own
+        `?`-statements would fill the pane before the clicked answer.  A click
+        during a run stops it first — the marker is the way out of a runaway query
+        as much as a way to ask one — and the question goes out once the load has
+        answered (`_ask_after_load`): a file that does not parse has no base to ask
+        (task_60).
         """
         if not statement:
             return
@@ -2736,18 +2654,11 @@ class MainWindow(QMainWindow):
     def _closing_needs_a_question(self, buffer: Buffer) -> bool:
         """Whether a modified buffer earns a question as the window closes (task_108).
 
-        A buffer with a file always does: the session keeps only its *path*, and the
-        next run reads the file from disk, so an edit that was not written is gone.
-        An unnamed buffer is kept by its text — that is what the session is for — so
-        closing the window may pass it by without a word: the question there would
-        be a file dialog for a scratch pad, and the answer «Не сохранять» the only
-        way to keep it out of the session.
-
-        The promise has two edges, and both of them ask: the setting that restores
-        tabs has to be on (without it there is no session to keep anything in), and
-        the text has to fit the budget for one buffer.  Closing a *tab* — `Ctrl+W`,
-        «Закрыть вкладку», «Закрыть все вкладки» — has no session behind it and asks
-        about everything, unnamed ones included.
+        A buffer with a file always does: the session keeps its path, and the next
+        run reads the disk, so an unwritten edit is gone.  An unnamed buffer is kept
+        by its text, so closing may pass it by — but only when the session will keep
+        it: restoring tabs is on and the text fits `SESSION_TEXT_BUDGET`.  Closing a
+        *tab* asks about everything.
         """
         if buffer.model.path is not None:
             return True
@@ -2818,23 +2729,17 @@ class MainWindow(QMainWindow):
             if buffer.is_modified() and not self.save_buffer(buffer):
                 return
 
+    # -- stopping a run (task_64) ------------------------------------------
     def stop_program(self) -> None:
         """Ends the run — politely first, and the base is not lost on the way.
 
-        The solver reads the interrupt at every step of its loop, so a query
-        that is running (a runaway included), waiting for input or paused at a
-        step point all end on the request: the session answers with the runtime
-        error of the interrupted query (`Interrupted`) and is then idle *with
-        its knowledge base*, which is the difference between stopping a run and
-        stopping the interpreter.  The deadline covers what the request cannot
-        reach — a front-end that never reads, say — and then the process goes as
-        it always did.
-
-        An idle interpreter with a base loaded is the other meaning: stopping
-        *it* unloads the base, and that is the one case that is immediate.  The
-        two-state button no longer reaches this branch (task_87 — it is dark while
-        no run is in flight, and the next start loads the base again); the command
-        keeps it for a caller that does want to unload.
+        The solver reads the interrupt at every step, so a runaway query, one
+        waiting for input and one paused at a step point all end on the request; the
+        session is then idle *with its base*, which is the difference between
+        stopping a run and stopping the interpreter.  The deadline covers what the
+        request cannot reach.  An idle interpreter is the other meaning: stopping it
+        unloads the base at once — out of the button's way since task_87, kept for a
+        caller that does want to unload.
         """
         if not self._session.is_running():
             self._status.setText("интерпретатор уже остановлен")
@@ -2901,6 +2806,7 @@ class MainWindow(QMainWindow):
         self._sync_run_actions()
         self._update_details()
 
+    # -- the commands of the output pane -----------------------------------
     def clear_output(self) -> None:
         """Empties the read-only panes and the table; the input queue is user data.
 
@@ -2909,7 +2815,7 @@ class MainWindow(QMainWindow):
         The table is a view of the same answer, so it goes with the text: leaving
         it behind would show a table whose source is gone (task_59).
         """
-        self._discard_output()
+        self._feed.discard()
         self._output.reset()
         self._problems.clear_problems()
         self._system.reset()
@@ -2925,7 +2831,7 @@ class MainWindow(QMainWindow):
         if not path:
             return
         # What is still queued belongs to the log as much as the rest does.
-        self._flush_output()
+        self._feed.flush()
         try:
             self._output.save_to(path)
         except OSError as error:
@@ -3087,15 +2993,10 @@ class MainWindow(QMainWindow):
     def _restore_session(self) -> int:
         """Opens the tabs of the previous run; returns how many did open.
 
-        A *file* tab is read from disk, so the window opens on the file as it is
-        now, not on what the editor held when the last window closed; a file that
-        has gone is skipped and named in the status line, because a half session
-        that says nothing is worse than one that says what is missing.  An
-        untitled tab comes back with its text and with the state it had: a tab the
-        user had changed stays unsaved work and the next close has to ask about
-        it, while one that was never touched comes back clean (task_49 — every
-        restored untitled tab used to be starred, which was a save question about
-        a program nobody had edited).
+        A file tab is read from disk now, not from what the editor held; a file that
+        has gone is skipped and named in the status line.  An untitled tab comes back
+        with its text and its edited-or-clean state (task_49 — every restored tab used
+        to be starred, which made closing ask about a program nobody had edited).
         """
         records = documents.decode_tabs(self._settings.session_tabs)
         missing: list[str] = []
@@ -3140,19 +3041,12 @@ class MainWindow(QMainWindow):
     def _store_session(self, tabs: list[Buffer], current: Buffer | None) -> int:
         """Remembers the tabs that were open for the next start.
 
-        `tabs` is the tab list taken *before* the closing questions walked over
-        it, and it holds the buffers themselves rather than copies: a buffer the
-        user saves to a file while closing is then remembered as the file it
-        became, not as the unnamed buffer it was.  An untitled buffer answered
-        with «Не сохранять» is left out (`self._discarded`) — that answer means
-        the text is not to be seen again.
-
-        A file tab is stored by its path (see `documents.TabRecord`) and an
-        untitled one by its text and by whether it held unsaved changes, up to the
-        budget of one buffer (task_108); `session_records` says how many did not
-        fit.  That budget is what closing the window asks about: an untitled
-        buffer the store can keep is asked about nothing, so the two numbers have
-        to be the same one (`SESSION_TEXT_BUDGET`).
+        `tabs` is the list taken *before* the closing questions, and it holds the
+        buffers themselves: one the user saves while closing is remembered as the
+        file it became.  An untitled buffer answered «Не сохранять» is left out.
+        Files are stored by path, untitled text by its text up to
+        `SESSION_TEXT_BUDGET` (task_108) — the same budget the closing question is
+        decided by.
         """
         kept = [buffer for buffer in tabs if buffer not in self._discarded]
         records, dropped = documents.session_records(
@@ -3197,12 +3091,9 @@ class MainWindow(QMainWindow):
         """Closing the window asks about every modified buffer first."""
         self._closing = True
         try:
-            # What the next start should reopen is taken here, while the tabs are
-            # still there, and *written* only once the close really happened:
-            # answering «Отмена» to a save question leaves the window open, and a
-            # session stored on the way out would then describe a window that never
-            # closed.  The questions may take a buffer out of it — «Не сохранять»
-            # on an unnamed buffer — so the list is not what is in `_buffers` now.
+            # Taken here, while the tabs are still there, and *written* only once the
+            # close really happened: «Отмена» to a save question leaves the window
+            # open, and the questions may drop an untitled buffer from the list.
             self._discarded.clear()
             tabs = list(self._buffers)
             current = self.current_buffer()
@@ -3572,21 +3463,11 @@ class MainWindow(QMainWindow):
     def _on_input_request(self, kind: str) -> None:
         """Feeds the program: the prepared lines first, the dialog only after them.
 
-        The lines come from the field under the output pane, one per request, and
-        are echoed with `>` so it stays visible what the program was given.  Only
-        when that list is empty does the window ask the user.
-
-        An answer typed here is a *piece of the program's input stream*, not one
-        line: since task_54 the interpreter splits it on `\n` itself, so two lines
-        in the console answer two `ВВОДСТР` and the window is asked once.  The
-        queue below still gives one line per request — it is where the `>` echo
-        and the «осталось строк» counter come from, and it is typed one line at a
-        time anyway.
-
-        Where it asks is the «Спрашивать ввод» switch (task_29): in the console
-        under the goal line — the field takes the answer and the box is what is
-        left when either that panel or the goal field itself is hidden (part 92) —
-        or in a box every time.
+        The lines come from the field under the output pane, one per request, echoed
+        with `>` so what the program was given stays visible.  An answer typed in the
+        console is a *piece of the input stream*, not one line: the interpreter
+        splits it on `\n` itself (task_54), so two lines answer two `ВВОДСТР` and the
+        window is asked once.  Where it asks is «Спрашивать ввод» (task_29).
         """
         if self._stopped_input:
             # Cancelled earlier in this run: the interpreter is on its way out and
@@ -3727,17 +3608,17 @@ class MainWindow(QMainWindow):
         so a caller that reads the pane has to be the one who ends that turn: a test
         and «сохранить вывод» would otherwise miss the last lines of a run.
         """
-        self._flush_output()
+        self._feed.flush()
         return self._output.toPlainText()
 
     def problems_text(self) -> str:
         """What the Проблемы pane holds: the run's errors and warnings."""
-        self._flush_output()
+        self._feed.flush()
         return self._problems.text()
 
     def system_text(self) -> str:
         """What the Система pane holds: the window's own notes."""
-        self._flush_output()
+        self._feed.flush()
         return self._system.toPlainText()
 
     def current_path(self) -> str | None:
@@ -3854,6 +3735,7 @@ class MainWindow(QMainWindow):
         self._sync_run_actions()
         self._update_details()
 
+    # -- the size of the text ----------------------------------------------
     def _on_zoom_changed(self, size: float) -> None:
         """The editor's own size — a preference since task_29, not both panels'.
 
@@ -3865,13 +3747,10 @@ class MainWindow(QMainWindow):
         self._settings.font_size = size
         for buffer in self._buffers:
             buffer.set_font_size(size)
-        # The output has no size of its own until someone gives it one: while the
-        # key is unwritten it follows the editor, exactly as it did before task_29
-        # split the two.  A wheel over the panel writes the key, and from then on
-        # the two are apart for good.  The follow applies the size *without*
-        # writing it: writing the key here froze the pair on the very first zoom,
-        # which nobody asked for — and after task_58 took the size box off the
-        # toolbar, zooming is the everyday way to change the size.
+        # The output has no size of its own until someone gives it one: while the key
+        # is unwritten it follows the editor, and a wheel over the panel writes the
+        # key.  The follow applies the size *without* writing it — writing here froze
+        # the pair on the very first zoom, which nobody asked for.
         if not self._settings.has(OUTPUT_FONT_SIZE):
             self._apply_output_font(size)
         # The step strip and the two help panes show program text, so they read
@@ -4038,23 +3917,12 @@ class MainWindow(QMainWindow):
     def _import_directories(self) -> list[str]:
         """The `-I` directories of the next session (task_61 put the rule in `paths`).
 
-        «Дополнительные каталоги ИМПОРТ» is a *search* list for `ИМПОРТ`, not the
-        working directory of the process, and it is passed exactly like
-        `--include`: the engine tries the importing file's own folder first, so a
-        local `lib/x.pld` still wins over a same-named file in a shared one
-        (task_46 folded the single «Рабочая папка» row into this list).  Only what
-        the user put in the list is passed — a package's own `examples/lib` is *not*
-        added (2026-10-03): lesson 11 asks the student to add that folder by hand, so
-        the row they see is the whole truth, and a folder copied to another machine
-        cannot leave a remembered path behind.
-
-        The answers are **absolute** (task_111): two readers share this list, and
-        they resolve a relative folder differently — the window's own lookup against
-        the window's working directory, the interpreter against the running
-        program's folder.  A row of `stdlib` therefore meant one folder to the popup
-        and another to the run: `iso.pld` was offered and «не найден» on `F5`.
-        `abspath` and not `resolve`: it only rewrites the spelling, without asking
-        the disk, and this is asked on every keystroke of the popup.
+        A *search* list for `ИМПОРТ`, not a working directory, passed like
+        `--include`; only what the user put in it is passed — a package's own
+        `examples/lib` is not added, because lesson 11 asks the student to add that
+        folder.  The answers are **absolute** (task_111): the popup and the run
+        resolve a relative folder differently, and `abspath` rather than `resolve` —
+        this is asked on every keystroke, without touching the disk.
         """
         return [
             os.path.abspath(directory)
@@ -4107,6 +3975,7 @@ class MainWindow(QMainWindow):
             self._status.setText(f"автосохранение: файлов {written}")
         return written
 
+    # -- the result of a run -----------------------------------------------
     def _on_result(self, found: bool) -> None:
         """Records the outcome; the text of the answer already arrived as output.
 
@@ -4173,6 +4042,7 @@ class MainWindow(QMainWindow):
             return
         self._show_panel_tab(panels.TAB_TABLE)
 
+    # -- what the interpreter answers: load, failure, trace ----------------
     def _on_loaded(self) -> None:
         """The load and the program's own `?`-statements are over (protocol 8).
 
@@ -4185,12 +4055,10 @@ class MainWindow(QMainWindow):
         of its own instead of the stale «выполняется».
         """
         if self._awaiting_query or self._stopping:
-            # A question still has to answer (the margin's click), or a stop of
-            # our own is in flight; both conclude with their own event.  The line
-            # about the load is not one of those things: the knowledge base is
-            # loaded by now, whoever asked for it, and a click on a margin marker
-            # gets the same line `F5` gets (task_58).  It goes *before* the answer,
-            # which is the order `F5` produces as well.
+            # A question still has to answer (the margin's click), or a stop of our
+            # own is in flight; both conclude with their own event.  The load line is
+            # not one of those: a margin click gets the same line `F5` gets (task_58),
+            # and it goes *before* the answer, as `F5` produces it.
             if self._awaiting_query and not self._failed_in_load:
                 self._append_note(
                     f"--- база знаний загружена ({self._run_clock.elapsed()} мс) ---\n"
@@ -4278,17 +4146,11 @@ class MainWindow(QMainWindow):
     def _open_problem(self, position) -> None:
         """Takes the editor to the line a row of «Проблемы» points at (part 88).
 
-        What a double-click in the table does.  The row already knows its position,
-        so this is the same road a fresh diagnostic takes — plus the one thing the
-        click is for: the tab of that file is brought to the front.  A diagnostic
-        never switches to a tab that is *already* open (it marks the line where it
-        is, so a run cannot pull the user out of what they are reading), while a
-        file it has to open is shown at once — showing what it opens is what
-        opening a file does (part 90).
-
-        A row with no place (a diagnostic about `<query>` or the interpreter's
-        library) says so in the status bar instead of moving a caret into text the
-        error is not about.
+        The same road a fresh diagnostic takes, plus the one thing the click is for:
+        the tab of that file comes to the front.  A diagnostic never switches to a
+        tab that is already open — a run must not pull the user out of what they are
+        reading — while a file it has to open is shown at once (part 90).  A row with
+        no place says so in the status bar instead.
         """
         if position is None or not position.file:
             self._status.setText("проблема не указывает место в тексте")
@@ -4367,50 +4229,17 @@ class MainWindow(QMainWindow):
     # -- where a diagnostic and a step point stand -------------------------
     def _clear_marks(self) -> None:
         """Both marks, in every view: a new run starts clean."""
-        for buffer in self._buffers:
-            for view in buffer.views():
-                view.clear_marks()
+        marks.clear(self._buffers)
 
     def _diagnostic_buffer(self, position) -> Buffer | None:
-        """The tab a diagnostic points at, opening it when it is a file of ours.
-
-        A diagnostic from an `ИМПОРТ`ed file names *that* file, and marking a line
-        in the wrong tab would be worse than marking none: the file is looked for
-        among the open tabs, then next to the file that imported it, then on disk
-        (where it is opened).  A name in angle brackets is not a file at all: the
-        text the window itself sent is `<buffer>` (the program — the showing
-        buffer's lines), `<query>` (one statement) or `<library>` (the
-        interpreter's own) — and only the first of them has lines in a tab.
-        """
-        name = position.file if position is not None else ""
-        if not name or name == "<buffer>":
-            # The program text the window itself sent: its lines are the buffer's.
-            return self.current_buffer()
-        if name.startswith("<"):
-            # `<query>` — the one statement of a `query` request (the query line
-            # or a margin marker); `<library>` — the interpreter's own library.
-            # Neither has a line in any tab: marking the current one would say
-            # the program broke where it did not.
-            return None
-        # An unnamed buffer is named by its tab title («Без имени 2»): the text is
-        # the window's own, and its lines are that buffer's lines.
-        for buffer in self._buffers:
-            if buffer.model.path is None and buffer.title() == name:
-                return buffer
-        wanted = pathlib.Path(name)
-        candidates = [wanted]
-        current = self.current_buffer()
-        if not wanted.is_absolute() and current is not None and current.model.path:
-            # A relative name is relative to the file the import was written in.
-            candidates.append(pathlib.Path(current.model.path).parent / wanted)
-        for candidate in candidates:
-            found = self._buffer_for_path(str(candidate))
-            if found is not None:
-                return found
-        for candidate in candidates:
-            if candidate.is_file() and self.open_path(str(candidate)):
-                return self._buffer_for_path(str(pathlib.Path(candidate)))
-        return None
+        """The tab a diagnostic points at, opening it when it is a file of ours."""
+        return marks.buffer_of(
+            position,
+            self._buffers,
+            current=self.current_buffer,
+            lookup=self._buffer_for_path,
+            open_path=self.open_path,
+        )
 
     def _mark_error_line(self, position) -> None:
         """Marks the line a diagnostic names and puts the caret on it."""
@@ -4426,36 +4255,20 @@ class MainWindow(QMainWindow):
             # rather than marking a line in a tab that has nothing to do with it.
             self._status.setText(f"ошибка в {position.where()} — файл не открыт")
             return
-        line = position.line
-        for other in self._buffers:
-            for view in other.views():
-                view.mark_error_line(line if other is buffer else None)
-        for view in buffer.views():
-            # The mark is clamped to a line that exists (`непарные скобки` is
-            # reported where the input ran out), and the caret follows that one.
-            view.show_line(view.error_line() or line)
+        marks.mark_error(self._buffers, buffer, position.line)
         self._status.setText(f"ошибка: {position.where()}")
 
     def _mark_trace_line(self, position) -> None:
-        """Marks the line a step stands on — in the tab that line belongs to.
-
-        The caret follows only when that tab is the one showing: a stepped run
-        through an imported file must not pull the user out of the program they
-        are watching, and the mark is there when they switch to it.
-        """
+        """Marks the line a step stands on — in the tab that line belongs to."""
         buffer = self._diagnostic_buffer(position) if position is not None else None
-        for other in self._buffers:
-            for view in other.views():
-                if other is not buffer:
-                    view.mark_trace_line(None)
-        if buffer is None:
-            return
-        for view in buffer.views():
-            view.mark_trace_line(position.line)
-        if buffer is self.current_buffer():
-            for view in buffer.views():
-                view.show_line(view.trace_line() or position.line)
+        marks.mark_trace(
+            self._buffers,
+            buffer,
+            position.line if buffer is not None else None,
+            follow=buffer is not None and buffer is self.current_buffer(),
+        )
 
+    # -- the end of a run --------------------------------------------------
     def _on_ended(self, exit_code: int) -> None:
         # A process that died while a `format` request was in flight will not
         # answer it: the buffer keeps its text and the state is dropped.
@@ -4470,8 +4283,8 @@ class MainWindow(QMainWindow):
         # stays «остановлено» and the status bar keeps the last real code.
         if self._stopping:
             self._stopping = False
-            self._flush_output()
-            self._flush_pane_tails()
+            self._feed.flush()
+            self._feed.flush_tails()
             self._sync_run_actions()
             self._update_details()
             return
@@ -4482,77 +4295,25 @@ class MainWindow(QMainWindow):
         self._step_stack.clear()
         # The last half-line: a program that stopped in the middle of `ВЫВОД` left
         # it in a pane's buffer, and nothing else will complete it.
-        self._flush_output()
-        self._flush_pane_tails()
+        self._feed.flush()
+        self._feed.flush_tails()
         self._status.setText(f"интерпретатор завершился, код {exit_code}")
         self._sync_run_actions()
         self._update_details()
 
+    # -- the output queue --------------------------------------------------
     def _append_output(self, text: str, kind: str = panels.OUTPUT) -> None:
-        """Queues text for the output pane, which colours it by kind.
+        """Queues text for the output pane — the one funnel of what a run prints.
 
-        The pane holds whatever follows the last newline, so a program that prints
-        with `ВЫВОД` and no `ПС` keeps its half-line until the rest arrives — or
-        until the run ends and `flush()` writes it.  What is queued goes in on the
-        next turn of the event loop (`_flush_output`), and everything that *reads*
-        the pane flushes first, so no caller can see the delay — only the cost per
-        line, which is what a trace of a deep recursion cannot afford (task_49).
-
-        This is also the one funnel the answer of a single goal passes through, so
-        it is where the table collects it (task_59): only `OUTPUT` counts — the
-        window's notes, the diagnostics and the echo of an answer are other kinds.
+        The queue itself (one batch per turn, joined by kind) is `outputfeed`.  What
+        stays here is the one reader of this funnel: the answer of a single goal
+        passes through it, so this is where the table collects it (task_59) — only
+        `OUTPUT` counts, because the window's notes, the diagnostics and the echo of
+        an answer are other kinds.
         """
         if self._answer_text is not None and kind == panels.OUTPUT:
             self._answer_text.append(text)
-        self._output_pending.append((kind, text))
-        if not self._output_timer.isActive():
-            self._output_timer.start()
-
-    def _flush_output(self) -> None:
-        """Hands the queued output to the pane: one call per run of one kind.
-
-        A batch, not a throttle: everything that arrived in the turn goes in, and
-        the next turn gets its own — nothing is dropped and nothing waits for a
-        clock.  A timer that *sampled* the output would lose lines, and a lost line
-        in a log is worse than a slow one.
-        """
-        self._output_timer.stop()
-        pending = self._output_pending
-        if not pending:
-            return
-        self._output_pending = []
-        kind, text = pending[0]
-        for next_kind, more in pending[1:]:
-            if next_kind == kind:
-                text += more
-                continue
-            self._feed_pane(kind, text)
-            kind, text = next_kind, more
-        self._feed_pane(kind, text)
-        self._refresh_panel_tabs()
-
-    def _feed_pane(self, kind: str, text: str) -> None:
-        """One run of one kind, into the pane its kind belongs to (task_50)."""
-        tab = panels.KIND_TAB.get(kind, panels.TAB_OUTPUT)
-        if tab == panels.TAB_PROBLEMS:
-            # Diagnostics come from `_on_failed` with their fields; text of these
-            # two kinds is the window feeding itself, and it gets a row with no
-            # place to go to.
-            self._problems.add_text(text, kind)
-        elif tab == panels.TAB_SYSTEM:
-            self._system.feed(text, kind)
-        else:
-            self._output.feed(text, kind)
-
-    def _flush_pane_tails(self) -> None:
-        """Ends the open half-line in every *text* pane; nothing else will finish it.
-
-        «Проблемы» is a table now: it holds whole rows, so there is no half-line to
-        complete.
-        """
-        for pane in (self._output, self._system):
-            pane.flush()
-        self._refresh_panel_tabs()
+        self._feed.append(kind, text)
 
     def _reset_panels(self) -> None:
         """Empties the read-only panes and the table; the input queue is user data.
@@ -4563,11 +4324,6 @@ class MainWindow(QMainWindow):
         body, two names: the button, and the start of a run.
         """
         self.clear_output()
-
-    def _discard_output(self) -> None:
-        """Drops what is queued: the panes are about to be emptied or reused."""
-        self._output_timer.stop()
-        self._output_pending.clear()
 
     def _append_note(self, text: str) -> None:
         """Appends a note of our own, coloured apart from the program's output.

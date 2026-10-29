@@ -1,14 +1,12 @@
 """What to offer while typing: the reserved names and the document's own names.
 
-Qt-free on purpose.  The two things worth testing are the ranking and *where*
-completion must stay quiet (a comment, a string, a `#…#` block), and both are
-pure functions of the text.  The popup itself is `editor.py`'s business.
+Qt-free on purpose: the ranking and *where* completion stays quiet (a comment, a
+string, a `#…#` block) are pure functions of the text, and the popup is
+`editor.py`'s business.
 
-The document is the better half of the value: in Prolog the name of the next
-predicate is almost always a name already written a few lines above, and no
-keyword table can know it.  The scan is a plain line-by-line pass over the
-tokenizer's output — deliberately not a parse, because the file is mid-edit and
-may not parse at all.
+The document is the better half of the value — the next predicate is almost always
+a name already written a few lines above.  The scan is a line-by-line pass over the
+tokenizer's output, deliberately not a parse: the file is mid-edit.
 """
 
 from __future__ import annotations
@@ -65,12 +63,10 @@ def _statement(template: str) -> Statement:
     return Statement(template.replace("|", ""), template.index("|"))
 
 
-#: The names a program writes as a statement of its own — the directives `ИМПОРТ`
-#: (task_105) and `ХОЛСТ` (task_106).
-#:
-#: The caret ends up where the next keystroke belongs: inside `ИМПОРТ`'s quotes,
-#: from where the string completes to a file (task_104), and before `ХОЛСТ`'s
-#: comma.
+#: The directives a program writes as a statement of its own — `ИМПОРТ` (task_105)
+#: and `ХОЛСТ` (task_106).  The caret lands where the next keystroke belongs: inside
+#: `ИМПОРТ`'s quotes (the string completes to a file, task_104) and before
+#: `ХОЛСТ`'s comma.
 STATEMENT_TEMPLATES = {
     "ИМПОРТ": _statement(':- ИМПОРТ("|").'),
     "import": _statement(':- import("|").'),
@@ -395,12 +391,10 @@ class CompletionModel:
     def _sort_key(self, candidate: Candidate, prefix: str, folded: str):
         name = self._fold(candidate.match_text)
         return (
-            # Same case as typed, then a match at all (a case-insensitive model
-            # can offer more than the prefix matches literally), then the same
-            # alphabet as the prefix — a Cyrillic prefix should not put Latin
-            # names first — then reserved names, the document's own and the
-            # imported ones, then predicates before atoms, and finally the
-            # alphabet so the order stays stable between keystrokes.
+            # Same case as typed, then a match at all, then the same alphabet as the
+            # prefix (a Cyrillic prefix should not put Latin names first), then
+            # reserved before the document's own before imported, predicates before
+            # atoms, and the alphabet last for a stable order between keystrokes.
             not candidate.match_text.startswith(prefix),
             not name.startswith(folded),
             tokens.alphabet_of(prefix) != tokens.alphabet_of(candidate.match_text),

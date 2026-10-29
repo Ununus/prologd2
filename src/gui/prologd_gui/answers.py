@@ -19,19 +19,14 @@ and a *repeat* of a name is exactly where the next solution begins.
     >>> parse("цена 40\\nX=15\\n").ignored
     ('цена 40',)
 
-Qt-free on purpose: this is a rule about text, and a rule about text is worth
-testing without a display (the pane and the window only carry the result).
+Qt-free: it is a rule about text, and a rule about text is worth testing without a
+display.
 
-What it deliberately does not do:
-
-* it does not parse values — a value is the rest of the line, exactly as the
-  interpreter printed it (`абвг`, `-а`, `Ёё[1,2]_1`, `_1`);
-* it does not guess: a line of any other shape is *ignored*, which is what a
-  program's own output inside an answer looks like.  The price is that a program
-  printing a line whose shape is exactly `Имя=значение` counts as a solution —
-  the text in «Выводе» stays the exact record either way;
-* it knows nothing about the goal that was asked: the window gives it one
-  query's answer and nothing else, which is what makes the table exact.
+What it deliberately does not do: parse values (a value is the rest of the line as
+the interpreter printed it), guess (a line of another shape is *ignored* — the price
+is that a program's own `Имя=значение` line counts as a solution, while «Вывод»
+keeps the exact record), or look at the goal (the window gives it one query's answer
+and nothing else).
 """
 
 from __future__ import annotations

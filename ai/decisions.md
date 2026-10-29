@@ -2026,3 +2026,75 @@ changes; `--no-warnings` silences it as it does the others.  The check runs afte
 messages — «встречается один раз» and «выглядят одинаково» — which is the truth: one
 of the two spellings is a typo *and* the mistyped name is used once.  The test corpus
 (`examples/`, `stdlib/`) had no such pair, so no lesson text changed.
+
+## ADR-061: the GUI is sliced by what a rule needs, not by what the window owns
+
+**Context.**  `window.py` reached 4596 lines and 256 methods on one class: the
+controller that stitches `panels`, `editor`, `session`, `settings`, `search` and the
+rest together.  It grows with every feature (98 commits touched it), and its own
+section headings had stopped matching their contents — 678 lines under «the graphics
+window» also held the formatter, `F12`, the tab menus and the questions of the margin.
+
+The obvious move — split `MainWindow` into `RunController`, `FindController`,
+`FileController` — is the wrong one here.  The 29 GUI scripts reach into the window
+some 400 times (`_actions` alone 183, `_settings` 78, `_table` and `_input_console` 43
+each), because those are the *surface* of the window, not its internals.  A split into
+objects with their own state would either break that surface or duplicate it.
+
+**Decision.**  Slice by rule, not by owner.  A piece moves out when its logic can be
+stated without the window: the helper takes the few callables and widgets it needs as
+arguments and knows nothing about `MainWindow`.
+
+* `marks.py` — which tab a position names, and that one line is marked at a time.  It
+  receives `_buffer_for_path` and `open_path` as callables, so the rules are exercised
+  without a window.
+* `outputfeed.py` — `OutputFeed`: the queue of what a run printed, the zero-timer, the
+  join by kind, the three panes and the `refresh` callback.
+
+The window keeps thin methods with the same names (`_append_output`,
+`_mark_error_line`, …) because they are the surface: `_append_output` still is where
+the answer table collects its text, and `_mark_error_line` still writes the status
+line.  Nothing that a script touches changes its name.
+
+**Consequences.**  The file did not shrink much (4596 → 4504), and that is the point:
+the win is that two pieces of logic now have a contract and a home of their own, not
+that a number went down.  The next slices, in the order they are worth doing: the find
+bar (~300 lines), the answer table's run (~160), and the picture bridge (~250, the most
+entangled).  Cutting the controller into mixins is ruled out — the coupling would stay
+and only its address would change.
+
+## ADR-062: a comment is a trap, and the story lives in the journal
+
+**Context.**  The GUI carried 5432 lines of comments and docstrings — 32% of
+`src/gui/prologd_gui` — and the owner asked whether they should be trimmed.  The
+density was not an accident of one file: `window.py` 34.7%, `session.py` 36.6%,
+`actions.py` 36.3%.  What it mostly held was good: the traps (`isHidden` vs
+`isVisible`, `blockSignals` in `_set_checked`, `abspath` vs `resolve`, the X11
+scan-code offset).  What it also held was *history* — 154 `task_NN` and 20 `part NNN`
+pointers wrapped in paragraphs retelling what broke and when — which `ai/status.md`
+already records in full.
+
+**Decision.**  A comment or docstring states what the code does and **why not the
+obvious alternative**, in as few lines as that takes.  The rule of thumb applied
+across the GUI:
+
+* **kept** — a trap a future editor would otherwise walk into; an ordering that must
+  not be rearranged; a platform quirk; a pointer (`task_58`, `part 226`) where the
+  reasoning is longer than the code;
+* **cut** — the retelling of the defect that produced the line, the "we used to…, and
+  then task_NN…" narrative, a paragraph that repeats what the docstring above it says,
+  and a comment that restates the statement it stands over;
+* **moved** — nothing: the story is already in the journal, and a code reader who
+  wants it follows the pointer.
+
+Long docstrings on a *public* entry point keep their contract (parameters, flags,
+what is returned); the essays inside them go.
+
+**Consequences.**  363 lines of notes left 19 files (notes 5432 → 5069, 32% → 30.6%),
+and the biggest essays lost two thirds of their length: `run_program` 24 → 12,
+`_import_directories` 20 → 8, `session.py`'s flood comment 16 → 5.  Only comments and
+docstrings changed — an AST comparison with docstrings stripped is byte-identical for
+every file — and all 29 GUI scripts with both CTest suites stayed green.  The
+module *introductions* of the remaining small modules (12–24 lines, one to a file)
+were left alone: they say what the module is for, which is the one thing a reader
+cannot get from its code.

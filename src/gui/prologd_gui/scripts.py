@@ -1,15 +1,13 @@
 """The external tools the window runs.
 
-One so far: `tools/image_to_pld.py`, which turns a picture into `картинка/6` facts and,
-without `--out`, into a whole little program that draws them.  The window's
-«Скрипты → Сконвертировать картинку…» fills in its arguments, runs it
-in the *same* interpreter the window runs under (the tool imports PySide6 for the
-image itself, so it is the venv's Python, not `python` from `PATH`), and puts the
+One so far: `tools/image_to_pld.py`, which turns a picture into `картинка/6` facts —
+and without `--out` into a whole little program.  «Скрипты → Сконвертировать
+картинку…» fills in its arguments, runs it under the *same* interpreter (the tool
+imports PySide6, so it is the venv's Python, not `python` from `PATH`), and puts the
 answer into an unnamed tab.
 
-A packaged build has no sources beside it, so `tool_path()` is what decides whether
-the entry can work at all: the caller asks first and says so, instead of running
-something that is not there (see `doc/gui.typ`).
+A packaged build has no sources beside it, so `tool_path()` decides whether the entry
+can work at all: the caller asks first and says so.
 """
 
 from __future__ import annotations
@@ -64,17 +62,13 @@ def image_arguments(
 ) -> list[str]:
     """The command line the dialog's fields become.
 
-    `cell` is how many pixels of the picture one cell holds; the grid follows from it
-    and from the picture's own size, so there is no «сетка» key any more.  `canvas_cell`
-    is the same cell on the canvas, in dots, and `auto` lets the tool size the drawing
-    to the canvas the engine starts with.
+    `cell` is how many pixels of the picture one cell holds — the grid follows from it
+    and the picture's own size, so there is no «сетка» key.  `canvas_cell` is the same
+    cell on the canvas, and `auto` sizes the drawing to the engine's canvas.
 
-    `drop_background` is the checkbox: the tool leaves the page out of the drawing by
-    default, and `--keep-background` is the key that says not to, so an unticked box
-    adds it and a ticked one says nothing.
-
-    `background` is `auto` or an `R,G,B` triple, exactly as the tool's own key takes
-    it — the window does not invent a second spelling.
+    `drop_background` is the checkbox (the tool leaves the page out by default, and
+    `--keep-background` says not to); `background` is `auto` or an `R,G,B` triple, the
+    tool's own spelling — the window does not invent a second one.
     """
     arguments = [
         "--image", f"{name}={image}",
@@ -102,16 +96,14 @@ def run(
 ) -> str:
     """Runs the converter and returns the text it printed.
 
-    Without `--out` the tool prints a program — canvas, facts, the predicate that draws
-    them and a question — and sends its summary lines to stderr, so the answer is the
-    text to put into a tab.  A failure is a `ScriptError` carrying the tool's own words:
-    the window shows them rather than a traceback.
+    Without `--out` the tool prints a program and sends its summary to stderr, so the
+    answer is the text to put into a tab; a failure is a `ScriptError` carrying the
+    tool's own words, not a traceback.
 
-    The child's stdout is a pipe, and a Windows process without a console prints a
-    pipe with the *system ANSI code page* (cp1252 on this machine) — the facts are
-    Cyrillic and the tool died on `print`.  So the environment says UTF-8 outright;
-    the tool does the same for itself, and the two together mean neither side has to
-    trust the other's process (the window sets no `PYTHONUTF8` of its own).
+    The child's stdout is a pipe, and a Windows process without a console writes a pipe
+    in the *system ANSI code page* — the facts are Cyrillic and the tool died on
+    `print`.  So the environment says UTF-8 outright, and the tool does the same for
+    itself.
     """
     executable = pathlib.Path(tool if tool is not None else tool_path())
     if not executable.is_file():

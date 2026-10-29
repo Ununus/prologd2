@@ -719,16 +719,11 @@ class CodeEditor(ZoomablePlainTextEdit):
         """`Shift+Del`: the whole line under the caret, or every line the selection
         touches.
 
-        The *whole* line goes, not its tail — that is what the command says — and
-        the caret lands in the first column of the line that slid up, so a run of
-        `Shift+Del` walks down the text.  A selection that stops at a line's first
-        column does not take that line with it: a drag from the middle of one line
-        to the start of the next means «these lines», not «and one more».
-
-        A document cannot lose its last block, so the last line of a file is
-        emptied rather than removed: what is left is an empty line, as in every
-        editor with this key.  One edit block, like `comment`, so one `Ctrl+Z`
-        brings the text back at once.
+        The *whole* line goes, not its tail, and the caret lands in the first column
+        of the line that slid up, so a run of `Shift+Del` walks down the text.  A
+        selection that stops at a line's first column does not take that line.  The
+        last line of a file is emptied rather than removed, and the whole thing is one
+        edit block: one `Ctrl+Z` brings the text back.
         """
         document = self.document()
         selection = self.textCursor()
@@ -836,12 +831,10 @@ class CodeEditor(ZoomablePlainTextEdit):
         # handled in `keyPressEvent`, and `activated` is deliberately left
         # unconnected: Qt emits it for a key press too, which would insert twice.
         completer.popup().clicked.connect(self._accept_index)
-        # The description of the highlighted row: Qt's completer has no second
-        # row of its own, so this is a label of its own under the popup —
-        # frameless and `Qt.ToolTip`, so it takes no focus and the popup's own
-        # geometry never changes (the trap of task_24).  It listens to the
-        # popup's *current row*, not to `QCompleter.highlighted`, which is not
-        # emitted for every way a row becomes current.
+        # The description of the highlighted row: Qt's completer has no second row of
+        # its own, so this is a frameless `Qt.ToolTip` label under the popup — no
+        # focus, and the popup's geometry never changes (the trap of task_24).  It
+        # listens to the popup's *current row*, which `highlighted` does not report.
         completer.highlighted.connect(self._update_detail)
         selection = completer.popup().selectionModel()
         if selection is not None:
@@ -954,18 +947,11 @@ class CodeEditor(ZoomablePlainTextEdit):
     def _update_detail(self, label: str = "") -> None:
         """The description of the highlighted candidate: title, then the modes.
 
-        `label` is what `QCompleter.highlighted` carries — the text of the row;
-        without it (the popup was just shown, or hidden) the highlighted index
-        answers.  No record for the name means no label: saying nothing is better
-        than a label that says «нет описания» for every name of the document.
-        The label is word-wrapped to a width of its own, so a long summary and
-        the argument modes read as several lines, not as one line off the screen.
-
-        A name an imported file brings in has no record either, but it does have a
-        file (task_102): that line is the whole label, unless the name is also a
-        built-in, where the record comes after it.  A name of the document or of a
-        library says what its first clause says above itself — the comment is read
-        with the name (task_103).
+        `label` is what `QCompleter.highlighted` carries; without it the highlighted
+        index answers, and no record means no label — silence beats «нет описания»
+        under every name of the document.  A name an imported file brings in has no
+        record but has a file (task_102); a name of the document says what its first
+        clause says above itself (task_103).
         """
         if self._completer is None or self._detail is None:
             return
@@ -1141,10 +1127,8 @@ class CodeEditor(ZoomablePlainTextEdit):
         if key == Qt.Key.Key_Delete and modifiers == Qt.KeyboardModifier.ShiftModifier:
             # `Shift+Del` never reaches the action's shortcut while the editor has
             # focus: `QTextControl` claims the platform's «cut» sequence (Windows
-            # spells `Ctrl+X` as `Shift+Del`), so the key arrives *here* — and with
-            # nothing selected it did nothing at all, while the same command from the
-            # menu worked (task_58's follow-up).  One command, two doors: this and
-            # the `delete_line` action both run `delete_lines`.
+            # spells `Ctrl+X` as `Shift+Del`) and the key arrives *here* (task_58).
+            # One command, two doors: this and the `delete_line` action.
             self.delete_lines()
             event.accept()
             return
@@ -1188,10 +1172,8 @@ class CodeEditor(ZoomablePlainTextEdit):
         ):
             # One newline, whatever `Shift` says.  Left to Qt, `Shift+Enter` inserts a
             # *line separator* (`U+2028`): the widget draws a new line without counting
-            # it, so the line numbers and the question markers of the margin stand on
-            # the wrong lines (`tokens.LINE_SEPARATORS`, the report of 2026-10-03).
-            # Nothing here is bound to `Ctrl`/`Alt` plus `Enter`, so those still reach
-            # Qt as they always did.
+            # it, so the numbers and the margin markers stand on wrong lines
+            # (`tokens.LINE_SEPARATORS`).
             if self._auto_indent and not self.textCursor().hasSelection():
                 self._insert_newline_with_indent()
             else:
@@ -1234,15 +1216,12 @@ class CodeEditor(ZoomablePlainTextEdit):
     def _insert_shortcut(self, event: QKeyEvent) -> bool:
         """`Ctrl`+physical key inserts punctuation (task_31), or nothing.
 
-        Matched on `nativeScanCode()`, never on `event.text()`: the character a
-        layout produces is exactly what differs between layouts.  That code is
-        the *platform's* numbering, so it goes through
-        `shortcuts.to_windows_scan_code` first — the table is written in Windows
-        scan codes, and on X11 `Ctrl+X` would otherwise match the code of `/`.
-        Only `Ctrl` (plus the `Shift` a chord asks for) is accepted — `Alt` alone
-        reaches the menu bar and `Ctrl+Alt` is `AltGr` on many layouts, so neither
-        may be swallowed here.  One `beginEditBlock` makes the insert one undo
-        step, exactly like typing the text by hand.
+        Matched on `nativeScanCode()`, never on `event.text()`: the character is
+        exactly what differs between layouts, and the code goes through
+        `shortcuts.to_windows_scan_code` first — the table is written in Windows scan
+        codes, and on X11 `Ctrl+X` would otherwise match `/`.  Only `Ctrl` (plus the
+        chord's `Shift`) is accepted: `Alt` reaches the menu bar and `Ctrl+Alt` is
+        `AltGr` on many layouts.  One `beginEditBlock`, so it is one undo step.
         """
         if self._shortcuts is None:
             return False

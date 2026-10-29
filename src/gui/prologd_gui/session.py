@@ -16,22 +16,11 @@ from PySide6.QtCore import QObject, QProcess, QTimer, Signal
 from . import graphics, protocol
 from .keywords import Keywords
 
-#: How many events one turn of the event loop is allowed to dispatch (task_65).
-#:
-#: The interpreter is a separate process, but its events are handled in the
-#: window's own thread, and they used to be handed over in one go, inside
-#: `_on_stdout`: a program that writes faster than the window can draw — a lesson
-#: printing in a loop, a picture of hundreds of thousands of primitives — kept the
-#: loop busy for the whole flood, so a click on «Остановить» and the «Предел
-#: времени» timer waited behind it and could not end the run.  The work is the
-#: same; it is handed out in slices, so that between two slices the window can be
-#: clicked, redrawn and stopped.
-#: How many bytes of the child's stream one turn may decode, and how many events
-#: it may dispatch (task_65).  Both are needed: decoding the whole read in one
-#: call froze the loop before the slices ever got to slice, and dispatching a
-#: whole flood in one call froze it after.  Together they keep a turn short, so
-#: «Остановить», painting and the «Предел времени» timer are all served while a
-#: program keeps writing.
+#: How many bytes of the child's stream one turn may decode, and how many events it
+#: may dispatch (task_65).  Both are needed: decoding a whole read in one call froze
+#: the loop before the slices could slice, and dispatching a whole flood in one call
+#: froze it after.  A turn stays short, so «Остановить», painting and the «Предел
+#: времени» timer are served while a program keeps writing.
 DECODE_BYTES_PER_TURN = 64 * 1024
 EVENTS_PER_TURN = 250
 
@@ -250,11 +239,9 @@ class PrologSession(QObject):
         self._events.clear()
         self._raw.clear()
         # The process that just went may have finished while it was being killed,
-        # with its `ended` still deferred (task_65).  Deliver it now: `ended` is
-        # what clears the window's `_stopping`, and without it the next run would
-        # swallow every line the new interpreter prints (found by using the
-        # window, task_66).  The window's stop-suppression keys on `_stopping` and
-        # ignores the code, so the value does not matter.
+        # with its `ended` still deferred (task_65).  Deliver it now: `ended` clears
+        # the window's `_stopping`, and without it the next run would swallow every
+        # line the new interpreter prints (task_66).
         pending = self._finished_code
         self._finished_code = None
         if pending is not None:

@@ -508,7 +508,10 @@ are shown in the pane and the caret is left alone.
 Marking line 1 of the program for a failed query is exactly what that rule fixed:
 the error is in the statement, not in the first line of the program.  A line past
 the end of the file (where `непарные скобки` is reported) is clamped to the last
-line that exists, and the first edit clears the mark.
+line that exists, and the first edit clears the mark.  The rules themselves — which
+tab a position names, and that one line is marked at a time — live in `marks.py`,
+which takes the window's own `_buffer_for_path` and `open_path` and nothing else, so
+they can be exercised without a window.
 
 ## The graphics window
 
@@ -664,8 +667,9 @@ Two measurements decided this part, and both are pinned by checks:
   `feed` per event costs some 30 µs of Python on top of the insertion, and the
   trace of a deep recursion is hundreds of thousands of events: 16 002 trace
   lines took 2.2 s that way and 0.6 s in one batch.  `_append_output` queues
-  `(kind, text)`, a zero-timer flushes, and `_flush_output` joins the neighbours
-  of one kind — which is the whole trace — into a single call.
+  `(kind, text)` in `outputfeed.OutputFeed`, a zero-timer flushes, and its
+  `flush` joins the neighbours of one kind — which is the whole trace — into a
+  single call.
   It is a batch, not a throttle: nothing is dropped and nothing waits for a
   clock, because a lost line in a log is worse than a slow one.  Everything that
   *reads* the pane (`output_text`, «Сохранить вывод…», the end of a run) flushes

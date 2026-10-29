@@ -1,20 +1,14 @@
 """Persisted preferences, and the description the dialog is built from.
 
-`Settings` is the store: typed properties for what the window reads, one key at
- a time, in an ini file (`%LOCALAPPDATA%\\PrologD\\gui\\ini`, or `--settings
-FILE`).  `SETTINGS` is the *list* of what the user may change: label, section,
-kind, default and bounds — the dialog builds a row from each record and
-«Сбросить» writes those defaults back, so a value cannot be editable without
-being stored, or stored without being documented.
+`Settings` is the store: typed properties over an ini file
+(`%LOCALAPPDATA%\\PrologD\\gui\\ini`, or `--settings FILE`).  `SETTINGS` is the list
+of what the user may change — label, section, kind, default, bounds — and the dialog
+builds a row from each record, so nothing is editable without being stored.
 
-Three promises hold for a hand-edited or foreign file:
-
-* a value that cannot be read (a string where a number used to be) falls back to
-  the default instead of taking the window down with it;
-* a number outside its bounds is clamped, never rejected;
-* a key this version does not know is **preserved** — an ini written by a newer
-  build must survive a round through this one, which is why values are written
-  one key at a time rather than by replacing the file.
+Three promises hold for a hand-edited file: a value that cannot be read falls back to
+the default, a number outside its bounds is clamped, and a key this version does not
+know is **preserved** — values are written one key at a time, never by replacing the
+file.
 """
 
 from __future__ import annotations
@@ -125,12 +119,10 @@ RUN_QUESTIONS = "execution/run_questions"
 #: `printQuestions` flag of `load` (protocol 11, task_46: the old `questions` was
 #: split into *run* and *print*).
 PRINT_QUESTIONS = "execution/print_questions"
-#: Whether the answer of a *single* goal is shown as a table in the «Таблица» tab
-#: as well (task_59): columns are the goal's variables, rows are the solutions.
-#: The text in «Выводе» does not change — the table is an addition, and it is
-#: built for a margin marker or a goal typed into the query line, never for a
-#: whole run: the answers of several questions cannot be told apart in the text
-#: (`answers.py`).
+#: Whether the answer of a *single* goal is also shown as a table in «Таблица»
+#: (task_59): columns are the goal's variables, rows the solutions.  The text in
+#: «Вывод» does not change — the table is an addition for a margin marker or a typed
+#: goal, never for a whole run (`answers.py`).
 ANSWER_TABLE = "execution/answer_table"
 #: The guards of a run (task_46), sent with every `load` (protocol 9).  `0` means
 #: «без предела» for all of them.  The engine has no limits of its own and its
@@ -151,19 +143,15 @@ TIMEOUT_MILLISECONDS = "execution/timeout_milliseconds"
 #: printed — and the answer to a flood is the same escalation: the request, then
 #: the process.
 MAX_OUTPUT_EVENTS = "execution/max_output_events"
-#: The row of task_46 that named a `prologd` by hand — «Выполнение →
-#: Интерпретатор».  Removed from the dialog in task_79: a *particular build* is
-#: `--exe` now.  The old value is still **read**, because a file that names another
-#: build has to keep naming it — it is the folder the interpreter is looked for in
-#: — and `--exe` is a newer answer than the row.  Not a row any more, so it lives in
-#: `MACHINE_KEYS`.
+#: task_46's «Выполнение → Интерпретатор» row, removed from the dialog in task_79
+#: (a *particular build* is `--exe` now).  The old value is still **read** — it is
+#: the folder the interpreter is looked for in — and `--exe` is the newer answer.
 LEGACY_INTERPRETER = "execution/interpreter"
 #: Where the *process* starts (task_46): `ЗАПИСЬ_В`, `ЧТЕНИЕ_ИЗ` and the other
-#: relative paths open from this folder.  Three answers: the running file's
-#: folder, the window's own folder, or a fixed one (`PROCESS_DIRECTORY_PATH`).
-#: Not the `-I` search folders of «Дополнительные каталоги ИМПОРТ» — those are
-#: *search* directories for the import; this one is the working directory of the
-#: child process.
+#: relative paths open from this folder — the running file's folder, the window's
+#: own, or a fixed one (`PROCESS_DIRECTORY_PATH`).  Not the `-I` search folders of
+#: «Дополнительные каталоги ИМПОРТ»: those are for `ИМПОРТ`, this is the working
+#: directory of the child.
 PROCESS_DIRECTORY = "execution/process_directory"
 PROCESS_DIRECTORY_PATH = "execution/process_directory_path"
 
@@ -202,12 +190,10 @@ DEFAULT_AUTO_COMPLETE_AFTER = 2
 MINIMUM_AUTO_COMPLETE_AFTER = 1
 MAXIMUM_AUTO_COMPLETE_AFTER = 10
 
-#: The formatter (task_30): the three shapes the mode control offers — «в одну
-#: строку», «мягкое» (цели собираются до ширины) и «жёсткое» (голова одна, по цели
-#: на строку).  «Не менять» ушёл: ненажатая команда и есть «не менять», а из
-#: жёсткого обратно в мягкое теперь можно — мягкое строит строки заново.  Меню
-#: этого значения стояло в «Правке» с task_30 и вернулось на панель инструментов
-#: в task_47, кнопкой сразу после «Форматировать».
+#: The formatter (task_30): «в одну строку», «мягкое» (цели собираются до ширины)
+#: и «жёсткое» (голова одна, по цели на строку).  «Не менять» ушёл: ненажатая
+#: команда и есть «не менять».  Меню этого значения стоит на панели инструментов
+#: сразу после «Форматировать» (task_47).
 DEFAULT_FORMAT_MODE = "soft"
 FORMAT_MODES = ("line", "soft", "hard")
 DEFAULT_FORMAT_WIDTH = 80
@@ -235,12 +221,10 @@ MAXIMUM_AUTOSAVE_MINUTES = 120
 DEFAULT_RECENT_LIMIT = 10
 MAXIMUM_RECENT_LIMIT = 50
 
-#: task_46's limits.  The engine's own defaults are «без предела», and the window
-#: ships numbers a lesson program cannot notice but a runaway cannot outlive: no
-#: step cap, a million frames of recursion, a million solutions per НАЙТИВСЕ and
-#: no clock.  Depth is the one that matters by default — without a cap a runaway
-#: recursion is stopped by nothing at all, while a million frames is deep enough
-#: that no honest program reaches it.
+#: task_46's limits.  The engine's defaults are «без предела»; the window ships no
+#: step cap, a million frames of recursion, a million solutions per НАЙТИВСЕ and no
+#: clock.  Depth is the one that matters by default: a cap of a million frames is
+#: deep enough for an honest program and stops a runaway recursion.
 DEFAULT_MAX_STEPS = 0
 MAXIMUM_MAX_STEPS = 1_000_000_000
 DEFAULT_MAX_DEPTH = 1_000_000
@@ -817,15 +801,11 @@ class Settings:
     def palette(self) -> theme.Palette:
         """The colours of everything: the theme name, resolved (task_29).
 
-        `system` means the desktop's own colours — the widget palette *and* the page
-        the syntax colours are measured against — so the answer comes from
-        `appearance`, the one module that knows Qt's colour scheme.  The import is
-        local: the store itself has nothing to do with widgets.
-
-        The syntax colours the user changed (task_50) are layered over the
-        resolved palette: the override is read for the palette that was actually
-        chosen, so a `system` desktop gets the dark override when the desktop is
-        dark.
+        `system` means the desktop's own colours, so the answer comes from
+        `appearance` — the one module that knows Qt's colour scheme (a local import:
+        the store has nothing to do with widgets).  The syntax colours the user
+        changed are layered over the resolved palette for *that* palette, so a dark
+        desktop gets the dark override.
         """
         from . import appearance
 

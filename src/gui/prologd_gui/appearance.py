@@ -1,21 +1,17 @@
 """Window appearance: making the editor readable whatever the system theme is.
 
-Qt 6 follows the Windows dark theme, and the syntax palette of `theme.py` was
-chosen against a **white** background — on a dark one those colours turn into
-mud, which is exactly what a user with a dark desktop saw.  So the default here is
-a forced light appearance.
+Qt 6 follows the Windows dark theme, and the syntax palette was chosen against a
+**white** background — on a dark one those colours turn into mud.  So the default
+here is a forced light appearance.
 
-A dark theme is not a switch over it: it needs its own syntax palette (bright
-colours) *and* its own chrome.  That is `theme.DARK`, and this module is the thin
-half that turns a palette into a `QPalette` — the colours themselves, and the
-contrast they have to keep, are data in `theme.py` and are checked by
-`test_appearance.py` for every palette there is.
+A dark theme is not a switch over it: it needs its own syntax palette *and* its own
+chrome.  That is `theme.DARK`, and this module is the thin half that turns a palette
+into a `QPalette`; the colours and the contrast they keep are data, checked by
+`test_appearance.py` for every palette.
 
-`system` follows the desktop completely: the platform's widget palette **and** the
-syntax palette that goes with its colour scheme (`theme_palette`), so a dark
-desktop gets a dark window *and* dark-page colours.  Without that it was half a
-theme — the widgets dark and the text light — which is why `dark` had to exist as
-a separate choice for a darkened desktop.
+`system` follows the desktop completely — the platform's widgets *and* the syntax
+palette of its colour scheme (`theme_palette`); without that it was half a theme
+(widgets dark, text light).
 """
 
 from __future__ import annotations

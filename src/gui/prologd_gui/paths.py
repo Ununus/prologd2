@@ -149,29 +149,16 @@ def resource(name: str) -> pathlib.Path:
 def settings_path() -> pathlib.Path | None:
     """Where a *frozen* build keeps `gui.ini`; `None` lets Qt use AppData.
 
-    task_61 made every packaged build keep its settings beside itself, which is what
-    makes the folder portable.  An **installed** build (task_116, Inno Setup) must
-    not: `%LOCALAPPDATA%\\Programs` is writable, so «can I write here?» cannot be the
-    question, and a per-user settings file belongs in AppData where Qt puts it.  The
-    folder a build runs from is the whole answer, in this order:
+    A packaged build keeps its settings beside itself — that is what makes the folder
+    portable — but an **installed** one must not (`%LOCALAPPDATA%\\Programs` is
+    writable, so «can I write here?» answers nothing), and neither must a macOS `.app`,
+    whose signature a write inside the bundle would break (task_119).
 
-    * a folder that already holds a `gui.ini` keeps it — a portable copy the user
-      has been running, whose settings must not move on an upgrade;
-    * a build under `%LOCALAPPDATA%\\Programs`, `%ProgramFiles%` or
-      `%ProgramFiles(x86)%` is an installed one, and answers AppData;
-    * anything else — a flash drive, a network folder, or the installed folder
-      copied somewhere else — is portable: beside itself.  That last case is what
-      makes «скопировал установленную папку на флешку — она повела себя как
-      переносимая» need no marker file and no switch.
-
-    A folder it cannot write to at all (a CD, a share opened read-only) falls back to
-    AppData as well: a `gui.ini` that fails at every close is worse than one away
-    from the folder.
-
-    A macOS `.app` is installed whatever its owner: writing beside the executable
-    would change the bundle's contents and break its signature (task_119), so it
-    answers AppData too — `~/Library/Application Support/PrologD/gui`, chosen by
-    `settings.default_path`.
+    In this order: a folder that already holds a `gui.ini` keeps it; a build under
+    `%LOCALAPPDATA%\\Programs`, `%ProgramFiles%` or `%ProgramFiles(x86)%` is installed
+    and answers AppData; anything else — a flash drive, a network folder, an installed
+    folder copied elsewhere — is portable.  A folder it cannot write to falls back to
+    AppData as well.
     """
     if not frozen():
         return None

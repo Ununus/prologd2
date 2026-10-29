@@ -1,29 +1,19 @@
 """«Настройки…»: every preference of `settings.SETTINGS` in one dialog.
 
-The dialog is **built from the description table** in `settings.py`: each record
-carries its label, section, kind, default and bounds, and this module turns a
-record into a row.  That is the whole reason the table exists — a new preference
-is a new `Setting`, and the dialog, its validation and «Сбросить» grow by
-themselves.  The reverse is checked too (`src/gui/tests/test_settingsdialog.py`):
-every row of the table has a widget, and every widget writes its key.
+The dialog is **built from the description table**: a record carries label, section,
+kind, default and bounds, and this module turns a record into a row — so a new
+preference is a new `Setting`, and the dialog, its validation and «Сбросить» grow by
+themselves.  `test_settingsdialog.py` checks the reverse: every row has a widget and
+every widget writes its key.
 
-What the buttons mean:
+**ОК**/**Применить** write through `Settings` and the window re-reads them at once;
+**Отмена** writes nothing, and an import that was not applied is dropped with it;
+**Сбросить** puts the defaults into the *widgets*, still waiting to be applied;
+**Импорт…** stages a file and shows it, while **Экспорт…** applies first, because
+what is exported has to be what the user is looking at.
 
-* **ОК** and **Применить** write the values through `Settings` — which validates
-  by the same description — and then the window re-reads them, so a change shows
-  at once (font, line numbers, the side of the output panel) rather than at the
-  next start;
-* **Отмена** closes without writing: an import that was not applied yet is
-  dropped with it;
-* **Сбросить** puts the defaults into the *widgets* — they still have to be
-  applied, so the reset can be looked at before it is kept;
-* **Импорт…** stages a file (`Settings.read_keys`) and shows it; **Экспорт…**
-  applies first and then writes the whole configuration, because what is
-  exported has to be what the user is looking at.
-
-Nothing here calls a modal box of its own (the file and folder choosers are
-small replaceable methods): a modal dialog hangs a headless test rather than
-failing it, and that trap has cost this project time twice.
+Nothing here opens a modal box of its own (the choosers are small replaceable
+methods): a modal in a headless run hangs the test instead of failing it.
 """
 
 from __future__ import annotations
@@ -110,18 +100,12 @@ class ColorButton(QPushButton):
 
 
 class PathListEditor(QWidget):
-    """A list of directories with «Добавить…» and «Убрать».
+    """A list of directories with «Добавить…» и «Убрать».
 
-    One folder per click: `QFileDialog` returns one at a time, and the list is
-    there to show what was collected, so a multi-selection dialog would buy
-    nothing.  A folder already in the list is not added twice — the same
-    directory twice would only make the engine search it twice.
-
-    A path is read from its *end*: the folder that was added is the last component,
-    and `C:\\Users\\…` is the same for every row.  So the list elides the
-    *beginning* (`…\\проект\\stdlib`) and keeps the whole path in the tooltip; Qt
-    elides while painting, which is why a wider dialog reveals more of the path
-    with no code of ours behind it.
+    One folder per click — `QFileDialog` returns one at a time — and a folder that is
+    already there is not added twice.  A path is read from its *end*, so the list
+    elides the *beginning* (`…\\проект\\stdlib`) and keeps the whole path in the
+    tooltip.
     """
 
     def __init__(self, ask, parent: QWidget | None = None) -> None:
@@ -217,12 +201,9 @@ def _same(value: object, other: object) -> bool:
 class SettingsDialog(QDialog):
     """The described settings, one page per section, built from the table."""
 
-    #: Emitted after the values were written — «Применить» and «ОК».
-    #: The window behind a modal dialog is blocked for input but still painted,
-    #: so this is what makes an applied change visible *there and then* (font,
-    #: line numbers, the side of the output panel) instead of after the dialog
-    #: closes.  The dialog itself knows nothing about editors: it says «written»
-    #: and whoever is interested re-reads the store.
+    #: Emitted after the values were written — «Применить» and «ОК»: the window behind
+    #: a modal is blocked for input but still painted, so this is what shows an applied
+    #: change at once.  The dialog knows nothing about editors.
     changesApplied = Signal()
 
 
@@ -237,11 +218,9 @@ class SettingsDialog(QDialog):
         self.resize(680, 460)
         self._settings = settings
         #: Where a *folder* chooser opens when its row says nothing (task_80): the
-        #: folder of the interpreter — `stdlib`, the examples and a course's own
-        #: files lie there, and «свой каталог процесса» is a folder beside the
-        #: interpreter in nine cases out of ten.  The window passes its own, because
-        #: a launch may be pinned to another build tree (`--exe`); a dialog built on
-        #: its own asks `paths`, the same search the window makes.
+        #: interpreter's folder — `stdlib` and the examples lie there, and «свой
+        #: каталог процесса» is a folder beside it in nine cases out of ten.  The
+        #: window passes its own, because a launch may be pinned with `--exe`.
         self._engine_directory = str(engine_directory or "") or str(
             pathlib.Path(paths.interpreter()).parent
         )
@@ -334,16 +313,11 @@ class SettingsDialog(QDialog):
     def _align_columns(self) -> None:
         """One label width for every page.
 
-        A `QFormLayout` sizes its first column to the longest label *on that
-        page*, so the fields started at a different x on every section and the
-        page shifted sideways when the user walked through them.  A fixed width —
-        the widest label of the whole dialog — puts every page on the same grid;
-        the labels are right-aligned, so what the eye compares (the colon column
-        and the left edge of the fields) is in the same place everywhere.
-
-        `QFormLayout` has no column width to set in PySide6 (`setColumnMinimumWidth`
-        belongs to the grid and box layouts), and a fixed label is what actually
-        makes the column the same width wherever it is used.
+        A `QFormLayout` sizes its first column to the longest label *on that page*, so
+        the fields started at a different x and the page shifted sideways between
+        sections.  A fixed width — the widest label of the dialog — puts every page on
+        the same grid; PySide6 has no column width to set, and a fixed label is what
+        makes the column the same wherever it is used.
         """
         self._label_column = max(
             (label.sizeHint().width() for label in self._labels), default=0
@@ -404,13 +378,11 @@ class SettingsDialog(QDialog):
                 combo.addItem(text, value)
             return combo
         if setting.kind == "dirs":
-            # A closure, not the bound method: the chooser is replaceable on the
-            # dialog (`_ask_directory`), and a bound method captured here would
-            # keep pointing at the real `QFileDialog` — which is modal, and a
-            # modal box in a headless run hangs the test instead of failing it.
-            # A `dirs` row has no field to read a start from, so it opens at the
-            # folder of the engine (`_directory_start`), where a course's examples
-            # and `stdlib` live (task_80).
+            # A closure, not the bound method: the chooser is replaceable
+            # (`_ask_directory`), and a captured bound method would keep the modal
+            # `QFileDialog`, which hangs a headless test instead of failing it.  A
+            # `dirs` row has no field to start from, so it opens at the engine's folder
+            # (task_80).
             return PathListEditor(
                 lambda: self._ask_directory(
                     self._directory_start(settings_module.IMPORT_PATHS),

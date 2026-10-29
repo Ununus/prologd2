@@ -11,26 +11,19 @@ questions, in comments:
     % ?длина(Х, 2) не завершится. ... - prose that only starts like one
     %! С=15                            - a recorded answer, not a question
 
-The margin draws a run marker next to the first kind and the parked questions,
-and none next to the prose.  The rule, in one sentence: the first non-blank
-characters of the line are `?` or `%` followed by blanks and `?`, the sentence
-ends at the first `.` outside `"..."`, `'...'` and `#...#` and outside every
-bracket, and every bare word inside it is a variable (upper case or `_`), a
-reserved name, or a name the document itself uses.  A `'` opens `'атом'` only
-where a token may start: after a name it is the old dialect's suffix (`Ф'`,
-`Сумма'`), exactly as `tokens.scan_line` reads it — one apostrophe must not
-swallow the sentence's own `.` (part 149).
+The margin draws a run marker next to the first kind and next to the parked
+questions, and none next to the prose.  The rule in one sentence: the first non-blank
+characters are `?`, or `%` and blanks and `?`; the sentence ends at the first `.`
+outside quotes and brackets; and every bare word inside is a variable, a reserved
+name or a name the document uses.  A `'` opens `'атом'` only where a token may start
+(after a name it is the old suffix, `Ф'`, part 149).
 
-The last clause is what separates a *commented* question from prose, and it is
-deliberately shallow: `?длина(Х, 2) не завершится.` is refused because `не` is a
-bare word that is neither reserved nor used anywhere in the document.  A live
-line needs no such defence — a line beginning with `?` is executed by the run
-itself, so it is a question by construction (and its own words count as used,
-because the line is part of the document).  This is not a parser and must not
-become one — an unaccepted name means *no marker*, and no marker is a small
-loss, while a marker that runs the wrong text is a wrong program.  The scan is
-line-local, so a statement split across lines gets no marker: running half of it
-would be worse than not offering it.
+That last clause separates a *commented* question from prose, and it is deliberately
+shallow: `?длина(Х, 2) не завершится.` is refused because `не` is used nowhere.  A
+live line needs no defence — the run executes it, so it is a question by
+construction.  This is not a parser and must not become one: no marker is a small
+loss, a marker that runs the wrong text is a wrong program.  The scan is line-local,
+so a statement split across lines gets none.
 """
 
 from __future__ import annotations

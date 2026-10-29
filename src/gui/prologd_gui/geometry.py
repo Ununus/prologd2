@@ -1,14 +1,11 @@
 """Window geometry between a window and the settings file (task_45, task_49).
 
-`QWidget.saveGeometry()` and `restoreGeometry()` know about screens, a maximised
-window and a display that is no longer there; a hand-made x/y/width/height would
-have to re-learn all of it.  What they produce is bytes, so it is stored base64 —
-text, which is what a value in the settings file can be.
+`saveGeometry()`/`restoreGeometry()` know about screens, a maximised window and a
+display that is gone; a hand-made x/y/width/height would have to re-learn all of it.
+What they produce is bytes, so it is stored base64 — text a settings value can hold.
 
-Both windows that remember their place go through here: the graphics window since
-task_45 and the main window since task_49, which is the one the user moves first.
-Two copies of «wrap it in base64 and swallow junk» would be two chances to disagree
-about the format a settings file holds.
+Both windows that remember their place go through here; two copies of «wrap it in
+base64 and swallow junk» would be two chances to disagree about the format.
 """
 
 from __future__ import annotations

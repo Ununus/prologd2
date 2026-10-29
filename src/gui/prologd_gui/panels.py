@@ -1,16 +1,12 @@
 """The output pane: coloured lines, a bounded history, and a tail that survives.
 
-`output` events carry arbitrary chunks of text, and a chunk need not end on a line
-boundary — a program that prints with `ВЫВОД` and never uses `ПС` leaves the window
-holding half a line.  Splitting a chunk into lines is where that goes wrong, so it
-lives here in a Qt-free class that `test_output.py` hammers: everything up to the
-last newline is a line, and the rest waits.
+`output` events carry arbitrary chunks, and a chunk need not end on a line boundary
+— a program that prints with `ВЫВОД` and never uses `ПС` leaves half a line.
+Everything up to the last newline is a line and the rest waits; that split lives in
+a Qt-free class `test_output.py` hammers.
 
-The pane itself is a `ZoomablePlainTextEdit` — the editor's font and zoom,
-read-only, never wrapped (a log line cut in the middle cannot be read as data).  It
-appends *lines* with a colour per kind, drops the oldest ones when the history grows
-past a limit, and follows the end of the output unless the user has scrolled up to
-read something.
+The pane is a `ZoomablePlainTextEdit` — read-only, never wrapped, the editor's font
+and zoom — and it follows the end of the output unless the user has scrolled up.
 """
 
 from __future__ import annotations
@@ -87,12 +83,9 @@ KIND_TAB: dict[str, str] = {
     WARNING: TAB_PROBLEMS,
 }
 
-#: The colours of the kinds that have one, from a theme palette (task_29).  The
-#: pane is given a palette, so the dark theme's colours reach it the same way the
-#: editor's do; `KIND_COLORS` is only the light default.
-#:
-#: `output` has no colour on purpose: it is the data being read, and it takes the
-#: text colour of the widget palette.
+#: The colours of the kinds that have one, from a theme palette (task_29): the pane
+#: is given a palette, so this is only the light default.  `output` has no colour on
+#: purpose — it is the data being read and takes the text colour.
 def kind_colors(palette: theme.Palette) -> dict[str, str]:
     return {
         ECHO: palette.echo,  # our echo of an answer: the query colour
@@ -905,16 +898,11 @@ def _tool_button(icon_name: str, tooltip: str, signal) -> QPushButton:
 class ElidedLabel(QLabel):
     """A one-line label that says so when it is too narrow for its text.
 
-    The step strip's «где» carries a place in a file.  At full length the path ran
-    up against the buttons beside it, and a narrower window cut it mid-word with
-    nothing to show that it had been cut.  Painting is what shortens: `text()` —
-    and so the tooltip and the accessors — stays whole, and what is painted keeps
-    the *end* of the text, because the end of a place in a file (the file's own
-    name, then the line and the column) is the part being read.  Qt's own
-    `elidedText(…, ElideMiddle, …)` was measured first and reads badly on a path:
-    at a third of the width the middle of `…\\examples\\problems\\hanoi.pld:2:1` is
-    all that is left — the file's name and the line are gone, which is exactly the
-    part being read.
+    Painting is what shortens: `text()` — and so the tooltip and the accessors —
+    stays whole, and what is painted keeps the *end*, because the end of a place in a
+    file (its name, then the line and the column) is what is being read.  Qt's
+    `elidedText(…, ElideMiddle, …)` was measured first: it leaves the middle of a
+    path, which is exactly the part nobody reads.
     """
 
     def display_text(self) -> str:

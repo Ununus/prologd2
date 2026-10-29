@@ -24,20 +24,14 @@ _BOLD_KINDS = frozenset({tokens.KEYWORD, tokens.DIRECTIVE})
 class Theme:
     """The colours of the editor: one per role, in the order the dialog shows them.
 
-    A *role* is what a reader sees, not what the tokenizer knows (part 226): a
-    quoted atom is painted as an atom, a question parked in a comment as a
-    comment, and both alphabets of a name share one colour — telling them apart
-    was a leftover of the naming modes that are gone.  Whole and real numbers
-    share one colour for the same reason.
+    A *role* is what a reader sees, not what the tokenizer knows (part 226): a quoted
+    atom is painted as an atom, both alphabets of a name share one colour, whole and
+    real numbers too.  An empty string means «do not paint this kind».
 
-    An empty string means «do not paint this kind at all», which no role uses
-    today but `color_for` still allows.
-
-    `mixed_background` is the one field that is not a role: it is the band drawn
-    *behind* a name that mixes the two alphabets, and it exists in both themes
-    because a background has to be chosen against its own page.  It has no row in
-    the settings dialog — the flag is a switch, not a colour (part 227) — which is
-    why `syntax_rows` walks `SYNTAX_LABELS` and not the fields of this record.
+    `mixed_background`/`mixed_underline` are not roles: they are the marks of a name
+    that mixes the alphabets, and each theme chooses them against its own page.  They
+    have no row in the dialog (part 227), which is why `syntax_rows` walks
+    `SYNTAX_LABELS` and not the fields of this record.
     """
 
     comment: str = "#0d6a0d"
@@ -279,16 +273,11 @@ class Palette:
     def readable_pairs(self) -> list[tuple[str, str, str]]:
         """`(what, text, background)` of every pair that has to be readable.
 
-        `test_appearance.py` walks this against WCAG AA (4.5), for every palette —
-        so a colour added to a palette is measured without the test being touched,
-        which is the only way a dark theme stays honest.  A few pairs are
-        deliberately *not* in it: the margin's inactive numbers and the placeholder
-        text are chrome, quiet on purpose (the margin is 3.03 in the light theme).
-
-        The mixed-name band is measured the other way round: not the band against
-        the page (it is a background, and 1.3–1.4 is what a highlight looks like),
-        but the *name* against the band — a marked name has to stay readable the
-        same way an unmarked one does (part 227).
+        `test_appearance.py` walks this against WCAG AA (4.5) for every palette, so a
+        new colour is measured without the test being touched.  Chrome is deliberately
+        out (the margin's inactive numbers, the placeholder).  The mixed-name band is
+        measured the other way round: the *name* against the band, which has to stay
+        readable (part 227).
         """
         pairs = [("текст на странице", self.foreground, self.background)]
         band = self.syntax.mixed_background

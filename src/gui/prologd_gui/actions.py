@@ -1,20 +1,15 @@
 """Every command in one place: its title, icon, keys and state.
 
-The menu bar, the toolbar and the editor's context menu are all built from these
-tables, so a shortcut, a tooltip or an enabled/disabled state cannot exist in two
-versions and drift apart: the window makes one `QAction` per entry and finds it by
-key.
+Menu bar, toolbar and context menus are built from these tables, so a shortcut, a
+tooltip or an enabled state cannot exist in two versions and drift apart: the window
+makes one `QAction` per entry and finds it by key.
 
-Entries with `implemented=False` stay visible but disabled, and their tooltip says
-what they wait for.  The feature list is long, and a menu that silently lacks half
-of it is worse than one that admits it — `doc/gui.typ`, section 9, has the same
-list in prose.
+`implemented=False` stays visible but disabled, its tooltip saying what it waits for
+— a menu that silently lacks half the feature list is worse than one that admits it.
 
-**The ellipsis in a title means «the command asks for something first»**: a file
-name (`Открыть…`, `Сохранить как…`, `Сохранить вывод…`), a folder and a set of
-settings (`Настройки…`), or a query (`Поиск и замена…`).  A command that acts at
-once gets none, even when it opens a window of its own (`Руководство пользователя`,
-`О программе`, `Графическое окно`): the ellipsis promises a question, not a window.
+**The ellipsis means «the command asks for something first»** (`Открыть…`,
+`Настройки…`, `Поиск и замена…`).  A command that acts at once gets none, even when
+it opens a window of its own: the ellipsis promises a question, not a window.
 """
 
 from __future__ import annotations
@@ -65,15 +60,9 @@ REMOVE_ICON = "settings-remove"
 SEPARATOR = "-"
 RECENT = "recent"
 
-#: The formatter's mode (task_30, moved back to the toolbar in task_47): a
-#: control of the toolbar, right after «Форматировать» — it carries the mode and
-#: the «только выделенное» switch the action reads.  It lived in the «Правка»
-#: submenu for a while; a mode is switched *while looking at the code*, so it
-#: belongs next to the command it changes.
-#:
-#: The font-size box was a marker here too (`#font`) until task_58; it left the
-#: toolbar, so the marker went with it.  A size is changed by `Ctrl`+wheel and the
-#: three zoom commands, and an exact value is a row of the settings dialog.
+#: The formatter's mode (task_30, on the toolbar since task_47): the mode and the
+#: «только выделенное» switch, next to the command they change — a mode is switched
+#: *while looking at the code*.
 FORMAT_MODE = "#format-mode"
 
 #: The appearance (task_29's dark theme): a submenu of «Вид», because a *set* of
@@ -122,12 +111,9 @@ ACTIONS: tuple[Action, ...] = (
     Action("save_output", "Сохранить вывод…", "file-save-as"),
     Action("close", "Закрыть вкладку", "file-close", ("Ctrl+W",)),
     Action("close_all", "Закрыть все", "file-close-all"),
-    # Visible where it is useful and nowhere else: the context menu of a tab
-    # (task_68).  It wears the picture of «Открыть…» — both commands open the same
-    # thing, and one drawing is better than two that drift apart.  The keys are a
-    # plain `Ctrl`+letter on purpose: `Shift+Alt+R` (what VS Code uses) never
-    # arrived — on Windows the keyboard-layout switch eats Alt chords, and the
-    # editor simply typed an `R` — while `Ctrl+E` is free and reaches the window.
+    # The context menu of a tab (task_68), with «Открыть…»'s picture.  The keys are a
+    # plain `Ctrl`+letter: `Shift+Alt+R` never arrived — the Windows layout switch eats
+    # Alt chords and the editor typed an `R`.
     Action("reveal", "Показать в проводнике", "file-open", ("Ctrl+E",)),
     Action("exit", "Выход", "file-exit", ("Ctrl+Q",)),
     # -- edit
@@ -217,13 +203,10 @@ ACTIONS: tuple[Action, ...] = (
     # solutions.  Text-only, like the two switches under it: a checkable entry says
     # what it does in words, and a picture would have to say «table» twice.
     Action("answer_table", "Формировать таблицу", None, checkable=True),
-    # The two switches of a run (task_46 split the one `questions` flag in two):
-    # the load may run the program's own `?`-statements, and may print each one
-    # before its answer.  They are settings (`execution/run_questions`,
-    # `execution/print_questions`) with the same titles, and the menu is the
-    # second door to them — a switch of a run is flipped *while working*, which is
-    # why these two moved here from the dialog (task_58).  «Сохранять перед
-    # запуском» stayed a setting: that one is decided once.
+    # The two switches of a run (task_46): run the program's own `?`-statements, and
+    # print each before its answer.  Settings with the same titles — the menu is the
+    # second door, because these are flipped *while working* (task_58).  «Сохранять
+    # перед запуском» stayed a setting: it is decided once.
     Action("run_questions", "Выполнять вопросы при запуске", None, checkable=True),
     Action("print_questions", "Печатать вопросы при запуске", None, checkable=True),
     # The window the graphics predicates draw into (task_45): a window of its own,
@@ -237,11 +220,9 @@ ACTIONS: tuple[Action, ...] = (
     # part of running a program, so it gets a menu of its own.
     Action("script_image", "Сконвертировать картинку…", None),
     # -- help
-    # The reference of a predicate (task_37): the same help picture, because it
-    # is the same «справка» — only the answer comes from `doc/builtins.json`
-    # instead of the PDF, and it is shown in the window, next to the code.  `F1`
-    # is the conventional help key, so it belongs to the answer needed *while
-    # reading a program*; the manual keeps `Shift+F1`.
+    # The reference of a predicate (task_37): the same picture as «справка», the answer
+    # coming from `doc/builtins.json` in the window.  `F1` answers what is needed
+    # *while reading a program*; the manual keeps `Shift+F1`.
     Action("reference", "Справка по предикату", "help", ("F1",)),
     Action("help_doc", "Руководство пользователя", "help", ("Shift+F1",)),
     # What `Ctrl`+key inserts, listed from the table itself (task_31): the table
@@ -359,15 +340,10 @@ MENUS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ),
 )
 
-#: The toolbar, grouped as the reference front-end had it: files, run/stop/step,
-#: editing (with the format *mode* control right after «Форматировать»), then the
-#: tools, and the size control between them and «Очистить вывод» — it acts on the
-#: text, not on the run, so it sits after «Настройки…» rather than among the
-#: commands of a run (task_58).  The manual left the toolbar in task_58 as well: a
-#: button for a PDF nobody opens in the middle of a run only takes room, and the
-#: menu keeps it.  «Сохранить все» is not here either: a command that acts on every
-#: tab belongs in «Файл», and the toolbar keeps the three file buttons that act on
-#: the tab in front of the user (task_48).
+#: The toolbar: files, run/stop/step, editing (with the format mode right after
+#: «Форматировать»), then the tools and the size control — it acts on the text, not on
+#: the run (task_58).  No «Руководство» (a PDF nobody opens mid-run), no «Сохранить
+#: все» (a command on every tab belongs in «Файл», task_48).
 TOOLBAR: tuple[str, ...] = (
     "new",
     "open",
