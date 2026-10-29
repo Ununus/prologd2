@@ -204,6 +204,15 @@ jobs:
           codesign --force --deep --sign - dist/PrologD.app
           codesign --verify --deep --strict --verbose=2 dist/PrologD.app
           dist/PrologD.app/Contents/MacOS/prologd -s examples/lessons/lesson_01.pld >/dev/null
+      - name: Start the frozen window
+        # A bundle can be signed and still die before its window appears — the
+        # failure a person sees as a bounce in the dock and nothing else.  The
+        # window is asked to come up offscreen, where the runner has no display
+        # (part 220; the same check runs on every push in `macos.yml`).
+        run: |
+          set -e
+          QT_QPA_PLATFORM=offscreen dist/PrologD.app/Contents/MacOS/PrologD --self-check \
+            --settings "$RUNNER_TEMP/gui.ini"
       - name: Make the .dmg
         run: |
           set -e

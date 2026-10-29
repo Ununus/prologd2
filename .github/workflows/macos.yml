@@ -49,3 +49,44 @@ jobs:
         run: cmake --build --preset macos-release
       - name: Test
         run: ctest --preset macos-release
+
+  # The job above tests the engine only: the window was never built here, and the
+  # release job that does build it never started it.  A frozen `.app` that cannot
+  # start dies silently when it is double-clicked — a bounce in the dock, no dialog,
+  # no console — so this job freezes the window the way the release does and asks
+  # it to come up (part 220; `--self-check` in `src/gui/main.py`).
+  window:
+    name: macOS frozen window (arm64)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the interpreter
+        run: |
+          cmake --preset macos-release
+          cmake --build --preset macos-release
+      - name: Python environment
+        run: |
+          python3 -m venv .venv
+          .venv/bin/python -m pip install --upgrade pip
+          .venv/bin/python -m pip install \
+            -r src/gui/requirements.txt -r src/gui/requirements-build.txt
+      - name: Freeze the window
+        run: |
+          .venv/bin/python -m PyInstaller --noconfirm --clean --onedir --windowed \
+            --name PrologD --osx-bundle-identifier com.csu.prologd \
+            --add-data 'src/gui/assets:assets' --paths src/gui \
+            --workpath build/pyinstaller --distpath dist \
+            src/gui/main.py
+      - name: Lay out and sign the bundle
+        run: |
+          set -e
+          app=dist/PrologD.app/Contents/MacOS
+          test -d "$app"
+          cp build/macos-release/src/cli/prologd "$app/"
+          codesign --force --deep --sign - dist/PrologD.app
+          codesign --verify --deep --strict --verbose=2 dist/PrologD.app
+      - name: Start the window
+        run: |
+          set -e
+          QT_QPA_PLATFORM=offscreen dist/PrologD.app/Contents/MacOS/PrologD --self-check \
+            --settings "$RUNNER_TEMP/gui.ini"

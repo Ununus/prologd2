@@ -24,7 +24,7 @@ from PySide6.QtWidgets import QApplication, QMessageBox  # noqa: E402
 
 
 
-def report_missing_interpreter(executable: str) -> int:
+def report_missing_interpreter(executable: str, interactive: bool = True) -> int:
     """Says why the window cannot start, in the way the build can be heard.
 
     A checkout is started from a terminal, so printing is enough and the message
@@ -33,9 +33,13 @@ def report_missing_interpreter(executable: str) -> int:
     printing into nothing, so the one thing that is wrong with the package gets a
     box instead.  The box is modal on purpose — it is the last thing the process
     does (task_61 §7.1).
+
+    `--self-check` is never interactive: a box would wait for a click that a
+    packaging job cannot make, and a run that hangs says nothing.  The message
+    goes to stderr and the exit code is the answer (part 220).
     """
     name = paths.EXECUTABLE_NAME
-    if not paths.frozen():
+    if not paths.frozen() or not interactive:
         print(f"{name} not found: {executable}", file=sys.stderr)
         print(
             "build it first (cmake --preset <preset> && cmake --build --preset <preset>)",
@@ -65,7 +69,9 @@ class WindowParser(argparse.ArgumentParser):
     """
 
     def error(self, message: str) -> None:  # noqa: D401 - argparse's own name
-        if not paths.frozen():
+        # `--self-check` speaks through its exit code: a box shown to nobody would
+        # hang the packaging job instead of failing it.
+        if not paths.frozen() or "--self-check" in sys.argv:
             super().error(message)
             return
         QApplication(sys.argv[:1])  # a box needs an application object first
@@ -111,6 +117,12 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="directory with the toolbar icons (default: src/gui/assets)",
     )
+    parser.add_argument(
+        "--self-check",
+        action="store_true",
+        help="build the window, show it, run the event loop once and exit: how a "
+             "packaged build proves it can start",
+    )
     arguments = parser.parse_args(argv)
     assets.set_directory(arguments.icons)
 
@@ -134,7 +146,7 @@ def main(argv: list[str] | None = None) -> int:
         folder = "" if parent in ("", ".") else parent
     executable = paths.interpreter(folder)
     if not pathlib.Path(executable).is_file():
-        return report_missing_interpreter(executable)
+        return report_missing_interpreter(executable, interactive=not arguments.self_check)
 
     # Qt must not see our own options: it parses the arguments it is given and
     # would complain about `--theme`.
@@ -149,6 +161,20 @@ def main(argv: list[str] | None = None) -> int:
     # note the window writes reads better with a full name.
     start = str(pathlib.Path(arguments.file).resolve()) if arguments.file else None
     window = MainWindow(launch, arguments.include, preferences, path=start)
+    if arguments.self_check:
+        # The outer half of task_119's smoke test: a frozen build that cannot get
+        # this far dies silently when double-clicked — a bounce in the dock and
+        # nothing else — so the packaging job asks the window to come up offscreen
+        # and say so.  A checkout runs the same flag in `test_main.py`, which keeps
+        # the flag from rotting.
+        window.show()
+        application.processEvents()
+        if not window.isVisible():
+            print("the window did not come up", file=sys.stderr)
+            return 1
+        print("ok: the window is up")
+        window.close()
+        return 0
     window.show()
     return application.exec()
 

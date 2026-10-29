@@ -12,12 +12,17 @@ document the window opens on.
 
 The behaviour itself — the file is the only tab, and a missing one falls back to
 the welcome program — is checked in `test_window.py`, where a real window exists.
+
+`--self-check` is the one path that cannot be faked with recorders: its whole
+point is that the window really comes up (part 220).  Those two checks therefore
+start `main.py` as a subprocess, where one process holds one `QApplication`.
 """
 
 from __future__ import annotations
 
 import os
 import pathlib
+import subprocess
 import sys
 import tempfile
 import types
@@ -127,6 +132,48 @@ def test_without_a_file_the_window_gets_none(
     print("ok: no file means no document, and --include still reaches the window")
 
 
+def start_for_real(arguments: list[str]) -> subprocess.CompletedProcess[str]:
+    """`main.py` in a process of its own — the only way to get a real window."""
+    return subprocess.run(
+        [sys.executable, str(pathlib.Path(main_module.__file__)), *arguments],
+        capture_output=True,
+        text=True,
+        timeout=180,
+        env={**os.environ, "QT_QPA_PLATFORM": "offscreen", "PYTHONUTF8": "1"},
+    )
+
+
+def test_the_self_check_comes_up(executable: str, directory: pathlib.Path) -> None:
+    """The outer half of task_119's smoke test: the window starts and says so.
+
+    A frozen window that cannot get this far dies silently when it is double-clicked
+    — a bounce in the dock and nothing else — so the packaging job runs exactly this
+    from inside the `.app` (part 220).  From a checkout it also checks the flag.
+    """
+    result = start_for_real(
+        ["--self-check", "--exe", executable, "--settings", str(directory / "gui.ini")]
+    )
+    assert result.returncode == 0, result.stderr
+    assert "ok: the window is up" in result.stdout, result.stdout
+    print("ok: the self-check builds the window, shows it and says so")
+
+
+def test_the_self_check_reports_a_missing_interpreter(directory: pathlib.Path) -> None:
+    """The check fails loudly when the launch has nothing to run.
+
+    In a package that is a box, because a double-clicked icon has no console
+    (task_61 §7.1); from a checkout it is the message on stderr that is checked
+    here — the box needs the display the box is for.
+    """
+    missing = directory / "нет_такого_каталога" / "prologd"
+    result = start_for_real(
+        ["--self-check", "--exe", str(missing), "--settings", str(directory / "gui.ini")]
+    )
+    assert result.returncode == 1, result.returncode
+    assert "not found" in result.stderr, result.stderr
+    print("ok: a launch without an interpreter is reported, not swallowed")
+
+
 def main(argv: list[str]) -> int:
     executable = find_executable(argv)
     assert executable is not None, "point the check at a build (PROLOGD_TEST_EXE)"
@@ -134,6 +181,8 @@ def main(argv: list[str]) -> int:
         directory = pathlib.Path(name)
         test_the_file_on_the_command_line_reaches_the_window(executable, directory)
         test_without_a_file_the_window_gets_none(executable, directory)
+        test_the_self_check_comes_up(executable, directory)
+        test_the_self_check_reports_a_missing_interpreter(directory)
     print("all entry point checks passed")
     return 0
 
