@@ -228,7 +228,7 @@ entries of the session log below and in `ai/task_*.md`.
 
 ## Test suite
 
-423 tests, about six seconds: 402 Catch2 cases plus 20 `cli_*` ones and the
+423 tests, about two seconds: 402 Catch2 cases plus 20 `cli_*` ones and the
 `test_case_names_are_ascii` guard (part 223) — the option
 spellings, the Cyrillic paths, the import search report, `--list-keywords`,
 `--format`, the engine limits, the diagnostics and the JSON protocol session, which
@@ -7832,3 +7832,24 @@ of the package».  Отдельно: 25 оконных наборов и `protoc
 * **Документация.**  `doc/gui.typ` §4: почему полоса и почему ещё и линия.
 * **Проверки.**  `linux-release` и `linux-werror`: 423/423.  Все 28 скриптов окна
   и `protocol_smoke.py` зелены.  `docs` собирает пять PDF; страница §4 посмотрена.
+
+### 229. `cli_engine_limits` собирал программу квадратично
+
+* **Вопрос владельца.**  «Если в тест 1000 шагов, почему оно выполняется 4.59 sec?»
+  Речь о двух разных тестах: `limits.maxSteps = 1000` живёт в `test_engine.cpp` и
+  идёт 1 мс, а 4.6 с — у CTest-теста `cli_engine_limits`, который шагов не считает
+  вовсе.
+* **Что он делает.**  Генерирует программу из 60 000 фактов (глубокий *терм* —
+  список из 60 000 ячеек, который раньше освобождался одной рекурсией и ронял
+  процесс), гоняет три программы в отдельных процессах и проверяет коды возврата.
+* **Причина медленности.**  Файл собирался так: `foreach(RANGE 1 60000)
+  string(APPEND fact_lines "ф(${index}).\n")`.  `string(APPEND)` копирует всю
+  строку, поэтому 60 000 добавлений дают квадратичный рост.  Замер: генерация
+  4.24 с из 4.57 с, три запуска интерпретатора — остальное.  Список с
+  `list(APPEND)` оказался ещё хуже (8.3 с): CMake копирует и список.
+* **Исправление.**  Блок из 1000 строк собирается отдельно и приписывается к
+  общему тексту 60 раз — к большой строке 60 обращений вместо 60 000.  Файл
+  побайтово тот же (`cmp` подтверждает), номера остались сквозными.  Генерация
+  0.21 с, тест 0.64 с вместо 4.7.
+* **Итог для всего набора.**  423 теста: было «about six seconds», стало **2.07 с**
+  (`linux-release`) и 2.05 с (`linux-werror`) — этот тест был 75% времени набора.

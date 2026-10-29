@@ -42,9 +42,21 @@ endif()
 
 # The same depth in a *term*: a list of 60 000 cells is released cell by cell,
 # and each cell used to destroy its tail inside its own destructor.
+#
+# The program is built in blocks of a thousand lines, and only the block is
+# appended to itself: the numbers stay unique and the text is the same, but the
+# growing string is copied 60 times instead of 60 000.  That matters — this file
+# used to be what made the whole suite take six seconds, four of them spent here
+# (`string(APPEND)` on the whole text is quadratic in its length).
 set(fact_lines "")
-foreach(index RANGE 1 60000)
-  string(APPEND fact_lines "ф(${index}).\n")
+set(fact_number 0)
+foreach(block RANGE 1 60)
+  set(chunk "")
+  foreach(index RANGE 1 1000)
+    math(EXPR fact_number "${fact_number} + 1")
+    string(APPEND chunk "ф(${fact_number}).\n")
+  endforeach()
+  string(APPEND fact_lines "${chunk}")
 endforeach()
 file(WRITE "${WORK_DIR}/engine_deep_term.pld"
   "${fact_lines}?ТИХО, НАЙТИВСЕ(И, ф(И), _), ВЫВОД(ok), ПС.\n")
