@@ -63,7 +63,8 @@ Packages, one script per platform:
   hand.
 
 A tag `v*` runs `release.yml`, which builds all three platforms and opens a **draft**
-release; `ci.yml` (Linux, Windows) and `macos.yml` test every push to `main`.
+release; `ci.yml` (Linux GCC, Linux Clang with `-Werror`, Windows) and `macos.yml`
+(engine tests and the frozen window) test every push to `main`.
 
 ## Rules that bite
 
