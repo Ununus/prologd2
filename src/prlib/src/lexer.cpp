@@ -18,9 +18,12 @@ const std::unordered_set<std::string> kReservedBuiltins = {
     "РАВНО", "ТИХО", "ВЕРСИЯ", "ПС",
     "fail", "trace", "no_trace", "call", "not", "forall", "first", "equal",
     "quiet", "version", "nl",
-    // Arithmetic
+    // Arithmetic.  The English predicates are capitals (`ABS/2`) and the
+    // functions of an expression are lowercase (`abs(X)`), so both spellings are
+    // reserved: one is a goal, the other is a name inside `#…#`.
     "БОЛЬШЕ", "МЕНЬШЕ", "СЛОЖЕНИЕ", "УМНОЖЕНИЕ", "СЛУЧ", "float", "mod", "div",
     "rem", "sign", "pi", "floor", "ceiling", "round", "truncate",
+    "ABS", "SQRT", "SIN", "COS", "TAN", "EXP",
     "greater", "less", "plus", "mul", "random", "abs", "sqrt", "sin",
     "cos", "tan", "exp", "log", "is_whole", "is_number",
     // I/O

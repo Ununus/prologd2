@@ -17,13 +17,17 @@ namespace {
 /// no dispatch entry, and `ИМПОРТ` is a statement form the loader handles.
 const std::unordered_set<std::string> kReservedOperators = {"mod", "div", "rem"};
 
-/// Names that live inside an arithmetic expression only — the functions
-/// `sign/1` and `log/1` and the constant `pi` of ISO.  They are reserved so that
+/// Names that live inside an arithmetic expression only — the functions of ISO
+/// (`abs`, `sqrt`, `sin`, `cos`, `tan`, `exp`, `sign`, `log`, `floor`, `ceiling`,
+/// `round`, `truncate`) and the constant `pi`.  The six of them that also have a
+/// predicate are spelled in capitals there (`ABS/2`) and in lowercase here, so
+/// one name of each kind is telling.  They are reserved so that
 /// `--list-keywords`, the reference panel and the completer know them, and so
 /// that a goal with one of them as its name says what it is instead of «не
 /// найдено».
 const std::unordered_set<std::string> kReservedFunctions = {
-    "sign", "pi", "log", "floor", "ceiling", "round", "truncate"};
+    "abs",    "sqrt",     "sin",     "cos",   "tan",     "exp",     "sign",
+    "log",    "floor",    "ceiling", "round", "truncate", "pi"};
 const std::unordered_set<std::string> kReservedDirectives = {"ИМПОРТ", "import", "ХОЛСТ", "canvas"};
 
 /// Callable names the *engine* answers before it consults the dispatch table

@@ -1960,3 +1960,29 @@ answer gained the cut, the example program shows both, and the manual's «пер
 вхождений нет» paragraph became an explanation of the order.  `ПОДСТРОКА` is a new
 reserved name — i.e. a program may not define its own `ПОДСТРОКА/5`, the same rule as
 for every other built-in.
+
+## ADR-059: case tells a predicate from a function
+
+**Context.**  The six arithmetic predicates of English spelling (`abs/2`, `sqrt/2`,
+`sin/2`, `cos/2`, `tan/2`, `exp/2`) were written in lowercase, and so are the functions
+of the same names inside `#…#`.  One spelling therefore meant two things — a goal and
+a name in an expression — and the only way to tell them apart was the number of
+arguments.  Every other name of the dialect is a capital word (`БОЛЬШЕ`, `КОПИЯ`), so
+the lowercase names were also the only ones that looked foreign.
+
+**Decision.**  The predicates are `ABS/2`, `SQRT/2`, `SIN/2`, `COS/2`, `TAN/2` and
+`EXP/2`; the functions keep the lowercase spelling of ISO.  Case is now the whole
+difference: `ABS(X, Y)` is a goal that answers, `abs(X)` is a name inside `#…#` that
+only computes.  Both spellings are reserved, the lowercase six are of the keyword kind
+`function` (they have no arity), and the uppercase six are `predicate` arity two.
+
+**Consequences.**  A program that called `abs/2` gets an error that names the new
+spelling instead of «не найдено» — the retired-name table is where that message lives,
+and only arity two is retired, because `abs/1` was never a predicate.  `stdlib/math.pld`
+and the N-queens fixture were the only programs of the repository to be rewritten.
+`builtins.json` carries a record for each spelling — the predicate points at §5.5 or
+§5.6, the function at §3.3 — and the reference panel therefore shows `ABS/2` as a
+predicate and `abs` as a function, which is exactly the distinction a reader of the
+manual needs.  English names of the other built-ins stay lowercase (`is_whole`,
+`findall`): only the arithmetic ones had a lowercase twin inside expressions, and only
+they needed the case to tell them apart.

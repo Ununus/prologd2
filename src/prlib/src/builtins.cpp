@@ -650,12 +650,17 @@ const BuiltinTable& builtinTable() {
     add("СЛОЖЕНИЕ", 3, builtinAdd);
     add("УМНОЖЕНИЕ", 3, builtinMul3);
     add("УМНОЖЕНИЕ", 4, builtinMul4);
-    add("abs", 2, builtinAbs);
-    add("sqrt", 2, builtinSqrt);
-    add("sin", 2, builtinSin);
-    add("cos", 2, builtinCos);
-    add("tan", 2, builtinTan);
-    add("exp", 2, builtinExp);
+    // The English arithmetic predicates are spelled in capitals, like the
+    // dialect's own names (`БОЛЬШЕ`), so a predicate of the language looks
+    // different from the function of an expression: `ABS(X, Y)` answers, and
+    // `abs(X)` is what stands inside `#…#`.  The lowercase spelling of arity two
+    // is retired with a message (`checks.cpp`).
+    add("ABS", 2, builtinAbs);
+    add("SQRT", 2, builtinSqrt);
+    add("SIN", 2, builtinSin);
+    add("COS", 2, builtinCos);
+    add("TAN", 2, builtinTan);
+    add("EXP", 2, builtinExp);
     // `int` and `float` were never conversions: they *check* that a value can be
     // taken as a whole number, or as any number at all (`int(4.0)` holds,
     // `int(4.5)` does not, `float(4)` does).  The strict type tests take the ISO

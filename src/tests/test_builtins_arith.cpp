@@ -197,60 +197,88 @@ TEST_CASE("ABS and SQRT") {
   // root of a negative number has none either — that one used to answer 0 for an
   // integer and `nan` for a float, because `BigInt::fromDouble(nan)` is zero.
   const auto result = runProgram(
-      "?abs(-5, X).\n"
-      "?abs(-5.5, X).\n"
-      "?abs(X, 5).\n"
-      "?abs(X, 0).\n"
-      "?abs(X, -5).\n"
-      "?abs(5, 5).\n"
-      "?abs(-5, 5).\n"
-      "?abs(5, -5).\n"
-      "?sqrt(9, X).\n"
-      "?sqrt(2, X).\n"
-      "?sqrt(2.25, X).\n"
-      "?sqrt(0, X).\n"
-      "?sqrt(X, 4).\n"
-      "?sqrt(X, -4).\n"
-      "?sqrt(X, 0).\n"
-      "?sqrt(9, 3).\n"
-      "?sqrt(2, 1).\n"
-      "?sqrt(-4, X).\n"
-      "?sqrt(-4.0, X).\n"
-      "?sqrt(-4, 0).\n");
+      "?ABS(-5, X).\n"
+      "?ABS(-5.5, X).\n"
+      "?ABS(X, 5).\n"
+      "?ABS(X, 0).\n"
+      "?ABS(X, -5).\n"
+      "?ABS(5, 5).\n"
+      "?ABS(-5, 5).\n"
+      "?ABS(5, -5).\n"
+      "?SQRT(9, X).\n"
+      "?SQRT(2, X).\n"
+      "?SQRT(2.25, X).\n"
+      "?SQRT(0, X).\n"
+      "?SQRT(X, 4).\n"
+      "?SQRT(X, -4).\n"
+      "?SQRT(X, 0).\n"
+      "?SQRT(9, 3).\n"
+      "?SQRT(2, 1).\n"
+      "?SQRT(-4, X).\n"
+      "?SQRT(-4.0, X).\n"
+      "?SQRT(-4, 0).\n");
   REQUIRE(result.loaded);
   REQUIRE(result.output == "X=5\nX=5.5\nX=5\nX=0\nНЕТ\nДА\nДА\nНЕТ\n"
                             "X=3\nX=1\nX=1.5\nX=0\nX=16\nX=16\nX=0\nДА\nНЕТ\n"
                             "НЕТ\nНЕТ\nНЕТ\n");
 }
 
-TEST_CASE("sin, cos, tan and exp: forward, inverse, and the check") {
+TEST_CASE("SIN, COS, TAN and EXP: forward, inverse, and the check") {
   // The three branches of the whole family, plus the edges of the domains: a
   // value the function does not have is a *failure*, never a `nan` unified with
   // the argument — `ln` of a negative number, `ln` of zero, `asin` of 2, and a
-  // forward value that overflows (`exp(1000.0, X)`).
+  // forward value that overflows (`EXP(1000.0, X)`).
   const auto result = runProgram(
-      "?sin(0.0, X).\n"
-      "?cos(0.0, X).\n"
-      "?tan(0.0, X).\n"
-      "?exp(0.0, X).\n"
-      "?sin(X, 0.0).\n"
-      "?cos(X, 1.0).\n"
-      "?tan(X, 0.0).\n"
-      "?exp(X, 1.0).\n"
-      "?sin(0.0, 0.0).\n"
-      "?cos(0.0, 1.0).\n"
-      "?tan(0.0, 0.0).\n"
-      "?exp(0.0, 1.0).\n"
-      "?cos(0.0, 0.0).\n"
-      "?exp(1.0, 0.0).\n"
-      "?exp(X, -1.0).\n"
-      "?exp(X, 0.0).\n"
-      "?exp(1000.0, X).\n"
-      "?sin(X, 2.0).\n"
-      "?cos(X, 2.0).\n");
+      "?SIN(0.0, X).\n"
+      "?COS(0.0, X).\n"
+      "?TAN(0.0, X).\n"
+      "?EXP(0.0, X).\n"
+      "?SIN(X, 0.0).\n"
+      "?COS(X, 1.0).\n"
+      "?TAN(X, 0.0).\n"
+      "?EXP(X, 1.0).\n"
+      "?SIN(0.0, 0.0).\n"
+      "?COS(0.0, 1.0).\n"
+      "?TAN(0.0, 0.0).\n"
+      "?EXP(0.0, 1.0).\n"
+      "?COS(0.0, 0.0).\n"
+      "?EXP(1.0, 0.0).\n"
+      "?EXP(X, -1.0).\n"
+      "?EXP(X, 0.0).\n"
+      "?EXP(1000.0, X).\n"
+      "?SIN(X, 2.0).\n"
+      "?COS(X, 2.0).\n");
   REQUIRE(result.loaded);
   REQUIRE(result.output == "X=0.0\nX=1.0\nX=0.0\nX=1.0\nX=0.0\nX=0.0\nX=0.0\nX=0.0\n"
                             "ДА\nДА\nДА\nДА\nНЕТ\nНЕТ\nНЕТ\nНЕТ\nНЕТ\nНЕТ\nНЕТ\n");
+}
+
+TEST_CASE("the arithmetic predicates are capitals, the functions lowercase") {
+  // Part 219: a goal and a name inside `#…#` are told apart by case.  `ABS/2` is
+  // the predicate; `abs` stayed the function of an expression, and calling it as
+  // a goal of arity two is the retired spelling, not «не найдено».
+  const auto functions = runProgram("?X is abs(-5) + sqrt(4) + sin(0) + cos(0) + tan(0) + exp(0).\n");
+  REQUIRE(functions.loaded);
+  REQUIRE(functions.output == "X=9.0\n");
+
+  for (const auto& [query, expected] :
+       {std::pair{"?abs(-5, X).\n", "«abs/2» переименовано: теперь «ABS(X, Y)»"},
+        std::pair{"?sqrt(9, X).\n", "«sqrt/2» переименовано: теперь «SQRT(X, Y)»"},
+        std::pair{"?sin(0.0, X).\n", "«sin/2» переименовано: теперь «SIN(X, Y)»"},
+        std::pair{"?cos(0.0, X).\n", "«cos/2» переименовано: теперь «COS(X, Y)»"},
+        std::pair{"?tan(0.0, X).\n", "«tan/2» переименовано: теперь «TAN(X, Y)»"},
+        std::pair{"?exp(0.0, X).\n", "«exp/2» переименовано: теперь «EXP(X, Y)»"}}) {
+    INFO("query: " << query);
+    const auto result = runProgram(query);
+    REQUIRE_FALSE(result.loaded);
+    REQUIRE(result.error.find(expected) != std::string::npos);
+  }
+
+  // Arity one of a capital name is a wrong arity, not a missing name: the
+  // predicate is there, and the message says how many arguments it takes.
+  const auto wrongArity = runProgram("?ABS(3).\n");
+  REQUIRE_FALSE(wrongArity.loaded);
+  REQUIRE(wrongArity.error.find("ABS не имеет арности 1") != std::string::npos);
 }
 
 TEST_CASE("multiplication/3: the reversible modes and the zero divisor") {
@@ -383,9 +411,9 @@ TEST_CASE("the arithmetic built-ins report a wrong type as an error") {
       "СЛОЖЕНИЕ(2, X, Y)",        // fewer than two arguments known
       "СЛОЖЕНИЕ(\"а\", 1, X)",
       "УМНОЖЕНИЕ(2, X, Y)",
-      "abs(\"а\", X)",
-      "sqrt(\"а\", X)",
-      "sin(\"а\", X)",
+      "ABS(\"а\", X)",
+      "SQRT(\"а\", X)",
+      "SIN(\"а\", X)",
       "ЦЕЛВЕЩ(\"а\", X)",
       "СЛУЧ(1.5)",                 // seeding needs an integer
   };

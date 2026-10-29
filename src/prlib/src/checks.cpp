@@ -174,6 +174,20 @@ constexpr RetiredName kRetiredNames[] = {
      "«substring» снято: «КОПИЯ(Стр, Ц1, Ц2, Стр4)» считает позиции с 1, а форма "
      "ISO — «sub_string(Стр, До, Длина, После, Подстрока)» с позиций с 0; "
      "по-русски она называется «ПОДСТРОКА»"},
+    // The English arithmetic predicates, which are capitals now so that a goal
+    // looks different from the function of an expression: `ABS(X, Y)` answers,
+    // `abs(X)` stands inside `#…#` (part 219).  Only arity two is retired —
+    // the function of arity one is another name entirely.
+    {"abs", 2,
+     "«abs/2» переименовано: теперь «ABS(X, Y)» большими буквами, как остальные "
+     "предикаты; в выражении функция остаётся строчной — «abs(X)»"},
+    {"sqrt", 2,
+     "«sqrt/2» переименовано: теперь «SQRT(X, Y)» большими буквами, как остальные "
+     "предикаты; в выражении функция остаётся строчной — «sqrt(X)»"},
+    {"sin", 2, "«sin/2» переименовано: теперь «SIN(X, Y)»; в выражении — «sin(X)»"},
+    {"cos", 2, "«cos/2» переименовано: теперь «COS(X, Y)»; в выражении — «cos(X)»"},
+    {"tan", 2, "«tan/2» переименовано: теперь «TAN(X, Y)»; в выражении — «tan(X)»"},
+    {"exp", 2, "«exp/2» переименовано: теперь «EXP(X, Y)»; в выражении — «exp(X)»"},
     // The naming modes and the marker that declared them.  There is one way to
     // read a name now — ISO's — so there is nothing to declare, and a file that
     // still says it is told that instead of being answered «не найдено».

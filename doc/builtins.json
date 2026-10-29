@@ -718,72 +718,125 @@
       "variants": ["ХОЛСТ(Высота, Ширина) — холст на всю программу; работает последняя директива"]
     },
     {
-      "name": "abs",
+      "name": "ABS",
       "aliases": [],
       "kind": "predicate",
       "arities": [2],
       "group": "arith",
       "section": "5.5",
       "summary": "Y = |X|; при свободной X берётся |Y|",
-      "variants": ["abs(X, Y) — Y = |X|; при свободной X: X = |Y| для неотрицательного Y",
-                     "abs(X) — модуль как функция выражения: abs(-5) равно 5"]
+      "variants": ["ABS(X, Y) — Y = |X|; при свободной X: X = |Y| для неотрицательного Y"]
     },
     {
-      "name": "sqrt",
+      "name": "abs",
+      "aliases": [],
+      "kind": "function",
+      "arities": [],
+      "group": "arith",
+      "section": "3.3",
+      "summary": "Модуль как функция выражения: abs(-5) равно 5",
+      "variants": ["abs(X) — модуль в выражении #…#; предикат того же имени — ABS/2"]
+    },
+    {
+      "name": "SQRT",
       "aliases": [],
       "kind": "predicate",
       "arities": [2],
       "group": "arith",
       "section": "5.5",
       "summary": "Y = корень X; при целых результат целый, свободная X получает Y*Y; нет значения — неудача",
-      "variants": ["sqrt(X, Y) — Y = корень X; свободная X получает Y*Y",
-                     "sqrt(X) — корень как функция выражения: sqrt(9) равно 3.0"]
+      "variants": ["SQRT(X, Y) — Y = корень X; свободная X получает Y*Y"]
     },
     {
-      "name": "sin",
+      "name": "sqrt",
+      "aliases": [],
+      "kind": "function",
+      "arities": [],
+      "group": "arith",
+      "section": "3.3",
+      "summary": "Корень как функция выражения: sqrt(9) равно 3.0",
+      "variants": ["sqrt(X) — корень в выражении #…#; предикат того же имени — SQRT/2"]
+    },
+    {
+      "name": "SIN",
       "aliases": [],
       "kind": "predicate",
       "arities": [2],
       "group": "arith",
       "section": "5.6",
       "summary": "Y = sin X; при связанной Y вычисляется обратная функция asin",
-      "variants": ["sin(X, Y) — Y = sin X; свободная X получает asin Y",
-                     "sin(X) — синус как функция выражения (радианы)"]
+      "variants": ["SIN(X, Y) — Y = sin X; свободная X получает asin Y"]
     },
     {
-      "name": "cos",
+      "name": "sin",
+      "aliases": [],
+      "kind": "function",
+      "arities": [],
+      "group": "arith",
+      "section": "3.3",
+      "summary": "Синус как функция выражения (радианы)",
+      "variants": ["sin(X) — синус в выражении #…#; предикат того же имени — SIN/2"]
+    },
+    {
+      "name": "COS",
       "aliases": [],
       "kind": "predicate",
       "arities": [2],
       "group": "arith",
       "section": "5.6",
       "summary": "Y = cos X; при связанной Y вычисляется обратная функция acos",
-      "variants": ["cos(X, Y) — Y = cos X; свободная X получает acos Y",
-                     "cos(X) — косинус как функция выражения (радианы)"]
+      "variants": ["COS(X, Y) — Y = cos X; свободная X получает acos Y"]
     },
     {
-      "name": "tan",
+      "name": "cos",
+      "aliases": [],
+      "kind": "function",
+      "arities": [],
+      "group": "arith",
+      "section": "3.3",
+      "summary": "Косинус как функция выражения (радианы)",
+      "variants": ["cos(X) — косинус в выражении #…#; предикат того же имени — COS/2"]
+    },
+    {
+      "name": "TAN",
       "aliases": [],
       "kind": "predicate",
       "arities": [2],
       "group": "arith",
       "section": "5.6",
       "summary": "Y = tg X; при связанной Y вычисляется обратная функция atan",
-      "variants": ["tan(X, Y) — Y = tg X; свободная X получает atan Y",
-                     "tan(X) — тангенс как функция выражения (радианы)"]
+      "variants": ["TAN(X, Y) — Y = tg X; свободная X получает atan Y"]
     },
     {
-      "name": "exp",
+      "name": "tan",
+      "aliases": [],
+      "kind": "function",
+      "arities": [],
+      "group": "arith",
+      "section": "3.3",
+      "summary": "Тангенс как функция выражения (радианы)",
+      "variants": ["tan(X) — тангенс в выражении #…#; предикат того же имени — TAN/2"]
+    },
+    {
+      "name": "EXP",
       "aliases": [],
       "kind": "predicate",
       "arities": [2],
       "group": "arith",
       "section": "5.6",
       "summary": "Y = e в степени X; при связанной Y вычисляется натуральный логарифм",
-      "variants": ["exp(X, Y) — Y = e в степени X; свободная X получает ln Y",
-                     "exp(X) — экспонента как функция выражения"]
+      "variants": ["EXP(X, Y) — Y = e в степени X; свободная X получает ln Y"]
     },
     {
+      "name": "exp",
+      "aliases": [],
+      "kind": "function",
+      "arities": [],
+      "group": "arith",
+      "section": "3.3",
+      "summary": "Экспонента как функция выражения",
+      "variants": ["exp(X) — экспонента в выражении #…#; предикат того же имени — EXP/2"]
+    },    {
       "name": "is_whole",
       "aliases": [],
       "kind": "predicate",
