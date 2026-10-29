@@ -21,7 +21,6 @@ from PySide6.QtGui import (
     QFont,
     QFontMetrics,
     QGuiApplication,
-    QKeySequence,
     QPainter,
     QPen,
     QTextCharFormat,
@@ -520,7 +519,10 @@ class ProblemsPane(ZoomableTable):
         # the one thing a reader cannot retype without a typo.
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.ActionsContextMenu)
         self.copy_action = QAction("Копировать", self)
-        self.copy_action.setShortcut(QKeySequence.StandardKey.Copy)
+        # No shortcut here: `Ctrl+C` is the *window's* command and copies from the
+        # pane that has the focus.  An action with the same key on the pane made Qt
+        # answer «Ambiguous shortcut overload: Ctrl+C» and copy nobody knew what
+        # (part 236).
         self.copy_action.triggered.connect(self.copy_current_problem)
         self.addAction(self.copy_action)
         self.set_font_size(font_size)

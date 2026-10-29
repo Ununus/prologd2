@@ -22,6 +22,7 @@ from PySide6.QtCore import (
 from PySide6.QtGui import (
     QColor,
     QFont,
+    QFontMetrics,
     QGuiApplication,
     QKeyEvent,
     QPainter,
@@ -30,6 +31,8 @@ from PySide6.QtGui import (
     QTextCursor,
     QTextDocument,
     QTextFormat,
+    QTextLength,
+    QTextTable,
     QWheelEvent,
 )
 from PySide6.QtWidgets import (
@@ -38,6 +41,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPlainTextEdit,
+    QTextBrowser,
     QTextEdit,
     QWidget,
 )
@@ -243,6 +247,125 @@ class ZoomablePlainTextEdit(QPlainTextEdit):
             if enabled
             else QPlainTextEdit.LineWrapMode.NoWrap
         )
+
+    def wheelEvent(self, event: QWheelEvent) -> None:  # noqa: N802 - Qt spelling
+        if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            delta = event.angleDelta().y()
+            if delta:
+                self.zoom_by(1 if delta > 0 else -1)
+            event.accept()
+            return
+        super().wheelEvent(event)
+
+
+class ZoomableTextBrowser(QTextBrowser):
+    """A rich-text pane that zooms with the rest and is set like a document.
+
+    The `F1` card is prose, so its *base* font is the interface one, and only the
+    calls inside it wear the editor's monospace family (the card is rebuilt from
+    the settings on every `F1`).  The size is the editor's, so a wheel over the
+    card changes the one preference every pane shares.
+    """
+
+    #: Emitted after `Ctrl`+wheel or a zoom command; carries the new point size.
+    zoomChanged = Signal(float)
+
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        *,
+        font_family: str = "Cascadia Mono",
+        font_size: float = DEFAULT_FONT_SIZE,
+    ) -> None:
+        super().__init__(parent)
+        #: The family the card sets a call in; `font_family` here for symmetry with
+        #: `ZoomablePlainTextEdit`, whose family *is* the text's.
+        self.code_family = font_family
+        self._size = float(font_size)
+        self.setOpenExternalLinks(False)
+        self.setOpenLinks(False)
+        self._apply_font()
+
+    # -- the document ------------------------------------------------------
+    def setHtml(self, html: str) -> None:  # noqa: N802 - Qt spelling
+        """Shows the card, gives it this pane's font and lays its table out."""
+        super().setHtml(html)
+        self._apply_font()
+        self._fit_variants_table()
+
+    def resizeEvent(self, event) -> None:  # noqa: N802 - Qt spelling
+        super().resizeEvent(event)
+        self._fit_variants_table()
+
+    def _code_font(self) -> QFont:
+        """The face the card sets a call in, at the size the pane zooms to."""
+        font = QFont(self.code_family)
+        font.setStyleHint(QFont.StyleHint.Monospace)
+        font.setFixedPitch(True)
+        font.setPointSizeF(self._size)
+        return font
+
+    def _fit_variants_table(self) -> None:
+        """First column = the widest call, the rest = the explanation.
+
+        A table whose columns ask for no width shares what is left between them,
+        which wrapped `КОПИЯ(Стр, Ц1, Ц2, Пер)` in the middle of its own arguments.
+        A call is one unit, so it is measured with the font it is drawn in; the
+        clamp keeps the explanation readable when the dock is narrow (part 236).
+        """
+        table = next(
+            (frame for frame in self.document().rootFrame().childFrames()
+             if isinstance(frame, QTextTable)),
+            None,
+        )
+        if table is None:
+            return
+        metrics = QFontMetrics(self._code_font())
+        widest = 0
+        for row in range(table.rows()):
+            cell = table.cellAt(row, 0)
+            if cell.isValid():
+                widest = max(widest, metrics.horizontalAdvance(cell.firstCursorPosition()
+                                                               .block().text()))
+        if widest <= 0:
+            return
+        room = max(120, int(self.viewport().width() * 0.6))
+        fmt = table.format()
+        fmt.setColumnWidthConstraints([
+            QTextLength(QTextLength.Type.FixedLength, min(widest + 16, room)),
+            QTextLength(QTextLength.Type.PercentageLength, 100),
+        ])
+        table.setFormat(fmt)
+
+    def setPlainText(self, text: str) -> None:  # noqa: N802 - Qt spelling
+        super().setPlainText(text)
+        self._apply_font()
+
+    def _apply_font(self) -> None:
+        """The interface face at the size the editor keeps in the settings."""
+        font = QFont(QApplication.font())
+        font.setPointSizeF(self._size)
+        self.setFont(font)
+        self.document().setDefaultFont(font)
+
+    # -- font and zoom ------------------------------------------------------
+    @property
+    def font_size(self) -> float:
+        return self._size
+
+    def set_font_size(self, size: float) -> None:
+        clamped = min(_MAX_FONT_SIZE, max(_MIN_FONT_SIZE, float(size)))
+        if abs(clamped - self._size) < 1e-6:
+            return
+        self._size = clamped
+        self._apply_font()
+        self.zoomChanged.emit(clamped)
+
+    def zoom_by(self, steps: float) -> None:
+        self.set_font_size(self._size + steps)
+
+    def reset_zoom(self) -> None:
+        self.set_font_size(DEFAULT_FONT_SIZE)
 
     def wheelEvent(self, event: QWheelEvent) -> None:  # noqa: N802 - Qt spelling
         if event.modifiers() & Qt.KeyboardModifier.ControlModifier:

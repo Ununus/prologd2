@@ -169,14 +169,14 @@ def test_sections_and_summaries() -> None:
 
 
 def test_the_groups_are_known() -> None:
-    known = {
-        "control", "debug", "arith", "types", "strings", "io", "database",
-        "modules", "graphics", "lists",
-    }
+    """Every record's group has a word for the `F1` card (part 235)."""
+    from prologd_gui.reference import GROUP_LABELS
+
     for record in load_records():
         group = record.get("group")
-        assert group in known, f"{record['name']}: unknown group {group!r}"
-    print(f"ok: every record belongs to one of {len(known)} groups")
+        assert group in GROUP_LABELS, f"{record['name']}: unknown group {group!r}"
+        assert GROUP_LABELS[group], f"{record['name']}: group {group!r} has no label"
+    print(f"ok: every record belongs to one of {len(GROUP_LABELS)} groups")
 
 
 def test_the_loader_serves_names_aliases_and_degrades() -> None:
@@ -201,7 +201,50 @@ def test_the_loader_serves_names_aliases_and_degrades() -> None:
     print("ok: the loader serves names and aliases, and a broken file is empty")
 
 
+def test_the_card_is_a_card() -> None:
+    """The `F1` card: title, meta, a table of the modes and a link (part 235).
+
+    The markup is a pure function of a record, so it is checked here without a
+    window — the colours come from a palette, and the card has to survive both a
+    record of this repository and the one the original engine's package ships
+    (no `section`, no `aliases`).
+    """
+    from prologd_gui import reference, theme
+
+    loaded = reference.Reference.load(BUILTINS_PATH)
+    sort = loaded.record("СОРТИРОВКА")
+    html = reference.card_html(sort, theme.LIGHT, mono="Cascadia Mono")
+    assert "СОРТИРОВКА" in html and "sort" in html, html
+    assert "предикат" in html and "арности 2, 3" in html and "списки" in html, html
+    assert 'href="section:3.7"' in html, html
+    # Every mode is a row, and the call and its description are apart.
+    for variant in sort["variants"]:
+        call = variant.split(" — ")[0]
+        escaped = call.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        assert escaped in html, (call, html)
+
+    # A record with no section has no link, and nothing in it can inject markup.
+    bare = {
+        "name": "БОЛЬШЕ",
+        "kind": "predicate",
+        "arities": [2],
+        "summary": "Сравнение <b>на больше</b>",
+        "variants": ["БОЛЬШЕ(А, Б) — истинно"],
+    }
+    plain = reference.card_html(bare, theme.DARK)
+    assert "href=" not in plain, plain
+    assert "&lt;b&gt;" in plain, "the summary was not escaped"
+
+    # The map of the manual is read the way the docs target writes it, and a
+    # checkout without the manuals answers an empty one.
+    pages = reference.load_section_pages()
+    assert isinstance(pages, dict)
+    assert reference.load_section_pages(pathlib.Path("нет-такого-файла.json")) == {}
+    print("ok: the F1 card is built from a record, and a missing map is not a failure")
+
+
 def main(argv: list[str]) -> int:
+    test_the_card_is_a_card()
     test_the_loader_serves_names_aliases_and_degrades()
     executable = argv[1] if len(argv) > 1 else check_default_executable()
     print(f"interpreter: {executable}")

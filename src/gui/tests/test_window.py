@@ -3142,11 +3142,12 @@ def test_copy_takes_the_selection_where_the_focus_is(executable: str) -> None:
 
 
 def test_f1_shows_the_record_of_the_word_under_the_caret(executable: str) -> None:
-    """task_37: `F1` on `КОПИЯ` lists the five modes of 7.4 and the section.
+    """task_37: `F1` on `КОПИЯ` shows the five modes of 7.4 and links the section.
 
-    The dock is filled from `doc/builtins.json`; the manual («Руководство
-    пользователя») keeps `Shift+F1`, because `F1` is the key pressed *while
-    reading a program*.
+    The dock is filled from `doc/builtins.json` and shows a *card* (part 235), so
+    the facts are checked in the text and the section link in the markup.  The
+    manual («Руководство пользователя») keeps `Shift+F1`, because `F1` is the key
+    pressed *while reading a program*.
     """
     window = empty_window(executable)
     try:
@@ -3158,11 +3159,15 @@ def test_f1_shows_the_record_of_the_word_under_the_caret(executable: str) -> Non
         window._actions["reference"].trigger()
 
         text = window.reference_text()
-        assert text.startswith("КОПИЯ — Подстрока и поиск"), ascii(text)
-        assert "раздел руководства: 7.4" in text, ascii(text)
+        assert text.startswith("КОПИЯ"), ascii(text)
+        assert "Подстрока и поиск" in text, ascii(text)
+        assert "предикат" in text and "арности 4" in text and "строки" in text, ascii(text)
         assert "английское имя" not in text, ascii(text)
         for mode in ("Ц1, Ц2, Пер", "Ц1, Ц2, Стр4", "Пер, Ц2, Стр4", "Пер, Ц, Стр4", "Ц1, Пер, Стр4"):
             assert mode in text, (mode, ascii(text))
+        # The card names the section and makes it a link the window answers.
+        assert "§7.4" in text, ascii(text)
+        assert 'href="section:7.4"' in window._reference_pane.toHtml(), "no section link"
         assert not window._reference_dock.isHidden()
 
         # An unknown word says so instead of showing the previous record.
@@ -3196,8 +3201,9 @@ def test_f1_shows_the_record_of_the_word_under_the_caret(executable: str) -> Non
         view.setTextCursor(cursor)
         window._actions["reference"].trigger()
         text = window.reference_text()
-        assert text.startswith("БОЛЬШЕ — Сравнение на больше"), ascii(text)
-        assert "раздел руководства" not in text, ascii(text)
+        assert text.startswith("БОЛЬШЕ"), ascii(text)
+        assert "Сравнение на больше" in text, ascii(text)
+        assert "§" not in text, "a record without a section has no link"
         assert "БОЛЬШЕ(А, Б)" in text, ascii(text)
     finally:
         discard_changes(window)
@@ -3225,6 +3231,114 @@ def press_ctrl_key(window, scan: int) -> bool:
     )
     QApplication.sendEvent(window.editor(), event)
     return event.isAccepted()
+
+
+def test_one_ctrl_c_copies_where_the_user_looks(executable: str) -> None:
+    """`Ctrl+C` is one command, and it copies the pane that has the focus.
+
+    «Проблемы» carried «Копировать» with the same key and the window's own action
+    carried it too, so Qt answered «Ambiguous shortcut overload: Ctrl+C» and copied
+    nobody knew what — and the card of the reference dock, being text, was copied
+    from the *editor* (part 236).
+    """
+    from PySide6.QtGui import QAction
+
+    window = empty_window(executable)
+    try:
+        window.show()
+        QApplication.processEvents()
+        with_ctrl_c = [
+            action
+            for action in window.findChildren(QAction)
+            for sequence in action.shortcuts()
+            if sequence.toString() == "Ctrl+C"
+        ]
+        assert [action.text() for action in with_ctrl_c] == ["Копировать"], with_ctrl_c
+
+        # The card is text: with the dock focused, that is what `Ctrl+C` takes.
+        window.editor().setPlainText('тест :- КОПИЯ("абв", 1, 2, Х).\n')
+        view = window.editor()
+        cursor = view.textCursor()
+        cursor.setPosition(view.toPlainText().index("КОПИЯ") + 2)
+        view.setTextCursor(cursor)
+        window.show_reference()
+        QApplication.clipboard().clear()
+        pane = window._reference_pane
+        pane.setFocus()
+        QApplication.processEvents()
+        assert window.focusWidget() is not view
+        cursor = pane.textCursor()
+        cursor.select(QTextCursor.SelectionType.Document)
+        pane.setTextCursor(cursor)
+        window._copy()
+        assert "Подстрока и поиск" in QApplication.clipboard().text()
+
+        # A row of «Проблемы» copies in the shape its own menu promises.
+        window._on_failed("runtime", "error", "деление на ноль", None)
+        window._feed.flush()
+        QApplication.clipboard().clear()
+        problems = window._problems
+        problems.setCurrentCell(0, 0)
+        problems.setFocus()
+        QApplication.processEvents()
+        window._copy()
+        assert QApplication.clipboard().text() == "деление на ноль", QApplication.clipboard().text()
+    finally:
+        discard_changes(window)
+    print("ok: one Ctrl+C, and it copies the pane the user is looking at")
+
+
+def test_the_card_links_the_section_and_opens_the_page(executable: str) -> None:
+    """The card's «руководство, §7.4» is a link, and it lands on the page.
+
+    The page comes from `doc/help_sections.json`, which the `docs` target writes;
+    a checkout that never built the manuals has no map, and then the same link
+    opens the manual at its start — a lost page, never a lost document.
+    """
+    from PySide6.QtCore import QUrl
+
+    from prologd_gui import window as window_module
+
+    window = empty_window(executable)
+    try:
+        window.editor().setPlainText('тест :- КОПИЯ("абв", 1, 2, Х).\n')
+        view = window.editor()
+        cursor = view.textCursor()
+        cursor.setPosition(view.toPlainText().index("КОПИЯ") + 2)
+        view.setTextCursor(cursor)
+        window.show_reference()
+
+        opened: list[str] = []
+
+        class Opener:
+            @staticmethod
+            def openUrl(url) -> None:
+                opened.append(url.toString())
+
+        real_service = window_module.QDesktopServices
+        window_module.QDesktopServices = Opener
+        try:
+            window._on_reference_link(QUrl("section:7.4"))
+        finally:
+            window_module.QDesktopServices = real_service
+        assert len(opened) == 1, opened
+        page = window._section_pages.get("7.4")
+        if page is None:
+            assert "#page=" not in opened[0], opened[0]
+        else:
+            assert opened[0].endswith(f"#page={page}"), opened[0]
+
+        # A section the map does not know is the same as no map at all.
+        real_service = window_module.QDesktopServices
+        window_module.QDesktopServices = Opener
+        try:
+            window._on_reference_link(QUrl("section:99.9"))
+        finally:
+            window_module.QDesktopServices = real_service
+        assert "#page=" not in opened[1], opened[1]
+    finally:
+        discard_changes(window)
+    print("ok: the card's section link opens the manual, on the page when it is known")
 
 
 def test_the_reference_opens_on_half_the_window(executable: str) -> None:
@@ -5305,6 +5419,8 @@ def main(argv: list[str]) -> int:
         test_running_programs_without_questions_finishes(executable)
         test_f1_shows_the_record_of_the_word_under_the_caret(executable)
         test_the_reference_opens_on_half_the_window(executable)
+        test_the_card_links_the_section_and_opens_the_page(executable)
+        test_one_ctrl_c_copies_where_the_user_looks(executable)
         test_the_cheat_sheet_lists_the_insert_table(executable)
         test_a_remapped_table_decides_what_ctrl_key_inserts(executable)
         test_the_output_can_be_saved(executable, files)

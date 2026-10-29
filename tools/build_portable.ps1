@@ -114,7 +114,7 @@ $trimmedFiles = @(
 
 #: What the checks insist on besides the files every package has.
 $neededFiles = @(
-    'prologd.exe', 'doc\builtins.json',
+    'prologd.exe', 'doc\builtins.json', 'doc\help_sections.json',
     'examples\lib\library.pld', 'examples\lessons\lesson_01.pld',
     'examples\problems\knapsack.pld', 'examples\sorting.pld',
     'stdlib\lists.pld', 'stdlib\sets.pld', 'stdlib\iso.pld'
@@ -159,6 +159,7 @@ function Copy-OurDocuments([string]$Target) {
         Copy-Item "doc\$name.pdf" $Target -Force
     }
     Copy-Item 'doc\builtins.json' $Target -Force
+    Copy-Item 'doc\help_sections.json' $Target -Force
 }
 
 $root = Split-Path -Parent $PSScriptRoot
@@ -228,6 +229,7 @@ try {
     }
     if (-not (Test-Path 'doc\style.typ')) { Fail 'doc\style.typ is missing (the other documents import it)' }
     if (-not (Test-Path 'doc\builtins.json')) { Fail 'doc\builtins.json is missing (F1 and the completion summaries read it)' }
+    if (-not (Test-Path 'doc\help_sections.json')) { Fail 'doc\help_sections.json is missing (the F1 card links pages with it)' }
     Write-Host "documents  : $($documentNames.Count) PDFs and builtins.json"
 
     Write-Step '5/8 Freeze the window (PyInstaller, --onedir)'

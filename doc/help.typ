@@ -1704,3 +1704,20 @@ prologd --format --format-width 100 -s program.pld > neat.pld
 проверки: `is_text`, `is_list`, `is_letter`, `is_digit`, `is_whole`, `is_number`.
 Переводы между типами читаются как `X_to_Y` с короткими корнями `int`, `float`,
 `str`, `list`: `int_to_float`, `str_to_int`, `str_to_float`, `str_to_list`.
+
+// The `F1` card of the window links to a section of this manual, and a link wants
+// a page.  A heading knows its own number — it is typed into the text — but only
+// `context` can ask where it landed, so this hidden element is what the `docs`
+// target turns into `doc/help_sections.json` (`doc/write_sections.cmake`).
+#context {
+  let number-of(body) = {
+    let head = if body.has("children") { body.children.first() } else { body }
+    let text = if head.has("text") { head.text } else { "" }
+    text.split(" ").first().split(".").filter(part => part != "").join(".")
+  }
+  let sections = query(heading).map(h => (
+    number: number-of(h.body),
+    page: h.location().page(),
+  ))
+  hide[#metadata(sections)<help-sections>]
+}

@@ -302,11 +302,24 @@ is an empty reference, never a failed start-up.
 
 Two places show it: a frameless `QLabel` under the completion popup showing the
 summary of the highlighted row (a row without a record shows no label — silence is
-better than «no description» for every second name), and the dock that `F1` opens:
-summary, English alias, the help section and *every* argument mode, filled for the
-word under the caret.  The dock is not modal — the manual is read *next to* the
-code, and a modal window cannot be driven from a headless test.  `F1` belongs to
-the in-window answer; the PDF manual keeps `Shift+F1`.
+better than «no description» for every second name), and the dock that `F1` opens.
+The dock is not modal — the manual is read *next to* the code, and a modal window
+cannot be driven from a headless test.  `F1` belongs to the in-window answer; the
+PDF manual keeps `Shift+F1`.
+
+The dock shows a **card**, not a list of lines: `reference.card_html` turns a record
+into the rich text a `QTextBrowser` renders — the name with its English spelling,
+kind, arities and group, the summary, then one table row per argument mode with the
+call in the editor's monospace face and its explanation in the interface one.  The
+colours come from the theme palette, so the card is dark on a dark desktop; the
+prose is set in the interface font because it is prose (the size is still the one
+preference every pane zooms with).  The section line is a link: `doc/help_sections.json`
+— written by `--target docs` from a hidden element `help.typ` emits, one
+`{number, page}` per heading — tells the window which page the section starts on, and
+the link opens the PDF with `#page=N`.  A checkout that never built the manuals has no
+map; the link then opens the manual at its start.  The card is markup, so the tests
+read the *text* (`reference_text()`) and the *link* (`toHtml()`), and
+`reference.card_html` is a pure function checked without a window.
 
 ## Menus, toolbar and icons
 

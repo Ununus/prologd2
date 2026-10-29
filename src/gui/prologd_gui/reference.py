@@ -53,6 +53,129 @@ def record_title(record: dict) -> str:
     return head
 
 
+#: The `kind` of a record in the words a reader of the window understands.
+KIND_LABELS = {
+    "predicate": "предикат",
+    "function": "функция",
+    "operator": "знак",
+    "directive": "директива",
+}
+
+#: The `group` of a record — the same words the manual's contents use.
+GROUP_LABELS = {
+    "arith": "арифметика",
+    "io": "ввод и вывод",
+    "types": "типы",
+    "control": "управление выводом",
+    "database": "база знаний",
+    "strings": "строки",
+    "graphics": "графика",
+    "debug": "отладка",
+    "lists": "списки",
+    "modules": "модули",
+}
+
+
+def card_html(record: dict, palette, mono: str = "") -> str:
+    """The record as the `F1` dock shows it: a card, not a list of lines.
+
+    Inline styles and the `<table>` of the rich-text subset `QTextDocument`
+    supports (no classes, no flex): the colours come from the theme palette, so the
+    card follows the light and the dark theme, and the names are set in the editor's
+    own monospace face (part 235).
+    """
+    name = _text(record.get("name"))
+    aliases = [alias for alias in (record.get("aliases") or []) if isinstance(alias, str)]
+    kind = KIND_LABELS.get(_text(record.get("kind")), "")
+    group = GROUP_LABELS.get(_text(record.get("group")), "")
+    arities = [str(arity) for arity in (record.get("arities") or []) if isinstance(arity, int)]
+    summary = _text(record.get("summary"))
+    variants = [variant for variant in (record.get("variants") or []) if isinstance(variant, str)]
+    section = _text(record.get("section"))
+
+    def code(text: str) -> str:
+        family = f"font-family:'{mono}';" if mono else ""
+        return f'<span style="{family}">{_escape(text)}</span>'
+
+    meta = " · ".join(
+        part for part in (kind, f"арности {', '.join(arities)}" if arities else "", group) if part
+    )
+    title = _escape(name)
+    if aliases:
+        title += f' <span style="font-weight:normal">{_escape(", ".join(aliases))}</span>'
+
+    parts = [
+        f'<p style="margin:0;font-size:large;font-weight:bold;'
+        f'color:{palette.syntax.keyword}">{title}</p>'
+    ]
+    if meta:
+        parts.append(
+            f'<p style="margin:0 0 6px 0;color:{palette.placeholder}">{_escape(meta)}</p>'
+        )
+    if summary:
+        parts.append(f'<p style="margin:0 0 8px 0;font-style:italic">{_escape(summary)}</p>')
+    if variants:
+        rule = f"border-bottom:1px solid {palette.alternate_base}"
+        rows = []
+        for variant in variants:
+            call, dash, what = variant.partition(" — ")
+            if dash:
+                rows.append(
+                    f'<tr><td width="45%" style="padding:4px 12px 4px 0;{rule}">'
+                    f"{code(call)}</td>"
+                    f'<td style="padding:4px 0;{rule}">{_escape(what)}</td></tr>'
+                )
+            else:
+                rows.append(f'<tr><td colspan="2" style="padding:4px 0">{code(variant)}</td></tr>')
+        parts.append(
+            '<table width="100%" cellspacing="0" cellpadding="3" '
+            'style="border-collapse:collapse">' + "".join(rows) + "</table>"
+        )
+    if section:
+        parts.append(
+            f'<p style="margin:8px 0 0 0"><a href="section:{_escape(section)}">'
+            f"руководство, §{_escape(section)}</a></p>"
+        )
+    return "".join(parts)
+
+
+def load_section_pages(path=None) -> dict[str, int]:
+    """`section -> page` of the manual; an empty map when the docs were not built.
+
+    The file is the array `help.typ` emits through a hidden `<help-sections>`
+    element, one `{"number": "7.4", "page": 22}` per heading (part 235).
+    """
+    try:
+        data = json.loads(pathlib.Path(path or pages_path()).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    if isinstance(data, list) and len(data) == 1 and isinstance(data[0], list):
+        data = data[0]  # a query of one element answers a list of lists
+    pages: dict[str, int] = {}
+    if isinstance(data, list):
+        for row in data:
+            if not isinstance(row, dict):
+                continue
+            number, page = row.get("number"), row.get("page")
+            if isinstance(number, str) and isinstance(page, int) and number not in pages:
+                pages[number] = page
+    return pages
+
+
+def pages_path() -> pathlib.Path:
+    """Where the map lives: `doc/help_sections.json`, beside the manuals."""
+    return paths.sections()
+
+
+def _text(value) -> str:
+    return value if isinstance(value, str) else ""
+
+
+def _escape(text: str) -> str:
+    return (text.replace("&", "&amp;").replace("<", "&lt;")
+                .replace(">", "&gt;").replace('"', "&quot;"))
+
+
 class Reference:
     """The records by name; an alias resolves to the record of its predicate."""
 

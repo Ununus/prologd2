@@ -20,6 +20,7 @@ compile_commands.json
 
 # Built documentation (the .typ sources are the sources of truth, see CMakeLists)
 doc/*.pdf
+doc/help_sections.json
 
 # Python front-end (src/gui) and the ai/ working folders
 __pycache__/

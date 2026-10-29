@@ -283,6 +283,16 @@ def document(name: str) -> pathlib.Path:
     return data_root() / "doc" / f"{name}.pdf"
 
 
+def sections() -> pathlib.Path:
+    """`section -> PDF page` of the manual, written by the `docs` target.
+
+    The `F1` card links to a section of `help.typ`, and a reader wants that page.
+    `help_sections.json` holds what a heading cannot tell a query — the page it
+    landed on — and a checkout without a built manual simply has no file.
+    """
+    return data_root() / "doc" / "help_sections.json"
+
+
 def builtins() -> pathlib.Path:
     """The records behind the `F1` dock and the completion summaries (`doc/builtins.json`).
 

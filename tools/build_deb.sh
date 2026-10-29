@@ -145,7 +145,8 @@ for name in "${DOCUMENTS[@]}"; do
     [ -f "doc/$name.pdf" ] || fail "doc/$name.pdf is missing (the docs target failed?)"
 done
 [ -f doc/builtins.json ] || fail 'doc/builtins.json is missing (F1 reads it)'
-echo "documents: ${#DOCUMENTS[@]} PDFs and builtins.json"
+[ -f doc/help_sections.json ] || fail 'doc/help_sections.json is missing (the F1 card links pages with it)'
+echo "documents: ${#DOCUMENTS[@]} PDFs, builtins.json and the section map"
 
 step '5/8 Freeze the window (PyInstaller --onedir)'
 GUI_DIST="$DIST/prologd-gui"
@@ -200,6 +201,7 @@ for name in "${DOCUMENTS[@]}"; do
     install -m 0644 "doc/$name.pdf" "$TREE/opt/prologd/doc/$name.pdf"
 done
 install -m 0644 doc/builtins.json "$TREE/opt/prologd/doc/builtins.json"
+install -m 0644 doc/help_sections.json "$TREE/opt/prologd/doc/help_sections.json"
 cp -a examples "$TREE/opt/prologd/examples"
 cp -a stdlib "$TREE/opt/prologd/stdlib"
 install -m 0755 installer/linux/prologd-gui "$TREE/usr/bin/prologd-gui"

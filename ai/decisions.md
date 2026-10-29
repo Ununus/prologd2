@@ -2098,3 +2098,47 @@ every file — and all 29 GUI scripts with both CTest suites stayed green.  The
 module *introductions* of the remaining small modules (12–24 lines, one to a file)
 were left alone: they say what the module is for, which is the one thing a reader
 cannot get from its code.
+
+## ADR-063: the `F1` card is rich text from the records, not a page from Typst
+
+**Context.**  The owner asked whether the predicate reference could look the way the
+manuals do — «примерно как Typst» — and whether that meant one `.typ` per predicate,
+compiled to PDF and shown in Qt.  The dock held three plain-text lines while
+`doc/builtins.json` already carried the kind, arities, group, section, summary and
+argument modes of 84 records.
+
+**Decision.**  The card is **rich text built from the record**:
+`reference.card_html(record, palette, mono)` — a pure function — rendered in a
+`QTextBrowser` that zooms with the rest of the window.
+
+The Typst routes were weighed and set aside:
+
+* **one `.typ` per predicate, compiled to PDF** — 84 documents beside a JSON that
+  already describes the same predicates, so the truth would live twice; `typst`
+  would become a dependency of the *package* build, `QtPdf` would enter the freeze,
+  and the PDF would fix its colours: a dark theme needs a second build of 84 pages.
+  A dock is a card next to the code, not a page of a book;
+* **one SVG per predicate from a Typst template** — visually the closest, but the
+  text stops being selectable or searchable, and the colours would be baked twice
+  as well.  Worth revisiting only if the card ever needs real typography (drop caps,
+  two-dimensional layouts) that `QTextDocument` cannot express;
+* **searching the PDF at runtime for the section** — fragile, and it would have made
+  page numbers a runtime guess instead of a build result.
+
+The one thing Typst still supplies is the **page**: `help.typ` ends with a hidden
+`#context` block that queries the headings and emits `{number, page}` for each as a
+`<help-sections>` metadata element, and `--target docs` writes that to
+`doc/help_sections.json` (`doc/write_sections.cmake`, `typst eval` with `typst query`
+as the fallback).  The card's section line is a link, and the window opens the PDF
+with `#page=N` — a fragment most viewers honour and the rest ignore, so a missing map
+costs the page and never the document.
+
+**Consequences.**  The colours come from the theme palette (`syntax.keyword` for the
+name, `placeholder` for the kind line, `alternate_base` for the row rules), so the
+card is dark on a dark desktop — but a `QTextDocument` settles its text colour when it
+is built, so the window re-renders the remembered record after a theme change.  The
+prose is set in the interface face and only the calls in the editor's monospace one:
+the dock stops looking like a log file.  `reference_text()` now answers the card's
+plain text, so the existing `F1` check reads facts from it and the link from
+`toHtml()`.  The map is a build artefact: gitignored, shipped by all three package
+scripts, and absent in a fresh checkout, where the link opens the manual at its start.

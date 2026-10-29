@@ -167,6 +167,15 @@ if(TYPST_EXECUTABLE)
               "${CMAKE_SOURCE_DIR}/doc/${doc}.pdf"
       COMMENT "typst: doc/${doc}.typ -> doc/${doc}.pdf")
   endforeach()
+  # The `F1` card links to a section of `help.typ`; a page number is the one thing
+  # a query cannot ask for without `context`, so the map is written beside the PDF.
+  add_custom_command(TARGET prologd_docs POST_BUILD
+    COMMAND ${CMAKE_COMMAND}
+            -DTYPST=${TYPST_EXECUTABLE}
+            -DSOURCE=${CMAKE_SOURCE_DIR}/doc/help.typ
+            -DOUTPUT=${CMAKE_SOURCE_DIR}/doc/help_sections.json
+            -P "${CMAKE_SOURCE_DIR}/doc/write_sections.cmake"
+    COMMENT "typst: doc/help.typ -> doc/help_sections.json")
   add_custom_target(docs DEPENDS prologd_docs)
 else()
   add_custom_command(TARGET prologd_docs POST_BUILD

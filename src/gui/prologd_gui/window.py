@@ -69,7 +69,7 @@ from . import (
     tokens,
 )
 from .buffers import Buffer
-from .editor import CodeEditor, QueryLine, ZoomablePlainTextEdit
+from .editor import CodeEditor, QueryLine, ZoomablePlainTextEdit, ZoomableTextBrowser
 from .panes import Pane
 from .session import PrologSession, read_keywords
 from .settings import OUTPUT_FONT_SIZE, Settings
@@ -129,6 +129,10 @@ class MainWindow(QMainWindow):
         #: window: the popup's detail label and `F1` read the same object, and a
         #: checkout without the file is an empty reference, not a failure.
         self._reference = reference.Reference.load()
+        #: `section -> PDF page` for the card's link; empty without a built manual.
+        self._section_pages = reference.load_section_pages()
+        #: The record the dock is showing: what a theme change re-renders.
+        self._reference_record: dict | None = None
         #: The files a buffer's `ИМПОРТ` lines name, read once per version of the
         #: file and handed to the popups (task_102).
         self._imported_files = imports.ImportedFiles()
@@ -447,14 +451,15 @@ class MainWindow(QMainWindow):
 
         # The reference of a predicate (task_37, `F1`): a dock, not a modal box —
         # the manual is read *next to* the code, and a modal cannot be driven
-        # from a headless test.  It zooms with everything else and starts hidden.
-        self._reference_pane = ZoomablePlainTextEdit(
+        # from a headless test.  The record is a *card* (part 235): a rich-text pane
+        # with the theme colours, which a plain edit could not show.
+        self._reference_pane = ZoomableTextBrowser(
             font_family=self._settings.font_family,
             font_size=self._settings.font_size,
         )
-        self._reference_pane.setReadOnly(True)
         self._reference_pane.setPlaceholderText("Справка по предикату: F1 на имени")
         self._reference_pane.zoomChanged.connect(self._on_zoom_changed)
+        self._reference_pane.anchorClicked.connect(self._on_reference_link)
         self._reference_dock = QDockWidget("Справка по предикату", self)
         self._reference_dock.setObjectName("referenceDock")
         self._reference_dock.setWidget(self._reference_pane)
@@ -1187,8 +1192,13 @@ class MainWindow(QMainWindow):
             if text:
                 QApplication.clipboard().setText(text)
             return
+        if isinstance(focused, panels.ProblemsPane):
+            # The row under the caret, in the form «Копировать» of its own menu
+            # puts on the clipboard; nothing to copy means nothing copied.
+            focused.copy_current_problem()
+            return
         if focused is not None and focused is not self.editor() and isinstance(
-            focused, (ZoomablePlainTextEdit, QLineEdit)
+            focused, (ZoomablePlainTextEdit, ZoomableTextBrowser, QLineEdit)
         ):
             focused.copy()
             return
@@ -1296,7 +1306,7 @@ class MainWindow(QMainWindow):
         box.setText(self.about_text())
         box.exec()
 
-    def _open_document(self, name: str) -> None:
+    def _open_document(self, name: str, *, section: str = "") -> None:
         """Opens a built PDF, or says where it should be.
 
         The PDFs are written into `doc/` by the `docs` target and are not in
@@ -1307,8 +1317,9 @@ class MainWindow(QMainWindow):
         """
         pdf = paths.document(name)
         if pdf.is_file():
+            target = self._manual_url(pdf, section)
             with paths.without_bundled_environment():
-                QDesktopServices.openUrl(QUrl.fromLocalFile(str(pdf)))
+                QDesktopServices.openUrl(target)
             return
         if paths.frozen():
             QMessageBox.information(
@@ -1325,6 +1336,18 @@ class MainWindow(QMainWindow):
             "Документация собирается командой:\n"
             "cmake --build build --target docs",
         )
+
+    def _manual_url(self, pdf: pathlib.Path, section: str = "") -> QUrl:
+        """The manual, at the page its section starts on when the map knows it.
+
+        `#page=` is what most viewers honour and the rest ignore, so a missing map
+        costs the page, never the document.
+        """
+        target = QUrl.fromLocalFile(str(pdf))
+        page = self._section_pages.get(section) if section else None
+        if page:
+            target.setFragment(f"page={page}")
+        return target
 
     # -- the recent-files submenu ------------------------------------------
     def _fill_recent_menu(self) -> None:
@@ -3637,21 +3660,23 @@ class MainWindow(QMainWindow):
         key.  A checkout without `doc/builtins.json` is not a failure either —
         the dock says the reference is unavailable.
         """
+        self._reference_record = None
         if len(self._reference) == 0:
-            text = "справочник недоступен: не найден doc/builtins.json"
+            self._reference_pane.setPlainText(
+                "справочник недоступен: не найден doc/builtins.json"
+            )
         else:
             view = self.editor()
             word = view.selected_token() or view.word_under_cursor()
-            record = self._reference.record(word) if word else None
-            if record is None:
-                text = (
+            self._reference_record = self._reference.record(word) if word else None
+            if self._reference_record is None:
+                self._reference_pane.setPlainText(
                     f"нет справки для «{word}»"
                     if word
                     else "поставьте курсор на имя предиката"
                 )
             else:
-                text = self._reference_text(record)
-        self._reference_pane.setPlainText(text)
+                self._render_reference()
         self._reference_dock.setVisible(True)
         if not self._reference_sized:
             # The record is read *next to* the program, and a dock the width of its
@@ -3685,6 +3710,33 @@ class MainWindow(QMainWindow):
             lines.append("")
             lines.extend(variants)
         return "\n".join(lines)
+
+    def _render_reference(self) -> None:
+        """Paints the remembered record — a theme change repaints this card.
+
+        The colour of a rich-text document is settled when the document is made, so
+        a card rendered in the light theme keeps its dark text under a dark one
+        until it is rendered again (part 235).
+        """
+        record = self._reference_record
+        if record is None:
+            return
+        self._reference_pane.setHtml(
+            reference.card_html(record, self._settings.palette,
+                                mono=self._settings.font_family)
+        )
+
+    def _on_reference_link(self, url) -> None:
+        """A section of the manual, clicked in the card: the manual, on that page.
+
+        The page comes from `doc/help_sections.json`, which the `docs` target writes
+        out of the headings; without it (a fresh checkout, a package built without
+        the manuals) the link opens the manual at its start — the `#page=` fragment
+        is honoured by the viewers that know it and ignored by the rest.
+        """
+        target = url.toString()
+        if target.startswith("section:"):
+            self._open_document("help", section=target.removeprefix("section:"))
 
     def reference_text(self) -> str:
         """What the reference dock is showing ("" while it was never filled)."""
@@ -3882,6 +3934,7 @@ class MainWindow(QMainWindow):
         self._apply_output_position(remember=False)
         self._refresh_panel_tabs()
         appearance.apply_theme(QApplication.instance(), self._settings.theme)
+        self._render_reference()
 
         # The insert table is data in the same file, and «Вернуть встроенную
         # таблицу» in the dialog has to reach the editors of an open window too.

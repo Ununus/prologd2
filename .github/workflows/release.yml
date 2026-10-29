@@ -193,7 +193,7 @@ jobs:
           mkdir -p "$app/bin"
           cp build/macos-release/src/cli/prologd "$app/bin/"
           mkdir -p "$app/doc"
-          cp doc/*.pdf doc/builtins.json "$app/doc/"
+          cp doc/*.pdf doc/builtins.json doc/help_sections.json "$app/doc/"
           cp -R examples stdlib "$app/"
           python3 tools/macos_plist.py dist/PrologD.app/Contents/Info.plist "$version"
           plutil -lint dist/PrologD.app/Contents/Info.plist
