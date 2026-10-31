@@ -1,5 +1,7 @@
 #include "prlib/term.hpp"
 
+#include <cmath>
+#include <compare>
 #include <utility>
 
 namespace prologd {
@@ -183,6 +185,49 @@ bool structurallyEqual(const Term& lhs, const Term& rhs) {
     }
   }
   return false;
+}
+
+namespace {
+
+/// Compares a whole number with a real, exactly.  `BigInt::fromDouble` gives the
+/// whole part the real holds (it truncates toward zero), so the two integers
+/// decide, and the fractional part decides only when they are equal.
+int compareIntegerToDouble(const BigInt& integer, double real) {
+  if (std::isnan(real)) {
+    return 1;  // NaN stands before every number
+  }
+  if (std::isinf(real)) {
+    return real > 0 ? -1 : 1;
+  }
+  const BigInt whole = BigInt::fromDouble(real);
+  const std::strong_ordering order = integer <=> whole;
+  if (order != 0) {
+    return order < 0 ? -1 : 1;
+  }
+  const double truncated = std::trunc(real);
+  if (real > truncated) {
+    return -1;  // the real has a fraction, the integer does not
+  }
+  return real < truncated ? 1 : 0;
+}
+
+}  // namespace
+
+int compareNumbers(const Term& left, const Term& right) {
+  if (left.kind == TermKind::Int) {
+    if (right.kind == TermKind::Int) {
+      const std::strong_ordering order = left.integer <=> right.integer;
+      return order < 0 ? -1 : (order > 0 ? 1 : 0);
+    }
+    return compareIntegerToDouble(left.integer, right.real);
+  }
+  if (right.kind == TermKind::Int) {
+    return -compareIntegerToDouble(right.integer, left.real);
+  }
+  if (std::isnan(left.real) || std::isnan(right.real)) {
+    return std::isnan(left.real) ? (std::isnan(right.real) ? 0 : -1) : 1;
+  }
+  return left.real < right.real ? -1 : (left.real > right.real ? 1 : 0);
 }
 
 std::string functorKey(std::string_view name, std::size_t arity) {

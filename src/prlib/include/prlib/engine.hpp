@@ -35,6 +35,14 @@ struct ArithValue {
   [[nodiscard]] BigInt asInteger() const;  // truncates toward zero
 };
 
+/// The same exact comparison `compareNumbers` gives two terms, for numbers an
+/// expression has just computed: `БОЛЬШЕ`, `МЕНЬШЕ` and `СРАВНЕНИЕ` read an
+/// argument through `#…#` first, so they cannot hand the terms themselves to the
+/// comparator, and they must not disagree with it — the `double` narrowing they
+/// used to do made `2 ** 53 + 1` and the real `2 ** 53` compare equal while
+/// `РАВНО` called them different numbers.
+int compareNumbers(const ArithValue& left, const ArithValue& right);
+
 /// What the solver was doing when a step hook was called.  The four points are
 /// the four the textual trace already has: a goal is entered, it succeeds, the
 /// solver goes back into it, or it fails.

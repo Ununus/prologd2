@@ -35,6 +35,11 @@ BigInt ArithValue::asInteger() const {
   return is_float ? BigInt::fromDouble(real) : integer;
 }
 
+int compareNumbers(const ArithValue& left, const ArithValue& right) {
+  return compareNumbers(left.is_float ? makeFloat(left.real) : makeInt(left.integer),
+                        right.is_float ? makeFloat(right.real) : makeInt(right.integer));
+}
+
 // ---------------------------------------------------------------------------
 // Limits
 // ---------------------------------------------------------------------------
@@ -852,17 +857,12 @@ bool Engine::unify(const Term& first, const Term& second) {
 
     // An integer and a real unify when they are the *same number*: the original
     // keeps the two apart as types but compares their values, so `6` matches
-    // `6.0` and not `6.5`.  The comparison has to be exact — the integer used to
-    // be narrowed to `float` first and compared with the double, which made
-    // different numbers unify (`16777217` with `16777216.0`) and made a large
-    // integer miss its own real (`16777217` with `16777217.0`); comparing the
-    // integer's nearest double would let `10^20 + 1` match `10^20.0`.
+    // `6.0` and not `6.5`.  The comparison is exact and shared with the standard
+    // order (`compareNumbers`), so `=` and `compare/3` cannot disagree about one
+    // pair: a large integer does not match a real that merely rounds to it.
     if ((left.kind == TermKind::Int && right.kind == TermKind::Float) ||
         (left.kind == TermKind::Float && right.kind == TermKind::Int)) {
-      const Term& as_int = left.kind == TermKind::Int ? left : right;
-      const double real = (left.kind == TermKind::Int ? right : left).real;
-      if (!std::isfinite(real) || real != std::trunc(real) ||
-          BigInt::fromDouble(real) != as_int.integer) {
+      if (compareNumbers(left, right) != 0) {
         return false;
       }
       continue;

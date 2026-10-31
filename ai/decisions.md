@@ -1853,7 +1853,8 @@ expression could not say `sqrt(2)`.
   is `-2`.  ISO's `mod` takes the divisor's sign and would answer `1`; the owner
   asked to keep ours for now, so `mod` and `rem` are the same operation and the
   difference is written down in the manual and in the tests instead of being
-  silently «fixed» in one of them;
+  silently «fixed» in one of them;  **that part is superseded by ADR-065**
+  (part 240): `div` and `mod` now round down, as ISO has them;
 * the four integer operators refuse real operands with a type error naming the
   operator — a truncation nobody asked for is worse than a diagnostic.
 
@@ -2142,3 +2143,99 @@ the dock stops looking like a log file.  `reference_text()` now answers the card
 plain text, so the existing `F1` check reads facts from it and the link from
 `toHtml()`.  The map is a build artefact: gitignored, shipped by all three package
 scripts, and absent in a fresh checkout, where the link opens the manual at its start.
+
+---
+
+## ADR-064: one exact comparison for every number, and printing that reads back
+
+**Context.**  Three places compared numbers, and the two that handled a mixed pair
+narrowed the integer to a `double`: the standard order (`order.cpp`), the
+`ArithValue` comparison behind `БОЛЬШЕ`/`МЕНЬШЕ` (`builtins_arith.cpp`), and — by
+an exact rule of its own — unification (`engine.cpp`).  On a pair near 2^53 the
+three disagreed: `БОЛЬШЕ(2 ** 53 + 1, 2 ** 53 + 0.0)` was false, `compare` answered
+`=`, `РАВНО` answered no.  The comparison was not even transitive, so
+`std::stable_sort` inside `СОРТИРОВКА` ran on an invalid order and dropped the
+wrong element: `[2 ** 53 + 1, 2 ** 53 + 0.0, 2 ** 53]` sorted to two different
+lists depending on the input order.  Separately, `formatFloat` went through
+`std::to_string`, which keeps six decimals: `#1/3#` was written `0.333333`, a text
+that does not read back as the number it stands for.
+
+**Decision.**  Numbers are compared by value **exactly, from one function**.
+`compareNumbers(const Term&, const Term&)` in `term.hpp`/`term.cpp` is the rule:
+two integers compare as integers, a mixed pair compares the integer with the real
+without narrowing either side, NaN stands before every number.  The standard order
+calls it; unification is `compareNumbers(...) == 0`; and the numbers an expression
+has just produced go through the overload `compareNumbers(const ArithValue&, ...)`
+in `engine.hpp`/`engine.cpp`, which converts to terms and calls the same rule, so
+`БОЛЬШЕ`, `СРАВНЕНИЕ` and `РАВНО` cannot disagree by construction.  The relations
+that check a computed value against a given one — `СЛОЖЕНИЕ` and `УМНОЖЕНИЕ` with
+all three places bound, `ABS`, `SQRT`, the trigonometry — take the same answer
+through a local `sameNumber`, which is that rule with NaN never equal to anything
+(IEEE's answer, not the total order's).
+
+`BigInt::fromDouble` had to become exact for this to hold: it divided the
+magnitude by the base in `double`, and above 2^53 that dropped low digits (1846 of
+3999 random large doubles came back wrong).  It now writes the whole part with
+`std::to_chars(std::trunc(value), chars_format::fixed, 0)` — exact by definition —
+and parses the digits, so the conversion is the number the double holds.
+
+`formatFloat` prints the **shortest text that reads back as the same double**
+(`std::to_chars` shortest), and appends `.0` when that text has neither a point nor
+an exponent, so a real never prints as a whole number.  The lexer already read the
+exponent form, so `1e+20` is a literal the parser takes.
+
+The deliberate deviation from ISO stays: `1 = 1.0` holds (the original PrologD
+compares values, and `help.typ` §4.7 says so).  ISO keeps the two types apart
+because it has `==` to observe the difference; this dialect has no `==` at all
+(`lexer.cpp` answers «не оператор»), so comparing values everywhere — `=`, `=:=`,
+`<`, standard order — is *more* consistent than ISO's split, not less.  `ЦЕЛ/1` and
+`ВЕЩ/1` still tell the kinds apart, and the arithmetic keeps them: `/` is the real
+quotient, `//` the whole one.
+
+**Consequences.**  `СОРТИРОВКА`, `СРАВНЕНИЕ`, `БОЛЬШЕ`, `МЕНЬШЕ` and `РАВНО` give
+one answer about one pair, and `std::stable_sort` gets a real order again (the
+mixed pair near 2^53 now sorts out deterministically).  Answers are longer than
+before: `pi` prints all seventeen digits, and `2 ** 0.5 * 2 ** 0.5` prints
+`2.0000000000000004` rather than a `2.0` that neither unified with it nor read back
+as it.  A lesson and §3.3 say so, and the two lines that still described the
+integer `/` of an older version (`#1/2#` is `0`, `ВЕЩ(#1/2#)` is false) are
+corrected.  The paper trail for a real is now `to_chars`, which needs a C++17
+library that has floating-point `to_chars` — GCC 11+, MSVC 2019 16.4+, libc++ 14+,
+all below the C++23 the project already asks for.
+
+**Status.** Accepted.
+
+---
+
+## ADR-065: `div` rounds down and `mod` keeps the divisor's sign
+
+**Context.**  ADR-056 made `//` and `div` one operation (truncating) and `rem` and
+`mod` another (the remainder of that truncation, with the dividend's sign), and
+recorded the difference from ISO as an owner's choice.  The owner has now asked for
+ISO: `div` and `mod` are the floored pair.
+
+**Decision.**  The four whole operators are two pairs, and the pair decides how the
+quotient rounds when the signs of the operands differ:
+
+* `//` and `rem` truncate toward zero — `-7 // 2` is `-3`, `-7 rem 2` is `-1`;
+* `div` and `mod` round down — `-7 div 2` is `-4`, `-7 mod 2` is `1`, and `5 mod -3`
+  is `-1`.
+
+`BigInt` already answers the truncated pair (`/` and `%`, both toward zero), so the
+floored one is that answer one step lower whenever the division left a remainder
+whose sign differs from the divisor's; the remainder is then measured from the
+quotient below it, which is why `mod` carries the divisor's sign.  Each pair closes
+its own identity — `A = (A // B) * B + A rem B` and `A = (A div B) * B + A mod B` —
+which the test checks on both lines.
+
+**Consequences.**  `div` and `mod` are no longer synonyms of `//` and `rem`, so the
+manual's §3.3 lists four operators with two rules instead of two with a spelling
+each, and `builtins.json` says so in the three records.  Nothing in `examples/` or
+`stdlib/` changes answer: the corpus divides non-negative numbers only (`graphics.pld`
+splits a colour code, `math.pld` takes a gcd and a half), where the two rules agree.
+Each record of the reference now shows the negative case (`-5 mod 3` is `1`), which
+is what a reader coming from ISO looks for.  The permutation is exact for every sign
+combination: 574 pairs of `(a, b)` for `a` in -20…20 and `b` in -7…7 were run through
+the interpreter and checked against Python's `//` and `%`, with no mismatch.
+
+**Status.** Accepted.

@@ -456,7 +456,8 @@ TEST_CASE("arithmetic expressions evaluate with precedence") {
 
 TEST_CASE("`/` is float division and `//` the integer one") {
   // ISO's `/` always answers a real: `1 / 2` is `0.5` and `6 / 3` is `2.0`.  The
-  // integer quotient is `//` (or `div`), which truncates toward zero.
+  // integer quotients are `//`, which truncates toward zero, and `div`, which
+  // rounds down; they agree on operands of the same sign.
   const auto result = runProgram(
       "?X is 1 / 2.\n"
       "?X is 6 / 3.\n"
@@ -471,20 +472,32 @@ TEST_CASE("`/` is float division and `//` the integer one") {
   REQUIRE(result.output == "X=0.5\nX=2.0\nX=0\nX=3\nX=-3\nX=2\nX=2\nДА\nДА\n");
 }
 
-TEST_CASE("`rem` and `mod` answer the remainder with the dividend's sign") {
-  // ISO's `rem` takes the sign of the dividend and `div` truncates toward zero,
-  // so `-5 rem 3` is `-2` while `-5 div 3` is `-1`.  ISO's `mod` would answer 1
-  // — that difference is on purpose here, so it is written down as a check.
+TEST_CASE("div and mod round down while the slash pair truncates") {
+  // ISO's four whole operators are two pairs, and the pair decides which way the
+  // quotient goes when the signs differ: `//` and `rem` truncate toward zero, so
+  // the remainder carries the dividend's sign (`-7 // 2` is -3 and `-7 rem 2` is
+  // -1), while `div` and `mod` round down, so the remainder carries the
+  // divisor's (`-7 div 2` is -4 and `-7 mod 2` is 1).  Each pair closes its own
+  // identity, `A = (A op B) * B + остаток`, which is what the last two lines
+  // check.
   const auto result = runProgram(
-      "?X is -5 rem 3.\n"
+      "?X is -7 // 2.\n"
+      "?X is -7 rem 2.\n"
+      "?X is -7 div 2.\n"
+      "?X is -7 mod 2.\n"
+      "?X is 7 // -2.\n"
+      "?X is 7 rem -2.\n"
+      "?X is 7 div -2.\n"
+      "?X is 7 mod -2.\n"
       "?X is -5 mod 3.\n"
-      "?X is -5 div 3.\n"
-      "?X is 5 rem 3.\n"
-      "?X is -5 rem -3.\n"
       "?X is 5 mod -3.\n"
-      "?X is 7 // 2 * 2 + 7 rem 2.\n");
+      "?X is -6 div 2.\n"
+      "?X is 7 // 2 * 2 + 7 rem 2.\n"
+      "?X is 7 div 2 * 2 + 7 mod 2.\n");
   REQUIRE(result.loaded);
-  REQUIRE(result.output == "X=-2\nX=-2\nX=-1\nX=2\nX=-2\nX=2\nX=7\n");
+  REQUIRE(result.output ==
+          "X=-3\nX=-1\nX=-4\nX=1\nX=-3\nX=1\nX=-4\nX=-1\nX=1\nX=-1\nX=-3\n"
+          "X=7\nX=7\n");
 }
 
 TEST_CASE("the arithmetic functions of ISO work inside an expression") {
@@ -511,7 +524,10 @@ TEST_CASE("the arithmetic functions of ISO work inside an expression") {
   REQUIRE(result.loaded);
   REQUIRE(result.output ==
           "X=5\nX=5.5\nX=5\nX=-1\nX=0\nX=1.0\nX=-1.0\nX=3.0\nX=0.0\n"
-          "X=1.0\nX=0.0\nX=1.0\nX=3.141593\nX=4\nX=-2\n");
+          // The answer is the shortest text that reads back as the same
+          // real: `pi` has all seventeen digits, not the six the old printer
+          // kept.
+          "X=1.0\nX=0.0\nX=1.0\nX=3.141592653589793\nX=4\nX=-2\n");
 }
 
 TEST_CASE("the rounding functions answer whole numbers") {
@@ -562,7 +578,11 @@ TEST_CASE("`**` is ISO's power, and it binds tighter than the sign") {
   REQUIRE(result.loaded);
   REQUIRE(result.output ==
           "X=1024\nX=1267650600228229401496703205376\nX=-4\nX=9\nX=18\nX=64\n"
-          "X=512\nX=0.5\nX=2.0\nX=1\nX=-8\nX=2.0\nX=8\nДА\nНЕТ\nДА\n");
+          // `4 ** 0.5` is 2.0 exactly; `2 ** 0.5 * 2 ** 0.5` is only
+          // nearly 2, and the answer now says so instead of rounding it to
+          // `2.0` — a text the query would not read back as the same number.
+          "X=512\nX=0.5\nX=2.0\nX=1\nX=-8\nX=2.0000000000000004\nX=8\n"
+          "ДА\nНЕТ\nДА\n");
 }
 
 TEST_CASE("`**` refuses a chain and a number it cannot hold") {
@@ -654,4 +674,20 @@ TEST_CASE("conversions between numbers and strings") {
       "?СТРВЕЩ(\"3.14\", K).\n");
   REQUIRE(result.loaded);
   REQUIRE(result.output == "X=3.0\nX=3\nK=42\nНЕТ\nK=3.14\n");
+}
+
+TEST_CASE("a relation checks its answer with the exact rule unification uses") {
+  // `СЛОЖЕНИЕ`, `УМНОЖЕНИЕ`, `ABS`, `SQRT` and the trigonometry compare the value
+  // they computed with the one they were given.  Through `double` the whole
+  // 2^53 + 1 and the real 2^53 were one number, so a relation answered «да» where
+  // `РАВНО` answered «нет»; both take their answer from `compareNumbers` now.
+  const auto result = runProgram(
+      "?СЛОЖЕНИЕ(0.0, 9007199254740992.0, 9007199254740993).\n"
+      "?СЛОЖЕНИЕ(0.0, 9007199254740992.0, 9007199254740992).\n"
+      "?УМНОЖЕНИЕ(1.0, 9007199254740992.0, 9007199254740993).\n"
+      "?УМНОЖЕНИЕ(1.0, 9007199254740992.0, 9007199254740992).\n"
+      "?ABS(-9007199254740992.0, 9007199254740993).\n"
+      "?ABS(-9007199254740992.0, 9007199254740992).\n");
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "НЕТ\nДА\nНЕТ\nДА\nНЕТ\nДА\n");
 }

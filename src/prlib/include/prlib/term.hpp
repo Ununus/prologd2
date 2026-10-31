@@ -109,6 +109,21 @@ bool listToVectorWithTail(const Term& list, std::vector<Term>& elements, Term& t
 /// Structural equality of ground terms (variables compare by id).
 bool structurallyEqual(const Term& lhs, const Term& rhs);
 
+/// Compares two numbers by value, exactly: the answer is `-1`, `0` or `1`.
+///
+/// Both terms must be `Int` or `Float`.  Two integers compare as integers (they
+/// can be wider than a `double`), and a mixed pair compares the integer with the
+/// real *exactly*, narrowing neither side: `2 ** 100` and its own nearest
+/// `double` are different numbers, and this says so.  `РАВНО` (through `== 0`),
+/// `БОЛЬШЕ`, `МЕНЬШЕ` and the standard order of terms all take their answer
+/// from here, so they cannot disagree about one pair — which is what the
+/// `double` comparison they used to share could do.
+///
+/// NaN stands before every number and equals itself, as ISO has it; the dialect
+/// produces none of its own (`sqrt(-1)` is an error), so this is the answer for
+/// a real that came from outside through `СТРВЕЩ`.
+int compareNumbers(const Term& left, const Term& right);
+
 /// Human readable functor key, `name/arity`.
 std::string functorKey(std::string_view name, std::size_t arity);
 

@@ -1,6 +1,8 @@
 #include "prlib/term_print.hpp"
 
 #include <algorithm>
+#include <array>
+#include <charconv>
 #include <cmath>
 #include <unordered_map>
 #include <vector>
@@ -16,9 +18,15 @@ std::string formatFloat(double value) {
   if (std::isinf(value)) {
     return value < 0 ? "-inf" : "inf";
   }
-  std::string text = std::to_string(value);
-  while (text.size() > 1 && text[text.size() - 2] != '.' && text.back() == '0') {
-    text.pop_back();
+  // The shortest text that reads back as this very `double`, so an answer can be
+  // typed into a query again: `1 / 3` prints all the digits it takes instead of
+  // the six `std::to_string` gave, and `2.0` keeps the `.0` that tells a real
+  // from the whole `2`.
+  std::array<char, 32> buffer{};
+  const auto written = std::to_chars(buffer.data(), buffer.data() + buffer.size(), value);
+  std::string text(buffer.data(), static_cast<std::size_t>(written.ptr - buffer.data()));
+  if (text.find_first_of(".eE") == std::string::npos) {
+    text += ".0";
   }
   return text;
 }

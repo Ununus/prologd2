@@ -1,6 +1,8 @@
 #include "prlib/big_int.hpp"
 
 #include <algorithm>
+#include <array>
+#include <charconv>
 #include <cmath>
 #include <limits>
 #include <stdexcept>
@@ -399,18 +401,24 @@ BigInt BigInt::fromDouble(double value) {
   if (!std::isfinite(value) || value == 0.0) {
     return BigInt();
   }
-  const bool negative = value < 0.0;
-  double magnitude = std::floor(std::abs(value));
-  BigInt result;
-  std::vector<std::uint32_t>& limbs = result.limbs_;
-  while (magnitude >= 1.0) {
-    const double chunk = std::fmod(magnitude, static_cast<double>(kBase));
-    limbs.push_back(static_cast<std::uint32_t>(chunk));
-    magnitude = (magnitude - chunk) / static_cast<double>(kBase);
+  // The whole part written out exactly.  `to_chars` rounds the value it is
+  // given, and an integral `double` needs no rounding at all: the digits are the
+  // number itself.  The limb loop this replaces divided the magnitude by
+  // `kBase`, and above 2^53 that division dropped low digits — a real of
+  // `10^300` came back as an integer a few digits short of it, which made
+  // `РАВНО` pair a whole number with the wrong double.
+  //
+  // 310 characters is the longest whole part a `double` can have (`1.8e308`),
+  // and the buffer leaves room for the sign.
+  std::array<char, 320> digits{};
+  const auto written =
+      std::to_chars(digits.data(), digits.data() + digits.size(), std::trunc(value),
+                    std::chars_format::fixed, 0);
+  if (written.ec != std::errc{}) {
+    return BigInt();
   }
-  result.negative_ = negative;
-  result.trim();
-  return result;
+  return BigInt(std::string_view(
+      digits.data(), static_cast<std::size_t>(written.ptr - digits.data())));
 }
 
 std::size_t BigInt::digitCount() const {

@@ -1,5 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include <cmath>
 #include <string>
 
 #include "prlib/big_int.hpp"
@@ -78,4 +79,22 @@ TEST_CASE("BigInt double conversion") {
   REQUIRE(BigInt::fromDouble(-42.9).toString() == "-42");
   const BigInt value("123456789012345678901234567890");
   REQUIRE(BigInt::fromDouble(value.toDouble()).digitCount() > 20);
+
+  // The conversion is exact for every finite double, not just for the small
+  // ones.  The limb loop it used to run divided the magnitude by the base in
+  // `double`, and above 2^53 that dropped low digits: `1e300` came back as an
+  // integer a few digits short of it, so `РАВНО` could pair a whole number with
+  // the wrong real.  Each expectation below is the number the double holds.
+  const double large = std::ldexp(1.0, 100);
+  REQUIRE(BigInt::fromDouble(large).toString() == "1267650600228229401496703205376");
+  // The next double after 2^100 is 2^100 + 2^48.
+  REQUIRE(BigInt::fromDouble(std::nextafter(large, INFINITY)).toString() ==
+          "1267650600228229682971679916032");
+  // `1e300` is not that decimal number: the double nearest to it is the one
+  // whose digits these are, and the conversion must give exactly them.
+  REQUIRE(BigInt::fromDouble(1e300).toString() ==
+          "100000000000000005250476025520442024870446858110815915491585411551180245798890819578"
+          "637137508044786404370444383288387817694252323536043057564479218478670698284838720092"
+          "657580373783023379478809005936895323497079994508111903896764088007465274278014249457"
+          "9258788820056842838115669472196386865459400540160");
 }

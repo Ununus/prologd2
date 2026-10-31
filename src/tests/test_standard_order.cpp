@@ -115,3 +115,36 @@ TEST_CASE("the dialect's own name for compare reaches the same function") {
   REQUIRE_FALSE(result.runtimeError);
   REQUIRE(result.output == "Порядок=<\nНЕТ\nДА\n");
 }
+
+TEST_CASE("a mixed pair of numbers compares exactly and not through a double") {
+  // 2^53 + 1 and the real 2^53 are different numbers that a `double` comparison
+  // calls equal.  Comparing them through `double` made the answer to `compare`
+  // disagree with `РАВНО` and threw one of them out of `СОРТИРОВКА`; the
+  // comparator now takes the exact rule from `compareNumbers`, the one
+  // unification uses.
+  const auto result = runProgram(
+      "?compare(Порядок, #2 ** 53 + 1#, #2 ** 53 + 0.0#).\n"
+      "?БОЛЬШЕ(#2 ** 53 + 1#, #2 ** 53 + 0.0#).\n"
+      "?МЕНЬШЕ(#2 ** 53 + 0.0#, #2 ** 53 + 1#).\n"
+      "?РАВНО(#2 ** 53 + 1#, #2 ** 53 + 0.0#).\n"
+      "?РАВНО(#2 ** 53#, #2 ** 53 + 0.0#).\n"
+      "?РАВНО(#2 ** 100#, #2 ** 100 + 0.0#).\n"
+      "?X is 2 ** 53, Y is 2 ** 53 + 1, Z is 2 ** 53 + 0.0, СОРТИРОВКА([Y, Z, X], L).\n");
+  REQUIRE(result.loaded);
+  REQUIRE_FALSE(result.runtimeError);
+  REQUIRE(result.output ==
+          // Bigger by one, and the order says so; the real 2^53 is the same
+          // number as the whole 2^53, which is why `РАВНО` pairs them.
+          "Порядок=>\n"
+          "ДА\n"
+          "ДА\n"
+          "НЕТ\n"
+          "ДА\n"
+          "ДА\n"
+          // Both numbers survive: the real `2^53` is a duplicate of the whole
+          // `2^53` and goes, `2^53 + 1` stays.
+          "X=9007199254740992\n"
+          "Y=9007199254740993\n"
+          "Z=9007199254740992.0\n"
+          "L=[9007199254740992.0,9007199254740993]\n");
+}

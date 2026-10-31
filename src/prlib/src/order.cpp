@@ -29,24 +29,6 @@ int rankOf(const Term& term) {
   return 3;
 }
 
-/// Numbers by value.  Two integers are compared as integers (they can be wider
-/// than a `double`), and a mix goes through `double`, exactly as `БОЛЬШЕ` and
-/// `МЕНЬШЕ` do it — so `sort/2` and the signs agree on what «равно» means.
-int compareNumbers(const Term& left, const Term& right) {
-  if (left.kind == TermKind::Int && right.kind == TermKind::Int) {
-    if (left.integer < right.integer) {
-      return -1;
-    }
-    return left.integer > right.integer ? 1 : 0;
-  }
-  const double a = left.kind == TermKind::Int ? left.integer.toDouble() : left.real;
-  const double b = right.kind == TermKind::Int ? right.integer.toDouble() : right.real;
-  if (a < b) {
-    return -1;
-  }
-  return a > b ? 1 : 0;
-}
-
 /// UTF-8 bytes compare as the code points they carry, so this is ISO's «by
 /// code point» without decoding anything.
 int compareText(const std::string& left, const std::string& right) {
@@ -74,6 +56,9 @@ int compareTerms(const Bindings& bindings, const Term& first, const Term& second
       }
       return 0;
     case 1:
+      // Numbers by value, exactly — the same answer `РАВНО` and the signs take
+      // from `compareNumbers`, so `sort/2`, `compare/3` and unification cannot
+      // call one pair equal and different at once.
       return compareNumbers(left, right);
     case 2:
       return compareText(left.text, right.text);

@@ -56,25 +56,16 @@ bool isExpressionWrapper(const Term& term) {
          term.compound->name == kExpressionFunctor && term.compound->args.size() == 1;
 }
 
-int compareValues(const ArithValue& left, const ArithValue& right) {
-  if (!left.is_float && !right.is_float) {
-    if (left.integer < right.integer) {
-      return -1;
-    }
-    if (left.integer > right.integer) {
-      return 1;
-    }
-    return 0;
+/// True when the two computed numbers are the same number.  This is the exact
+/// comparison `compareNumbers` gives, with one difference: NaN is never «the
+/// same number» as anything, itself included — a real of `nan` can come in
+/// through `СТРВЕЩ`, and the relations here answer with IEEE's rule rather than
+/// the total order's.
+bool sameNumber(const ArithValue& left, const ArithValue& right) {
+  if ((left.is_float && std::isnan(left.real)) || (right.is_float && std::isnan(right.real))) {
+    return false;
   }
-  const double a = left.asDouble();
-  const double b = right.asDouble();
-  if (a < b) {
-    return -1;
-  }
-  if (a > b) {
-    return 1;
-  }
-  return 0;
+  return compareNumbers(left, right) == 0;
 }
 
 /// Pairs of list cells being compared right now, so a cyclic list
@@ -153,7 +144,7 @@ std::optional<int> compareComparable(Engine& engine, const Term& first, const Te
   const auto left_number = asNumeric(engine, first);
   const auto right_number = asNumeric(engine, second);
   if (left_number && right_number) {
-    return compareValues(*left_number, *right_number);
+    return compareNumbers(*left_number, *right_number);
   }
   const auto left_text = asText(engine, first);
   const auto right_text = asText(engine, second);
@@ -237,7 +228,7 @@ BuiltinResult builtinAdd(Engine& engine, std::span<const Term> args) {
     ArithValue expected;
     if (anyFloat) {
       expected = ArithValue::ofFloat(av->asDouble() + bv->asDouble());
-      return expected.real == cv->asDouble() ? BuiltinResult::Continue : BuiltinResult::Fail;
+      return sameNumber(expected, *cv) ? BuiltinResult::Continue : BuiltinResult::Fail;
     }
     expected = ArithValue::ofInteger(av->integer + bv->integer);
     return expected.integer == cv->integer ? BuiltinResult::Continue : BuiltinResult::Fail;
@@ -289,8 +280,9 @@ BuiltinResult builtinMul3(Engine& engine, std::span<const Term> args) {
   const bool anyFloat = (av && av->is_float) || (bv && bv->is_float) || (cv && cv->is_float);
   if (known == 3) {
     if (anyFloat) {
-      return (av->asDouble() * bv->asDouble() == cv->asDouble()) ? BuiltinResult::Continue
-                                                                 : BuiltinResult::Fail;
+      return sameNumber(ArithValue::ofFloat(av->asDouble() * bv->asDouble()), *cv)
+                 ? BuiltinResult::Continue
+                 : BuiltinResult::Fail;
     }
     return (av->integer * bv->integer == cv->integer) ? BuiltinResult::Continue
                                                       : BuiltinResult::Fail;
@@ -440,8 +432,9 @@ BuiltinResult builtinAbs(Engine& engine, std::span<const Term> args) {
   }
   if (x && y) {
     if (x->is_float || y->is_float) {
-      return std::fabs(x->asDouble()) == y->asDouble() ? BuiltinResult::Continue
-                                                       : BuiltinResult::Fail;
+      return sameNumber(ArithValue::ofFloat(std::fabs(x->asDouble())), *y)
+                 ? BuiltinResult::Continue
+                 : BuiltinResult::Fail;
     }
     return x->integer.abs() == y->integer ? BuiltinResult::Continue : BuiltinResult::Fail;
   }
@@ -474,8 +467,9 @@ BuiltinResult builtinSqrt(Engine& engine, std::span<const Term> args) {
                                                                   : BuiltinResult::Fail;
   }
   if (x && y) {
-    return std::sqrt(x->asDouble()) == y->asDouble() ? BuiltinResult::Continue
-                                                     : BuiltinResult::Fail;
+    return sameNumber(ArithValue::ofFloat(std::sqrt(x->asDouble())), *y)
+               ? BuiltinResult::Continue
+               : BuiltinResult::Fail;
   }
   badArguments(engine, args, "SQRT", ArgKind::Number);
 }
@@ -507,8 +501,9 @@ BuiltinResult unaryFloat(Engine& engine, std::span<const Term> args, double (*fo
                                               : BuiltinResult::Fail;
   }
   if (x && y) {
-    return forward(x->asDouble()) == y->asDouble() ? BuiltinResult::Continue
-                                                   : BuiltinResult::Fail;
+    return sameNumber(ArithValue::ofFloat(forward(x->asDouble())), *y)
+               ? BuiltinResult::Continue
+               : BuiltinResult::Fail;
   }
   badArguments(engine, args, name, ArgKind::Number);
 }
@@ -811,12 +806,23 @@ ArithValue evaluateBinary(Engine& engine, std::string_view op, const Term& left,
     if (b.integer.isZero()) {
       engine.raise(ErrorCode::DivisionByZero);
     }
-    // `BigInt` divides the magnitudes and keeps the sign of the dividend for a
-    // remainder, which is exactly ISO: the quotient truncates toward zero
-    // (`-5 div 3` is `-1`) and `rem` takes the sign of the dividend
-    // (`-5 rem 3` is `-2`).  `mod` is the same as `rem` here for now.
-    return isRemainder(op) ? ArithValue::ofInteger(a.integer % b.integer)
-                           : ArithValue::ofInteger(a.integer / b.integer);
+    // ISO's four whole operators are two pairs, and the pair decides which way
+    // the quotient goes when the signs differ: `//` and `rem` truncate toward
+    // zero (`-7 // 2` is `-3`, `-7 rem 2` is `-1`), `div` and `mod` round down
+    // (`-7 div 2` is `-4`, `-7 mod 2` is `1`).  `BigInt` answers the truncated
+    // pair, so the floored one is that answer one step lower whenever the
+    // division left a remainder of the other sign — and then the remainder is
+    // measured from the quotient below it, which is why `mod` gets the sign of
+    // the divisor.
+    const BigInt quotient = a.integer / b.integer;
+    const BigInt remainder = a.integer % b.integer;
+    const bool stepDown =
+        !remainder.isZero() && remainder.isNegative() != b.integer.isNegative();
+    const bool floored = op == "div" || op == "mod";
+    if (isRemainder(op)) {
+      return ArithValue::ofInteger(floored && stepDown ? remainder + b.integer : remainder);
+    }
+    return ArithValue::ofInteger(floored && stepDown ? quotient - BigInt(1) : quotient);
   }
   if (op == "/") {
     // ISO's `/` is *float* division: `1 / 2` is `0.5` and `6 / 3` is `2.0`, and

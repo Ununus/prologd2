@@ -59,6 +59,24 @@ TEST_CASE("output writes terms without a newline") {
   REQUIRE(result.output == "123\nДА\n");
 }
 
+TEST_CASE("a real is written as the shortest text that reads back as itself") {
+  // `std::to_string` kept six digits, so `1 / 3` was written `0.333333` — a
+  // number that is not the one the answer holds, and one the query would read
+  // back as something else.  A whole real keeps its `.0`, which is what tells it
+  // from the whole number; a large one takes the exponent form the lexer reads.
+  const auto result = runProgram(
+      "?X is 1 / 3, ВЫВОД(X), ПС.\n"
+      "?X is 6 / 3, ВЫВОД(X), ПС.\n"
+      "?X is 1.0 * 10 ** 20, ВЫВОД(X), ПС.\n"
+      "?X is 1 / 4, ВЫВОД(X), ПС.\n");
+  REQUIRE(result.loaded);
+  REQUIRE(result.output ==
+          "0.3333333333333333\nX=0.3333333333333333\n"
+          "2.0\nX=2.0\n"
+          "1e+20\nX=1e+20\n"
+          "0.25\nX=0.25\n");
+}
+
 TEST_CASE("output prints strings unquoted and lists") {
   const auto result = runProgram("?ВЫВОД(\"Ёё\", [1,2]).\n");
   REQUIRE(result.loaded);
