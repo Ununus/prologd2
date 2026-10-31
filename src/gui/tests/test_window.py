@@ -27,7 +27,7 @@ from test_session import find_executable, pump  # noqa: E402
 from test_paths import make_package, packaged  # noqa: E402
 
 try:
-    from PySide6.QtGui import QGuiApplication, QTextCursor
+    from PySide6.QtGui import QGuiApplication, QTextCursor, QTextTable
     from PySide6.QtWidgets import QApplication
 except ImportError:  # pragma: no cover - main() reports it
     QApplication = None  # type: ignore[assignment]
@@ -1220,6 +1220,32 @@ def test_the_output_arrives_while_the_program_runs(executable: str) -> None:
     finally:
         discard_changes(window)
     print("ok: the output arrives line by line while the program is still running")
+
+
+def test_a_program_that_halts_ends_the_session_and_the_next_run_works(
+    executable: str,
+) -> None:
+    """`ЗАВЕРШЕНИЕ` (`halt`) is the program's own end, and the window survives it.
+
+    The interpreter is a process of its own, so a halt takes it down: the run must
+    finish (the buttons come back), the statements after the halt must not appear,
+    and the next «Запустить» must start a new session rather than talk to a
+    process that is gone.
+    """
+    window = empty_window(executable)
+    try:
+        window.editor().setPlainText("?ВЫВОД(1), ПС.\n?ЗАВЕРШЕНИЕ.\n?ВЫВОД(2), ПС.\n")
+        window._actions["run"].trigger()
+        assert pump(window, lambda: window._actions["run"].isEnabled()), window.status_text()
+        assert printed_lines(window)[0] == "1", ascii(window.output_text())
+        assert "2" not in printed_lines(window), "the statements after halt ran"
+
+        window.editor().setPlainText("?ВЫВОД(3), ПС.\n")
+        window._actions["run"].trigger()
+        assert pump(window, lambda: "3" in window.output_text()), ascii(window.output_text())
+        print("ok: a program that halts ends its session and the next run works")
+    finally:
+        discard_changes(window)
 
 
 def test_the_window_remembers_its_size_and_place(executable: str) -> None:
@@ -3288,6 +3314,42 @@ def test_one_ctrl_c_copies_where_the_user_looks(executable: str) -> None:
     print("ok: one Ctrl+C, and it copies the pane the user is looking at")
 
 
+def test_the_card_fits_its_longest_call_on_one_line(executable: str) -> None:
+    """`ЗАВЕРШЕНИЕ` is the longest single word a card puts in its first column.
+
+    The width comes from `QFontMetrics` of the code face, and Qt draws the Cyrillic
+    through a fallback that is wider, so a column of exactly the padded width broke
+    the name into `ЗАВЕРШЕНИ` + `Е`.  The fit keeps a few pixels of air now, and this
+    checks the two extremes: the longest word, and the longest call of the manual.
+    """
+    window = empty_window(executable)
+    window.resize(1200, 800)
+    window.show()
+    try:
+        for name in ("ЗАВЕРШЕНИЕ", "СОРТИРОВКА"):
+            window.editor().setPlainText(f"тест :- {name}.\n")
+            view = window.editor()
+            cursor = view.textCursor()
+            cursor.setPosition(view.toPlainText().index(name) + 2)
+            view.setTextCursor(cursor)
+            window.show_reference()
+            QApplication.processEvents()
+            pane = window._reference_pane
+            document = pane.document()
+            document.setTextWidth(pane.viewport().width())
+            table = next(
+                frame
+                for frame in document.rootFrame().childFrames()
+                if isinstance(frame, QTextTable)
+            )
+            for row in range(table.rows()):
+                block = table.cellAt(row, 0).firstCursorPosition().block()
+                assert block.layout().lineCount() == 1, f"{name}: {block.text()} was split"
+        print("ok: the card keeps its widest call on one line")
+    finally:
+        discard_changes(window)
+
+
 def test_the_card_links_the_section_and_opens_the_page(executable: str) -> None:
     """The card's «руководство, §7.4» is a link, and it lands on the page.
 
@@ -5320,6 +5382,7 @@ def main(argv: list[str]) -> int:
     test_the_editor_remembers_the_font_size(executable)
     test_a_query_is_answered_once(executable)
     test_a_run_is_repeatable(executable)
+    test_a_program_that_halts_ends_the_session_and_the_next_run_works(executable)
     test_the_documented_shortcuts_are_bound(executable)
     test_every_declared_key_belongs_to_a_widget(executable)
     with tempfile.TemporaryDirectory(prefix="prologd_gui_files_") as name:
@@ -5419,6 +5482,7 @@ def main(argv: list[str]) -> int:
         test_running_programs_without_questions_finishes(executable)
         test_f1_shows_the_record_of_the_word_under_the_caret(executable)
         test_the_reference_opens_on_half_the_window(executable)
+        test_the_card_fits_its_longest_call_on_one_line(executable)
         test_the_card_links_the_section_and_opens_the_page(executable)
         test_one_ctrl_c_copies_where_the_user_looks(executable)
         test_the_cheat_sheet_lists_the_insert_table(executable)

@@ -37,6 +37,9 @@ struct RunResult {
   std::string error;
   bool loaded = false;
   bool runtimeError = false;
+  /// The program called `ЗАВЕРШЕНИЕ` (`halt`): it stopped there, and the
+  /// statements after it never ran.
+  bool halted = false;
   /// Where the first runtime error happened: the clause it was raised in, or the
   /// question it came from when the goal was written in the query (part 137).
   SourceLocation errorLocation;
@@ -82,6 +85,12 @@ inline RunResult runProgram(const std::string& source, const std::string& input 
   RunResult result;
   try {
     result.loaded = loader.loadSource(source, "<test>", &error);
+  } catch (const HaltRequest&) {
+    // `ЗАВЕРШЕНИЕ` in a test program is the end of that program, not a failure:
+    // the harness stands in for the front-end, so it catches the signal here —
+    // otherwise it would take the whole test binary down.
+    result.halted = true;
+    result.loaded = true;
   } catch (const PrologRuntimeError& runtimeError) {
     errorStream << runtimeError.what() << '\n';
     runtime_error = true;

@@ -1202,7 +1202,7 @@ primitive outside it is clipped.
 | `{"event":"graphics","op":"setPixel","x":1,"y":2,"color":3}` | one drawing primitive, as the program called it; `op` is one of the eight and the fields are the cell, the segment or the box it acts on |
 | `{"event":"bitmap","width":600,"height":600,"data":"…"}` | the whole screen, base64 of four-byte little-endian colour values — the answer to a `graphics` request |
 | `{"event":"error","kind":"parse","severity":"warning","message":"…","file":"…","line":3,"column":5}` | diagnostic; `kind` is `parse`, `runtime` or `protocol`, `severity` is `error` or `warning` (a warning never ends the run), and the position is absent when there is none to report |
-| `{"event":"bye"}` | the session is over |
+| `{"event":"bye"}` | the session is over — the front-end asked (`quit`), or the program ended it with `ЗАВЕРШЕНИЕ`/`halt` |
 
 Exit codes: `0` clean, `1` usage error, `2` load/parse failure, `3` runtime
 failure (for example an interrupted query).

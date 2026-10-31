@@ -124,3 +124,28 @@ endif()
 if(NOT errors MATCHES "error:")
   message(FATAL_ERROR "Expected an error for the wrong arity, got: ${errors}")
 endif()
+
+# `ЗАВЕРШЕНИЕ` (`halt`) stops the program where it stands and exits 0: the
+# statement after it never runs, and the code is the one ISO's `halt/0` promises.
+# Nothing here is Cyrillic except the file the program is written in — the
+# expectation is the number 1 in the output and its absence after `halt`.
+file(WRITE "${WORK_DIR}/cli_halt.pld" "?ВЫВОД(1), ПС.\n?ЗАВЕРШЕНИЕ.\n?ВЫВОД(2), ПС.\n")
+
+execute_process(
+  COMMAND "${PROLOGD_EXE}" -s "${WORK_DIR}/cli_halt.pld"
+  OUTPUT_VARIABLE output
+  ERROR_VARIABLE errors
+  RESULT_VARIABLE exit_code)
+
+if(NOT exit_code EQUAL 0)
+  message(FATAL_ERROR "halt should exit 0, got ${exit_code}: ${errors}")
+endif()
+if(NOT output MATCHES "^1\n")
+  message(FATAL_ERROR "halt did not let the first statement run: ${output}")
+endif()
+if(output MATCHES "2")
+  message(FATAL_ERROR "halt did not stop the program: ${output}")
+endif()
+if(errors MATCHES "error:")
+  message(FATAL_ERROR "halt must not be an error: ${errors}")
+endif()

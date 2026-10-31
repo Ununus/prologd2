@@ -2239,3 +2239,47 @@ combination: 574 pairs of `(a, b)` for `a` in -20…20 and `b` in -7…7 were ru
 the interpreter and checked against Python's `//` and `%`, with no mismatch.
 
 **Status.** Accepted.
+
+---
+
+## ADR-066: `halt/0` and nothing else, named `ЗАВЕРШЕНИЕ`
+
+**Context.**  The owner asked whether the dialect wants `halt/0,1`.  The console and
+the JSON session already have exit codes of their own — 0 clean, 2 a load or parse
+failure, 3 a runtime failure — and a program could not influence any of them: a run
+whose questions all failed still exited 0.  ISO's `halt` is the one built-in that
+gives a program a say in how the session ends.
+
+**Decision.**  The dialect takes `halt/0`: `ЗАВЕРШЕНИЕ` ends the session where it
+stands and the front-end answers with 0.  `halt/1` is not here — a program-chosen
+exit status would have to share the code space with the front-end's own 2 and 3,
+and the owner chose the half that buys ISO compatibility without reopening that
+question.
+
+The signal is an exception of its own, `HaltRequest` in `engine.hpp`, and
+deliberately not a `PrologRuntimeError`: the query did not fail, the session ended,
+and the goals that answer every failure with «нет» (`НЕ`, `ПЕРВОЕ`, `НАЙТИВСЕ`,
+`ДЛЯВСЕХ`) must let it through.  The console catches it around the whole run
+(statements after the halt never execute, the exception goes up through the loader,
+not back into it); the JSON session catches it in its request loop and breaks, so
+the tail of the loop still flushes and emits `bye`; the test harness catches it and
+marks the program as halted, because it stands in for a front-end and would
+otherwise take the test binary down.
+
+The Russian name is `ЗАВЕРШЕНИЕ` and not `ВЫХОД`: one letter away from `ВЫВОД`, and
+the two mean opposite things — a student who types `ВЫХОД` where `ВЫВОД` was meant
+would end the session in the middle of a lesson.  The pair is `ЗАВЕРШЕНИЕ`/`halt`,
+like `ВЫВОД`/`write`.
+
+**Consequences.**  A program can stop early — a branch that has decided everything
+does not have to walk to the last line — and a console script sees the same 0 it
+sees for a program that ran to the end.  In the window a halt is the end of the
+session: the child process goes, `_on_ended` puts the buttons back, and the next
+«Запустить» starts a new interpreter with an empty base (the clauses of the halted
+run are gone, as they are after any new run).  `ЗАВЕРШЕНИЕ` is a reserved name, so
+the call-site check knows its arity and `ЗАВЕРШЕНИЕ(0)` is a load-time error rather
+than a silent «нет такого».  The manual's §4.10 says all of this, `builtins.json`
+carries the record (the pair table in §17 and the `F1` card pick it up on their
+own), and the README of the window says `bye` can now come from the program.
+
+**Status.** Accepted.

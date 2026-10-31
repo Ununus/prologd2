@@ -196,6 +196,16 @@ struct CollectedGroups {
 
 using BuiltinFn = BuiltinResult (*)(Engine&, std::span<const Term>);
 
+/// Thrown by `ЗАВЕРШЕНИЕ/0` (`halt`): the program asks the session to end, and
+/// only a front-end knows what that means — the console returns from `main`, a
+/// protocol session reports `bye` and exits 0.
+///
+/// It is deliberately *not* a `PrologRuntimeError`: the query did not fail, the
+/// session ended.  Nothing inside the solver may treat it as a failure, and
+/// `НЕ`, `ПЕРВОЕ` and `НАЙТИВСЕ` do exactly that with every exception that is
+/// one, so this type is separate and they let it through.
+struct HaltRequest {};
+
 /// Look up a built-in by name and arity; nullptr when none.
 BuiltinFn findBuiltin(std::string_view name, std::size_t arity);
 

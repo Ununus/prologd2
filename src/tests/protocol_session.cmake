@@ -539,3 +539,36 @@ endif()
 if(NOT exit_code EQUAL 0)
   message(FATAL_ERROR "A refused graphics request must not change the exit code, got ${exit_code}")
 endif()
+
+# --- `halt` ends the session from inside the program -------------------------
+# The signal is the program's, not the front-end's: the session answers `bye` and
+# exits 0, and the requests after the halting one are never read.  The `quit` at
+# the end of the file is there to prove exactly that — it is sent, and it must
+# not be what ends the session.
+file(WRITE "${session}"
+  "{\"cmd\":\"load\",\"text\":\"?ВЫВОД(1), ПС.\\n?ЗАВЕРШЕНИЕ.\\n?ВЫВОД(2), ПС.\\n\"}\n"
+  "{\"cmd\":\"query\",\"text\":\"?ВЫВОД(3).\"}\n")
+
+execute_process(
+  COMMAND "${PROLOGD_EXE}" --protocol json
+  INPUT_FILE "${session}"
+  OUTPUT_VARIABLE events
+  RESULT_VARIABLE exit_code)
+
+string(FIND "${events}" "{\"event\":\"output\",\"text\":\"1\\n\"}" position)
+if(position EQUAL -1)
+  message(FATAL_ERROR "halt did not let the statement before it run\n--- got ---\n${events}")
+endif()
+if(events MATCHES "\"text\":\"2")
+  message(FATAL_ERROR "halt did not stop the program it was called from\n--- got ---\n${events}")
+endif()
+if(events MATCHES "\"text\":\"3")
+  message(FATAL_ERROR "The session went on after halt\n--- got ---\n${events}")
+endif()
+string(FIND "${events}" "{\"event\":\"bye\"}" bye_position)
+if(bye_position EQUAL -1)
+  message(FATAL_ERROR "The session did not say goodbye after halt\n--- got ---\n${events}")
+endif()
+if(NOT exit_code EQUAL 0)
+  message(FATAL_ERROR "A program that halts must exit 0, got ${exit_code}")
+endif()

@@ -312,6 +312,11 @@ class ZoomableTextBrowser(QTextBrowser):
         which wrapped `КОПИЯ(Стр, Ц1, Ц2, Пер)` in the middle of its own arguments.
         A call is one unit, so it is measured with the font it is drawn in; the
         clamp keeps the explanation readable when the dock is narrow (part 236).
+
+        The air is not decoration: `QFontMetrics` of the code family reports a
+        Cyrillic word a couple of pixels narrower than Qt finally draws it (the
+        glyphs come from a fallback face), and a column of exactly the padded width
+        broke `ЗАВЕРШЕНИЕ` into `ЗАВЕРШЕНИ` + `Е` (part 242).
         """
         table = next(
             (frame for frame in self.document().rootFrame().childFrames()
@@ -331,8 +336,10 @@ class ZoomableTextBrowser(QTextBrowser):
             return
         room = max(120, int(self.viewport().width() * 0.6))
         fmt = table.format()
+        # `8 + 16`: a little air for the fallback face, then the cell's own padding
+        # (`4px` on the left and `12px` on the right, in `reference.card_html`).
         fmt.setColumnWidthConstraints([
-            QTextLength(QTextLength.Type.FixedLength, min(widest + 16, room)),
+            QTextLength(QTextLength.Type.FixedLength, min(widest + 8 + 16, room)),
             QTextLength(QTextLength.Type.PercentageLength, 100),
         ])
         table.setFormat(fmt)

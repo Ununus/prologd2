@@ -97,6 +97,9 @@ BuiltinResult builtinForall(Engine&, std::span<const Term>);
 BuiltinResult builtinEqual(Engine&, std::span<const Term>);
 BuiltinResult builtinNewline(Engine&, std::span<const Term>);
 BuiltinResult builtinWait(Engine&, std::span<const Term>);
+/// Throws `HaltRequest`: the session ends, and the front-end decides what that
+/// means (see `engine.hpp`).
+BuiltinResult builtinHalt(Engine&, std::span<const Term>);
 
 // ---- type tests ----
 BuiltinResult builtinIsVar(Engine&, std::span<const Term>);

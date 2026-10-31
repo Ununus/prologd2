@@ -361,6 +361,13 @@ int main(int argc, char** argv) {
     // the location, `what()` carries the message alone).
     engine.io().errorStream() << prologd::DiagnosticSink::format(error.error()) << '\n';
     exit_code = 3;
+  } catch (const prologd::HaltRequest&) {
+    // `ЗАВЕРШЕНИЕ` (`halt`) in the program: the session stops where it stands and
+    // the console answers with 0, which is what ISO's `halt/0` asks for.  Output
+    // is flushed on every write (`IoContext::write`), so there is nothing left to
+    // save here.  The statements after the halt never run — the exception went up
+    // through the loader, not back into it.
+    return 0;
   }
 
   return exit_code;

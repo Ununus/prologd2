@@ -125,6 +125,16 @@
       ]
     },
     {
+      "name": "ЗАВЕРШЕНИЕ",
+      "aliases": ["halt"],
+      "kind": "predicate",
+      "arities": [0],
+      "group": "control",
+      "section": "4.10",
+      "summary": "Заканчивает работу: следующие вопросы не выполняются",
+      "variants": ["ЗАВЕРШЕНИЕ — конец сеанса с кодом возврата 0; аргумента нет"]
+    },
+    {
       "name": "ВЫП",
       "aliases": ["call"],
       "kind": "predicate",

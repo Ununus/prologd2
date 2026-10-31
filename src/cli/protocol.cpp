@@ -304,6 +304,12 @@ class Session {
         dispatch(command, request);
       } catch (const Json::exception& bad_field) {
         fail("protocol", command + ": " + bad_field.what());
+      } catch (const HaltRequest&) {
+        // `ЗАВЕРШЕНИЕ` (`halt`) in the program: the session is over, and the
+        // front-end learns it the same way it learns an answer to `quit` — `bye`
+        // and a clean exit.  `break` rather than a return, so the tail of the loop
+        // below still flushes and says goodbye.
+        break;
       }
       flush();
     }

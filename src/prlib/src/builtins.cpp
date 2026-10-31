@@ -313,6 +313,10 @@ BuiltinResult builtinWait(Engine& engine, std::span<const Term> args) {
   return BuiltinResult::Continue;
 }
 
+BuiltinResult builtinHalt(Engine&, std::span<const Term>) {
+  throw HaltRequest{};
+}
+
 // ---------------------------------------------------------------------------
 // Type tests
 // ---------------------------------------------------------------------------
@@ -511,6 +515,7 @@ constexpr std::pair<std::string_view, std::string_view> kEnglishNames[] = {
     {"ДЛЯВСЕХ", "forall"},      {"ПЕРВОЕ", "first"},
     {"РАВНО", "equal"},
     {"ПС", "nl"},            {"ЖДИ", "wait"},
+    {"ЗАВЕРШЕНИЕ", "halt"},
     {"ПЕР", "var"},           {"ЦЕЛ", "integer"},
     {"ВЕЩ", "float"},         {"СИМВ", "is_text"},
     {"СПИСОК", "is_list"},      {"ПОЛНЫЙ", "ground"},
@@ -619,6 +624,11 @@ const BuiltinTable& builtinTable() {
     add("РАВНО", 2, builtinEqual);
     add("ПС", 0, builtinNewline);
     add("ЖДИ", 1, builtinWait);
+    // ISO's `halt`, without the argument: the program ends the session and the
+    // console returns 0.  The word is `ЗАВЕРШЕНИЕ` and not `ВЫХОД` on purpose —
+    // one letter away from `ВЫВОД` would be a trap, and the two mean opposite
+    // things (part 241).
+    add("ЗАВЕРШЕНИЕ", 0, builtinHalt);
 
     // Type tests.
     add("ПЕР", 1, builtinIsVar);

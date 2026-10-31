@@ -400,3 +400,55 @@ TEST_CASE("forall takes goals, and the goals inside it are checked") {
   REQUIRE(checked.output == "НЕТ\n");
   REQUIRE(checked.error.find("не найдено: нет_такого/1") != std::string::npos);
 }
+
+TEST_CASE("halt ends the whole program and nothing after it runs") {
+  // ISO's `halt` without the argument: the program asks the session to end, and
+  // the front-end answers with 0.  The statements after it never run — the signal
+  // goes up through the loader, not back into it — which is what the two
+  // questions below check, and why a query that would print `2` prints nothing.
+  const auto result = runProgram(
+      "?ВЫВОД(1), ПС.\n"
+      "?ЗАВЕРШЕНИЕ.\n"
+      "?ВЫВОД(2), ПС.\n");
+  REQUIRE(result.loaded);
+  REQUIRE(result.halted);
+  REQUIRE_FALSE(result.runtimeError);
+  REQUIRE(result.output == "1\nДА\n");
+
+  // The English spelling reaches the same built-in, and "halt" is its own goal,
+  // not a name that falls through to «нет такого предиката».
+  const auto alias = runProgram("?halt.\n?ВЫВОД(нет), ПС.\n");
+  REQUIRE(alias.loaded);
+  REQUIRE(alias.halted);
+  REQUIRE(alias.output.empty());
+}
+
+TEST_CASE("halt goes out through negation and findall") {
+  // The signal is not a failure, so the goals that answer every failure with
+  // «нет» have to let it through: `НЕ` would turn «halt» into a success,
+  // `ПЕРВОЕ` would fall to its second goal, and `НАЙТИВСЕ` would collect an empty
+  // list and carry on.  None of them may, or the session outlives the program
+  // that ended it.
+  const auto negated = runProgram("?НЕ(ЗАВЕРШЕНИЕ), ВЫВОД(нет), ПС.\n");
+  REQUIRE(negated.loaded);
+  REQUIRE(negated.halted);
+  REQUIRE(negated.output.empty());
+
+  const auto collected = runProgram("?НАЙТИВСЕ(X, ЗАВЕРШЕНИЕ, L), ВЫВОД(нет), ПС.\n");
+  REQUIRE(collected.loaded);
+  REQUIRE(collected.halted);
+  REQUIRE(collected.output.empty());
+
+  const auto first = runProgram("?ПЕРВОЕ(ЗАВЕРШЕНИЕ, ИСТИНА), ВЫВОД(нет), ПС.\n");
+  REQUIRE(first.loaded);
+  REQUIRE(first.halted);
+  REQUIRE(first.output.empty());
+}
+
+TEST_CASE("halt takes no argument") {
+  // ISO's `halt/1` is not here on purpose: the session has no exit status of its
+  // own yet (ADR-066), and a call with an argument is a plain arity mistake.
+  const auto wrongArity = runProgram("?ЗАВЕРШЕНИЕ(0).\n");
+  REQUIRE_FALSE(wrongArity.loaded);
+  REQUIRE(wrongArity.error.find("ЗАВЕРШЕНИЕ не имеет арности 1") != std::string::npos);
+}

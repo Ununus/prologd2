@@ -15,9 +15,9 @@ const std::unordered_set<std::string> kReservedBuiltins = {
     // spelling `or` stays retired (task_44) — the English vocabulary is
     // `ПЕРВОЕ`/`first` (task_83).
     "ЛОЖЬ", "ТРАССА", "НЕТ_ТРАССЫ", "ВЫП", "НЕ", "ДЛЯВСЕХ", "ПЕРВОЕ", "ИЛИ",
-    "РАВНО", "ТИХО", "ВЕРСИЯ", "ПС",
+    "РАВНО", "ТИХО", "ВЕРСИЯ", "ПС", "ЗАВЕРШЕНИЕ",
     "fail", "trace", "no_trace", "call", "not", "forall", "first", "equal",
-    "quiet", "version", "nl",
+    "quiet", "version", "nl", "halt",
     // Arithmetic.  The English predicates are capitals (`ABS/2`) and the
     // functions of an expression are lowercase (`abs(X)`), so both spellings are
     // reserved: one is a goal, the other is a name inside `#…#`.
