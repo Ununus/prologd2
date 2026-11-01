@@ -292,6 +292,13 @@ Tests are written **together with** the feature, never after.
   **not** a thing: it produces two `no text within stars` warnings and prints the
   stars literally, so a paragraph keeps its asterisks and nothing is bold.  The
   PDFs build fine — only the warning and the page show it.
+* Prose avoids the conjunction «а» as a contrast crutch.  «Это А, а не Б» becomes
+  «Это А» or splits in two («Это А.  Б здесь нет.»); «а не» also hides the plain
+  answer behind a negation.  Parallel contrasts that genuinely need it stay
+  («`6 / 3` -- это `2.0`, а `6 // 3` -- это `2`»).  The user manual is clean:
+  `grep -oP "(?<![А-Яа-яЁё])а не(?![А-Яа-яЁё])" doc/help.typ` prints nothing.
+  `technical.typ`, `gui.typ` and `style.typ` still carry it and are cleaned as they
+  are touched.
 
 ## The original material
 
