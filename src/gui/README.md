@@ -1193,7 +1193,7 @@ primitive outside it is clipped.
 |-------|---------|
 | `{"event":"ready","protocol":13,"version":"2.4.0","screen":{"height":600,"width":600},"keywords":[…]} `| the session is up |
 | `{"event":"output","text":"…"}` | program output (`ВЫВОД`, query results) — **one event per written line** since task_49, so it arrives while the program is still running; text written without a line end goes out with the end of the request (and a prompt with the `input_request` that follows it) |
-| `{"event":"result","found":true}` | one query finished; `found` is false when nothing matched |
+| `{"event":"result","found":true}` | one query finished; `found` is false when nothing matched.  A `query` request always gets at least one of these, and a directive (`?ИМПОРТ("…")`, `?ХОЛСТ(…)`) — carried out by the loader while the text is read — answers `true` from the session itself, so a front-end never waits for an answer that cannot come |
 | `{"event":"loaded"}` | a `load` request is over: its program and its own `?`-statements ran (a `query` request is answered by its `result` alone) |
 | `{"event":"input_request","kind":"line"}` | `ВВОДСТР`/`ВВОДСИМВ`/`ВВКОД` waits for an answer; `kind` is `token`, `line` or `codepoint` |
 | `{"event":"step","action":"call","goal":"…","depth":2,"file":"…","line":9,"column":1}` | a step point; `action` is `call`, `exit`, `redo` or `fail`.  `goal` is absent for `exit` (the goal is the one its `call` named), and the position is absent when there is none |

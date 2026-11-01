@@ -1592,6 +1592,51 @@ def ask_from_the_margin(window, statement: str) -> None:
     wait_for_the_run(window)
 
 
+def test_a_question_that_is_a_directive_answers_instead_of_hanging(
+    executable: str, directory: pathlib.Path
+) -> None:
+    """`?ИМПОРТ(...)` is carried out by the loader, and a click on it must still end.
+
+    The directive runs while the text is read, so it never reaches the
+    interpreter's query runner — and the session used to answer nothing at all, so
+    the window waited for a `result` forever (part 246).  The imported file here
+    asks nothing, which is the worst case: nothing else could have answered.  Both
+    places that send one statement are checked — a margin marker and the goal line.
+    """
+    (directory / "справка.pld").write_text(
+        "подсказка(1).\n", encoding="utf-8", newline="\n"
+    )
+    program = directory / "программа.pld"
+    program.write_text(
+        ':- ИМПОРТ("справка.pld").\n'
+        "?подсказка(_Х).\n"
+        '?ИМПОРТ("справка.pld").\n',
+        encoding="utf-8",
+        newline="\n",
+    )
+    window = empty_window(executable)
+    try:
+        assert window.open_path(str(program)), program
+        ask_from_the_margin(window, '?ИМПОРТ("справка.pld").')
+        assert "решени" in window.status_text(), window.status_text()
+
+        # The goal line sends the same statement, and the base is loaded by now: the
+        # answer comes straight from the session.
+        window._query_line.setText('?ИМПОРТ("справка.pld").')
+        window._run_query()
+        wait_for_the_run(window)
+        assert "решени" in window.status_text(), window.status_text()
+
+        # A plain goal after it still answers as it always did.
+        window._query_line.setText("?подсказка(Ч).")
+        window._run_query()
+        wait_for_the_run(window)
+        assert "Ч=1" in window.output_text(), ascii(window.output_text())
+        print("ok: a directive question answers from the margin and from the goal line")
+    finally:
+        discard_changes(window)
+
+
 def test_the_answer_table_switch_is_in_the_menu_and_in_the_settings(executable: str) -> None:
     """task_59: «Формировать таблицу» is one switch in two places, on by default.
 
@@ -5471,6 +5516,9 @@ def main(argv: list[str]) -> int:
         test_a_run_focuses_the_output_and_the_system_notes_the_time(executable)
         test_cancelling_input_stops_the_run(executable)
         test_a_run_uses_the_tab_that_is_showing(executable)
+        test_a_question_that_is_a_directive_answers_instead_of_hanging(
+            executable, files
+        )
         test_the_split_editor_shares_one_document(executable)
         test_each_pane_has_its_own_current_tab(executable, files)
         test_merging_the_editor_keeps_the_documents(executable, files)

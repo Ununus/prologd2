@@ -437,6 +437,7 @@ class Session {
       wanted.applyTo(engine_.options());
     }
     reported_diagnostics_ = false;
+    answered_ = false;
     // A single query asked for from the editor's margin is loaded *quietly*: a
     // run loads the program *and* runs its own `?`-statements (that is what
     // `Запустить` must keep doing), but for one clicked query that would fill
@@ -489,6 +490,18 @@ class Session {
     if (command == "load") {
       emit(Json{{"event", "loaded"}});
     }
+    // A `query` request is never left unanswered, and a statement that is not a goal
+    // has nothing to answer with: `?ИМПОРТ("…").` and `?ХОЛСТ(…).` are directives
+    // the *loader* carries out while the text is read, so they never reach
+    // `runQuery`.  The imported file's own questions do reach it (each with
+    // its own `result`), and a file that asks none — or one that was loaded before,
+    // since a file is loaded once per session — leaves the front-end waiting for an
+    // answer that never comes: the window stayed «выполняется» forever after a
+    // click on such a marker (part 246).  The directive succeeded, so the answer is
+    // «да», which is what `found` carries.
+    if (command == "query" && !answered_) {
+      emit(Json{{"event", "result"}, {"found", true}});
+    }
   }
 
   void runQuery(const Query& query) {
@@ -498,8 +511,10 @@ class Session {
                   {"text", engine_.queryText(query) + "\n"}});
       }
       const bool found = engine_.runQuery(query);
+      answered_ = true;
       emit(Json{{"event", "result"}, {"found", found}});
     } catch (const PrologRuntimeError& runtime_error) {
+      answered_ = true;  // the diagnostic below is the outcome of this question
       reportDiagnostic(runtime_error.error(), "runtime");
       exit_code_ = 3;
     }
@@ -785,6 +800,10 @@ class Session {
   /// True once a diagnostic was emitted for the current request, so the loader's
   /// summary is not printed on top of the diagnostics themselves.
   bool reported_diagnostics_ = false;
+  /// True once this request reported the outcome of the statement it was given —
+  /// a `result` for a goal, a diagnostic for one that failed.  A statement that
+  /// reports neither is a directive, and the session answers for it itself.
+  bool answered_ = false;
   /// Whether a run question echoes itself before its answer (protocol 11).
   bool print_questions_ = false;
   /// The state of stepping: stop at the next point, and whether the points

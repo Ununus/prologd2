@@ -572,3 +572,28 @@ endif()
 if(NOT exit_code EQUAL 0)
   message(FATAL_ERROR "A program that halts must exit 0, got ${exit_code}")
 endif()
+
+# --- a question that is a directive still answers ----------------------------
+# `?ИМПОРТ("…")` and `?ХОЛСТ(…)` are carried out by the loader while the text is
+# read, so they never reach the query runner: the session used to send no `result`
+# at all, and a front-end waited for one forever (part 246).  The imported file
+# here asks nothing, which is the worst case — nothing else could have answered.
+file(WRITE "${WORK_DIR}/quiet_lib.pld" "подсказка(1).\n")
+file(WRITE "${session}"
+  "{\"cmd\":\"load\",\"text\":\"проверка.\\n\",\"questions\":false}\n"
+  "{\"cmd\":\"query\",\"text\":\"?ИМПОРТ(\\\"quiet_lib.pld\\\").\"}\n"
+  "{\"cmd\":\"quit\"}\n")
+
+execute_process(
+  COMMAND "${PROLOGD_EXE}" --protocol json
+  INPUT_FILE "${session}"
+  OUTPUT_VARIABLE events
+  RESULT_VARIABLE exit_code)
+
+string(FIND "${events}" "{\"event\":\"result\",\"found\":true}" answered)
+if(answered EQUAL -1)
+  message(FATAL_ERROR "A query that is a directive answered nothing\n--- got ---\n${events}")
+endif()
+if(NOT exit_code EQUAL 0)
+  message(FATAL_ERROR "A directive question must not change the exit code, got ${exit_code}")
+endif()

@@ -16,7 +16,7 @@ namespace prologd::cli {
 /// |---------|---------|
 /// | `{"cmd":"load","path":"prog.pld"}` | load a file (imports use `-I`) |
 /// | `{"cmd":"load","text":"...","name":"buffer"}` | load program text |
-/// | `{"cmd":"query","text":"?goal."}` | run one statement |
+/// | `{"cmd":"query","text":"?goal."}` | run one statement; it always answers with a `result` |
 /// | `{"cmd":"input","text":"..."}` | answer the pending `input_request` |
 /// | `{"cmd":"step","action":"into"}` | answer the pending `step` event |
 /// | `{"cmd":"graphics","snapshot":true}` | the picture drawn so far |
