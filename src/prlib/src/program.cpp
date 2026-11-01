@@ -88,6 +88,26 @@ bool Database::retractClause(std::string_view name, std::size_t arity, std::int6
   return true;
 }
 
+bool Database::retractById(std::string_view name, std::size_t arity, std::uint64_t id) {
+  const ClauseListPtr existing = clausesFor(name, arity);
+  if (!existing) {
+    return false;
+  }
+  std::size_t index = existing->size();
+  for (std::size_t i = 0; i < existing->size(); ++i) {
+    if ((*existing)[i].id == id) {
+      index = i;
+      break;
+    }
+  }
+  if (index == existing->size()) {
+    return false;
+  }
+  auto list = mutableListFor(name, arity);
+  list->erase(list->begin() + static_cast<std::ptrdiff_t>(index));
+  return true;
+}
+
 Database::ClauseListPtr Database::clausesFor(std::string_view name, std::size_t arity) const {
   static const auto kEmpty = std::make_shared<const ClauseList>();
   auto it = table_.find(name);

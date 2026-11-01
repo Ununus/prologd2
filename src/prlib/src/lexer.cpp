@@ -49,7 +49,9 @@ const std::unordered_set<std::string> kReservedBuiltins = {
     // Database.  `ДОБНАЧ`/`ДОБКОН` are ISO's `asserta`/`assertz` without the
     // position argument (part 250).
     "СКОЛЬКО", "ПРЕДЛ", "ТЕРМ", "ДОБ", "УДАЛЕНИЕ", "ДОБНАЧ", "ДОБКОН",
+    "УДАЛИТЬВСЕ",
     "clause_count", "clause_at", "univ", "assert", "retract", "asserta", "assertz",
+    "retractall",
     // Graphics
     "ТОЧКА", "ЛИНИЯ", "ОКРУЖНОСТЬ", "ЗАКРАСКА",
     "point", "line", "circle", "fill",

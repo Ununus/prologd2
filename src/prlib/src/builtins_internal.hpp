@@ -195,6 +195,10 @@ BuiltinResult builtinAssert(Engine&, std::span<const Term>);
 BuiltinResult builtinAssertFirst(Engine&, std::span<const Term>);
 BuiltinResult builtinAssertLast(Engine&, std::span<const Term>);
 BuiltinResult builtinRetract(Engine&, std::span<const Term>);
+/// `УДАЛЕНИЕ/1` (`retract`) — the first clause whose head answers to the pattern,
+/// and `УДАЛИТЬВСЕ/1` (`retractall`) — every one of them (part 251).
+BuiltinResult builtinRetractFirst(Engine&, std::span<const Term>);
+BuiltinResult builtinRetractAll(Engine&, std::span<const Term>);
 
 // ---- graphics ----
 BuiltinResult builtinPoint(Engine&, std::span<const Term>);

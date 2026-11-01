@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -167,6 +168,83 @@ BuiltinResult builtinAssert(Engine& engine, std::span<const Term> args) {
   return BuiltinResult::Continue;
 }
 
+namespace {
+
+/// Does this clause answer to `pattern`?  Asked on a copy of the head, and the
+/// bindings are unwound at once: `УДАЛИТЬВСЕ` must not bind anything, and
+/// `УДАЛЕНИЕ/1` asks before it answers.
+bool headFits(Engine& engine, const Clause& clause, const Term& pattern) {
+  Term head;
+  std::vector<Term> body;
+  engine.instantiateClause(clause, head, body);
+  const std::size_t mark = engine.bindings().trailMark();
+  const bool fits = engine.unify(pattern, head);
+  engine.bindings().unwind(mark);
+  return fits;
+}
+
+/// The walk over the answers of `УДАЛЕНИЕ/1` (`retract/1`), in ISO's order: one
+/// clause per answer, the next one on backtracking.
+///
+/// The candidates are the clause *identifiers* that matched when the goal was
+/// called — the snapshot the logical update view promises, so a clause asserted
+/// during the walk is not seen by it.  Identity also survives the removal of an
+/// earlier answer, which a position would not.
+class RetractWalk {
+ public:
+  RetractWalk(Engine& engine, Functor functor, Term pattern)
+      : functor_(std::move(functor)), pattern_(std::move(pattern)) {
+    const auto clauses =
+        engine.database().clausesFor(functor_.name, functor_.arity);
+    if (!clauses) {
+      return;
+    }
+    for (const Clause& clause : *clauses) {
+      if (headFits(engine, clause, pattern_)) {
+        candidates_.push_back(clause.id);
+      }
+    }
+  }
+
+  std::optional<BuiltinAnswer> next(Engine& engine) {
+    while (next_ < candidates_.size()) {
+      const std::uint64_t id = candidates_[next_++];
+      const auto clauses = engine.database().clausesFor(functor_.name, functor_.arity);
+      const Clause* found = nullptr;
+      if (clauses) {
+        for (const Clause& clause : *clauses) {
+          if (clause.id == id) {
+            found = &clause;
+            break;
+          }
+        }
+      }
+      if (found == nullptr) {
+        continue;  // an earlier answer of this walk already took it
+      }
+      Term head;
+      std::vector<Term> body;
+      engine.instantiateClause(*found, head, body);
+      const std::size_t mark = engine.bindings().trailMark();
+      if (!engine.unify(pattern_, head)) {
+        engine.bindings().unwind(mark);
+        continue;
+      }
+      engine.database().retractById(functor_.name, functor_.arity, id);
+      return BuiltinAnswer{};
+    }
+    return std::nullopt;
+  }
+
+ private:
+  Functor functor_;
+  Term pattern_;
+  std::vector<std::uint64_t> candidates_;
+  std::size_t next_ = 0;
+};
+
+}  // namespace
+
 /// The one-argument form asserts a fact: the goals are the empty list.
 BuiltinResult builtinAssertFirst(Engine& engine, std::span<const Term> args) {
   const Term facts_only = makeNil();
@@ -181,6 +259,47 @@ BuiltinResult builtinAssertLast(Engine& engine, std::span<const Term> args) {
   Clause clause = clauseFrom(engine, args[0], args.size() == 2 ? args[1] : facts_only,
                              "ДОБКОН");
   engine.database().appendByName(std::move(clause));
+  return BuiltinResult::Continue;
+}
+
+/// `УДАЛЕНИЕ(Предложение)` (`retract`): the first clause whose *head* answers to
+/// the pattern, one per answer — ISO's `retract/1` minus the body, which a clause
+/// term would need (part 251).
+BuiltinResult builtinRetractFirst(Engine& engine, std::span<const Term> args) {
+  const Term pattern = engine.bindings().deref(args[0]);
+  const auto functor = functorOf(pattern);
+  if (!functor) {
+    badArgument(engine, args[0], "УДАЛЕНИЕ", 1, ArgKind::Text,
+                "имя предиката или голова предложения");
+  }
+  auto walk = std::make_shared<RetractWalk>(engine, *functor, args[0]);
+  BuiltinChoice choice;
+  choice.produce = [walk](Engine& inner) { return walk->next(inner); };
+  engine.setBuiltinChoice(std::move(choice));
+  return BuiltinResult::Yield;
+}
+
+/// `УДАЛИТЬВСЕ(Предложение)` (`retractall`): every clause whose head answers to
+/// the pattern, and nothing left bound — one answer, `ДА`.
+BuiltinResult builtinRetractAll(Engine& engine, std::span<const Term> args) {
+  const Term pattern = engine.bindings().deref(args[0]);
+  const auto functor = functorOf(pattern);
+  if (!functor) {
+    badArgument(engine, args[0], "УДАЛИТЬВСЕ", 1, ArgKind::Text,
+                "имя предиката или голова предложения");
+  }
+  const auto clauses = engine.database().clausesFor(functor->name, functor->arity);
+  if (clauses) {
+    std::vector<std::uint64_t> doomed;
+    for (const Clause& clause : *clauses) {
+      if (headFits(engine, clause, args[0])) {
+        doomed.push_back(clause.id);
+      }
+    }
+    for (const std::uint64_t id : doomed) {
+      engine.database().retractById(functor->name, functor->arity, id);
+    }
+  }
   return BuiltinResult::Continue;
 }
 

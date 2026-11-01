@@ -558,6 +558,7 @@ constexpr std::pair<std::string_view, std::string_view> kEnglishNames[] = {
     {"ПРЕДЛ", "clause_at"},     {"ТЕРМ", "univ"},
     {"ДОБ", "assert"},          {"ДОБНАЧ", "asserta"},
     {"ДОБКОН", "assertz"},      {"УДАЛЕНИЕ", "retract"},
+    {"УДАЛИТЬВСЕ", "retractall"},
     {"ТОЧКА", "point"},         {"ЛИНИЯ", "line"},
     {"ОКРУЖНОСТЬ", "circle"},   {"ЗАКРАСКА", "fill"},
 };
@@ -744,7 +745,12 @@ const BuiltinTable& builtinTable() {
     add("ДОБНАЧ", 2, builtinAssertFirst);
     add("ДОБКОН", 1, builtinAssertLast);
     add("ДОБКОН", 2, builtinAssertLast);
+    add("УДАЛЕНИЕ", 1, builtinRetractFirst);
     add("УДАЛЕНИЕ", 2, builtinRetract);
+    // `retractall` of SWI and GNU Prolog: every clause the head answers to, and
+    // nothing left bound.  In ISO there is no such predicate, hence the word of
+    // our own — `УДАЛИТЬВСЕ` in the pair `НАЙТИВСЕ`/`findall` (part 251).
+    add("УДАЛИТЬВСЕ", 1, builtinRetractAll);
 
     // Graphics.
     add("ТОЧКА", 3, builtinPoint);

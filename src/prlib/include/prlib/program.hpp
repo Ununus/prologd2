@@ -58,6 +58,12 @@ class Database {
   /// has no clauses at all.
   bool retractClause(std::string_view name, std::size_t arity, std::int64_t index);
 
+  /// Remove the clause with this identifier — the removal `УДАЛЕНИЕ/1` and
+  /// `УДАЛИТЬВСЕ/1` do by matching a head.  Identity is what survives between
+  /// the snapshot the walk collected and the moment an answer is handed out, so
+  /// a clause another answer already took is simply not found (false).
+  bool retractById(std::string_view name, std::size_t arity, std::uint64_t id);
+
   [[nodiscard]] ClauseListPtr clausesFor(std::string_view name, std::size_t arity) const;
   [[nodiscard]] ClauseListPtr clausesFor(const Functor& functor) const {
     return clausesFor(functor.name, functor.arity);

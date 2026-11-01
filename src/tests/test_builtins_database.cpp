@@ -439,3 +439,64 @@ TEST_CASE("asserta and assertz refuse what is not a clause") {
     REQUIRE(result.error.find(expected) != std::string::npos);
   }
 }
+
+TEST_CASE("retract by pattern takes one clause per answer, retractall takes them all") {
+  // Part 251: `УДАЛЕНИЕ/1` is ISO's `retract/1` minus the body — a clause is not a
+  // term here, so the head is what answers.  One clause goes per answer, and the
+  // clauses a walk was called with are the ones it sees.
+  const auto result = runProgram(
+      "ф(1).\n"
+      "ф(2).\n"
+      "?УДАЛЕНИЕ(ф(Х)).\n"
+      "?НАЙТИВСЕ(Х, ф(Х), После).\n"
+      "?УДАЛИТЬВСЕ(ф(_)).\n"
+      "?НАЙТИВСЕ(Х, ф(Х), Пусто).\n"
+      "?УДАЛИТЬВСЕ(ф(_)).\n");
+  REQUIRE(result.loaded);
+  REQUIRE_FALSE(result.runtimeError);
+  REQUIRE(result.output == "Х=1\nХ=2\nХ=_1\nПосле=[]\n"
+                           "ДА\nХ=_1\nПусто=[]\n"
+                           "ДА\n");
+}
+
+TEST_CASE("retractall matches a head, so it takes a rule too, and leaves nothing bound") {
+  // The difference from ISO, said out loud: `retract(ф(1))` there removes only the
+  // fact `ф(1)`, because a rule is the term `:-(ф(1), …)` and does not unify with
+  // it.  Here the head decides, so the rule goes as well.
+  const auto rule = runProgram(
+      "правило(Х):-ф(Х), БОЛЬШЕ(Х, 2).\n"
+      "?УДАЛИТЬВСЕ(правило(_)).\n"
+      "?НАЙТИВСЕ(Х, правило(Х), Л).\n");
+  REQUIRE(rule.loaded);
+  REQUIRE(rule.output == "ДА\nХ=_1\nЛ=[]\n");
+
+  // A named variable in the pattern stays free: `retractall` never binds.
+  const auto free_variable = runProgram("ф(1).\n?УДАЛИТЬВСЕ(ф(Х)), ПЕР(Х).\n");
+  REQUIRE(free_variable.loaded);
+  REQUIRE(free_variable.output == "Х=_1\n");
+}
+
+TEST_CASE("a retract walk does not see a clause asserted during it") {
+  const auto result = runProgram(
+      "ф(1).\n"
+      "ф(2).\n"
+      "?УДАЛЕНИЕ(ф(Х)), ДОБ(ф(9), [], 99).\n"
+      "?НАЙТИВСЕ(Х, ф(Х), Л).\n");
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "Х=1\nХ=2\nХ=_1\nЛ=[9,9]\n");
+}
+
+TEST_CASE("retract by pattern refuses what is not a clause") {
+  const std::pair<std::string, std::string> cases[] = {
+      {"УДАЛЕНИЕ(Х)", "УДАЛЕНИЕ: Недопустимый тип аргументов: аргумент 1"},
+      {"УДАЛЕНИЕ(5)", "УДАЛЕНИЕ: Недопустимый тип аргументов: аргумент 1"},
+      {"УДАЛИТЬВСЕ(5)", "УДАЛИТЬВСЕ: Недопустимый тип аргументов: аргумент 1"},
+  };
+  for (const auto& [goal, expected] : cases) {
+    INFO("goal: " << goal);
+    const auto result = runProgram("?" + goal + ".\n");
+    REQUIRE(result.loaded);
+    REQUIRE(result.runtimeError);
+    REQUIRE(result.error.find(expected) != std::string::npos);
+  }
+}
