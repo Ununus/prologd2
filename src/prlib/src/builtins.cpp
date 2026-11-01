@@ -556,7 +556,8 @@ constexpr std::pair<std::string_view, std::string_view> kEnglishNames[] = {
     {"ВВОДСТР", "read_string"}, {"ЧТЕНИЕ_ИЗ", "see"},
     {"ЗАПИСЬ_В", "tell"},       {"СКОЛЬКО", "clause_count"},
     {"ПРЕДЛ", "clause_at"},     {"ТЕРМ", "univ"},
-    {"ДОБ", "assert"},          {"УДАЛЕНИЕ", "retract"},
+    {"ДОБ", "assert"},          {"ДОБНАЧ", "asserta"},
+    {"ДОБКОН", "assertz"},      {"УДАЛЕНИЕ", "retract"},
     {"ТОЧКА", "point"},         {"ЛИНИЯ", "line"},
     {"ОКРУЖНОСТЬ", "circle"},   {"ЗАКРАСКА", "fill"},
 };
@@ -735,6 +736,14 @@ const BuiltinTable& builtinTable() {
     add("ПРЕДЛ", 4, builtinClauseInfo);
     add("ТЕРМ", 2, builtinTermConvert);
     add("ДОБ", 3, builtinAssert);
+    // `asserta`/`assertz` without the position: the same clause, added as the
+    // first or the last one of its predicate.  Arity one is the fact form, which
+    // is the whole of ISO's `asserta(Fact)`; arity two takes the goals the way
+    // `ДОБ` does, because a rule is not a term here (part 250).
+    add("ДОБНАЧ", 1, builtinAssertFirst);
+    add("ДОБНАЧ", 2, builtinAssertFirst);
+    add("ДОБКОН", 1, builtinAssertLast);
+    add("ДОБКОН", 2, builtinAssertLast);
     add("УДАЛЕНИЕ", 2, builtinRetract);
 
     // Graphics.

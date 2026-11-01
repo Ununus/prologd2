@@ -74,6 +74,11 @@ class Database {
   /// name (all arities), following the historical `ДОБ` rules.
   void insertByNamePosition(Clause clause, std::int64_t position);
 
+  /// Assert `clause` as the last one of its predicate — `ДОБКОН` (`assertz`).
+  /// The counterpart of `insertByNamePosition(clause, 1)`, which `ДОБНАЧ`
+  /// (`asserta`) calls.
+  void appendByName(Clause clause);
+
   /// All predicates currently known, sorted by name/arity.
   [[nodiscard]] std::vector<Functor> predicates() const;
 

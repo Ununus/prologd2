@@ -101,6 +101,7 @@ const std::vector<std::string>& checkedExamples() {
       "sort.pld",
       "ground.pld",
       "types.pld",
+      "database.pld",
       "forall.pld",
       "stdlib.pld",
       "problems/sorting.pld",

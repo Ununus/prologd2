@@ -46,9 +46,10 @@ const std::unordered_set<std::string> kReservedBuiltins = {
     "СТРСПИС", "СТРЦЕЛ", "СТРВЕЩ", "ЦЕЛВЕЩ", "АТОМСТР",
     "var", "integer", "atom", "string", "is_text", "is_list", "ground",
     "str_to_list", "str_to_int", "str_to_float", "int_to_float", "atom_string",
-    // Database
-    "СКОЛЬКО", "ПРЕДЛ", "ТЕРМ", "ДОБ", "УДАЛЕНИЕ",
-    "clause_count", "clause_at", "univ", "assert", "retract",
+    // Database.  `ДОБНАЧ`/`ДОБКОН` are ISO's `asserta`/`assertz` without the
+    // position argument (part 250).
+    "СКОЛЬКО", "ПРЕДЛ", "ТЕРМ", "ДОБ", "УДАЛЕНИЕ", "ДОБНАЧ", "ДОБКОН",
+    "clause_count", "clause_at", "univ", "assert", "retract", "asserta", "assertz",
     // Graphics
     "ТОЧКА", "ЛИНИЯ", "ОКРУЖНОСТЬ", "ЗАКРАСКА",
     "point", "line", "circle", "fill",

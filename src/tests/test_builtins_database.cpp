@@ -403,3 +403,39 @@ TEST_CASE("assert and univ read a list a program built") {
   REQUIRE(result.output == "Х=[]\n"
                            "Х=[]\nС=[ф,1]\nТ=ф(1)\n");
 }
+
+TEST_CASE("asserta and assertz add a clause at the front and at the back") {
+  // Part 250: the two spellings of `ДОБ` that need no position.  Arity one is a
+  // fact, arity two takes the goals the way `ДОБ` does — a rule is not a term in
+  // this dialect, so ISO's `asserta((Head :- Goals))` has nothing to parse.
+  const auto result = runProgram(
+      "ф(1).\n"
+      "?ДОБНАЧ(ф(0)).\n"
+      "?ДОБКОН(ф(9)).\n"
+      "?НАЙТИВСЕ(Х, ф(Х), Л).\n"
+      "?ДОБНАЧ(двойной(Х), [БОЛЬШЕ(Х, 0)]).\n"
+      "?ПРЕДЛ(двойной, 1, Голова, Цели).\n"
+      "?asserta(ф(7)).\n"
+      "?assertz(ф(8)).\n"
+      "?НАЙТИВСЕ(Х, ф(Х), Л2).\n");
+  REQUIRE(result.loaded);
+  REQUIRE_FALSE(result.runtimeError);
+  REQUIRE(result.output == "ДА\nДА\nХ=_1\nЛ=[0,1,9]\n"
+                           "Х=_1\nГолова=двойной(_1)\nЦели=[БОЛЬШЕ(_1,0)]\n"
+                           "ДА\nДА\nХ=_1\nЛ2=[7,0,1,9,8]\n");
+}
+
+TEST_CASE("asserta and assertz refuse what is not a clause") {
+  // The messages name the predicate that was called, not `ДОБ`.
+  const std::pair<std::string, std::string> cases[] = {
+      {"ДОБНАЧ(5)", "ДОБНАЧ: Недопустимый тип аргументов: аргумент 1"},
+      {"ДОБКОН(ф(1), 5)", "ДОБКОН: Недопустимый тип аргументов: аргумент 2"},
+  };
+  for (const auto& [goal, expected] : cases) {
+    INFO("goal: " << goal);
+    const auto result = runProgram("?" + goal + ".\n");
+    REQUIRE(result.loaded);
+    REQUIRE(result.runtimeError);
+    REQUIRE(result.error.find(expected) != std::string::npos);
+  }
+}

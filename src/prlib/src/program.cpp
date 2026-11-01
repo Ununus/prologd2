@@ -218,6 +218,15 @@ void Database::insertByNamePosition(Clause clause, std::int64_t position) {
   list->insert(list->begin() + static_cast<std::ptrdiff_t>(own_index), std::move(clause));
 }
 
+void Database::appendByName(Clause clause) {
+  const auto functor = functorOf(clause.head);
+  if (!functor) {
+    return;
+  }
+  clause.id = next_id_++;
+  mutableListFor(functor->name, functor->arity)->push_back(std::move(clause));
+}
+
 void Database::clear() {
   table_.clear();
   next_id_ = 1;

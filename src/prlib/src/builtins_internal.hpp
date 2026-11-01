@@ -190,6 +190,10 @@ BuiltinResult builtinClauseCount(Engine&, std::span<const Term>);
 BuiltinResult builtinClauseInfo(Engine&, std::span<const Term>);
 BuiltinResult builtinTermConvert(Engine&, std::span<const Term>);
 BuiltinResult builtinAssert(Engine&, std::span<const Term>);
+/// `ДОБНАЧ` (`asserta`) and `ДОБКОН` (`assertz`): the same clause as `ДОБ` takes,
+/// added as the first or the last one of its predicate — no position to write.
+BuiltinResult builtinAssertFirst(Engine&, std::span<const Term>);
+BuiltinResult builtinAssertLast(Engine&, std::span<const Term>);
 BuiltinResult builtinRetract(Engine&, std::span<const Term>);
 
 // ---- graphics ----

@@ -29,6 +29,34 @@ bool isCallable(Engine& engine, const Term& term) {
   return resolved.kind == TermKind::Atom || resolved.kind == TermKind::Compound;
 }
 
+/// The clause the `ДОБ` family builds from a head and a list of goals — copied
+/// into the database's own space, so a later binding of the caller's variables
+/// cannot reach it.
+Clause clauseFrom(Engine& engine, const Term& head_arg, const Term& goals_arg,
+                  std::string_view predicate) {
+  const Term head = engine.bindings().deref(head_arg);
+  if (head.kind != TermKind::Atom && head.kind != TermKind::Compound) {
+    badArgument(engine, head_arg, predicate, 1, ArgKind::Text,
+                "имя предиката или голова предложения");
+  }
+  const Term goals = engine.bindings().deref(goals_arg);
+  if (!isList(goals)) {
+    badArgument(engine, goals_arg, predicate, 2, ArgKind::List);
+  }
+  const auto body = listElements(engine, goals);
+  if (!body) {
+    engine.raise(ErrorCode::WrongList);
+  }
+  for (const Term& goal : *body) {
+    if (!isCallable(engine, goal)) {
+      badArguments(engine, predicate);
+    }
+  }
+  Clause clause;
+  engine.copyClauseResolved(head, *body, clause.head, clause.body);
+  return clause;
+}
+
 }  // namespace
 
 BuiltinResult builtinClauseCount(Engine& engine, std::span<const Term> args) {
@@ -130,31 +158,29 @@ BuiltinResult builtinTermConvert(Engine& engine, std::span<const Term> args) {
 }
 
 BuiltinResult builtinAssert(Engine& engine, std::span<const Term> args) {
-  const Term head = engine.bindings().deref(args[0]);
-  if (head.kind != TermKind::Atom && head.kind != TermKind::Compound) {
-    badArgument(engine, args[0], "ДОБ", 1, ArgKind::Text,
-                "имя предиката или голова предложения");
-  }
-  const Term goals = engine.bindings().deref(args[1]);
-  if (!isList(goals)) {
-    badArgument(engine, args[1], "ДОБ", 2, ArgKind::List);
-  }
   const auto position = integerValue(engine, args[2]);
   if (!position) {
     badArgument(engine, args[2], "ДОБ", 3, ArgKind::Integer);
   }
-  const auto body = listElements(engine, goals);
-  if (!body) {
-    engine.raise(ErrorCode::WrongList);
-  }
-  for (const Term& goal : *body) {
-    if (!isCallable(engine, goal)) {
-      badArguments(engine, "ДОБ");
-    }
-  }
-  Clause clause;
-  engine.copyClauseResolved(head, *body, clause.head, clause.body);
+  Clause clause = clauseFrom(engine, args[0], args[1], "ДОБ");
   engine.database().insertByNamePosition(std::move(clause), *position);
+  return BuiltinResult::Continue;
+}
+
+/// The one-argument form asserts a fact: the goals are the empty list.
+BuiltinResult builtinAssertFirst(Engine& engine, std::span<const Term> args) {
+  const Term facts_only = makeNil();
+  Clause clause = clauseFrom(engine, args[0], args.size() == 2 ? args[1] : facts_only,
+                             "ДОБНАЧ");
+  engine.database().insertByNamePosition(std::move(clause), 1);
+  return BuiltinResult::Continue;
+}
+
+BuiltinResult builtinAssertLast(Engine& engine, std::span<const Term> args) {
+  const Term facts_only = makeNil();
+  Clause clause = clauseFrom(engine, args[0], args.size() == 2 ? args[1] : facts_only,
+                             "ДОБКОН");
+  engine.database().appendByName(std::move(clause));
   return BuiltinResult::Continue;
 }
 
