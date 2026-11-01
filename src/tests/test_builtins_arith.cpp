@@ -345,6 +345,9 @@ TEST_CASE("addition: all three modes, integers and floats") {
 }
 
 TEST_CASE("is_whole, is_number and the truncating conversion take what they are given") {
+  // Part 248 gave the two soft checks Russian names: `ЦЕЛЗНАЧ` is «значение
+  // целое», `ЧИСЛЗНАЧ` is «значение — число».  The `is_` spellings answer the
+  // same, and both read the *value*, which is why `ЦЕЛ(4.0)` is false here.
   const auto result = runProgram(
       "?is_whole(4).\n"
       "?is_whole(4.0).\n"
@@ -353,6 +356,10 @@ TEST_CASE("is_whole, is_number and the truncating conversion take what they are 
       "?is_number(4).\n"
       "?is_number(4.0).\n"
       "?is_number(4.5).\n"
+      "?ЦЕЛЗНАЧ(4.0).\n"
+      "?ЦЕЛЗНАЧ(4.5).\n"
+      "?ЧИСЛЗНАЧ(4).\n"
+      "?ЦЕЛ(4.0).\n"
       "?ЦЕЛВЕЩ(5, X).\n"
       "?ЦЕЛВЕЩ(X, 5.0).\n"
       "?ЦЕЛВЕЩ(5.5, X).\n"
@@ -360,7 +367,8 @@ TEST_CASE("is_whole, is_number and the truncating conversion take what they are 
       "?ЦЕЛВЕЩ(5, 5.0).\n"
       "?ЦЕЛВЕЩ(5.5, 5).\n");
   REQUIRE(result.loaded);
-  REQUIRE(result.output == "ДА\nДА\nНЕТ\nНЕТ\nДА\nДА\nДА\nX=5.0\nX=5\nX=5\nX=5\nДА\nДА\n");
+  REQUIRE(result.output ==
+          "ДА\nДА\nНЕТ\nНЕТ\nДА\nДА\nДА\nДА\nНЕТ\nДА\nНЕТ\nX=5.0\nX=5\nX=5\nX=5\nДА\nДА\n");
 }
 
 TEST_CASE("the random built-in seeds, draws, and refuses what it cannot do") {
@@ -427,7 +435,8 @@ TEST_CASE("the arithmetic built-ins report a wrong type as an error") {
   // `is_whole` and `is_number` have an error of their own: the argument is a
   // number or it is nothing, and «ошибка преобразования типа» says which.
   for (const std::string goal :
-       {"is_whole(\"4\")", "is_number(\"4\")", "is_whole(X)", "is_number(X)"}) {
+       {"is_whole(\"4\")", "is_number(\"4\")", "is_whole(X)", "is_number(X)",
+        "ЦЕЛЗНАЧ(\"4\")", "ЧИСЛЗНАЧ(X)"}) {
     const auto result = runProgram("?" + goal + ".\n");
     REQUIRE(result.loaded);
     REQUIRE(result.runtimeError);

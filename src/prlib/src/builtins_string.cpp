@@ -49,18 +49,28 @@ BuiltinResult classifyCharacter(Engine& engine, std::span<const Term> args,
   if (!text) {
     badArgument(engine, args[0], name, 1, ArgKind::Text);
   }
-  const std::size_t length = utf8Length(*text);
   if (isUnbound(engine, args[1])) {
-    for (std::size_t i = 0; i < length; ++i) {
-      const DecodeResult decoded = decodeCodePoint(*text, utf8ByteOffset(*text, i));
+    // One walk over the string, not one per position: asking
+    // `utf8ByteOffset(text, i)` for every `i` would decode the whole prefix each
+    // time and make the search quadratic in the length of the text.
+    std::size_t index = 0;
+    std::size_t offset = 0;
+    while (offset < text->size()) {
+      const DecodeResult decoded = decodeCodePoint(*text, offset);
+      if (decoded.length == 0) {
+        break;
+      }
       if (decoded.valid && classify(decoded.code_point)) {
-        return unifyInteger(engine, args[1], BigInt(static_cast<std::int64_t>(i + 1)))
+        return unifyInteger(engine, args[1], BigInt(static_cast<std::int64_t>(index + 1)))
                    ? BuiltinResult::Continue
                    : BuiltinResult::Fail;
       }
+      offset += decoded.length;
+      ++index;
     }
     return BuiltinResult::Fail;
   }
+  const std::size_t length = utf8Length(*text);
   const auto position = positionOf(engine, args[1]);
   if (!position) {
     badArgument(engine, args[1], name, 2, ArgKind::Integer);

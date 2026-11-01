@@ -2283,3 +2283,71 @@ carries the record (the pair table in §17 and the `F1` card pick it up on their
 own), and the README of the window says `bye` can now come from the program.
 
 **Status.** Accepted.
+
+## ADR-067: `АТОМ` and `СТРОКА` split `СИМВ`, and `atom("…")` is false
+
+**Context.**  The port made text one kind in two spellings: a string was a term of
+its own but every check that asked «is this text» answered for both, so
+`atom("молоко")` was true.  The ISO predicate of that name asks something else —
+`atom/1` is true for an atom and false for a string — and the library said so in a
+comment instead of behaving so.  The owner had already decided not to make an atom
+and a string the same thing; this is the other half of that decision: the *checks*
+have to tell them apart.
+
+**Decision.**  `АТОМ`/`atom` and `СТРОКА`/`string` are built in, one term kind each
+(`TermKind::Atom`, `TermKind::String`), and `СИМВ`/`is_text` stays as the union the
+dialect needs for «текст» — the kind every text-taking built-in accepts.  `[]` is an
+atom, as it is in ISO: it is a constant like any other.
+
+Conversions follow the same reading: `АТОМСТР`/`atom_string` translates one text
+into the other kind and back, and refuses with a type error when an argument is
+bound to the wrong kind — ISO calls that a type error, not a failure, and so does
+this dialect.  Both arguments free is an error too (there is nothing to translate).
+
+The library keeps its own predicates but stops redefining what is built in:
+`stdlib/iso.pld` loses `atom/1`, `atomic/1` widens to `СИМВ` (a string is atomic,
+as in ISO), and `callable/1` narrows to what the engine accepts as a goal —
+`callable("молоко")` is now false, because `ВЫП("молоко")` is «Цель должна быть
+предикатом».
+
+**Consequences.**  The recorded difference from ISO in `doc/library.typ` and in the
+journal is gone: a string is now excluded from `atom/1` here for the same reason as
+in ISO, even though the string itself is a different thing (text in quotes here, a
+code list there).  A program that asked `atom("…")` gets «нет» — that is the point,
+and no shipped example did.  The two names are reserved, so the arity check, the
+highlighter, completion and `--list-keywords` know them with no further work.
+`examples/types.pld` is the one place that shows the whole set; §9 and §10 of the
+manual carry the reading, and `doc/builtins.json` the records.
+
+**Status.** Accepted.
+
+## ADR-068: a position is `_at`, a value check is `ЗНАЧ`
+
+**Context.**  Two naming questions came out of `examples/types.pld` (part 247).  First,
+`is_letter/2` and `is_digit/2` take a *position* as their second argument, and a name
+without `_at` promises a test of one term — a reader of ordinary Prolog would expect
+`is_letter(X)`.  Second, `is_whole` and `is_number` had no Russian names at all, and
+the obvious words were taken: `ПОЛНЫЙ` is `ground`, `ЦЕЛ` is `integer`, and `number/1`
+in `stdlib/iso.pld` is the *strict* test, so a soft «ЧИСЛО» next to it would put two
+different `number`s side by side.
+
+**Decision.**  The English names say what the second argument is: `БУКВА/2` and
+`ЦИФРА/2` answer to `is_letter_at` and `is_digit_at`.  The old spellings are retired
+the way `substring` was — reserved, so a call reaches the checks and is told what to
+write instead of being answered «не найдено».
+
+The soft value checks get Russian names built from the check word and the tail `ЗНАЧ`:
+`ЦЕЛЗНАЧ` is «значение целое», `ЧИСЛЗНАЧ` is «значение — число».  The tail does the
+work the `is_` prefix does in English: it marks a predicate of ours, which looks at the
+*value*, and keeps it apart from the type test of the same stem.  `is_whole` and
+`is_number` stay as the English spellings through the ordinary alias table.
+
+**Consequences.**  `#`-style naming rules are written where a new built-in is read
+(`ai/conventions.md`): bare where the standard means the same, `is_` for a check of
+ours, a trailing `_at` when the last argument is a position, `ЗНАЧ` for the soft value
+checks, `X_to_Y` for a conversion.  The pair table in §17 gained `ЦЕЛЗНАЧ`/`is_whole`
+and `ЧИСЛЗНАЧ`/`is_number` on its own, and §5.7 stopped saying «русского имени нет».
+Nothing in the corpus called `is_letter` or `is_digit`, so no program needed changing;
+both new spellings are reserved, keyworded and completed with no further work.
+
+**Status.** Accepted.

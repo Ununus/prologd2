@@ -84,7 +84,8 @@ const std::vector<std::string>& checkedLessons() {
 /// them shows one group of the built-ins the dialect added on top of the port or
 /// carries the ISO spelling beside it (part 245): the arithmetic signs, the three
 /// collectors, `ПЕРВОЕ` and `->`, the standard order, `ПОДСТРОКА`, `СОРТИРОВКА`,
-/// `ПОЛНЫЙ` and `ДЛЯВСЕХ`.  Also here: the tour of the standard library, the two
+/// `ПОЛНЫЙ` and `ДЛЯВСЕХ`, and the type tests with the conversions between the
+/// kinds (part 247).  Also here: the tour of the standard library, the two
 /// problems whose output is the same on every machine, the study sorts that left
 /// the library for `examples/problems/sorting.pld` (task_89) and the family tree.
 /// `problems/hanoi.pld` draws and `problems/hanoi_play.pld` reads input, so those
@@ -99,6 +100,7 @@ const std::vector<std::string>& checkedExamples() {
       "sub_string.pld",
       "sort.pld",
       "ground.pld",
+      "types.pld",
       "forall.pld",
       "stdlib.pld",
       "problems/sorting.pld",

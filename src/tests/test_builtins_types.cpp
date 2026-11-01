@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <string>
+#include <utility>
 
 #include "test_helpers.hpp"
 
@@ -33,8 +34,8 @@ TEST_CASE("a type test with an unregistered arity is an error") {
   // Each of these names has exactly one arity, so a two-argument call can never
   // succeed; the load stops with the message instead of a silent `НЕТ`.
   for (const std::string goal :
-       {"ПЕР(X, X)", "ЦЕЛ(1, 1)", "ВЕЩ(1.0, 1.0)", "СИМВ(a, a)", "СПИСОК([], [])",
-        "ПОЛНЫЙ([], [])"}) {
+       {"ПЕР(X, X)", "ЦЕЛ(1, 1)", "ВЕЩ(1.0, 1.0)", "АТОМ(a, a)", "СТРОКА(\"a\", \"a\")",
+        "СИМВ(a, a)", "СПИСОК([], [])", "ПОЛНЫЙ([], [])"}) {
     const auto result = runProgram("?" + goal + ".\n");
     REQUIRE_FALSE(result.loaded);
     REQUIRE(result.error.find("не имеет арности 2 (есть 1)") != std::string::npos);
@@ -102,6 +103,90 @@ TEST_CASE("the symbol test is true for an atom or a string") {
       "?РАВНО(X, \"abc\"), СИМВ(X).\n");
   REQUIRE(result.loaded);
   REQUIRE(result.output == "ДА\nДА\nДА\nДА\nНЕТ\nНЕТ\nНЕТ\nНЕТ\nНЕТ\nНЕТ\nX=abc\n");
+}
+
+TEST_CASE("the atom test is true exactly for an atom") {
+  // Part 247: `АТОМ`/`atom` and `СТРОКА`/`string` split what `СИМВ` answers
+  // together.  A string is a term of its own here, as in ISO, so the split is
+  // the ISO reading of `atom/1` — and `[]`, being a constant, is an atom.
+  const auto result = runProgram(
+      "?АТОМ(a).\n"
+      "?АТОМ(молоко).\n"
+      "?АТОМ([]).\n"
+      "?АТОМ(\"\").\n"
+      "?АТОМ(\"abc\").\n"
+      "?АТОМ(5).\n"
+      "?АТОМ(5.0).\n"
+      "?АТОМ([a]).\n"
+      "?АТОМ(f(1)).\n"
+      "?АТОМ(#1+1#).\n"
+      "?АТОМ(X).\n"
+      "?РАВНО(X, \"abc\"), АТОМ(X).\n"
+      "?РАВНО(X, abc), АТОМ(X).\n"
+      "?atom(abc).\n");
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "ДА\nДА\nДА\nНЕТ\nНЕТ\nНЕТ\nНЕТ\nНЕТ\nНЕТ\nНЕТ\nНЕТ\n"
+                           "НЕТ\nX=abc\nДА\n");
+}
+
+TEST_CASE("the string test is true exactly for a string") {
+  const auto result = runProgram(
+      "?СТРОКА(\"abc\").\n"
+      "?СТРОКА(\"\").\n"
+      "?СТРОКА(a).\n"
+      "?СТРОКА([]).\n"
+      "?СТРОКА(5).\n"
+      "?СТРОКА([a]).\n"
+      "?СТРОКА(f(1)).\n"
+      "?СТРОКА(X).\n"
+      "?РАВНО(X, \"abc\"), СТРОКА(X).\n"
+      "?РАВНО(X, abc), СТРОКА(X).\n"
+      "?string(\"abc\").\n");
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "ДА\nДА\nНЕТ\nНЕТ\nНЕТ\nНЕТ\nНЕТ\nНЕТ\nX=abc\nНЕТ\nДА\n");
+}
+
+TEST_CASE("atom_string converts both ways and keeps the kinds") {
+  // An atom and a string of the same text print the same, so each answer is
+  // checked with the test that names its kind.
+  const auto result = runProgram(
+      "?АТОМСТР(молоко, С).\n"
+      "?АТОМСТР(А, \"молоко\").\n"
+      "?АТОМСТР(молоко, С), СТРОКА(С).\n"
+      "?АТОМСТР(А, \"молоко\"), АТОМ(А).\n"
+      "?АТОМСТР(молоко, \"молоко\").\n"
+      "?АТОМСТР(молоко, \"сыр\").\n"
+      "?АТОМСТР(А, \"\").\n"                // пустое имя: печать его не показывает
+      "?atom_string(foo, S), string(S).\n");
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "С=молоко\n"
+                           "А=молоко\n"
+                           "С=молоко\n"
+                           "А=молоко\n"
+                           "ДА\n"
+                           "НЕТ\n"
+                           "А=\n"
+                           "S=foo\n");
+}
+
+TEST_CASE("atom_string refuses what is neither an atom nor a string") {
+  // ISO writes these as type errors, not as failures, and so does the dialect:
+  // a value of the wrong kind is a mistake in the program, not an answer.
+  const std::pair<std::string, std::string> cases[] = {
+      {"АТОМСТР(1, С)", "аргумент 1 — 1, нужно атом"},
+      {"АТОМСТР(\"а\", С)", "аргумент 1 — а, нужно атом"},
+      {"АТОМСТР(А, молоко)", "аргумент 2 — молоко, нужно строка"},
+      {"АТОМСТР(А, С)", "аргумент 1 — несвязанная переменная, нужно атом"},
+      {"АТОМСТР(1, молоко)", "аргумент 1 — 1, нужно атом"},
+  };
+  for (const auto& one : cases) {
+    INFO("goal: " << one.first);
+    const auto result = runProgram("?" + one.first + ".\n");
+    REQUIRE(result.loaded);
+    REQUIRE(result.runtimeError);
+    REQUIRE(result.error.find("АТОМСТР: Недопустимый тип аргументов: " + one.second) !=
+            std::string::npos);
+  }
 }
 
 TEST_CASE("the list test is true for a list cell or the empty list") {

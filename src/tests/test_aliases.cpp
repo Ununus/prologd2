@@ -154,6 +154,9 @@ TEST_CASE("the English surface works from a program") {
       "?equal(5, 5).\n"
       "?is_list([1]).\n"
       "?is_text(текст).\n"
+      "?atom(текст).\n"
+      "?string(\"текст\").\n"
+      "?atom_string(текст, Текст).\n"
       "?concat(\"а\", \"б\", Пара).\n"
       "?sub_string(\"абв\", 0, 1, _, Первая).\n");
   REQUIRE(result.loaded);
@@ -166,5 +169,5 @@ TEST_CASE("the English surface works from a program") {
           "Who=bob\n"
           "ok\n"
           "ДА\nДА\nНЕТ\nДА\nДА\nN=4\n"
-          "ДА\nДА\nДА\nДА\nДА\nПара=аб\nПервая=а\n");
+          "ДА\nДА\nДА\nДА\nДА\nДА\nДА\nТекст=текст\nПара=аб\nПервая=а\n");
 }

@@ -199,6 +199,26 @@
       "variants": ["ВЕЩ(Терм) — Терм вещественное"]
     },
     {
+      "name": "АТОМ",
+      "aliases": ["atom"],
+      "kind": "predicate",
+      "arities": [1],
+      "group": "types",
+      "section": "9",
+      "summary": "Истинно, если аргумент — атом (пустой список тоже атом); строка атомом не является",
+      "variants": ["АТОМ(Терм) — Терм атом, имя предмета"]
+    },
+    {
+      "name": "СТРОКА",
+      "aliases": ["string"],
+      "kind": "predicate",
+      "arities": [1],
+      "group": "types",
+      "section": "9",
+      "summary": "Истинно, если аргумент — строка, текст в кавычках",
+      "variants": ["СТРОКА(Терм) — Терм строка"]
+    },
+    {
       "name": "СИМВ",
       "aliases": ["is_text"],
       "kind": "predicate",
@@ -379,6 +399,16 @@
       "variants": ["ЦЕЛВЕЩ(Ц, Вещ) — целое в вещественное и обратно"]
     },
     {
+      "name": "АТОМСТР",
+      "aliases": ["atom_string"],
+      "kind": "predicate",
+      "arities": [2],
+      "group": "types",
+      "section": "10",
+      "summary": "Перевод атома в строку и обратно; вид терма сохраняется",
+      "variants": ["АТОМСТР(Атом, Стр) — атом и строка одного текста, в любую сторону"]
+    },
+    {
       "name": "СТРЦЕЛ",
       "aliases": ["str_to_int"],
       "kind": "predicate",
@@ -410,7 +440,7 @@
     },
     {
       "name": "БУКВА",
-      "aliases": ["is_letter"],
+      "aliases": ["is_letter_at"],
       "kind": "predicate",
       "arities": [2],
       "group": "strings",
@@ -420,7 +450,7 @@
     },
     {
       "name": "ЦИФРА",
-      "aliases": ["is_digit"],
+      "aliases": ["is_digit_at"],
       "kind": "predicate",
       "arities": [2],
       "group": "strings",
@@ -847,24 +877,24 @@
       "summary": "Экспонента как функция выражения",
       "variants": ["exp(X) — экспонента в выражении #…#; предикат того же имени — EXP/2"]
     },    {
-      "name": "is_whole",
-      "aliases": [],
+      "name": "ЦЕЛЗНАЧ",
+      "aliases": ["is_whole"],
       "kind": "predicate",
       "arities": [1],
       "group": "arith",
       "section": "5.7",
       "summary": "Мягкая проверка значения: целое или вещественное с нулевой дробной частью",
-      "variants": ["is_whole(X) — значение X целое (is_whole(5.0) истинно)"]
+      "variants": ["ЦЕЛЗНАЧ(X) — значение X целое (ЦЕЛЗНАЧ(5.0) истинно)"]
     },
     {
-      "name": "is_number",
-      "aliases": [],
+      "name": "ЧИСЛЗНАЧ",
+      "aliases": ["is_number"],
       "kind": "predicate",
       "arities": [1],
       "group": "arith",
       "section": "5.7",
       "summary": "Мягкая проверка значения: X — число",
-      "variants": ["is_number(X) — X — число"]
+      "variants": ["ЧИСЛЗНАЧ(X) — X — число"]
     },
     {
       "name": "mod",

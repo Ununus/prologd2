@@ -26,6 +26,9 @@ const std::unordered_set<std::string> kReservedBuiltins = {
     "ABS", "SQRT", "SIN", "COS", "TAN", "EXP",
     "greater", "less", "plus", "mul", "random", "abs", "sqrt", "sin",
     "cos", "tan", "exp", "log", "is_whole", "is_number",
+    // The soft value checks answer to Russian names too (part 248): `ЦЕЛЗНАЧ`
+    // is «значение целое», `ЧИСЛЗНАЧ` is «значение — число».
+    "ЦЕЛЗНАЧ", "ЧИСЛЗНАЧ",
     // I/O
     "ЧТЕНИЕ_ИЗ", "ЗАПИСЬ_В", "ВВКОД", "ВВОДЦЕЛ", "ВВОДВЕЩ", "ВВОДСИМВ",
     "ВВОДСТР", "ВЫВОД", "ВЫВОДПС", "ЖДИ",
@@ -33,16 +36,16 @@ const std::unordered_set<std::string> kReservedBuiltins = {
     "read_string", "write", "writeln", "wait",
     // Strings
     "БУКВА", "ЦИФРА", "СЦЕП", "КОПИЯ", "ДЛИНА",
-    "is_letter", "is_digit", "concat", "strlen",
+    "is_letter_at", "is_digit_at", "concat", "strlen",
     // `sub_string/5` is ISO's name for the work `КОПИЯ/4` does from one, and
     // `ПОДСТРОКА/5` is the same predicate in Russian (task_84): both are
     // reserved, and its old English alias `substring` is retired below.
     "ПОДСТРОКА", "sub_string",
     // Type tests and conversions
-    "ПЕР", "ЦЕЛ", "ВЕЩ", "СИМВ", "СПИСОК", "ПОЛНЫЙ", "СТРСПИС", "СТРЦЕЛ",
-    "СТРВЕЩ", "ЦЕЛВЕЩ",
-    "var", "integer", "is_text", "is_list", "ground", "str_to_list",
-    "str_to_int", "str_to_float", "int_to_float",
+    "ПЕР", "ЦЕЛ", "ВЕЩ", "АТОМ", "СТРОКА", "СИМВ", "СПИСОК", "ПОЛНЫЙ",
+    "СТРСПИС", "СТРЦЕЛ", "СТРВЕЩ", "ЦЕЛВЕЩ", "АТОМСТР",
+    "var", "integer", "atom", "string", "is_text", "is_list", "ground",
+    "str_to_list", "str_to_int", "str_to_float", "int_to_float", "atom_string",
     // Database
     "СКОЛЬКО", "ПРЕДЛ", "ТЕРМ", "ДОБ", "УДАЛЕНИЕ",
     "clause_count", "clause_at", "univ", "assert", "retract",
@@ -86,6 +89,12 @@ const std::unordered_set<std::string> kRetiredBuiltinNames = {
     // being answered «не найдено».
     "ИМЕНА",
     "variables",
+    // The English names of `БУКВА/2` and `ЦИФРА/2` before part 248.  Both take a
+    // position as their second argument, so a name without `_at` promised a test
+    // of one term; the spellings stay reserved so a call reaches the checks and
+    // is told what to write.
+    "is_letter",
+    "is_digit",
 };
 
 /// Operator spellings borrowed from other Prologs that this dialect does not

@@ -135,6 +135,7 @@ PINNED: dict[str, int] = {
     "sort.pld": 12,
     "stdlib.pld": 73,
     "sub_string.pld": 11,
+    "types.pld": 44,
 }
 
 

@@ -304,6 +304,40 @@ TEST_CASE("letter and digit: a non-string source is a type error") {
   checkBadArguments("БУКВА(\"абв\", \"а\")", "БУКВА");
 }
 
+TEST_CASE("the search walks the string once and counts characters") {
+  // Part 248: the free-position search used to ask for the byte offset of every
+  // position, which decoded the whole prefix each time.  It walks once now, and
+  // the position it reports is still a code-point index — two-byte characters
+  // before it must not shift it.
+  std::string text;
+  for (int i = 0; i < 500; ++i) {
+    text += "ё";
+  }
+  const auto result = runProgram("?БУКВА(\"" + text + "\", 1).\n" +
+                                 "?БУКВА(\"1" + text + "\", X).\n");
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "ДА\nX=2\n");
+}
+
+TEST_CASE("the letter and digit checks answer to names that say _at") {
+  // Part 248: the second argument is a position, so the English name says so.
+  // The old spelling stays reserved and the call is told what to write.
+  const auto result = runProgram(
+      "?is_letter_at(\"абв\", 1).\n"
+      "?is_digit_at(\"абв1\", X).\n");
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "ДА\nX=4\n");
+
+  for (const auto& [query, expected] :
+       {std::pair{"?is_letter(\"абв\", 1).\n", "«is_letter» переименовано: теперь «is_letter_at"},
+        std::pair{"?is_digit(\"1\", 1).\n", "«is_digit» переименовано: теперь «is_digit_at"}}) {
+    INFO("query: " << query);
+    const auto old = runProgram(query);
+    REQUIRE_FALSE(old.loaded);
+    REQUIRE(old.error.find(expected) != std::string::npos);
+  }
+}
+
 TEST_CASE("text to number: conversion and comparison") {
   const auto result = runProgram(
       "?СТРЦЕЛ(\"42\", X).\n"                       // X=42

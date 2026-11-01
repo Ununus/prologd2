@@ -174,6 +174,15 @@ constexpr RetiredName kRetiredNames[] = {
      "«substring» снято: «КОПИЯ(Стр, Ц1, Ц2, Стр4)» считает позиции с 1, а форма "
      "ISO — «sub_string(Стр, До, Длина, После, Подстрока)» с позиций с 0; "
      "по-русски она называется «ПОДСТРОКА»"},
+    // The English names of `БУКВА/2` and `ЦИФРА/2` before part 248.  A name
+    // without `_at` promised a test of one term, and both of these take a
+    // position as their second argument.
+    {"is_letter", 2,
+     "«is_letter» переименовано: теперь «is_letter_at(Текст, Поз)» — второй "
+     "аргумент позиция; по-русски это «БУКВА(Текст, Поз)»"},
+    {"is_digit", 2,
+     "«is_digit» переименовано: теперь «is_digit_at(Текст, Поз)» — второй "
+     "аргумент позиция; по-русски это «ЦИФРА(Текст, Поз)»"},
     // The English arithmetic predicates, which are capitals now so that a goal
     // looks different from the function of an expression: `ABS(X, Y)` answers,
     // `abs(X)` stands inside `#…#` (part 219).  Only arity two is retired —

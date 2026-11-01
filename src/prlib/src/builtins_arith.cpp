@@ -15,6 +15,7 @@ namespace prologd {
 using detail::ArgKind;
 using detail::asNumeric;
 using detail::asText;
+using detail::badArgument;
 using detail::badArguments;
 using detail::isUnbound;
 using detail::unifyFloat;
@@ -724,6 +725,32 @@ BuiltinResult builtinStringToList(Engine& engine, std::span<const Term> args) {
                : BuiltinResult::Fail;
   }
   badArguments(engine, args, "СТРСПИС", ArgKind::Text);
+}
+
+BuiltinResult builtinAtomToString(Engine& engine, std::span<const Term> args) {
+  const Term atom = engine.bindings().deref(args[0]);
+  const Term string = engine.bindings().deref(args[1]);
+  if (atom.kind == TermKind::Atom) {
+    if (string.kind == TermKind::Var) {
+      return engine.unify(args[1], makeString(atom.text)) ? BuiltinResult::Continue
+                                                          : BuiltinResult::Fail;
+    }
+    if (string.kind != TermKind::String) {
+      badArgument(engine, args[1], "АТОМСТР", 2, ArgKind::Text, "строка");
+    }
+    return atom.text == string.text ? BuiltinResult::Continue : BuiltinResult::Fail;
+  }
+  if (atom.kind == TermKind::Var) {
+    if (string.kind == TermKind::String) {
+      return engine.unify(args[0], makeAtom(string.text)) ? BuiltinResult::Continue
+                                                          : BuiltinResult::Fail;
+    }
+    if (string.kind == TermKind::Var) {
+      badArgument(engine, args[0], "АТОМСТР", 1, ArgKind::Text, "атом");
+    }
+    badArgument(engine, args[1], "АТОМСТР", 2, ArgKind::Text, "строка");
+  }
+  badArgument(engine, args[0], "АТОМСТР", 1, ArgKind::Text, "атом");
 }
 
 // ---------------------------------------------------------------------------

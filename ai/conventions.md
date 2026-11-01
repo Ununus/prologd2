@@ -45,9 +45,12 @@ edited by hand.  Names the engine or the parser answers
 (`ВЫП`/`call`, `ИМПОРТ`/`import`) are listed in `keywords.cpp`/`parser.cpp`
 instead.  An English name that no Russian name owns follows one rule: bare only
 where the standard means the same thing (`var`, `integer`, `float`, `compare`),
-`is_` for a check of ours (`is_text`, `is_list`, `is_letter`, `is_digit`,
+`is_` for a check of ours (`is_text`, `is_list`, `is_letter_at`, `is_digit_at`,
 `is_whole`, `is_number`), and `X_to_Y` with the short stems `int`, `float`,
-`str`, `list` for a conversion (`int_to_float`, `str_to_int`).
+`str`, `list` for a conversion (`int_to_float`, `str_to_int`).  A check whose second
+argument is a *position* says so with a trailing `_at` (`is_letter_at/2`); the soft
+value checks carry the `ЗНАЧ` tail in Russian (`ЦЕЛЗНАЧ`, `ЧИСЛЗНАЧ`) and `is_` in
+English.
 
 A built-in that has more than one answer returns `BuiltinResult::Yield` and leaves
 them with `Engine::setBuiltinChoice`; the solver turns them into a

@@ -105,6 +105,9 @@ BuiltinResult builtinHalt(Engine&, std::span<const Term>);
 BuiltinResult builtinIsVar(Engine&, std::span<const Term>);
 BuiltinResult builtinIsInt(Engine&, std::span<const Term>);
 BuiltinResult builtinIsFloat(Engine&, std::span<const Term>);
+/// One of the two kinds `СИМВ` covers together: an atom, or a string.
+BuiltinResult builtinIsAtom(Engine&, std::span<const Term>);
+BuiltinResult builtinIsString(Engine&, std::span<const Term>);
 BuiltinResult builtinIsSymbol(Engine&, std::span<const Term>);
 BuiltinResult builtinIsList(Engine&, std::span<const Term>);
 BuiltinResult builtinIsGround(Engine&, std::span<const Term>);
@@ -151,6 +154,7 @@ BuiltinResult builtinConvertIntFloat(Engine&, std::span<const Term>);
 BuiltinResult builtinStringToInt(Engine&, std::span<const Term>);
 BuiltinResult builtinStringToFloat(Engine&, std::span<const Term>);
 BuiltinResult builtinStringToList(Engine&, std::span<const Term>);
+BuiltinResult builtinAtomToString(Engine&, std::span<const Term>);
 
 // ---- strings ----
 BuiltinResult builtinIsLetter(Engine&, std::span<const Term>);

@@ -345,6 +345,16 @@ BuiltinResult builtinIsSymbol(Engine& engine, std::span<const Term> args) {
   return detail::isTextual(engine, args[0]) ? BuiltinResult::Continue : BuiltinResult::Fail;
 }
 
+BuiltinResult builtinIsAtom(Engine& engine, std::span<const Term> args) {
+  return derefTerm(engine, args[0]).kind == TermKind::Atom ? BuiltinResult::Continue
+                                                           : BuiltinResult::Fail;
+}
+
+BuiltinResult builtinIsString(Engine& engine, std::span<const Term> args) {
+  return derefTerm(engine, args[0]).kind == TermKind::String ? BuiltinResult::Continue
+                                                             : BuiltinResult::Fail;
+}
+
 BuiltinResult builtinIsList(Engine& engine, std::span<const Term> args) {
   return isList(engine.bindings().deref(args[0])) ? BuiltinResult::Continue
                                                   : BuiltinResult::Fail;
@@ -517,7 +527,8 @@ constexpr std::pair<std::string_view, std::string_view> kEnglishNames[] = {
     {"ПС", "nl"},            {"ЖДИ", "wait"},
     {"ЗАВЕРШЕНИЕ", "halt"},
     {"ПЕР", "var"},           {"ЦЕЛ", "integer"},
-    {"ВЕЩ", "float"},         {"СИМВ", "is_text"},
+    {"ВЕЩ", "float"},         {"АТОМ", "atom"},
+    {"СТРОКА", "string"},     {"СИМВ", "is_text"},
     {"СПИСОК", "is_list"},      {"ПОЛНЫЙ", "ground"},
     {"НАЙТИВСЕ", "findall"},    {"СОРТИРОВКА", "sort"},
     // `ВСЕРЕШ`/`bagof` and `МНОРЕШ`/`setof` collect by groups (task_91); the words
@@ -528,9 +539,11 @@ constexpr std::pair<std::string_view, std::string_view> kEnglishNames[] = {
     {"БОЛЬШЕ", "greater"},      {"МЕНЬШЕ", "less"},
     {"СЛОЖЕНИЕ", "plus"},       {"УМНОЖЕНИЕ", "mul"},
     {"СЛУЧ", "random"},       {"ЦЕЛВЕЩ", "int_to_float"},
+    {"ЦЕЛЗНАЧ", "is_whole"},  {"ЧИСЛЗНАЧ", "is_number"},
     {"СТРЦЕЛ", "str_to_int"},    {"СТРВЕЩ", "str_to_float"},
-    {"СТРСПИС", "str_to_list"},   {"БУКВА", "is_letter"},
-    {"ЦИФРА", "is_digit"},      {"СЦЕП", "concat"},
+    {"СТРСПИС", "str_to_list"},   {"АТОМСТР", "atom_string"},
+    {"БУКВА", "is_letter_at"},   {"ЦИФРА", "is_digit_at"},
+    {"СЦЕП", "concat"},
     {"ПОДСТРОКА", "sub_string"},
     // `КОПИЯ` has no English spelling any more (task_84): the ISO predicate for
     // the same work is `sub_string/5`, whose positions count from zero, so it is
@@ -634,6 +647,8 @@ const BuiltinTable& builtinTable() {
     add("ПЕР", 1, builtinIsVar);
     add("ЦЕЛ", 1, builtinIsInt);
     add("ВЕЩ", 1, builtinIsFloat);
+    add("АТОМ", 1, builtinIsAtom);
+    add("СТРОКА", 1, builtinIsString);
     add("СИМВ", 1, builtinIsSymbol);
     add("СПИСОК", 1, builtinIsList);
     add("ПОЛНЫЙ", 1, builtinIsGround);
@@ -674,17 +689,22 @@ const BuiltinTable& builtinTable() {
     // `int` and `float` were never conversions: they *check* that a value can be
     // taken as a whole number, or as any number at all (`int(4.0)` holds,
     // `int(4.5)` does not, `float(4)` does).  The strict type tests take the ISO
-    // names (`integer`, `float`), so these two got names that say what they do.
-    // They keep the `is_` prefix that marks a predicate of ours: ISO `number/1`
-    // merely fails on an unbound argument, while these raise a type error.
-    add("is_whole", 1, builtinToInt);
-    add("is_number", 1, builtinToFloat);
+    // names (`integer`, `float`), so these two answer to names that say what they
+    // do: `ЦЕЛЗНАЧ` is «значение целое», `ЧИСЛЗНАЧ` is «значение — число».
+    // The `is_` spellings stay as the English ones, and they mark a predicate of
+    // ours: ISO's `number/1` merely fails on an unbound argument, while these
+    // raise a type error.
+    add("ЦЕЛЗНАЧ", 1, builtinToInt);
+    add("ЧИСЛЗНАЧ", 1, builtinToFloat);
     add("СЛУЧ", 1, builtinRandom);
     add("СЛУЧ", 3, builtinRandom);
     add("ЦЕЛВЕЩ", 2, builtinConvertIntFloat);
     add("СТРЦЕЛ", 2, builtinStringToInt);
     add("СТРВЕЩ", 2, builtinStringToFloat);
     add("СТРСПИС", 2, builtinStringToList);
+    // `atom_string/2` of ISO.  The two directions are one predicate here as
+    // there: an atom in, a string out, and the other way round.
+    add("АТОМСТР", 2, builtinAtomToString);
     // Strings.
     add("БУКВА", 2, builtinIsLetter);
     add("ЦИФРА", 2, builtinIsDigit);
