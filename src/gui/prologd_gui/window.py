@@ -66,7 +66,6 @@ from . import (
     settings,
     settingsdialog,
     shortcuts,
-    tokens,
 )
 from .buffers import Buffer
 from .editor import CodeEditor, QueryLine, ZoomablePlainTextEdit, ZoomableTextBrowser
@@ -79,7 +78,7 @@ from .settings import OUTPUT_FONT_SIZE, Settings
 STOP_GRACE_MS = 500
 
 WELCOME_TEXT = """\
-:- ИМПОРТ("iso.pld"). % подключает стандартные предикаты ISO
+:- ИМПОРТ('iso.pld'). % подключает стандартные предикаты ISO
 % F12 над ИМПОРТ откроет файл
 % F12 над символом откроет первое определение
 ?length([1, 2, 3], Д).\n
@@ -2246,31 +2245,27 @@ class MainWindow(QMainWindow):
         """The file named by the `ИМПОРТ` line under the caret, if that is the line.
 
         The line is read with the editor's own tokenizer, so it may be written any way
-        the language allows — `:- ИМПОРТ("lib/x.pld").` and `:- import("x.pld").`
-        both do.  When one line names several files, the string the caret sits in wins.
+        the language allows — `:- ИМПОРТ("lib/x.pld").`, `:- ИМПОРТ('x.pld').` and
+        `:- import("x.pld").` all do.  The three spellings of the argument are read
+        in one place, `imports.directive_arguments`, so this key and the popup
+        cannot disagree about what the line brings in.
         """
         pane = self.active_pane() if self._panes else None
         view = pane.current_view() if pane is not None else None
         if view is None:
             return None
         cursor = view.textCursor()
-        directive = False
-        names: list[tuple[int, str]] = []
-        for token in tokens.tokenize(cursor.block().text(), self._session.keywords):
-            if token.kind == tokens.DIRECTIVE or (
-                token.kind == tokens.KEYWORD and token.text in ("ИМПОРТ", "import")
-            ):
-                directive = True
-            elif directive and token.kind == tokens.STRING:
-                # The tokenizer hands a literal over as it was written — quotes and
-                # all — while the lexer's `text` is decoded (task_69).
-                names.append((token.start, tokens.literal_text(token.text)))
-        if not directive or not names:
+        arguments = imports.directive_arguments(
+            cursor.block().text(), self._session.keywords
+        )
+        if not arguments:
             return None
-        for start, name in names:
-            if start <= cursor.positionInBlock() <= start + len(name):
+        # The caret wins when it sits in one of the arguments; on any other place of
+        # the line the first one is what the user is looking at.
+        for start, end, name in arguments:
+            if start <= cursor.positionInBlock() <= end:
                 return name
-        return names[0][1]
+        return arguments[0][2]
 
     def _go_to(self) -> None:
         """`F12`: the file an `ИМПОРТ` line names, or the clause a name starts with.
@@ -3972,8 +3967,8 @@ class MainWindow(QMainWindow):
 
         A *search* list for `ИМПОРТ`, not a working directory, passed like
         `--include`; only what the user put in it is passed — a package's own
-        `examples/lib` is not added, because lesson 11 asks the student to add that
-        folder.  The answers are **absolute** (task_111): the popup and the run
+        `examples/import/lib` is not added behind their back.  The answers are
+        **absolute** (task_111): the popup and the run
         resolve a relative folder differently, and `abspath` rather than `resolve` —
         this is asked on every keystroke, without touching the disk.
         """

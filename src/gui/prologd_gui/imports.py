@@ -43,13 +43,42 @@ def is_directive_name(token) -> bool:
     return token.text in DIRECTIVE_NAMES and token.kind in _DIRECTIVE_KINDS
 
 
+def directive_arguments(line: str, keywords=None) -> list[tuple[int, int, str]]:
+    """The files an `ИМПОРТ` line names, as `(start, end, name)`, in the order written.
+
+    `start` and `end` are where the argument stands in the line, quotes included:
+    `F12` asks which one the caret is in.  The line is read with the editor's own
+    tokenizer, so a directive inside a comment or a string names nothing, and both
+    spellings of the name count.
+
+    Three ways to write the argument are allowed and all three are read here,
+    because the parser takes all three — a string (`ИМПОРТ("x.pld")`), a quoted
+    atom (`ИМПОРТ('x.pld')`) and a bare one (`ИМПОРТ(x)`);
+    `tokens.literal_text` unwraps the quotes the tokenizer keeps (part 243).
+    """
+    found: list[tuple[int, int, str]] = []
+    inside = False
+    for token in tokens.tokenize(line, keywords):
+        # The name of the directive is a reserved word, so it arrives as a
+        # `KEYWORD` or, once the kinds are known, a `DIRECTIVE` (task_111).
+        if is_directive_name(token):
+            inside = True
+        elif inside and token.kind in (tokens.STRING, tokens.QUOTED_ATOM):
+            found.append((token.start, token.end, tokens.literal_text(token.text)))
+            break
+        elif inside and token.kind == tokens.ATOM:
+            found.append((token.start, token.end, token.text))
+            break
+        elif inside and token.kind in (tokens.COMMENT, tokens.PUNCTUATION):
+            if token.text != "(":
+                break
+    return found
+
+
 def directive_names(text: str, keywords=None) -> list[str]:
     """The file names the `ИМПОРТ` directives of `text` name, in the order written.
 
-    The line is read with the editor's own tokenizer, so a directive inside a
-    comment or a string names nothing, and both spellings count.  The argument is
-    a string or, since the parser takes an atom too, a bare name;
-    `tokens.literal_text` unwraps the quotes the tokenizer keeps.
+    One name per line: the first argument of the first directive on it.
     """
     names: list[str] = []
     for line in text.splitlines():
@@ -58,23 +87,9 @@ def directive_names(text: str, keywords=None) -> list[str]:
         # before the tokenizer sees them.
         if "ИМПОРТ" not in line and "import" not in line:
             continue
-        inside = False
-        for token in tokens.tokenize(line, keywords):
-            # The name of the directive is a reserved word, so it arrives as a
-            # `KEYWORD` or, once the kinds are known, a `DIRECTIVE` (task_111).
-            if is_directive_name(token):
-                inside = True
-            elif inside and token.kind in (tokens.STRING, tokens.QUOTED_ATOM):
-                # The parser takes a string or an atom, and the tokenizer hands a
-                # literal over as it was written — `tokens.literal_text` unwraps it.
-                names.append(tokens.literal_text(token.text))
-                break
-            elif inside and token.kind == tokens.ATOM:
-                names.append(token.text)
-                break
-            elif inside and token.kind in (tokens.COMMENT, tokens.PUNCTUATION):
-                if token.text != "(":
-                    break
+        arguments = directive_arguments(line, keywords)
+        if arguments:
+            names.append(arguments[0][2])
     return names
 
 

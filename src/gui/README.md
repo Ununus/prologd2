@@ -24,7 +24,7 @@ cmake --build build/windows-msvc --config Release
 
 python -m venv .venv
 .venv\Scripts\python -m pip install -r src/gui/requirements.txt
-.venv\Scripts\python.exe src/gui/main.py --include examples/lib
+.venv\Scripts\python.exe src/gui/main.py --include examples/import/lib
 ```
 
 `--exe` names the interpreter of this launch: the file itself or its folder, and a
@@ -48,7 +48,7 @@ longer there leaves the window as it always opens and says so in «Систем�
 A **packaged** build (task_61) finds all of that beside itself — `prologd.exe` next
 to the window, the icons inside its folder, `doc/` and `examples/` next to the
 executable — and the settings file as well (`gui.ini`, below).  It adds **nothing** to
-the `ИМПОРТ` search list: an earlier version put its own `examples/lib` there, and a
+the `ИМПОРТ` search list: an earlier version put its own `examples/import/lib` there, and a
 lesson now asks the student to add that folder by hand instead (2026-10-03).  The
 list a run gets is exactly what the user configured (`paths.import_directories`),
 which is both transparent and immune to the folder being copied to another machine.

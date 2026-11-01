@@ -8296,3 +8296,88 @@ of the package».  Отдельно: 25 оконных наборов и `protoc
   небольшим запасом», с объяснением про запасной шрифт.
 * **Проверки.**  Все 29 скриптов окна и `protocol_smoke.py` зелены; `docs` собирает
   пять PDF и карту, страница 16 (GUI §5.1) посмотрена.
+
+### 243. `F12` по `ИМПОРТ('iso.pld')`: имя в одинарных кавычках
+
+* **Просьба владельца.**  «Давай починим переход в файл по `F12` по
+  `:- ИМПОРТ('iso.pld').` с одинарными кавычками».  Клавиша работала только со
+  строкой в двойных кавычках.
+* **Причина.**  `_import_under_cursor` в `window.py` брал аргументом только
+  `tokens.STRING`.  Одинарные кавычки дают `QUOTED_ATOM`, и такого токена он не
+  знал: список имён выходил пуст, клавиша проваливалась в поиск *предложения*, и
+  строка состояния отвечала «iso: определение не найдено» — по сути, окно искало
+  предикат с именем файла.  Голый атом (`:- ИМПОРТ(iso).`), который разбор тоже
+  принимает (`parser.cpp`), не читался по той же причине.
+* **Что сделано.**  Чтение аргумента вынесено в одно место —
+  `imports.directive_arguments(line, keywords)` возвращает `(start, end, name)`, где
+  `start`/`end` — позиции аргумента в строке (с кавычками), а `name` — уже значение
+  через `tokens.literal_text`.  Им пользуются и `imports.directive_names` (список
+  импортов для автодополнения), и `window._import_under_cursor` (`F12`), поэтому
+  клавиша и подсказка больше не могут разойтись в том, что строка приносит.
+  Проверка каретки теперь идёт по `end` токена, а не по `start + len(name)`: у
+  литерала длина значения на две кавычки меньше того, что стоит в строке, так что
+  прежняя формула показывала не то место.
+* **Автодополнение.**  Оно и раньше понимало оба вида кавычек
+  (`import_argument_at` берёт `STRING` и `QUOTED_ATOM`): `ИМПОРТ('is')` предлагает
+  `iso.pld` и оставляет одинарные кавычки.  Отдельной работы не понадобилось.
+* **Тесты.**  `test_imports.py`: `test_the_argument_is_read_where_it_stands_quotes_and_all`
+  — четыре написания, позиции и значение, и две строки, которые импортом не
+  являются (в строке и в комментарии).  `test_window.py`:
+  `test_f12_opens_the_file_however_its_name_is_written` — три написания открывают
+  файл, недостающее имя даёт «не найдено».
+* **Документация.**  GUI §4: имя `ИМПОРТ` можно записать строкой, атомом в кавычках
+  или голым атомом — так же, как его принимает разбор.
+* **Проверки.**  Все 29 скриптов окна и `protocol_smoke.py` зелены; `linux-release`
+  — 431/431; `docs` собирает пять PDF и карту, страница 8 (GUI §4) посмотрена.
+
+### 244. Примеры разложены по папкам: `import/`, `problems/sorting.pld`, `lesson_11_lib.pld`
+
+* **Что сделал владелец.**  Разложил `examples/` по смыслу: весь импорт ушёл в
+  `examples/import/` (`import.pld`, `lib/library.pld`, новый `lib/hello.pld` и
+  `diamond/`), учебные сортировки переехали из корня в `examples/problems/`, а
+  библиотека урока 11 — в `examples/lessons/lesson_11_lib.pld`, то есть *рядом* с
+  уроком.  Заодно `ИМПОРТ(...)` в примерах стал писаться одинарными кавычками, а
+  урок 11 переписан целиком.
+* **Что из этого падало.**  Пять проверок: `the diamond example loads its shared
+  module once` (путь `examples/diamond/main.pld`), `ported example programs parse
+  cleanly` и `the example programs print what their comments promise`
+  (`import.pld`, `lib/library.pld`, `sorting.pld`), `every shipped program is
+  already in the standard shape` (два новых файла без перевода строки в конце и
+  `lesson_11_lib.pld` с пробелами вокруг `:-`), `cli_include` (старый путь пары
+  `-I`/`-s`) и GUI-страж `test_queries.py` (`PINNED`).
+* **Тесты.**  Пути обновлены: `test_module_loader.cpp` (ромб),
+  `test_lessons.cpp` (список разбираемых файлов, `problems/sorting.pld`, каталог
+  поиска `lessons` вместо `lib` — он больше не нужен), `CMakeLists.txt`
+  (`cli_include`), `PINNED` в `test_queries.py` (46 записей, 462 вопроса;
+  добавлены `import/*`, `problems/sorting.pld`, `lessons/lesson_11_lib.pld`).
+  Новые файлы приведены к стандартной форме (`--format soft`), у `hello.pld`
+  появился перевод строки в конце.
+* **Код окна.**  `paths.example_library()` теперь указывает на
+  `examples/import/lib` (и его проверяет `test_paths.py`); комментарии в
+  `paths.import_directories` и `window._import_directories` говорят, что уроку 11
+  каталог поиска больше не нужен — библиотека лежит рядом с уроком.
+* **Документация.**  `examples/README.md` (таблицы переписаны: `import/` отдельной
+  папкой, `sorting` в `problems/`, библиотека урока 11 в `lessons/`),
+  `examples/lessons/README.md` (урок 11 больше не требует подготовки),
+  `doc/lessons.typ` (то же в руководстве), `doc/help.typ` §8 (`examples/import/diamond/`),
+  `doc/technical.typ` (`examples/import/lib/library.pld`), `doc/gui.typ` и
+  `src/gui/README.md` (`--include examples/import/lib`).
+* **Упаковка.**  `tools/build_portable.ps1`: в списке обязательных файлов —
+  `examples\import\lib\library.pld`, `examples\lessons\lesson_11_lib.pld`,
+  `examples\problems\sorting.pld`; запускаемая программа — `-s
+  examples\import\import.pld` без `-I` (файл ищется рядом с подключающим).
+* **Заодно.**  Поправлены устаревшие команды запуска в самих примерах
+  (`import.pld` звал `-I examples/lib`, `problems/sorting.pld` и `stdlib.pld` —
+  старый путь), опечатка «интерпретатация» в уроке 11 и `Testing/` в `.gitignore`
+  (этот каталог оставляет `ctest`, запущенный из корня исходников, — так и вышло
+  в этой сессии).
+* **Проверено запуском.**  `prologd -s examples/import/import.pld` (без ключей) —
+  `Дважды=42`, `Кто=мир`, `Привет из hello.pld`; `-s
+  examples/import/diamond/main.pld` — пять ответов ромба; `-s
+  examples/lessons/lesson_11.pld` — `Предложений=1` дважды;
+  `-I stdlib -s examples/problems/sorting.pld` и `-I stdlib -i
+  examples/stdlib.input.txt -s examples/stdlib.pld` — как в шапках файлов;
+  циклический импорт по-прежнему ошибка загрузки (код 2), как и написано в уроке.
+* **Проверки.**  `linux-release` и `linux-werror` — 431/431; все 29 скриптов окна
+  и `protocol_smoke.py` зелены; `docs` собирает пять PDF и карту, страница 2
+  `lessons.pdf` посмотрена.

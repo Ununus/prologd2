@@ -115,15 +115,16 @@ $trimmedFiles = @(
 #: What the checks insist on besides the files every package has.
 $neededFiles = @(
     'prologd.exe', 'doc\builtins.json', 'doc\help_sections.json',
-    'examples\lib\library.pld', 'examples\lessons\lesson_01.pld',
-    'examples\problems\knapsack.pld', 'examples\sorting.pld',
+    'examples\import\lib\library.pld', 'examples\lessons\lesson_01.pld',
+    'examples\lessons\lesson_11_lib.pld',
+    'examples\problems\knapsack.pld', 'examples\problems\sorting.pld',
     'stdlib\lists.pld', 'stdlib\sets.pld', 'stdlib\iso.pld'
 )
 
 #: The programs the packaged interpreter must run from the package's own folder.
 $packagePrograms = @(
     @('-s', 'examples\lessons\lesson_01.pld'),
-    @('-I', 'examples\lib', '-s', 'examples\import.pld'),
+    @('-s', 'examples\import\import.pld'),
     @('-i', 'examples\stdlib.input.txt', '-s', 'examples\stdlib.pld')
 )
 

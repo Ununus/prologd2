@@ -462,7 +462,7 @@ def test_the_folder_chooser_opens_at_the_engine(directory: pathlib.Path) -> None
     assert SettingsDialog(settings, None, pinned)._engine_directory == pinned
 
     # The list of «Дополнительные каталоги ИМПОРТ» has no field to read a start from,
-    # and opens at the engine as well — `examples/lib` and `stdlib` are there.
+    # and opens at the engine as well — `examples/import/lib` and `stdlib` are there.
     editor = dialog._widgets[settings_module.IMPORT_PATHS]
     add, _remove = editor.buttons()
     seen.clear()

@@ -85,9 +85,13 @@ if(TARGET prologd)
   set_tests_properties(cli_help PROPERTIES
     PASS_REGULAR_EXPRESSION "--source")
 
+  # The import example and its library live in one folder now
+  # (`examples/import` and `examples/import/lib`), and the directive inside names
+  # the file relative to itself, so the run needs no search directory — `-I` here
+  # names the same folder and pins that it is still there.
   add_test(NAME cli_include
-    COMMAND prologd -I "${CMAKE_SOURCE_DIR}/examples/lib"
-            -s "${CMAKE_SOURCE_DIR}/examples/import.pld")
+    COMMAND prologd -I "${CMAKE_SOURCE_DIR}/examples/import/lib"
+            -s "${CMAKE_SOURCE_DIR}/examples/import/import.pld")
   set_tests_properties(cli_include PROPERTIES
     PASS_REGULAR_EXPRESSION "Дважды=42")
 

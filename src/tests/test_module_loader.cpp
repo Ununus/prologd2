@@ -303,12 +303,12 @@ TEST_CASE("an include directory with a Cyrillic name is searched") {
 }
 
 TEST_CASE("the diamond example loads its shared module once") {
-  // `examples/diamond`: the top file imports two branches, each branch imports
-  // `base.pld`, and the top file imports it directly as well - three paths to a
-  // single file, which must still be loaded exactly once, so the shared
+  // `examples/import/diamond`: the top file imports two branches, each branch
+  // imports `base.pld`, and the top file imports it directly as well - three paths
+  // to a single file, which must still be loaded exactly once, so the shared
   // predicate keeps its two clauses instead of gaining more.
   const fs::path entry =
-      fromUtf8Path(std::string(PROLOGD_TEST_DATA_DIR) + "/diamond/main.pld");
+      fromUtf8Path(std::string(PROLOGD_TEST_DATA_DIR) + "/import/diamond/main.pld");
   const LoadOutcome outcome = load(entry, {entry.parent_path()});
   REQUIRE(outcome.ok);
   REQUIRE(outcome.output ==

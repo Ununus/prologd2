@@ -7,6 +7,9 @@ build/
 out/
 cmake-build-*/
 
+# `ctest` run from the source folder instead of a build one leaves its log here.
+Testing/
+
 # Packaging (task_61): the frozen folder, the archive built from it, and the
 # `.spec` PyInstaller writes next to the command that ran it.
 dist/

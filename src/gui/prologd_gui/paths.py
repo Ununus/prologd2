@@ -274,8 +274,8 @@ def interpreter(folder: str = "") -> str:
 
 
 def example_library() -> pathlib.Path:
-    """`examples/lib` of the package: the import directory lesson 11 needs."""
-    return data_root() / "examples" / "lib"
+    """`examples/import/lib` of the package: the library the import examples use."""
+    return data_root() / "examples" / "import" / "lib"
 
 
 def document(name: str) -> pathlib.Path:
@@ -311,12 +311,13 @@ def import_directories(configured: Iterable[str]) -> list[str]:
     the importing file itself is tried before any of these, by the engine.
 
     A **package** used to append its own `examples/lib` here, so that lesson 11 ran
-    out of the box.  That was dropped on 2026-10-03 at the reader's request: the
-    lesson now tells the student to add the directory by hand, which is transparent —
-    they see the row they filled and the path they chose — and nothing is recorded
-    behind their back that could go stale when the folder moves to another machine.
-    The library still travels in the package (`example_library()`), it is simply not
-    searched until the student says so.
+    out of the box.  That was dropped on 2026-10-03 at the reader's request: a
+    directory of its own is the student's to add, which is transparent — they see the
+    row they filled and the path they chose — and nothing is recorded behind their
+    back that could go stale when the folder moves to another machine.  Since part
+    244 the lesson needs no directory at all: it imports `lesson_11_lib.pld`, which
+    lies beside it, and the library of `examples/import` is named relative to its own
+    file.  It still travels in the package (`example_library()`).
     """
     result: list[str] = []
     for directory in configured:

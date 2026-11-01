@@ -32,6 +32,36 @@ def test_a_directive_names_its_file_in_both_spellings() -> None:
     print("ok: both spellings and both argument kinds name a file")
 
 
+def test_the_argument_is_read_where_it_stands_quotes_and_all() -> None:
+    """`F12` asks which argument the caret is in, so the positions must be the line's.
+
+    `directive_arguments` answers `(start, end, name)`; `end` is the closing quote
+    for a literal and the last letter for a bare atom, and `name` is the *value* —
+    that is the difference between looking for a file called `iso.pld` and a file
+    called `'iso.pld'` (part 243).
+    """
+    for line, expected in (
+        (':- ИМПОРТ("iso.pld").', 'iso.pld'),
+        (":- ИМПОРТ('iso.pld').", 'iso.pld'),
+        (':- ИМПОРТ(iso).', 'iso'),
+        (':- import("lib/x.pld").', 'lib/x.pld'),
+    ):
+        found = imports.directive_arguments(line)
+        assert len(found) == 1, (line, found)
+        start, end, name = found[0]
+        assert name == expected, (line, name)
+        # The piece of the line the argument occupies is the literal as written.
+        written = line[start:end]
+        assert written[0] in "\"'" or written == expected, (line, written)
+        assert written.strip("\"'") == name, (line, written, name)
+
+    # A line that names nothing answers nothing, so `F12` falls through to the
+    # clause lookup instead of opening a file that was never named.
+    assert imports.directive_arguments(":- ВЫВОД(\"iso.pld\").") == []
+    assert imports.directive_arguments("% :- ИМПОРТ('iso.pld').") == []
+    print("ok: an import argument is read where it stands, whichever quotes it wears")
+
+
 def test_a_directive_in_a_comment_or_a_string_names_nothing() -> None:
     text = (
         "% :- ИМПОРТ(\"нет.pld\").\n"
@@ -133,6 +163,7 @@ def test_a_file_is_read_again_only_when_it_changed() -> None:
 
 def main(argv: list[str]) -> int:
     test_a_directive_names_its_file_in_both_spellings()
+    test_the_argument_is_read_where_it_stands_quotes_and_all()
     test_a_directive_in_a_comment_or_a_string_names_nothing()
     test_a_directive_is_found_whatever_kind_its_name_arrives_as()
     test_the_walk_is_recursive_and_survives_a_cycle()

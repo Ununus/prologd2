@@ -98,7 +98,7 @@ def test_a_checkout_reads_its_own_tree() -> None:
     assert paths.document("help") == ROOT / "doc" / "help.pdf"
     assert paths.builtins() == ROOT / "doc" / "builtins.json"
     assert paths.builtins().is_file(), "the built-in records are part of the tree"
-    assert paths.example_library() == ROOT / "examples" / "lib"
+    assert paths.example_library() == ROOT / "examples" / "import" / "lib"
     found = paths.interpreter()
     assert found.endswith(paths.EXECUTABLE_NAME), found
     if pathlib.Path(found).is_file():
@@ -117,7 +117,7 @@ def test_a_package_finds_everything_beside_itself() -> None:
             assert paths.settings_path() == package / "gui.ini"
             assert paths.document("gui") == package / "doc" / "gui.pdf"
             assert paths.builtins() == package / "doc" / "builtins.json"
-            assert paths.example_library() == package / "examples" / "lib"
+            assert paths.example_library() == package / "examples" / "import" / "lib"
             assert paths.resource("assets") == package / "_internal" / "assets"
     print("ok: a package finds its interpreter, settings, documents and icons beside itself")
 
@@ -320,7 +320,7 @@ def test_the_reference_reads_the_same_document() -> None:
 def test_a_package_searches_only_what_the_student_added() -> None:
     """No directory is added behind the reader's back (2026-10-03).
 
-    A package *carries* `examples/lib` — `test_a_package_finds_everything_beside_itself`
+    A package *carries* `examples/import/lib` — `test_a_package_finds_everything_beside_itself`
     checks that — but the window does not search it.  Lesson 11 asks the student to add
     the folder by hand, so the row of the settings dialog is the whole truth, and a
     folder copied to another machine leaves no remembered path behind.

@@ -3943,6 +3943,63 @@ def test_f12_goes_to_the_first_clause_of_a_name(
     print("ok: F12 goes to the first clause, in this file or in an import")
 
 
+def test_f12_opens_the_file_however_its_name_is_written(
+    executable: str, directory: pathlib.Path
+) -> None:
+    """`F12` on an `ИМПОРТ` line opens the file, whichever way the name is quoted.
+
+    The parser takes a string, a quoted atom or a bare one, and the key used to know
+    only the string: `:- ИМПОРТ('iso.pld').` fell through to the clause lookup and
+    answered «iso: определение не найдено» (part 243).  All three spellings are one
+    `imports.directive_arguments` call now, and the caret inside the quotes wins over
+    the first argument of the line.
+    """
+    (directory / "iso.pld").write_text("member(X, [X|_]).\n", encoding="utf-8", newline="\n")
+    (directory / "bare").write_text("member(X, [X|_]).\n", encoding="utf-8", newline="\n")
+    window = empty_window(executable)
+    try:
+        spellings = (
+            (':- ИМПОРТ("iso.pld").', "iso.pld"),
+            (":- ИМПОРТ('iso.pld').", "iso.pld"),
+            (":- ИМПОРТ(bare).", "bare"),
+        )
+        for index, (directive, target) in enumerate(spellings):
+            program = directory / f"импорт{index}.pld"
+            program.write_text(directive + "\n?member(1, [1]).\n", encoding="utf-8",
+                               newline="\n")
+            assert window.open_path(str(program)), program
+            view = window.active_pane().current_view()
+            cursor = view.textCursor()
+            cursor.setPosition(view.document().findBlockByNumber(0).position() + 1)
+            view.setTextCursor(cursor)
+            window._update_details()
+            assert window._actions["open_import"].isEnabled(), directive
+            assert window._import_under_cursor() == target, (
+                directive, window._import_under_cursor()
+            )
+            window._actions["open_import"].trigger()
+            opened = window.current_buffer()
+            assert opened is not None and opened.model.path == str(directory / target), (
+                directive, opened.model.path if opened else None
+            )
+
+        # A name nothing answers: the note says so instead of opening the program
+        # that named it.
+        program = directory / "импорт3.pld"
+        program.write_text(":- ИМПОРТ('нет.pld').\n", encoding="utf-8", newline="\n")
+        assert window.open_path(str(program))
+        view = window.active_pane().current_view()
+        cursor = view.textCursor()
+        cursor.setPosition(view.document().findBlockByNumber(0).position() + 1)
+        view.setTextCursor(cursor)
+        window._update_details()
+        window._actions["open_import"].trigger()
+        assert "не найдено" in window.system_text(), ascii(window.system_text())
+        print("ok: F12 opens an import whichever way its name is written")
+    finally:
+        discard_changes(window)
+
+
 def test_the_import_string_completes_to_a_file_name(
     executable: str, files: pathlib.Path
 ) -> None:
@@ -5477,6 +5534,7 @@ def main(argv: list[str]) -> int:
         test_the_reserved_names_are_there_before_the_first_run(executable)
         test_an_imported_file_reaches_the_popup(executable, files)
         test_f12_goes_to_the_first_clause_of_a_name(executable, files)
+        test_f12_opens_the_file_however_its_name_is_written(executable, files)
         test_the_import_string_completes_to_a_file_name(executable, files)
         test_the_directive_is_inserted_as_a_whole_statement(executable)
         test_running_programs_without_questions_finishes(executable)

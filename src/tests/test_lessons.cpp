@@ -84,7 +84,7 @@ const std::vector<std::string>& checkedLessons() {
 /// are the showcase for the predicates the dialect added on top of the port
 /// (`ПЕРВОЕ`, `СОРТИРОВКА`, `ПОЛНЫЙ`, `ДЛЯВСЕХ`), the two problems whose output
 /// is the same on every machine, the tour of the standard library, the study
-/// sorts that left the library for `examples/sorting.pld` (task_89), and the folder
+/// sorts that left the library for `examples/problems/sorting.pld` (task_89), and the folder
 /// `examples/iso` of programs written with ISO names and signs (task_92: the
 /// arithmetic signs, the library, a family tree, the standard order, `->` and
 /// `sub_string/5`); `problems/hanoi.pld` draws and `problems/hanoi_play.pld` reads
@@ -98,7 +98,7 @@ const std::vector<std::string>& checkedExamples() {
       "bagof.pld",
       "ground.pld",
       "forall.pld",
-      "sorting.pld",
+      "problems/sorting.pld",
       "stdlib.pld",
       "problems/factorial.pld",
       "problems/knapsack.pld",
@@ -152,7 +152,8 @@ TEST_CASE("ported example programs parse cleanly") {
       "problems/factorial.pld", "problems/hanoi.pld", "problems/hanoi_play.pld",
       "problems/maze/maze.pld", "problems/maze/maze.graphics.pld",
       "problems/maze/maze.images.pld",
-      "file_io.pld", "drawing.pld", "findall.pld", "import.pld", "lib/library.pld",
+      "file_io.pld", "drawing.pld", "findall.pld",
+      "import/import.pld", "import/lib/library.pld", "import/lib/hello.pld",
   };
   for (const std::string& file : files) {
     const auto result = runProgram(withoutQueries(readExample(file)));
@@ -166,12 +167,11 @@ TEST_CASE("ported example programs parse cleanly") {
 TEST_CASE("every lesson prints exactly what its comments promise") {
   for (const std::string& name : checkedLessons()) {
     const std::string stem = name.substr(0, name.rfind('.'));
-    // Lesson 11 imports a library and lesson 12 the colour names, so the check
-    // searches the same three places the CLI would reach with
-    // `-I examples/lib -I stdlib`: next to the lesson, then the two libraries.
+    // Lesson 11 imports `lesson_11_lib.pld`, which lies beside it, and lesson 12 the
+    // colour names of the standard library, so the check searches the two places a
+    // reader's own run reaches: the folder of the lesson, then `stdlib`.
     checkPromises("lessons/" + name, readOptional("lessons/" + stem + ".input.txt"),
                   {std::string(PROLOGD_TEST_DATA_DIR) + "/lessons",
-                   std::string(PROLOGD_TEST_DATA_DIR) + "/lib",
                    std::string(PROLOGD_STDLIB_DIR)});
   }
 }
