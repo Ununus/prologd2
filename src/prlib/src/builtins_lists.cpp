@@ -31,22 +31,6 @@ std::vector<Term> sortedTerms(Engine& engine, std::vector<Term> elements, bool a
   return elements;
 }
 
-namespace {
-
-using detail::ArgKind;
-using detail::asNumeric;
-using detail::asText;
-using detail::badArgument;
-using detail::badArguments;
-
-/// The elements of `argument`, with every tail dereferenced, or `nullopt` when it
-/// is not a proper list of elements.
-///
-/// Both refusals matter: a listlike tail (`[1 | 2]`) is not a list of elements,
-/// and a list that contains itself would send the plain loop of `listToVector`
-/// walking forever.  The visited set is what makes the second one an error
-/// instead of a hang (`РАВНО(X, [1 | X])` is legal here — there is no occurs
-/// check).
 std::optional<std::vector<Term>> listElements(Engine& engine, const Term& argument) {
   std::vector<Term> elements;
   std::unordered_set<const CompoundTerm*> visited;
@@ -63,6 +47,14 @@ std::optional<std::vector<Term>> listElements(Engine& engine, const Term& argume
   }
   return elements;
 }
+
+namespace {
+
+using detail::ArgKind;
+using detail::asNumeric;
+using detail::asText;
+using detail::badArgument;
+using detail::badArguments;
 
 /// How `СОРТИРОВКА/3` was asked to order the list (task_95).
 ///

@@ -696,19 +696,17 @@ BuiltinResult builtinStringToList(Engine& engine, std::span<const Term> args) {
     return engine.unify(args[1], list) ? BuiltinResult::Continue : BuiltinResult::Fail;
   }
   if (isUnbound(engine, args[0])) {
-    const Term resolved = engine.bindings().deref(args[1]);
-    if (!isList(resolved)) {
-      badArguments(engine, args, "СТРСПИС", ArgKind::List);
-    }
-    std::vector<Term> elements;
-    Term tail;
-    listToVectorWithTail(resolved, elements, tail);
-    if (!isNil(tail)) {
+    const auto elements = listElements(engine, args[1]);
+    if (!elements) {
+      const Term resolved = engine.bindings().deref(args[1]);
+      if (!isList(resolved)) {
+        badArguments(engine, args, "СТРСПИС", ArgKind::List);
+      }
       engine.raise(ErrorCode::WrongList);
     }
     std::vector<CodePoint> code_points;
-    code_points.reserve(elements.size());
-    for (const Term& element : elements) {
+    code_points.reserve(elements->size());
+    for (const Term& element : *elements) {
       const auto value = detail::asInteger(engine, element);
       if (!value) {
         badArguments(engine, "СТРСПИС");

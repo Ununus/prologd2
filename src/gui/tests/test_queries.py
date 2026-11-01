@@ -133,9 +133,9 @@ PINNED: dict[str, int] = {
     "problems/maze/maze.pld": 2,
     "problems/sorting.pld": 8,
     "sort.pld": 12,
-    "stdlib.pld": 73,
+    "stdlib.pld": 83,
     "sub_string.pld": 11,
-    "types.pld": 44,
+    "types.pld": 43,
 }
 
 

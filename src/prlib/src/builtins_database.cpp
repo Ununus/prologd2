@@ -79,20 +79,18 @@ BuiltinResult builtinTermConvert(Engine& engine, std::span<const Term> args) {
   const Term second = engine.bindings().deref(args[1]);
 
   auto buildFromList = [&engine](const Term& list, Term& built) -> bool {
-    std::vector<Term> elements;
-    Term tail;
-    listToVectorWithTail(list, elements, tail);
-    if (!isNil(tail) || elements.empty()) {
+    const auto elements = listElements(engine, list);
+    if (!elements || elements->empty()) {
       engine.raise(ErrorCode::WrongList);
     }
-    const Term functor = engine.bindings().deref(elements[0]);
+    const Term functor = engine.bindings().deref(elements->at(0));
     if (functor.kind != TermKind::Atom) {
       return false;
     }
-    if (elements.size() == 1) {
+    if (elements->size() == 1) {
       built = makeAtom(functor.text);
     } else {
-      std::vector<Term> arguments(elements.begin() + 1, elements.end());
+      std::vector<Term> arguments(elements->begin() + 1, elements->end());
       built = makeCompound(functor.text, std::move(arguments));
     }
     return true;
@@ -145,19 +143,17 @@ BuiltinResult builtinAssert(Engine& engine, std::span<const Term> args) {
   if (!position) {
     badArgument(engine, args[2], "ДОБ", 3, ArgKind::Integer);
   }
-  std::vector<Term> body;
-  Term tail;
-  listToVectorWithTail(goals, body, tail);
-  if (!isNil(tail)) {
+  const auto body = listElements(engine, goals);
+  if (!body) {
     engine.raise(ErrorCode::WrongList);
   }
-  for (const Term& goal : body) {
+  for (const Term& goal : *body) {
     if (!isCallable(engine, goal)) {
       badArguments(engine, "ДОБ");
     }
   }
   Clause clause;
-  engine.copyClauseResolved(head, body, clause.head, clause.body);
+  engine.copyClauseResolved(head, *body, clause.head, clause.body);
   engine.database().insertByNamePosition(std::move(clause), *position);
   return BuiltinResult::Continue;
 }

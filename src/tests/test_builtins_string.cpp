@@ -408,3 +408,12 @@ TEST_CASE("string to list: a broken list and a wrong type are errors") {
   checkBadArguments("СТРСПИС(X, 1)", "СТРСПИС");
 }
 
+
+TEST_CASE("str_to_list takes a list a program built") {
+  // Part 249: the same walk, reached through `СТРСПИС`.  Without the dereference
+  // the codes a rule collected would be refused as «неправильный список».
+  const auto result = runProgram(
+      "?РАВНО(Х, [1072]), РАВНО(С, [1073|Х]), СТРСПИС(Стр, С).\n");
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "Х=[1072]\nС=[1073,1072]\nСтр=ба\n");
+}

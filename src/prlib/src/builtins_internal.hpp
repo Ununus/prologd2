@@ -123,6 +123,16 @@ BuiltinResult builtinSort3(Engine&, std::span<const Term>);
 std::vector<Term> sortedTerms(Engine& engine, std::vector<Term> elements, bool ascending,
                               bool keepDuplicates);
 
+/// The elements of `argument` with every tail dereferenced, or nothing when it is
+/// not a proper list of elements.
+///
+/// This is the walk for a list a *program* built: its last cell ends in a variable
+/// that was bound to the rest later, so a walk over the raw terms (`listToVector`
+/// in `term.hpp`) stops at that variable and calls the list improper (part 249).
+/// Both refusals matter — a listlike tail (`[1 | 2]`) is not a list of elements,
+/// and a list that contains itself is an error rather than a hang.
+std::optional<std::vector<Term>> listElements(Engine& engine, const Term& argument);
+
 // ---------------------------------------------------------------------------
 // The standard order of terms
 // ---------------------------------------------------------------------------

@@ -389,3 +389,17 @@ TEST_CASE("changing the database during a goal does not disturb that goal") {
   REQUIRE(asserted.loaded);
   REQUIRE(asserted.output == "X=1\nX=2\nY=9\nY=9\nY=1\nY=2\n");
 }
+
+TEST_CASE("assert and univ read a list a program built") {
+  // Part 249: a list a rule builds is a chain of cells whose last tail is a
+  // *variable* bound to the rest of the list, and the walk used here dereferenced
+  // nothing — it stopped at that variable and called the list improper.  `Х` in
+  // these goals plays the part of that variable.
+  const auto result = runProgram(
+      "?РАВНО(Х, []), ДОБ(факт(1), [ИСТИНА|Х], 1).\n"
+      "?РАВНО(Х, []), РАВНО(С, [ф, 1|Х]), ТЕРМ(Т, С).\n");
+  REQUIRE(result.loaded);
+  REQUIRE_FALSE(result.runtimeError);
+  REQUIRE(result.output == "Х=[]\n"
+                           "Х=[]\nС=[ф,1]\nТ=ф(1)\n");
+}
