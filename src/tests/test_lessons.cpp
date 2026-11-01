@@ -80,35 +80,31 @@ const std::vector<std::string>& checkedLessons() {
   return names;
 }
 
-/// Examples beside the lessons whose `%!` lines are checked the same way.  They
-/// are the showcase for the predicates the dialect added on top of the port
-/// (`ПЕРВОЕ`, `СОРТИРОВКА`, `ПОЛНЫЙ`, `ДЛЯВСЕХ`), the two problems whose output
-/// is the same on every machine, the tour of the standard library, the study
-/// sorts that left the library for `examples/problems/sorting.pld` (task_89), and the folder
-/// `examples/iso` of programs written with ISO names and signs (task_92: the
-/// arithmetic signs, the library, a family tree, the standard order, `->` and
-/// `sub_string/5`); `problems/hanoi.pld` draws and `problems/hanoi_play.pld` reads
-/// input, so those two are only parsed (see the test below), and so is
-/// `problems/maze/maze.pld` with its two modules: it draws a maze and walks a
-/// mouse along the found path.
+/// Examples beside the lessons whose `%!` lines are checked the same way.  Each of
+/// them shows one group of the built-ins the dialect added on top of the port or
+/// carries the ISO spelling beside it (part 245): the arithmetic signs, the three
+/// collectors, `ПЕРВОЕ` and `->`, the standard order, `ПОДСТРОКА`, `СОРТИРОВКА`,
+/// `ПОЛНЫЙ` and `ДЛЯВСЕХ`.  Also here: the tour of the standard library, the two
+/// problems whose output is the same on every machine, the study sorts that left
+/// the library for `examples/problems/sorting.pld` (task_89) and the family tree.
+/// `problems/hanoi.pld` draws and `problems/hanoi_play.pld` reads input, so those
+/// two are only parsed (see the test below), and so is `problems/maze/maze.pld`
+/// with its two modules: it draws a maze and walks a mouse along the found path.
 const std::vector<std::string>& checkedExamples() {
   static const std::vector<std::string> names = {
-      "first.pld",
+      "arith.pld",
+      "findall.pld",
+      "if_then.pld",
+      "order.pld",
+      "sub_string.pld",
       "sort.pld",
-      "bagof.pld",
       "ground.pld",
       "forall.pld",
-      "problems/sorting.pld",
       "stdlib.pld",
+      "problems/sorting.pld",
+      "problems/family.pld",
       "problems/factorial.pld",
       "problems/knapsack.pld",
-      "iso/arith.pld",
-      "iso/lists.pld",
-      "iso/family.pld",
-      "iso/groups.pld",
-      "iso/order.pld",
-      "iso/if_then.pld",
-      "iso/sub_string.pld",
   };
   return names;
 }
@@ -152,7 +148,7 @@ TEST_CASE("ported example programs parse cleanly") {
       "problems/factorial.pld", "problems/hanoi.pld", "problems/hanoi_play.pld",
       "problems/maze/maze.pld", "problems/maze/maze.graphics.pld",
       "problems/maze/maze.images.pld",
-      "file_io.pld", "drawing.pld", "findall.pld",
+      "file_io.pld", "drawing.pld",
       "import/import.pld", "import/lib/library.pld", "import/lib/hello.pld",
   };
   for (const std::string& file : files) {

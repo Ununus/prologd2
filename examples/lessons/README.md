@@ -100,8 +100,9 @@ shipped program is already in the standard shape» в `src/tests/test_formatter.
 * `doc/help.typ` — руководство по языку (в конце каждого урока указаны нужные
   разделы).
 * `doc/lessons.typ` — тот же обзор курса в составе документации.
-* `examples/` — программы примеров: `ПЕРВОЕ`, `СОРТИРОВКА`, `ПОЛНЫЙ`,
-  `ДЛЯВСЕХ`, `НАЙТИВСЕ`, импорт библиотеки (`examples/import/`), задачи
-  (`examples/problems/`) и ромбовидный импорт `examples/import/diamond/`.
-  Что где лежит — `examples/README.md`.
+* `examples/` — программы примеров: по одной на группу встроенных предикатов
+  (`arith.pld`, `findall.pld`, `if_then.pld`, `order.pld`, `sub_string.pld`,
+  `sort.pld`, `ground.pld`, `forall.pld`), импорт библиотеки
+  (`examples/import/`), задачи (`examples/problems/`) и ромбовидный импорт
+  `examples/import/diamond/`.  Что где лежит — `examples/README.md`.
 * `doc/gui.typ` — окно графики: рисование урока 12 и пошаговое выполнение.

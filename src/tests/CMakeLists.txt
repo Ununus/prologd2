@@ -62,7 +62,11 @@ add_test(NAME test_case_names_are_ascii
 # Command-line integration tests
 # ---------------------------------------------------------------------------
 if(TARGET prologd)
-  set(PROLOGD_DEMO "${CMAKE_SOURCE_DIR}/examples/findall.pld")
+  # The demo of the four ways to name a source file: any example will do.  The
+  # needle is the exact 20! and nothing else — ASCII, because `ctest` decodes a
+  # child's output with the console code page (`cli_diagnostics.cmake` says the
+  # same), and distinctive enough that no other line can match it.
+  set(PROLOGD_DEMO "${CMAKE_SOURCE_DIR}/examples/arith.pld")
 
   add_test(NAME cli_source_short COMMAND prologd -s "${PROLOGD_DEMO}")
   add_test(NAME cli_source_long COMMAND prologd --source "${PROLOGD_DEMO}")
@@ -70,7 +74,7 @@ if(TARGET prologd)
   add_test(NAME cli_positional COMMAND prologd "${PROLOGD_DEMO}")
   foreach(test IN ITEMS cli_source_short cli_source_long cli_source_equals cli_positional)
     set_tests_properties(${test} PROPERTIES
-      PASS_REGULAR_EXPRESSION "А=\\[\\[вова,корчагин\\]")
+      PASS_REGULAR_EXPRESSION "=2432902008176640000")
   endforeach()
 
   add_test(NAME cli_version COMMAND prologd --version)

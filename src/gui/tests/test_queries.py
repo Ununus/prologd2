@@ -94,14 +94,13 @@ CASES: list[tuple[str, str | None]] = [
 #: Counts of `find_statements` per example program (posix separators), refreshed
 #: with `--print` when a lesson gains or loses a question on purpose.
 PINNED: dict[str, int] = {
-    "bagof.pld": 9,
-    "compare.pld": 9,
+    "arith.pld": 22,
     "drawing.pld": 1,
-    "file_io.pld": 3,
-    "findall.pld": 2,
-    "first.pld": 5,
+    "file_io.pld": 4,
+    "findall.pld": 13,
     "forall.pld": 5,
     "ground.pld": 7,
+    "if_then.pld": 13,
     "import/diamond/base.pld": 0,
     "import/diamond/left.pld": 0,
     "import/diamond/main.pld": 5,
@@ -109,13 +108,6 @@ PINNED: dict[str, int] = {
     "import/import.pld": 3,
     "import/lib/hello.pld": 1,
     "import/lib/library.pld": 0,
-    "iso/arith.pld": 16,
-    "iso/family.pld": 4,
-    "iso/groups.pld": 4,
-    "iso/if_then.pld": 8,
-    "iso/lists.pld": 10,
-    "iso/order.pld": 13,
-    "iso/sub_string.pld": 10,
     "lessons/appendix_debug.pld": 7,
     "lessons/lesson_01.pld": 9,
     "lessons/lesson_02.pld": 12,
@@ -130,7 +122,9 @@ PINNED: dict[str, int] = {
     "lessons/lesson_11.pld": 5,
     "lessons/lesson_11_lib.pld": 0,
     "lessons/lesson_12.pld": 11,
+    "order.pld": 19,
     "problems/factorial.pld": 2,
+    "problems/family.pld": 6,
     "problems/hanoi.pld": 2,
     "problems/hanoi_play.pld": 1,
     "problems/knapsack.pld": 2,
@@ -140,6 +134,7 @@ PINNED: dict[str, int] = {
     "problems/sorting.pld": 8,
     "sort.pld": 12,
     "stdlib.pld": 73,
+    "sub_string.pld": 11,
 }
 
 
