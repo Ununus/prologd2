@@ -45,7 +45,7 @@
   width: 100%,
   fill: fill,
   inset: (x: 10pt, y: 9pt),
-  outset: (x: 12pt),
+  outset: (x: 0pt),
   radius: 6pt,
   stroke: (
     left: 2.5pt + bar,

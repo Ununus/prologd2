@@ -32,7 +32,10 @@ TREE="$ROOT/build/deb-tree"
 PRESET="linux-release"
 PYTHON=${PYTHON:-$ROOT/.venv/bin/python}
 JOBS=${JOBS:-$(nproc 2>/dev/null || echo 2)}
-DOCUMENTS=(help technical gui lessons library)
+#: The manuals the package carries.  `technical.pdf` is for whoever works on the
+#: engine and stays in the repository: the `docs` target still builds it, the
+#: package does not carry it.
+DOCUMENTS=(help gui lessons library)
 
 #: Qt pieces the window never loads, relative to /opt/prologd (task_118).  Freezing
 #: keeps them whatever `--exclude-module` says: PySide6 ships its Qt libraries as

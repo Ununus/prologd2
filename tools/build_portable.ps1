@@ -8,7 +8,7 @@
     -> zip.
 
     What the package is: `prologd-gui.exe` with its `_internal` folder beside
-    `prologd.exe`, the three Visual C++ DLLs our C++ needs, `doc` (five PDFs and
+    `prologd.exe`, the three Visual C++ DLLs our C++ needs, `doc` (four PDFs and
     `builtins.json` — the sources of the manuals stay in the repository), `examples`
     (lessons, tasks, `lib`) and `stdlib` (the standard library, which the interpreter
     searches beside itself).  The window finds the interpreter next to itself and
@@ -71,8 +71,10 @@ trap {
     exit 1
 }
 
-#: The five documents of the target; `style.typ` is a shared style, not a document.
-$documentNames = @('help', 'technical', 'gui', 'lessons', 'library')
+#: The manuals the package carries; `style.typ` is a shared style, not a document,
+#: and `technical.pdf` is for whoever works on the engine, so it stays in the
+#: repository.
+$documentNames = @('help', 'gui', 'lessons', 'library')
 
 #: Modules the QWidget window never loads.  Removing them keeps PyInstaller from
 #: walking into them at all (that is what takes the `qml` folder of the QML modules

@@ -2351,3 +2351,30 @@ Nothing in the corpus called `is_letter` or `is_digit`, so no program needed cha
 both new spellings are reserved, keyworded and completed with no further work.
 
 **Status.** Accepted.
+
+## ADR-069: the packages carry four manuals, `technical.pdf` stays at home
+
+**Context.**  Both packages — the Debian one (`tools/build_deb.sh`) and the portable
+Windows folder that the Inno installer copies (`tools/build_portable.ps1`) — took all
+five PDFs the `docs` target builds: `help`, `technical`, `gui`, `lessons`, `library`.
+`technical.pdf` is the design document: the model of terms, unification, the machine,
+the algorithm and its complexity, the test scheme.  Whoever opens it is working on the
+engine, and both packages are made for the reader who *writes programs*: the same round
+had already taken the `.typ` sources out of the package (task_116) for that reason.
+
+**Decision.**  `DOCUMENTS` and `$documentNames` name four documents.  `technical.typ`
+and its PDF stay in the repository, and the `docs` target keeps building it — the
+conventions require looking at the changed pages of whatever manual was edited, and
+`technical.typ` is edited with the engine.
+
+**Consequences.**  The package carries `help`, `gui`, `lessons` and `library`.  Nothing
+in the window or the interpreter opens `technical.pdf`, so no code had to move; both
+scripts print the count from their list, so the messages followed on their own.  The
+existence check now covers the four shipped PDFs, which is what it was for — catching a
+`typst` that failed on a document the package needs — and `doc/README.md` keeps its
+`typst compile` line for `technical.typ`, because building it by hand is how a change to
+the engine's description is read.  The `.deb` loses about 350 KB.  That is not the
+reason: the design document is for the person changing the engine, and beside
+`help.pdf` it is noise.
+
+**Status.** Accepted.
