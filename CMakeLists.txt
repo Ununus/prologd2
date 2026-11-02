@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.24)
 
 project(prologd
-  VERSION 2.6.1
+  VERSION 2.7.0
   DESCRIPTION "PrologD logic programming language interpreter"
   LANGUAGES CXX)
 
@@ -17,7 +17,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # build date: a banner that changes on every compile cannot be checked against, and a
 # package built from a tag should name the day the tag was cut.  Bump it with
 # `VERSION` above.
-set(PROLOGD_RELEASE_DATE "2026-10-25")
+set(PROLOGD_RELEASE_DATE "2026-11-02")
 
 # What `--version` calls the program: the executable's own name in Latin letters.
 # It reaches the generated `src/prlib/src/version.cpp` through `configure_file`, not

@@ -140,6 +140,7 @@ Removed from PrologD:
 | M16 | Interpreter options, profiles and limits | 46 |
 | M17 | A portable Windows build: interpreter, window, docs and examples in one folder | 61 |
 | M18 | The editor: completion, statement forms, conversion, the session and closing | 99–114 |
+| M19 | One name (`prologd`), the dialect at 27.1, ISO-leaning arithmetic and the predicates of text and of the base | status 246–256 |
 
 ## 6. Risks and mitigations
 
