@@ -149,3 +149,36 @@ endif()
 if(errors MATCHES "error:")
   message(FATAL_ERROR "halt must not be an error: ${errors}")
 endif()
+
+# A command the parser cannot read is one code, 1 (part 258, ADR-071): the docs
+# promise «1 usage error», and CLI11's own numbers — 104 a bad integer, 105 a bad
+# value, 109 an unknown option, 114 a missing argument — describe the mistake to
+# the parser, not to the person who typed the line.  Both halves of that `catch`
+# are checked here, because the good half must not follow the bad one: `--help`
+# is not a mistake, exits 0, and a script that builds and then asks for help
+# relies on it.  `[OPTIONS]` is the ASCII part of the help's first line.
+execute_process(
+  COMMAND "${PROLOGD_EXE}" --no-such-option
+  OUTPUT_VARIABLE output
+  ERROR_VARIABLE errors
+  RESULT_VARIABLE exit_code)
+
+if(NOT exit_code EQUAL 1)
+  message(FATAL_ERROR "An unknown option should exit 1, got ${exit_code}: ${errors}")
+endif()
+if(NOT errors MATCHES "not expected")
+  message(FATAL_ERROR "An unknown option said nothing: '${errors}'")
+endif()
+
+execute_process(
+  COMMAND "${PROLOGD_EXE}" --help
+  OUTPUT_VARIABLE output
+  ERROR_VARIABLE errors
+  RESULT_VARIABLE exit_code)
+
+if(NOT exit_code EQUAL 0)
+  message(FATAL_ERROR "--help should exit 0, got ${exit_code}: ${errors}")
+endif()
+if(NOT output MATCHES "\\[OPTIONS\\]")
+  message(FATAL_ERROR "--help printed no option list: ${output}")
+endif()

@@ -2403,3 +2403,28 @@ needed a second goal behind the same token, a hidden numeric check in the parser
 each of the three notations keeps one meaning.
 
 **Status.** Accepted.
+
+## ADR-071: a malformed command line is exit code 1, whatever CLI11 thinks
+
+**Context.**  The manual has promised «`1` -- ошибка в параметрах командной строки»
+since the CLI was written, and the README repeated it.  It was not true: `main()`
+returned `app.exit(parseError)`, so CLI11's own numbers reached the shell — 104 for a
+number that is not a number, 105 for a value outside a set, 109 for an unknown option,
+114 for a missing argument.  Code 1 was returned only by the checks made *after* the
+parse (`--format` together with `--protocol json`, an `-i`/`-o`/`-e` file that does not
+open), which is the rarer mistake of the two.
+
+**Decision.**  The catch keeps `app.exit(parseError)` — it prints the message — and
+returns 1 unless that code is 0.  Zero is the half that must survive: `--help` and
+`--version` are `ParseError`s too, with code 0, and a script that builds and then asks
+for help depends on that.
+
+**Consequences.**  The documented contract is now the real one, for every kind of bad
+command line, and no script has to learn four numbers that describe the mistake to the
+parser rather than to the person who typed it.  Nothing else changed: the load and
+parse failures keep 2, runtime errors keep 3, `--format` on unparsable input keeps 2,
+and a program whose questions all failed still exits 0.  `cli_diagnostics.cmake` checks
+both halves — an unknown option gives 1, `--help` gives 0 — and the check failed against
+the old binary, so it guards the behaviour rather than describing it.
+
+**Status.** Accepted.

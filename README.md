@@ -46,7 +46,7 @@ sudo apt remove prologd
 rm -f ~/.config/PrologD/gui/gui.ini
 rmdir ~/.config/PrologD/gui ~/.config/PrologD
 ```
-`apt remove` оставляет запись dpkg в состоянии `rc`; `sudo apt purge prologd` чтобы убирать.
+`apt remove` оставляет запись dpkg в состоянии `rc`; `sudo apt purge prologd` уберёт и её.
 
 ## Обзор языка
 
@@ -94,20 +94,22 @@ rmdir ~/.config/PrologD/gui ~/.config/PrologD
 ## Quick start
 
 ```sh
-cmake -S . -B build -G Ninja
-cmake --build build
-ctest --test-dir build
+cmake --preset linux-release
+cmake --build --preset linux-release
+ctest --preset linux-release
 ```
 
-The console interpreter is `build/src/cli/prologd`.
+The console interpreter is `build/linux-release/src/cli/prologd` (macOS: the
+`macos-release` preset, the same path with that name; Windows has its own section
+below).
 
 ```sh
 # Run a program file
-./build/src/cli/prologd -s examples/findall.pld
+./build/linux-release/src/cli/prologd -s examples/findall.pld
 # Or read the program from stdin
-./build/src/cli/prologd < examples/findall.pld
+./build/linux-release/src/cli/prologd < examples/findall.pld
 # Help
-./build/src/cli/prologd -h
+./build/linux-release/src/cli/prologd -h
 ```
 
 Start the GUI:
@@ -147,7 +149,8 @@ cmake --build --preset windows-msvc
 ctest --preset windows-msvc
 ```
 
-The executable is `build\src\cli\Release\prologd.exe`.
+The executable is `build\src\cli\Release\prologd.exe` for the manual build above and
+`build\windows-msvc\src\cli\Release\prologd.exe` with the preset.
 
 The portable package is built by one script:
 ```powershell
@@ -201,8 +204,10 @@ prologd --source examples/findall.pld
 Diagnostics use the usual compiler format:
 `file:line:column: error: message`.
 
-Exit codes: `0` success, `1` usage error, `2` a source file could not be loaded
-or parsed, `3` a runtime error (including an interrupted query).
+Exit codes: `0` success, `1` a malformed command line (an unknown option, a bad
+value, a missing argument), `2` a source file could not be loaded or parsed,
+`3` a runtime error (including an interrupted query). A question that fails does
+not change the code.
 
 ### Front-end protocol
 
@@ -227,7 +232,7 @@ src/gui/              PySide6 front-end (drives the CLI over the JSON protocol)
 src/tests/            Catch2 test suite and CLI integration tests
 src/3rdparty/         FetchContent dependencies (gitignored)
 doc/                  Typst documentation (Russian)
-examples/             example PrologD programs (demo, problems, lessons, lib)
+examples/             demonstration programs at the root, plus import/, lessons/, problems/
 stdlib/               standard library, shipped beside the executable
 .github/workflows/    CI (Linux GCC, Windows MSVC, macOS AppleClang)
 ai/                   plan, task breakdown and notes for the AI agent

@@ -126,7 +126,11 @@ int main(int argc, char** argv) {
   try {
     app.parse(argc, argv);
   } catch (const CLI::ParseError& parseError) {
-    return app.exit(parseError);
+    // `--help` and `--version` arrive here too, with code 0.  A real parse
+    // failure is a malformed command line, and the documented code for that is
+    // 1: CLI11's own numbers (104, 105, 109, 114) name the kind of mistake to
+    // the parser, not to the person who typed the command.
+    return app.exit(parseError) == 0 ? 0 : 1;
   }
 
   for (const std::string& file : positional) {
