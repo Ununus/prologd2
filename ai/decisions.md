@@ -2378,3 +2378,28 @@ reason: the design document is for the person changing the engine, and beside
 `help.pdf` it is noise.
 
 **Status.** Accepted.
+
+## ADR-070: the comparison signs stay the shout of `БОЛЬШЕ` and `МЕНЬШЕ`
+
+**Context.**  The manual writes `A > B`, `A < B`, `A >= B`, `A =< B` as the sign
+spellings of `БОЛЬШЕ`/`МЕНЬШЕ` (the last two through `НЕ`), and says so: the parser
+substitutes the same goal.  In ISO the same four signs are arithmetic — both operands
+are evaluated and must be numbers, so `"а" < "б"` there is a type error, while here it
+is true, because `МЕНЬШЕ` compares values: numbers, texts, lists.  The owner asked
+whether the signs should be made ISO-strict.
+
+**Decision.**  They stay as they are: a sign is the shorthand of the word, and the word
+compares values.  The divergence is written down in the manual — a `#warn` box in §5.1
+and the reason given in §3.7, where `СОРТИРОВКА` refuses `<` because it sorts by the
+standard order of terms, not by value.
+
+**Consequences.**  A program that ISO answers correctly never changes meaning: correct
+ISO code does not compare non-numbers with these signs.  What differs is only the
+answer-to-error boundary, and it moves in the permissive direction — an ISO program with
+this particular bug gets an answer here instead of a report.  The alternative — signs
+strict, words wide — would have cost the invariant «знак -- это только запись» and
+needed a second goal behind the same token, a hidden numeric check in the parser.
+`=:=` and `=\=` stay arithmetic-only, as in ISO, and `@<` stays the standard order, so
+each of the three notations keeps one meaning.
+
+**Status.** Accepted.
