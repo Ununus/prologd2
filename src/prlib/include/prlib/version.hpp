@@ -17,14 +17,14 @@ std::string_view versionString();
 /// every machine that builds the same tag.
 std::string_view releaseDateString();
 
-/// `prologd 2.7.0 (2026-11-02)` — what `--version` prints.
+/// `prologd 2.8.0 (2026-11-09)` — what `--version` prints.
 std::string versionBanner();
 
 /// The version the *language* reports through `ВЕРСИЯ`.
 ///
 /// It does not follow the interpreter's own version and never will: the number is
 /// part of the dialect as the course's programs know it, and a lesson that prints it
-/// has to keep printing it after a release.  `2.7.0` is what the program is;
+/// has to keep printing it after a release.  `2.8.0` is what the program is;
 /// `27.1` is what the language is.
 inline constexpr std::string_view kDialectVersion = "27.1";
 

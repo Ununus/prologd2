@@ -1,6 +1,6 @@
 """Writes the macOS bundle metadata PyInstaller leaves out (task_119).
 
-    python tools/macos_plist.py dist/PrologD.app/Contents/Info.plist 2.7.0
+    python tools/macos_plist.py dist/PrologD.app/Contents/Info.plist 2.8.0
 
 PyInstaller fills in the executable, the identifier and the icon; the version,
 the deployment floor and the document type are ours.  The file is a binary or

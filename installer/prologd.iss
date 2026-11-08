@@ -5,14 +5,14 @@
 ; примеры, — плюс, если попросят, связь файлов .pld с окном.
 ;
 ; Собирается из tools\build_installer.ps1, который передаёт версию:
-;   ISCC.exe -DAppVersion=2.7.0 installer\prologd.iss
+;   ISCC.exe -DAppVersion=2.8.0 installer\prologd.iss
 ; Версия ниже — только значение по умолчанию для ручного запуска.
 ;
 ; Файл сохранён в UTF-8 **с BOM**: без BOM Inno Setup читает .iss как ANSI и
 ; превращает кириллицу в мусор.
 
 #ifndef AppVersion
-  #define AppVersion "2.7.0"
+  #define AppVersion "2.8.0"
 #endif
 
 ; Имя продукта — просто «Пролог-Д»: у программы один номер, и это номер версии.
@@ -33,7 +33,7 @@ AppVersion={#AppVersion}
 AppPublisher=PrologD
 VersionInfoVersion={#AppVersion}
 ; Свойства файла установщика: без них Inno подставляет сюда AppVerName, и в
-; свойствах получается «Пролог-Д 2.7.0 Setup».
+; свойствах получается «Пролог-Д 2.8.0 Setup».
 VersionInfoDescription={#AppName} — установщик
 VersionInfoProductName={#AppName}
 

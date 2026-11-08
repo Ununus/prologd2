@@ -28,7 +28,7 @@
 ## Linux .deb пакет
 ### Установка
 ```sh
-sudo apt install ./prologd_2.7.0_amd64.deb
+sudo apt install ./prologd_2.8.0_amd64.deb
 ```
 
 ### Запуск
