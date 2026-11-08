@@ -647,7 +647,8 @@ constexpr std::pair<std::string_view, std::string_view> kEnglishNames[] = {
     // a name of its own and not an alias.  `substring/4` is retired with a
     // message, and `test_aliases.cpp` allows the exception by name.
     {"ДЛИНА", "strlen"},
-    {"ВЫВОД", "write"},         {"ВЫВОДПС", "writeln"},
+    {"ВЫВОД", "write"},          {"ВЫВОДПС", "writeln"},
+    {"ФОРМАТ", "format_string"}, {"ВЫВОДФ", "format"},
     {"ВВКОД", "put_code"},      {"ВВОДЦЕЛ", "read_int"},
     {"ВВОДВЕЩ", "read_float"},  {"ВВОДСИМВ", "read_char"},
     {"ВВОДСТР", "read_string"}, {"ЧТЕНИЕ_ИЗ", "see"},
@@ -714,9 +715,11 @@ struct VariadicName {
 };
 
 constexpr VariadicName kVariadicNames[] = {
-    {"ВЫВОД", builtinWrite},     {"write", builtinWrite},
-    {"ВЫВОДПС", builtinWriteLine}, {"writeln", builtinWriteLine},
-    {"ПЕРВОЕ", builtinFirst},    {"first", builtinFirst},
+    {"ВЫВОД", builtinWrite},        {"write", builtinWrite},
+    {"ВЫВОДПС", builtinWriteLine},  {"writeln", builtinWriteLine},
+    {"ФОРМАТ", builtinFormat},      {"format_string", builtinFormat},
+    {"ВЫВОДФ", builtinFormatWrite}, {"format", builtinFormatWrite},
+    {"ПЕРВОЕ", builtinFirst},       {"first", builtinFirst},
 };
 
 /// The function behind a variadic name, `nullptr` when the name is not variadic.

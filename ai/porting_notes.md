@@ -46,7 +46,7 @@ not a port; the old lesson it replaces is kept under `examples/lessons/_old/`.
 | `lessons/_old/lesson_8.pld` | archived when lesson 12 was rewritten for the course (graphics moved there); the animation query recurses forever and is therefore not executed by the tests. |
 | `lessons/_old/lesson_9.pld` | archived when lesson 10 was rewritten for the course (its subject, the dialogue and input/output, is lesson 7 now); interactive (`ВВОДСИМВ`); the queries need input, so only parsing is tested. |
 | `factorial.pld` | `н`, `ф`, `х` → `Н`, `Ф`, `Х`; the `;` sentence terminators became `.` when `;` was made a disjunction (task_41) — it was the only ported file that used the old terminator. |
-| `file_io.pld` | `Н` stays `Н`. |
+| `io.pld` (was `file_io.pld`) | `Н` stays `Н`; renamed in part 267, when it grew the output predicates. |
 | `drawing.pld` | tabs preserved; single-letter coordinates renamed. |
 | `monk.pld`, `monkd.pld` (now `problems/hanoi.pld`, `problems/hanoi_play.pld`) | `a`, `b`, `c` become `A_`, `B_`, `C_` because `A`, `B`, `C` are already variables. |
 | `ranez.pld` | dropped: the reference copy was double-encoded; the `ranez` predicate is present in `lesson_4.pld`. |

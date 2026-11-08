@@ -565,6 +565,28 @@
       ]
     },
     {
+      "name": "ВЫВОДФ",
+      "aliases": ["format"],
+      "kind": "predicate",
+      "arities": [],
+      "variadic": true,
+      "group": "io",
+      "section": "6.11",
+      "summary": "Печатает образец, подставляя значения вместо {}",
+      "variants": ["ВЫВОДФ(Образец, Значение, ...) — печать по образцу с местами {}"]
+    },
+    {
+      "name": "ФОРМАТ",
+      "aliases": ["format_string"],
+      "kind": "predicate",
+      "arities": [],
+      "variadic": true,
+      "group": "strings",
+      "section": "6.11",
+      "summary": "Собирает строку по образцу, подставляя значения вместо {}",
+      "variants": ["ФОРМАТ(Результат, Образец, Значение, ...) — строка по образцу с местами {}"]
+    },
+    {
       "name": "ВВКОД",
       "aliases": ["put_code"],
       "kind": "predicate",

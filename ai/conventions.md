@@ -324,6 +324,13 @@ Tests are written **together with** the feature, never after.
   a Finder launch runs the engine from `/`, and the import died with «Искался в:
   /iso.pld».  A package is checked by running an importing program from `/` against
   it, never by looking at the tree — the tree looked right.
+* An example that writes a file is checked by `checkPromises` like any other: the
+  check runs it inside a scratch folder (`ScratchDirectory` in `test_lessons.cpp`),
+  so a relative name in the program means that folder, the workspace stays clean and
+  a leftover file cannot make a later run pass.  `examples/io.pld` writes
+  `output.txt` that way; lesson 7 writes its data file.  A program whose output
+  differs from run to run (a timer, a random draw) cannot be in the checked lists —
+  its query goes into a comment, as the timer line of `io.pld` does.
 * Prose avoids the conjunction «а» as a contrast crutch.  «Это А, а не Б» becomes
   «Это А» or splits in two («Это А.  Б здесь нет.»); «а не» also hides the plain
   answer behind a negation.  Parallel contrasts that genuinely need it stay

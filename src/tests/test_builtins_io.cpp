@@ -511,3 +511,60 @@ TEST_CASE("the stream built-ins report the current stream, or fail") {
     REQUIRE(result.error.find("Недопустимый тип аргументов") != std::string::npos);
   }
 }
+
+TEST_CASE("format_string/2: a pattern with {} places, values in order") {
+  // Part 266: the dialect had no way to put a number into a text at all — `СЦЕП`
+  // takes strings — so this is the missing half of number <-> text, not sugar over
+  // `СЦЕП`.  A value is written the way `ВЫВОД` writes it, and the result is a
+  // string, which is why the same goal works as a check.
+  const auto result = runProgram(
+      "?ФОРМАТ(X, \"Ответ: {}\", 5).\n"
+      "?ФОРМАТ(X, \"{} + {} = {}\", 2, 3, 5).\n"
+      "?ФОРМАТ(X, \"{}\", [а, б]).\n"
+      "?ФОРМАТ(X, '{}!', молоко).\n"
+      "?ФОРМАТ(X, \"без мест\").\n"
+      "?ФОРМАТ(X, \"скобки {{}} в тексте\").\n"
+      "?ФОРМАТ(\"Ответ: 5\", \"Ответ: {}\", 5).\n");
+  REQUIRE(result.loaded);
+  REQUIRE(result.output == "X=Ответ: 5\n"
+                            "X=2 + 3 = 5\n"
+                            "X=[а,б]\n"
+                            "X=молоко!\n"
+                            "X=без мест\n"
+                            "X=скобки {} в тексте\n"
+                            "ДА\n");
+}
+
+TEST_CASE("format_string/2 and format/1: a broken pattern or count is an error") {
+  // Named, not silent: a pattern asking for two values and given one used to be
+  // the kind of mistake that prints half a message.
+  for (const auto& [goal, message] :
+       {std::pair{"ФОРМАТ(X, \"{} {}\", 1)", "в образце мест — 2, а значений — 1"},
+        std::pair{"ФОРМАТ(X, \"{}\", 1, 2)", "в образце мест — 1, а значений — 2"},
+        std::pair{"ФОРМАТ(X, \"a{b\", 1)", "в образце «{» без пары"},
+        std::pair{"ФОРМАТ(X, \"}\", 1)", "в образце «}» без пары"},
+        std::pair{"ВЫВОДФ(\"{}\", 1, 2)", "в образце мест — 1, а значений — 2"}}) {
+    INFO("goal: " << goal);
+    const auto result = runProgram("? " + std::string(goal) + ".\n");
+    REQUIRE(result.loaded);
+    REQUIRE(result.runtimeError);
+    REQUIRE(result.error.find(message) != std::string::npos);
+  }
+
+  // The pattern is text; a number is not.
+  const auto wrongKind = runProgram("?ФОРМАТ(X, 5, 1).\n");
+  REQUIRE(wrongKind.loaded);
+  REQUIRE(wrongKind.runtimeError);
+  REQUIRE(wrongKind.error.find("аргумент 2 — число 5, нужно образец строкой или атомом") !=
+          std::string::npos);
+}
+
+TEST_CASE("format/1: the same pattern, straight to the output") {
+  const auto result = runProgram(
+      "?ВЫВОДФ(\"Ответ: {}\\n\", 5).\n"
+      "?format(\"{}!\", 1), ПС.\n"
+      "?ВЫВОДФ(\"{}\", [а, б]).\n");
+  REQUIRE(result.loaded);
+  // `ДА` after each: a goal without variables answers with the word, as always.
+  REQUIRE(result.output == "Ответ: 5\nДА\n1!\nДА\n[а,б]\nДА\n");
+}

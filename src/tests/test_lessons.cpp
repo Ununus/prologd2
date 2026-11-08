@@ -1,5 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
+#include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -85,7 +87,10 @@ const std::vector<std::string>& checkedLessons() {
 /// carries the ISO spelling beside it (part 245): the arithmetic signs, the three
 /// collectors, `ПЕРВОЕ` and `->`, the standard order, `ПОДСТРОКА`, `СОРТИРОВКА`,
 /// `ПОЛНЫЙ` and `ДЛЯВСЕХ`, and the type tests with the conversions between the
-/// kinds (part 247).  Also here: the tour of the standard library, the two
+/// kinds (part 247).  `io.pld` joined in part 267: it was `file_io.pld`, only
+/// parsed, until it grew `ФОРМАТ`/`ВЫВОДФ`; the files it writes now land in the
+/// scratch folder of the check and not in the workspace.  Also here: the tour of
+/// the standard library, the two
 /// problems whose output is the same on every machine, the study sorts that left
 /// the library for `examples/problems/sorting.pld` (task_89) and the family tree.
 /// `problems/hanoi.pld` draws and `problems/hanoi_play.pld` reads input, so those
@@ -94,6 +99,7 @@ const std::vector<std::string>& checkedLessons() {
 const std::vector<std::string>& checkedExamples() {
   static const std::vector<std::string> names = {
       "arith.pld",
+      "io.pld",
       "findall.pld",
       "if_then.pld",
       "order.pld",
@@ -112,6 +118,39 @@ const std::vector<std::string>& checkedExamples() {
   return names;
 }
 
+/// An empty scratch folder that becomes the process working folder while it lives.
+///
+/// An example may write a file, and a relative name in one means the folder of the
+/// run: `io.pld` writes `output.txt`, lesson 7 its data file.  Without this the
+/// check would drop those files into whatever folder the test binary was started
+/// from, and a file left by an earlier run could make a later one pass.  The
+/// folder is removed afterwards, and so is any file the program wrote into it.
+class ScratchDirectory {
+ public:
+  explicit ScratchDirectory(const std::string& hint) {
+    std::error_code code;
+    path_ = std::filesystem::temp_directory_path(code) / ("prologd-check-" + hint);
+    std::filesystem::remove_all(path_, code);
+    std::filesystem::create_directories(path_, code);
+    previous_ = std::filesystem::current_path(code);
+    std::filesystem::current_path(path_, code);
+    REQUIRE_FALSE(code);
+  }
+
+  ~ScratchDirectory() {
+    std::error_code code;
+    std::filesystem::current_path(previous_, code);
+    std::filesystem::remove_all(path_, code);
+  }
+
+  ScratchDirectory(const ScratchDirectory&) = delete;
+  ScratchDirectory& operator=(const ScratchDirectory&) = delete;
+
+ private:
+  std::filesystem::path path_;
+  std::filesystem::path previous_;
+};
+
 /// Run one file and compare the whole output with the `%!` lines it carries.
 void checkPromises(const std::string& relative, const std::string& input,
                    std::vector<std::filesystem::path> include_paths) {
@@ -121,6 +160,12 @@ void checkPromises(const std::string& relative, const std::string& input,
   // Lesson files are stored with LF ends; a stray CR would end up in the expected
   // text and never match what the interpreter prints.
   REQUIRE(source.find('\r') == std::string::npos);
+  // One scratch folder per checked file, named after it: `lessons/x.pld` and
+  // `x.pld` must not share one, and two runs of the same file must not see each
+  // other's leftovers.
+  std::string hint = relative;
+  std::replace_if(hint.begin(), hint.end(), [](char c) { return c == '/' || c == '\\' || c == '.'; }, '-');
+  const ScratchDirectory scratch(hint);
   const auto result = runProgramWithIncludes(source, input, std::move(include_paths));
   INFO("errors: " << result.error);
   REQUIRE(result.loaded);
@@ -151,7 +196,7 @@ TEST_CASE("ported example programs parse cleanly") {
       "problems/factorial.pld", "problems/hanoi.pld", "problems/hanoi_play.pld",
       "problems/maze/maze.pld", "problems/maze/maze.graphics.pld",
       "problems/maze/maze.images.pld",
-      "file_io.pld", "drawing.pld",
+      "drawing.pld",
       "import/import.pld", "import/lib/library.pld", "import/lib/hello.pld",
   };
   for (const std::string& file : files) {

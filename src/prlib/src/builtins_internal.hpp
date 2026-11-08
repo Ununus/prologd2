@@ -38,6 +38,10 @@ bool unifyText(Engine& engine, const Term& argument, const std::string& value);
 /// `compareStandardOrder` in `prlib/order.hpp` (task_90).
 int compareOrder(Engine& engine, std::span<const Term> args, std::string_view predicate);
 
+/// The name a diagnostic uses for the predicate (part 260): the spelling the
+/// program wrote, or `predicate` itself when the built-in was called directly.
+std::string_view spokenName(Engine& engine, std::string_view predicate);
+
 /// The short `"<predicate>: Недопустимый тип аргументов"`, for the failures where no
 /// single argument is at fault (part 136).
 ///
@@ -96,6 +100,10 @@ BuiltinResult builtinNot(Engine&, std::span<const Term>);
 BuiltinResult builtinForall(Engine&, std::span<const Term>);
 BuiltinResult builtinEqual(Engine&, std::span<const Term>);
 BuiltinResult builtinNewline(Engine&, std::span<const Term>);
+/// `ФОРМАТ/2+` and `ВЫВОДФ/1+` — a pattern with `{}` places, both variadic, so
+/// they are registered by `kVariadicNames` and not by `add` (part 266).
+BuiltinResult builtinFormat(Engine&, std::span<const Term>);
+BuiltinResult builtinFormatWrite(Engine&, std::span<const Term>);
 BuiltinResult builtinWait(Engine&, std::span<const Term>);
 /// Throws `HaltRequest`: the session ends, and the front-end decides what that
 /// means (see `engine.hpp`).

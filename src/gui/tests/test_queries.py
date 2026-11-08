@@ -97,7 +97,7 @@ PINNED: dict[str, int] = {
     "arith.pld": 22,
     "database.pld": 23,
     "drawing.pld": 1,
-    "file_io.pld": 4,
+    "io.pld": 18,
     "findall.pld": 13,
     "forall.pld": 5,
     "ground.pld": 7,

@@ -2627,3 +2627,38 @@ bundle on Linux, where the rule is proven by the existing unit test of
 `standardLibraryDirectory`.
 
 **Status.** Accepted.
+
+## ADR-078: `ФОРМАТ` and `ВЫВОДФ` fill `{}` from the term printer, and `std::format` is not used
+
+**Context.**  The owner proposed `ФОРМАТ/2+(X, "Строка с {} в ней", аргументы)` and
+`ВЫВОДФ/1+("Так же с {}\n", аргументы)` and asked whether it is hard, whether it is
+worth it, and whether `std::format` would help.  The gap it fills is real: nothing in
+the dialect turned a *value* into text.  `СЦЕП/3` refuses a number outright
+(«аргумент 2 — число 5, нужно строка или атом»), and the conversions that exist
+(`str_to_int`, `str_to_float`, `atom_string`) all go the other way, so «Ответ: 5» was
+not expressible at all.
+
+**Decision.**  Both predicates exist, variadic like `ВЫВОД`.  `ФОРМАТ(Результат,
+Образец, Значение, ...)` binds a *string*, as `СЦЕП` does; `ВЫВОДФ(Образец,
+Значение, ...)` writes the same text straight to the output.  A value is formatted by
+`Engine::format` — the printer of `ВЫВОД` — so a string is spliced without quotes and a
+list as `[a,b]`: one printer for answers and for the text a program builds.  `{{` and
+`}}` are literal braces; a lone brace is an error, and so is a mismatch between places
+and values (one message naming both numbers).
+
+`std::format` was considered and rejected for three reasons.  Its arguments would be
+Prolog *terms* we print ourselves, so every `{}` would already be a string and the
+library would replace only the twenty-line scan for braces.  It would import a format
+specification we do not support (`{:>10}`, `{:d}`, `{0}`) and throw `std::format_error`
+where our diagnostics name the argument and the count.  And its availability divides
+the three builds: libc++ gained `<format>` only in its 18 branch (there is no such
+header in `release/17.x`), and on this machine `clang++ -std=c++23` cannot find it at
+all while `g++` 15 can.
+
+**Consequences.**  The manual has one subsection for the pair (§6.11, at the end of
+«Ввод и вывод», so no renumbering) with pointers from `ВЫВОД` (§6.1) and `СЦЕП`
+(§7.3).  The result being a string makes the goal work as a check too, which the tests
+pin.  `format_string` and `format` are the English names; `format` prints, as it does
+in SWI, though the place syntax differs — `{}` here, `~w` there.
+
+**Status.** Accepted.

@@ -31,9 +31,10 @@ const std::unordered_set<std::string> kReservedBuiltins = {
     "ЦЕЛЗНАЧ", "ЧИСЛЗНАЧ",
     // I/O
     "ЧТЕНИЕ_ИЗ", "ЗАПИСЬ_В", "ВВКОД", "ВВОДЦЕЛ", "ВВОДВЕЩ", "ВВОДСИМВ",
-    "ВВОДСТР", "ВЫВОД", "ВЫВОДПС", "ЖДИ",
+    "ВВОДСТР", "ВЫВОД", "ВЫВОДПС", "ФОРМАТ", "ВЫВОДФ",
+    "ЖДИ",
     "see", "tell", "put_code", "read_int", "read_float", "read_char",
-    "read_string", "write", "writeln", "wait",
+    "read_string", "write", "writeln", "format_string", "format", "wait",
     // Strings
     "БУКВА", "ЦИФРА", "СЦЕП", "КОПИЯ", "ДЛИНА",
     "is_letter_at", "is_digit_at", "concat", "strlen",
