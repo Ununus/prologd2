@@ -296,6 +296,14 @@ Tests are written **together with** the feature, never after.
   **not** a thing: it produces two `no text within stars` warnings and prints the
   stars literally, so a paragraph keeps its asterisks and nothing is bold.  The
   PDFs build fine — only the warning and the page show it.
+* An «Отличие от ISO» claim is checked against a real implementation before it is
+  written, and both are on the machine: `swipl` (what people use, ISO plus
+  extensions) and `gprolog` (ISO with almost nothing added — the one to ask whether
+  something is *standard*).  Part 261 found five claims that no one could have
+  checked that way: a string called an atom, `sub_string/5` called the ISO
+  predicate (the standard's is `sub_atom/5`, SWI's `sub_string/5` is the string
+  twin), dicts and `rdiv` called ISO (both are SWI's), and `msort` called SWI's
+  alone (GNU Prolog has it too).
 * Prose avoids the conjunction «а» as a contrast crutch.  «Это А, а не Б» becomes
   «Это А» or splits in two («Это А.  Б здесь нет.»); «а не» also hides the plain
   answer behind a negation.  Parallel contrasts that genuinely need it stay
