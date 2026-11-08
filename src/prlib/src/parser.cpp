@@ -860,10 +860,15 @@ Term Parser::parsePowerOperand() {
 /// expression grammar is the only place such a term is evaluated.
 bool isArithmeticFunctionName(std::string_view name) {
   return name == "abs" || name == "sign" || name == "sqrt" || name == "sin" ||
-         name == "cos" || name == "tan" || name == "exp" || name == "log" ||
-         name == "floor" || name == "ceiling" || name == "round" ||
-         name == "truncate";
+         name == "cos" || name == "tan" || name == "atan" || name == "exp" ||
+         name == "log" || name == "floor" || name == "ceiling" ||
+         name == "round" || name == "truncate";
 }
+
+/// The one arithmetic function of ISO that takes two arguments: `atan2(Y, X)`.
+/// It is not an operator, so the `,` between its arguments is read here and
+/// nowhere else in an expression.
+bool isTwoArgumentFunctionName(std::string_view name) { return name == "atan2"; }
 
 Term Parser::parsePrimaryArithmetic() {
   const Token token = peek();
@@ -875,6 +880,24 @@ Term Parser::parsePrimaryArithmetic() {
     case TokenKind::Variable:
       return parsePrimary();
     case TokenKind::Identifier:
+      if (isTwoArgumentFunctionName(token.text) &&
+          peek(1).kind == TokenKind::LParen) {
+        // `atan2(Y, X)` — both arguments are arithmetic operands, and the
+        // comma between them belongs to the call.
+        const Token name = advance();
+        advance();  // '('
+        Term ordinate = parseAdditive();
+        if (!match(TokenKind::Comma)) {
+          report(ErrorCode::InvalidArithmeticExpression, peek().location,
+                 "atan2: нужны два аргумента — ордината и абсцисса");
+        }
+        Term abscissa = parseAdditive();
+        if (!match(TokenKind::RParen)) {
+          report(ErrorCode::InvalidArithmeticExpression, peek().location,
+                 "Не закрыта скобка в арифметическом выражении");
+        }
+        return makeCompound(name.text, {std::move(ordinate), std::move(abscissa)});
+      }
       if (isArithmeticFunctionName(token.text) &&
           peek(1).kind == TokenKind::LParen) {
         // The argument is an *arithmetic* operand, not a term: `abs(2 - 5)` has

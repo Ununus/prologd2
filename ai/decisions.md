@@ -2526,3 +2526,36 @@ kind — so the section's promise of the ISO order holds for the kinds and their
 and names its two exceptions instead of implying there are none.
 
 **Status.** Accepted.
+
+## ADR-075: `atan` and `atan2` are functions of the expression, and `atan2` brings a two-argument call
+
+**Context.**  Part 262 wrote down that the function names inside an expression are
+ISO's, with `tan` as the single exception: ISO has `atan`, `tan` is what the
+implementations added.  The owner read that line and asked «Сделаем atan у нас?» —
+the dialect had no arc tangent in expression form at all, and `atan2`, ISO's
+two-argument arc tangent, was absent in every form.  A quarter of a circle could be
+named only by the predicate `TAN(X, Y)` with `Y` bound, which answers `atan` and
+nothing else.
+
+**Decision.**  Both go in as *functions*: `atan(X)` and `atan2(Y, X)`, the arguments
+in ISO's order — the ordinate first, so `atan2(1, -1)` is 3π/4 and not -π/4.
+Neither gets a predicate.  The owner chose that: the inverse of `atan` is already
+`TAN(X, Y)` with `Y` known, and `LOG/2` is the precedent for a function that has no
+predicate at all (§5.6 says so in as many words).  An `ATAN/2` would be a third
+spelling of the same two counts, and `ATAN2/3` would be an API of our own invention.
+
+`atan2` is the only two-argument function of ISO, and the expression grammar knew
+none: a name followed by `(` was a one-argument call, and everything with two
+arguments was an operator.  The parser therefore grew one branch
+(`isTwoArgumentFunctionName` + the comma inside the call), and `evaluateBinary` — the
+place two arguments already reach — grew the case.  The comma of `atan2(1, 2)` is
+read inside the call and never escapes: `?X is atan(1), Y is 2.` is still two goals.
+
+**Consequences.**  All twelve names of ISO's arithmetic are here now, `tan` still
+being the one the standard lacks.  `atan2(1)` is a parse error that says it wants
+two arguments, and bare `atan` used as a goal gets the existing warning
+«пишется в арифметическом выражении, а не в цели».  `--list-keywords` prints 184
+lines, and `doc/builtins.json` holds two more records of kind `function`, so the
+reference panel of the window and `test_reference.py` see them.
+
+**Status.** Accepted.

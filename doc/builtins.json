@@ -917,6 +917,26 @@
       "variants": ["tan(X) — тангенс в выражении #…#; предикат того же имени — TAN/2"]
     },
     {
+      "name": "atan",
+      "aliases": [],
+      "kind": "function",
+      "arities": [],
+      "group": "arith",
+      "section": "3.3",
+      "summary": "Арктангенс как функция выражения (радианы)",
+      "variants": ["atan(X) — угол от -pi/2 до pi/2; обратный счёт — TAN(X, Y)"]
+    },
+    {
+      "name": "atan2",
+      "aliases": [],
+      "kind": "function",
+      "arities": [],
+      "group": "arith",
+      "section": "3.3",
+      "summary": "Арктангенс точки (X, Y): угол от -pi до pi, четверть видна",
+      "variants": ["atan2(Y, X) — ордината первой, как в ISO"]
+    },
+    {
       "name": "EXP",
       "aliases": [],
       "kind": "predicate",

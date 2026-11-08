@@ -281,6 +281,39 @@ TEST_CASE("the arithmetic predicates are capitals, the functions lowercase") {
   REQUIRE(wrongArity.error.find("ABS не имеет арности 1") != std::string::npos);
 }
 
+TEST_CASE("atan and atan2: ISO's arc tangents, the two-argument one included") {
+  // Part 263: `tan` was the one trigonometric function of the dialect with no
+  // inverse in expression form, and `atan2` — ISO's only two-argument function —
+  // was absent altogether.  The values below are the ones SWI and GNU Prolog
+  // answer for the same queries.
+  const auto values = runProgram(
+      "?X is atan(0).\n"
+      "?X is atan(1).\n"
+      "?X is atan(-1).\n"
+      "?X is atan2(1, -1).\n"
+      "?X is atan2(-1, 1).\n"
+      "?X is atan2(1, 0).\n"
+      "?X is atan(1) * 4.\n"
+      // Both arguments are arithmetic operands, and the comma between them
+      // belongs to the call — also in the middle of a longer expression.
+      "?X is 1 + atan2(1 + 1, 2 * 1).\n");
+  REQUIRE(values.loaded);
+  REQUIRE(values.output == "X=0.0\n"
+                            "X=0.7853981633974483\n"
+                            "X=-0.7853981633974483\n"
+                            "X=2.356194490192345\n"
+                            "X=-0.7853981633974483\n"
+                            "X=1.5707963267948966\n"
+                            "X=3.141592653589793\n"
+                            "X=1.7853981633974483\n");
+
+  // `atan2` without its second argument is a parse error that says so, not a
+  // call of an unknown one-argument function.
+  const auto oneArgument = runProgram("?X is atan2(1).\n");
+  REQUIRE_FALSE(oneArgument.loaded);
+  REQUIRE(oneArgument.error.find("atan2: нужны два аргумента") != std::string::npos);
+}
+
 TEST_CASE("multiplication/3: the reversible modes and the zero divisor") {
   const auto result = runProgram(
       "?УМНОЖЕНИЕ(2, 3, 6).\n"

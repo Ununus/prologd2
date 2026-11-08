@@ -891,6 +891,13 @@ ArithValue evaluateBinary(Engine& engine, std::string_view op, const Term& left,
     }
     return ArithValue::ofFloat(result);
   }
+  if (op == "atan2") {
+    // ISO's only two-argument function: the arc tangent of the point (X, Y),
+    // which `atan` alone cannot name because it knows no quarter.  The order of
+    // arguments is ISO's and C's — the *ordinate* first: `atan2(1, -1)` is
+    // 3π/4, not -π/4.
+    return ArithValue::ofFloat(std::atan2(a.asDouble(), b.asDouble()));
+  }
   engine.raise(ErrorCode::InvalidArithmeticExpression);
 }
 
@@ -967,6 +974,10 @@ ArithValue evaluateFunction(Engine& engine, std::string_view name, const ArithVa
     result = std::cos(argument);
   } else if (name == "tan") {
     result = std::tan(argument);
+  } else if (name == "atan") {
+    // The arc tangent of ISO, in radians, in the open interval (-π/2, π/2).
+    // The two-argument form, which also picks the quarter, is `atan2`.
+    result = std::atan(argument);
   } else if (name == "exp") {
     result = std::exp(argument);
   } else if (name == "log") {
@@ -990,8 +1001,8 @@ ArithValue evaluateFunction(Engine& engine, std::string_view name, const ArithVa
 /// True for the function names `evaluateFunction` answers.
 bool isArithmeticFunction(std::string_view name) {
   return name == "abs" || name == "sign" || name == "sqrt" || name == "sin" ||
-         name == "cos" || name == "tan" || name == "exp" || name == "log" ||
-         isRoundingFunction(name);
+         name == "cos" || name == "tan" || name == "atan" || name == "exp" ||
+         name == "log" || isRoundingFunction(name);
 }
 
 ArithValue evaluateNode(Engine& engine, const Term& node) {

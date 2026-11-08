@@ -25,7 +25,7 @@ const std::unordered_set<std::string> kReservedBuiltins = {
     "rem", "sign", "pi", "floor", "ceiling", "round", "truncate",
     "ABS", "SQRT", "SIN", "COS", "TAN", "EXP",
     "greater", "less", "plus", "mul", "random", "abs", "sqrt", "sin",
-    "cos", "tan", "exp", "log", "is_whole", "is_number",
+    "cos", "tan", "atan", "atan2", "exp", "log", "is_whole", "is_number",
     // The soft value checks answer to Russian names too (part 248): `ЦЕЛЗНАЧ`
     // is «значение целое», `ЧИСЛЗНАЧ` is «значение — число».
     "ЦЕЛЗНАЧ", "ЧИСЛЗНАЧ",
