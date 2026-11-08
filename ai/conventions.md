@@ -304,6 +304,16 @@ Tests are written **together with** the feature, never after.
   predicate (the standard's is `sub_atom/5`, SWI's `sub_string/5` is the string
   twin), dicts and `rdiv` called ISO (both are SWI's), and `msort` called SWI's
   alone (GNU Prolog has it too).
+* An example is checked against ISO by translating it and running it in `gprolog`
+  or `swipl`, and three substitutions are not mechanical (part 262):
+  `#…#` is ISO's `is` — the arithmetic marker evaluates anywhere in a goal here,
+  while in ISO `f(X-1)` passes the *term* `X-1`, so the translation inserts
+  `R is X-1` first; `ПЕРВОЕ(A, B)` is `once((A ; B))`, a first solution of a
+  disjunction, not `(A -> B)`; `БОЛЬШЕ`/`МЕНЬШЕ` over text and lists are `@>` and
+  `@<`, because ISO's `>` on an atom is a type error and the example would fail
+  with a message that looks like a finding.  `->` next to `;` reads as in ISO —
+  `(A -> B ; C)` drops `C` once `A` has a solution — so an if-then-else that
+  answers «no» where «иначе» was expected is the ISO rule, not a defect.
 * Prose avoids the conjunction «а» as a contrast crutch.  «Это А, а не Б» becomes
   «Это А» or splits in two («Это А.  Б здесь нет.»); «а не» also hides the plain
   answer behind a negation.  Parallel contrasts that genuinely need it stay

@@ -2498,3 +2498,31 @@ grows without bound.  The «ожидался … найден …» order was re
 agreement would need a gender table where the impersonal «нужно» needs none.
 
 **Status.** Accepted.
+
+## ADR-074: `1` and `1.0` are one number in the term order, and the manual says so
+
+**Context.**  Part 262 checked the standard-order section (§5.9) the same way part 261
+checked the «Отличие от ISO» boxes — by running it in `gprolog` and `swipl`.  The
+heading promised the ISO order and the table kept it, except for one row: «число — по
+значению; `1` и `1.0` — одно число».  Both implementations disagree: they order
+*floats before integers*, so `1.0 @< 1` is true, `1 @< 1.0` is false,
+`compare(>, 1, 1.0)` succeeds, `sort([1,1.0], S)` gives `S = [1.0,1]` and
+`msort([1,1.0], S)` the same.  GNU Prolog's manual lists the order as «floating point
+numbers, in numeric order; integers, in numeric order; atoms …» and calls the order
+system-dependent only for variables, so the difference is real on both sides, not an
+SWI quirk.
+
+**Decision.**  The behaviour stays.  Numbers are compared by value here, the two
+spellings of one value are equal in the term order, and `МНОЖЕСТВО([1,1.0], С)` gives
+`С=[1]` — which is what the owner asked for when the sorts were separated (part 259)
+and what §3.7 and `examples/sort.pld` already show.  A second `#warn` box in §5.9
+states the difference, because a reader arriving from SWI would otherwise read the
+`С=[1]` example as a bug: `1.0 @< 1` is false here, `СРАВНЕНИЕ(Порядок, 1, 1.0)` is
+`=`, and `СОРТИРОВКА` keeps the pair in the order it was given.
+
+**Consequences.**  `МНОЖЕСТВО` really is a set of *values*: `1` and `1.0` collapse.
+§5.9 now carries two boxes side by side — the merged numbers and the separate string
+kind — so the section's promise of the ISO order holds for the kinds and their order
+and names its two exceptions instead of implying there are none.
+
+**Status.** Accepted.

@@ -1,5 +1,5 @@
 // Оформление листингов и эмблемы — общее для всех документов (см. doc/style.typ).
-#import "style.typ": apply, logos
+#import "style.typ": apply, logos, warn
 #show: apply
 
 #set document(title: "Пролог-Д: стандартная библиотека", author: "Проект PrologD")
@@ -45,7 +45,7 @@
   inset: 4pt,
   align: (left, left),
   table.header([*Файл*], [*Что внутри*]),
-  [`iso.pld`], [имена стандарта: списки, целые, сортировка плюс тесты типов, `once/1`, `ignore/1`, `succ/2` и `nth1/3`; никого не подключает],
+  [`iso.pld`], [имена ISO и общие библиотечные: списки, тесты типов, `once/1`, `ignore/1`, `succ/2`, `nth1/3`, работа с текстом; никого не подключает],
   [`lists.pld`], [списки: края, номер, построение, разбор, работа целью; подключает `iso.pld`],
   [`sets.pld`], [множества на списках; подключает `lists.pld`],
   [`strings.pld`], [строки: пробелы, слова, замена, разбор чисел; подключает `lists.pld`],
@@ -68,10 +68,21 @@ prologd -I stdlib -s examples/stdlib.pld
 
 = 2. Имена ISO (`iso.pld`)
 
-Библиотека с реализацией стандартных предикатов `member/2`,
-`append/3`, `length/2`, `last/2` и `between/3`, тесты типов,
-работа с текстом и числами по-ISO и `once/1`, `ignore/1`, `succ/2`, `nth1/3`,
-`memberchk/2`.
+Здесь то, что программа на ISO ждёт под именами стандарта, но чего нет в самом
+языке.  Половины две.  Предикаты собственно стандарта — тесты типов `nonvar/1`,
+`number/1`, `atomic/1`, `compound/1`, `callable/1`, `once/1` и работа с текстом и
+числами: `atom_length/2`, `atom_concat/3`, `sub_atom/5`, `atom_codes/2`,
+`atom_chars/2`, `char_code/2`, `number_codes/2`, `number_chars/2`.  И общие
+библиотечные имена, которые есть в любой реализации, хотя стандарт их не требует:
+`member/2`, `append/3`, `length/2`, `last/2`, `between/3`, `succ/2`, `ignore/1`,
+`nth1/3`, `memberchk/2`.
+
+#warn[
+*Чего здесь нет.*  Стандарт требует ещё `functor/3`, `arg/3`, `=../2` (в языке это
+`ТЕРМ/2`), `copy_term/2`, `keysort/2`, `clause/2`, `abolish/1` и `repeat/0` — их
+нет ни в языке, ни в библиотеке.  Исключений (`catch`/`throw`), `halt/1` и модулей
+нет во всём языке: это записано в руководстве (разделы 4.9, 4.10 и 8).
+]
 
 #table(
   columns: (auto, 1fr),

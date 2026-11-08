@@ -1,10 +1,17 @@
 % Стандартная библиотека: имена ISO.
 %
-% Здесь находятся реализации стандартных предикатов:
-% member/2, append/3, length/2, last/2 и between/3,
-% тесты типов, once/1, ignore/1, succ/2, nth1/3 и memberchk/2,
-% а также работа с текстом по-ISO: atom_length/2, atom_concat/3, sub_atom/5,
-% atom_codes/2, atom_chars/2, char_code/2, number_codes/2 и number_chars/2.
+% Здесь то, что программа на ISO ждёт под именами стандарта, но чего нет в самом
+% языке.  Две половины: предикаты собственно стандарта (nonvar/1, number/1,
+% atomic/1, compound/1, callable/1, once/1 и работа с текстом: atom_length/2,
+% atom_concat/3, sub_atom/5, atom_codes/2, atom_chars/2, char_code/2,
+% number_codes/2, number_chars/2) и общие библиотечные имена, которые есть в
+% любой реализации, хотя стандарт их не требует (member/2, append/3, length/2,
+% last/2, between/3, succ/2, ignore/1, nth1/3, memberchk/2).
+%
+% Чего здесь нет, хотя оно в стандарте: functor/3, arg/3, =../2 (вместо него
+% ТЕРМ/2), copy_term/2, keysort/2, clause/2, abolish/1 и repeat/0.  Исключений,
+% halt/1 и модулей нет во всём языке — это записано в руководстве (разделы 4.9,
+% 4.10 и 8).
 %
 % Подключение:  prologd -I stdlib -s программа.pld  и в программе
 %   :- ИМПОРТ("iso.pld").
