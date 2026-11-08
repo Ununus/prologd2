@@ -89,18 +89,21 @@ std::optional<SortOrder> sortOrderFrom(Engine& engine, const Term& argument) {
   return std::nullopt;
 }
 
-/// The one sort both arities share: copy `source` in the standard order, drop the
-/// repeats when the order says so, and unify `result` with that list.
+/// The one sort every arity of both predicates shares: copy `source` in the
+/// standard order, drop the repeats when the order says so, and unify `result`
+/// with that list.
 ///
-/// `argument` is the number `source` carries among the predicate's arguments, so a
-/// refusal counts the way the caller does (part 136).  A list that is not *proper*
-/// keeps the short message: it is a list, just not one that ends.
+/// `name` is the predicate as the person wrote it in Russian (`МНОЖЕСТВО`,
+/// `СОРТИРОВКА`), and `argument` is the number `source` carries among that
+/// predicate's arguments, so a refusal counts the way the caller does (part 136).
+/// A list that is not *proper* keeps the short message: it is a list, just not
+/// one that ends.
 BuiltinResult sortTerms(Engine& engine, const Term& source, const Term& result,
-                        const SortOrder& order, std::size_t argument) {
+                        const SortOrder& order, std::string_view name,
+                        std::size_t argument) {
   const auto elements = listElements(engine, source);
   if (!elements) {
-    badArguments(engine, std::span<const Term>(&source, 1), "СОРТИРОВКА", ArgKind::List, {},
-                 argument);
+    badArguments(engine, std::span<const Term>(&source, 1), name, ArgKind::List, {}, argument);
   }
   std::vector<Term> sorted = sortedTerms(engine, *elements, order.ascending,
                                          order.keepDuplicates);
@@ -110,10 +113,17 @@ BuiltinResult sortTerms(Engine& engine, const Term& source, const Term& result,
 
 }  // namespace
 
-BuiltinResult builtinSort(Engine& engine, std::span<const Term> args) {
-  // ISO's `sort/2`: ascending, repeats dropped — `СОРТИРОВКА/3` with `@<` written
-  // out, and both arities go through one function so they cannot disagree (task_95).
-  return sortTerms(engine, args[0], args[1], SortOrder{}, 1);
+BuiltinResult builtinSet(Engine& engine, std::span<const Term> args) {
+  // ISO's `sort/2`: ascending, repeats dropped — `СОРТИРОВКА(@<, …)` written out.
+  // The Russian name says what comes out: a set, and `1` and `1.0` are one value
+  // in it, so only the first of them stays (part 259).
+  return sortTerms(engine, args[0], args[1], SortOrder{}, "МНОЖЕСТВО", 1);
+}
+
+BuiltinResult builtinSortKeep(Engine& engine, std::span<const Term> args) {
+  // `msort/2`: the same order, every repeat kept — `СОРТИРОВКА(@=<, …)` written
+  // out, so `[1, 1.0]` stays whole even though the dialect calls those one number.
+  return sortTerms(engine, args[0], args[1], SortOrder{true, true}, "СОРТИРОВКА", 1);
 }
 
 BuiltinResult builtinSort3(Engine& engine, std::span<const Term> args) {
@@ -121,7 +131,7 @@ BuiltinResult builtinSort3(Engine& engine, std::span<const Term> args) {
   if (!order) {
     badArgument(engine, args[0], "СОРТИРОВКА", 1, ArgKind::Text, "@<, @=<, @> или @>=");
   }
-  return sortTerms(engine, args[1], args[2], *order, 2);
+  return sortTerms(engine, args[1], args[2], *order, "СОРТИРОВКА", 2);
 }
 
 BuiltinResult builtinCompare(Engine& engine, std::span<const Term> args) {

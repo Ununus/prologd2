@@ -1,7 +1,9 @@
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
+#include <map>
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "prlib/engine.hpp"
 #include "test_helpers.hpp"
@@ -22,6 +24,16 @@ bool isAnsweredOutsideTheTable(std::string_view name) {
   return name == "ВЫП" || name == "ИМПОРТ";
 }
 
+/// The English spelling that belongs to exactly this arity.
+std::string_view englishOfAt(std::string_view russian, std::size_t arity) {
+  for (const prologd::BuiltinAlias& alias : prologd::builtinAliases()) {
+    if (alias.russian == russian && alias.arity && *alias.arity == arity) {
+      return alias.english;
+    }
+  }
+  return {};
+}
+
 /// The Russian names that have no English spelling, each for a reason of its own
 /// (task_83, task_84, task_107):
 ///
@@ -35,10 +47,11 @@ bool hasNoEnglishSpelling(std::string_view name) {
   return name == "ИЛИ" || name == "КОПИЯ";
 }
 
+/// The English spelling of `russian`, whichever arity it was found at.
 std::string_view englishOf(std::string_view russian) {
   for (const prologd::BuiltinAlias& alias : prologd::builtinAliases()) {
-    if (alias.first == russian) {
-      return alias.second;
+    if (alias.russian == russian) {
+      return alias.english;
     }
   }
   return {};
@@ -47,19 +60,39 @@ std::string_view englishOf(std::string_view russian) {
 }  // namespace
 
 TEST_CASE("every alias is wired to the function its Russian name reaches") {
-  // The alias table is what `add` registers from, so this is the test that keeps
-  // the two spellings from drifting apart: same name, every arity, one address.
+  // The alias tables are what `add` registers from, so this is the test that
+  // keeps the two spellings from drifting apart: one row, one arity, one
+  // address.  A row without an arity is a variadic name, covered below.
   for (const prologd::BuiltinAlias& alias : prologd::builtinAliases()) {
-    const std::string russian(alias.first);
-    const std::string english(alias.second);
-    if (prologd::builtinArities(russian).variadic) {
-      continue;  // variadic, no arities to enumerate; covered below
+    if (!alias.arity) {
+      INFO("variadic alias: " << alias.english);
+      REQUIRE(prologd::builtinArities(alias.russian).variadic);
+      continue;
     }
-    for (const std::size_t arity : prologd::builtinArities(russian).arities) {
-      INFO("alias: " << english << "/" << arity);
-      REQUIRE(prologd::findBuiltin(english, arity) == prologd::findBuiltin(russian, arity));
-      REQUIRE(prologd::findBuiltin(english, arity) != nullptr);
+    const std::string russian(alias.russian);
+    const std::string english(alias.english);
+    INFO("alias: " << english << "/" << *alias.arity);
+    REQUIRE(prologd::findBuiltin(english, *alias.arity) ==
+            prologd::findBuiltin(russian, *alias.arity));
+    REQUIRE(prologd::findBuiltin(english, *alias.arity) != nullptr);
+  }
+}
+
+TEST_CASE("an English spelling names one predicate per arity") {
+  // `sort` is two rows on purpose (part 259): `/2` is ISO's set, `/3` is the sort
+  // with the order.  Two rows at the *same* arity would be a name that reaches
+  // whichever was registered last, which is the mistake this guards.
+  std::map<std::pair<std::string, std::size_t>, std::string> claimed;
+  for (const prologd::BuiltinAlias& alias : prologd::builtinAliases()) {
+    if (!alias.arity) {
+      continue;
     }
+    const auto key = std::make_pair(std::string(alias.english), *alias.arity);
+    const auto [found, inserted] = claimed.emplace(key,
+                                                   std::string(alias.russian));
+    INFO("spelling: " << key.first << "/" << key.second);
+    REQUIRE(inserted);
+    (void)found;
   }
 }
 
@@ -80,9 +113,11 @@ TEST_CASE("the variadic built-ins are variadic under both spellings") {
 }
 
 TEST_CASE("every Russian built-in has an English spelling") {
-  // Completeness, and the reason it is a test rather than a comment: a new
-  // built-in added to the dispatch table without a row in the alias table would
-  // otherwise be the one Russian name a reader of ordinary Prolog cannot call.
+  // Completeness, arity by arity, and the reason it is a test rather than a
+  // comment: a new built-in added to the dispatch table without a row in an alias
+  // table would otherwise be the one Russian name a reader of ordinary Prolog
+  // cannot call.  The arity matters since part 259: `СОРТИРОВКА/2` is `msort`
+  // while `СОРТИРОВКА/3` is `sort`, and neither covers the other.
   for (const std::string& name : prologd::builtinNames()) {
     if (!isRussianName(name)) {
       continue;
@@ -92,6 +127,16 @@ TEST_CASE("every Russian built-in has an English spelling") {
     }
     INFO("built-in without an English spelling: " << name);
     REQUIRE_FALSE(englishOf(name).empty());
+
+    const prologd::BuiltinArities arities = prologd::builtinArities(name);
+    if (arities.variadic) {
+      continue;
+    }
+    for (const std::size_t arity : arities.arities) {
+      INFO("arity without an English spelling: " << name << "/" << arity);
+      REQUIRE(prologd::findBuiltin(englishOfAt(name, arity), arity) ==
+              prologd::findBuiltin(name, arity));
+    }
   }
 }
 

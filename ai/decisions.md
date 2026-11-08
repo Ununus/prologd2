@@ -2428,3 +2428,41 @@ both halves — an unknown option gives 1, `--help` gives 0 — and the check fa
 the old binary, so it guards the behaviour rather than describing it.
 
 **Status.** Accepted.
+
+## ADR-072: `sort/2` is the set and `msort/2` is the sort, so an English name belongs to an arity
+
+**Context.**  `СОРТИРОВКА/2` was ISO's `sort/2` — sorted, repeats dropped — and
+`msort/2` lived in `stdlib/iso.pld` as a Prolog merge sort because the engine had no
+second sort.  The owner wanted the set to have a Russian name of its own
+(`МНОЖЕСТВО`) and `СОРТИРОВКА/2` to be the `msort/2` of SWI: sorted, repeats kept,
+with `СОРТИРОВКА/3` unchanged.
+
+That splits one English spelling across two predicates: `sort/2` is the set, `sort/3`
+is the sort with the order written down, and `msort/2` is the two-argument sort.  The
+alias table gave one English spelling to every arity of a Russian name, which cannot
+express it, and the reference test's model — spelling to record, arities equal — could
+not express it either.
+
+**Decision.**  `kEnglishNames` keeps the name-wide pairs; a second table,
+`kEnglishNamesByArity`, names an arity and is consulted first.  `builtinAliases()` now
+returns rows of `{russian, english, arity}` (arity empty for a variadic name) instead
+of pairs, so the tests check one spelling at one arity.  `builtins.json` gains
+`aliasArities` for a spelling that covers part of a record, and its records may now
+share a spelling as long as their arities do not overlap.
+
+Two sorts, one order: `МНОЖЕСТВО/2` is `sortedTerms(…, keepDuplicates: false)` —
+`СОРТИРОВКА(@<, …)` — and `СОРТИРОВКА/2` is the same call with the flag set —
+`СОРТИРОВКА(@=<, …)`, so `[1, 1.0]` stays whole even though the dialect calls those
+one number.  The Prolog merge sort and its two helpers left `stdlib/iso.pld`: the
+library keeps what ISO names, and `msort` is now a spelling of a built-in.
+
+**Consequences.**  An ISO program that calls `sort/2` gets the same answer as before.
+A program that relied on `sort/3` keeps it.  `msort/3` does not exist, and the parser
+says so by name (`msort не имеет арности 3`).  `--list-keywords` prints `sort/2`,
+`sort/3` and `msort/2`; the pair table of appendix 17 gained `МНОЖЕСТВО`/`sort` and
+gained the sentence about `СОРТИРОВКА` having two English names.  `sets.pld` builds
+its sets with `МНОЖЕСТВО` now, and the examples (`sort.pld`, `stdlib.pld`,
+`lesson_05.pld`, `order.pld`, `problems/sorting.pld`) show the pair rather than one
+predicate.
+
+**Status.** Accepted.

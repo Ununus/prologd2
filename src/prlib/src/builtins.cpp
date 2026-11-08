@@ -530,7 +530,7 @@ constexpr std::pair<std::string_view, std::string_view> kEnglishNames[] = {
     {"ВЕЩ", "float"},         {"АТОМ", "atom"},
     {"СТРОКА", "string"},     {"СИМВ", "is_text"},
     {"СПИСОК", "is_list"},      {"ПОЛНЫЙ", "ground"},
-    {"НАЙТИВСЕ", "findall"},    {"СОРТИРОВКА", "sort"},
+    {"НАЙТИВСЕ", "findall"},    {"МНОЖЕСТВО", "sort"},
     // `ВСЕРЕШ`/`bagof` and `МНОРЕШ`/`setof` collect by groups (task_91); the words
     // are made of the same letters as `НАЙТИВСЕ`, so a reader of the course can
     // guess them: «все решения», «много решений».
@@ -574,6 +574,35 @@ std::string_view englishName(std::string_view name) {
   return {};
 }
 
+/// An English spelling that belongs to *one arity* of a name rather than to the
+/// name as a whole (part 259).
+struct ArityEnglishName {
+  std::string_view russian;
+  std::size_t arity;
+  std::string_view english;
+};
+
+/// `sort` is two predicates here: `sort/2` is ISO's set (`МНОЖЕСТВО`), and
+/// `sort/3` is the same sort with the order written down (`СОРТИРОВКА/3`).  The
+/// name-wide table cannot say that — it gives one spelling to every arity — so
+/// this table names the arity too, is consulted first, and `СОРТИРОВКА/2` gets
+/// the other ISO spelling of the same family, `msort`.
+constexpr ArityEnglishName kEnglishNamesByArity[] = {
+    {"СОРТИРОВКА", 2, "msort"},
+    {"СОРТИРОВКА", 3, "sort"},
+};
+
+/// English spelling of `name/arity`: the arity-specific one when there is one,
+/// the name-wide one otherwise, empty when there is neither.
+std::string_view englishNameFor(std::string_view name, std::size_t arity) {
+  for (const ArityEnglishName& entry : kEnglishNamesByArity) {
+    if (entry.russian == name && entry.arity == arity) {
+      return entry.english;
+    }
+  }
+  return englishName(name);
+}
+
 /// The variadic names: every positive arity is legal, so they have no table
 /// entry to enumerate — `findBuiltin` looks here first.
 ///
@@ -615,7 +644,7 @@ const BuiltinTable& builtinTable() {
     };
     auto add = [&registerOne](std::string_view name, std::size_t arity, BuiltinFn function) {
       registerOne(name, arity, function);
-      if (const std::string_view english = englishName(name); !english.empty()) {
+      if (const std::string_view english = englishNameFor(name, arity); !english.empty()) {
         registerOne(english, arity, function);
       }
     };
@@ -660,10 +689,14 @@ const BuiltinTable& builtinTable() {
     add("ВСЕРЕШ", 3, builtinBagOf);
     add("МНОРЕШ", 3, builtinSetOf);
 
-    // Lists.  `СОРТИРОВКА/2` is ISO's `sort/2`; `/3` is the same sort with the
-    // order written down (task_95) — the cheap form of the `sort/4` that SWI has,
-    // and `sort/2` is exactly its `sort(0, @<, …)`.
-    add("СОРТИРОВКА", 2, builtinSort);
+    // Lists.  `МНОЖЕСТВО/2` is ISO's `sort/2`: the sorted list with every repeat
+    // gone, `1` and `1.0` being one value.  `СОРТИРОВКА/2` is `msort/2` — the same
+    // order, repeats kept — and `/3` is that sort with the order written down
+    // (task_95), the cheap form of the `sort/4` that SWI has.  An ISO `sort` and
+    // an ISO-ish `msort` answer to the same English word at different arities,
+    // which is what `kEnglishNamesByArity` is for (part 259).
+    add("МНОЖЕСТВО", 2, builtinSet);
+    add("СОРТИРОВКА", 2, builtinSortKeep);
     add("СОРТИРОВКА", 3, builtinSort3);
 
     // The standard order of terms (task_90): `СРАВНЕНИЕ/3` is the dialect's own
@@ -778,7 +811,28 @@ BuiltinFn findBuiltin(std::string_view name, std::size_t arity) {
   return it->second;
 }
 
-std::span<const BuiltinAlias> builtinAliases() { return kEnglishNames; }
+std::span<const BuiltinAlias> builtinAliases() {
+  // Built from the two tables rather than written out: a name-wide pair becomes
+  // one row per arity of its Russian name, and the arity-specific rows follow.
+  static const std::vector<BuiltinAlias> table = [] {
+    std::vector<BuiltinAlias> result;
+    for (const auto& [russian, english] : kEnglishNames) {
+      const BuiltinArities arities = builtinArities(russian);
+      if (arities.variadic) {
+        result.push_back(BuiltinAlias{russian, english, std::nullopt});
+        continue;
+      }
+      for (const std::size_t arity : arities.arities) {
+        result.push_back(BuiltinAlias{russian, english, arity});
+      }
+    }
+    for (const ArityEnglishName& entry : kEnglishNamesByArity) {
+      result.push_back(BuiltinAlias{entry.russian, entry.english, entry.arity});
+    }
+    return result;
+  }();
+  return table;
+}
 
 BuiltinArities builtinArities(std::string_view name) {
   // A variadic name has no table entry to enumerate: `findBuiltin` accepts any

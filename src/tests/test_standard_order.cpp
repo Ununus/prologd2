@@ -119,7 +119,7 @@ TEST_CASE("the dialect's own name for compare reaches the same function") {
 TEST_CASE("a mixed pair of numbers compares exactly and not through a double") {
   // 2^53 + 1 and the real 2^53 are different numbers that a `double` comparison
   // calls equal.  Comparing them through `double` made the answer to `compare`
-  // disagree with `РАВНО` and threw one of them out of `СОРТИРОВКА`; the
+  // disagree with `РАВНО` and threw one of them out of `МНОЖЕСТВО`; the
   // comparator now takes the exact rule from `compareNumbers`, the one
   // unification uses.
   const auto result = runProgram(
@@ -129,7 +129,7 @@ TEST_CASE("a mixed pair of numbers compares exactly and not through a double") {
       "?РАВНО(#2 ** 53 + 1#, #2 ** 53 + 0.0#).\n"
       "?РАВНО(#2 ** 53#, #2 ** 53 + 0.0#).\n"
       "?РАВНО(#2 ** 100#, #2 ** 100 + 0.0#).\n"
-      "?X is 2 ** 53, Y is 2 ** 53 + 1, Z is 2 ** 53 + 0.0, СОРТИРОВКА([Y, Z, X], L).\n");
+      "?X is 2 ** 53, Y is 2 ** 53 + 1, Z is 2 ** 53 + 0.0, МНОЖЕСТВО([Y, Z, X], L).\n");
   REQUIRE(result.loaded);
   REQUIRE_FALSE(result.runtimeError);
   REQUIRE(result.output ==

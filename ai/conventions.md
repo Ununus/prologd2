@@ -50,7 +50,11 @@ where the standard means the same thing (`var`, `integer`, `float`, `compare`),
 `str`, `list` for a conversion (`int_to_float`, `str_to_int`).  A check whose second
 argument is a *position* says so with a trailing `_at` (`is_letter_at/2`); the soft
 value checks carry the `ЗНАЧ` tail in Russian (`ЦЕЛЗНАЧ`, `ЧИСЛЗНАЧ`) and `is_` in
-English.
+English.  A spelling belongs to a *name* by default, and to one arity when the
+standard splits them: `kEnglishNamesByArity` in `builtins.cpp` gives `sort/2` to
+`МНОЖЕСТВО` and `sort/3` to `СОРТИРОВКА`, which is also `msort/2` (part 259).  The
+`aliasArities` field of a `builtins.json` record says the same for the reference,
+and `test_aliases.cpp` fails if two rows claim one spelling at one arity.
 
 A built-in that has more than one answer returns `BuiltinResult::Yield` and leaves
 them with `Engine::setBuiltinChoice`; the solver turns them into a

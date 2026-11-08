@@ -55,8 +55,10 @@ const std::unordered_set<std::string> kReservedBuiltins = {
     // Graphics
     "ТОЧКА", "ЛИНИЯ", "ОКРУЖНОСТЬ", "ЗАКРАСКА",
     "point", "line", "circle", "fill",
-    // Lists
-    "СОРТИРОВКА", "sort",
+    // Lists.  `sort` names two arities of two predicates (part 259): `sort/2` is
+    // the set, `МНОЖЕСТВО`, and `sort/3` is `СОРТИРОВКА` with the order written
+    // down; `msort/2` is `СОРТИРОВКА/2`.
+    "МНОЖЕСТВО", "msort", "СОРТИРОВКА", "sort",
     // The standard order of terms (task_90): the dialect's own name is `СРАВНЕНИЕ`,
     // and `compare` is its English spelling — the call the four `@` signs are sugar
     // for (task_94).

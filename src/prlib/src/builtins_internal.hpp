@@ -113,13 +113,16 @@ BuiltinResult builtinIsList(Engine&, std::span<const Term>);
 BuiltinResult builtinIsGround(Engine&, std::span<const Term>);
 
 // ---- lists ----
-BuiltinResult builtinSort(Engine&, std::span<const Term>);
+/// `МНОЖЕСТВО/2` — ISO's `sort/2` — and `СОРТИРОВКА/2` — `msort/2`: one order,
+/// two answers about repeats (part 259).
+BuiltinResult builtinSet(Engine&, std::span<const Term>);
+BuiltinResult builtinSortKeep(Engine&, std::span<const Term>);
 BuiltinResult builtinSort3(Engine&, std::span<const Term>);
 
 /// `elements` in the standard order (task_95, task_91): ascending or not, with
-/// the repeats dropped or kept.  `СОРТИРОВКА/2`, `/3` and `МНОРЕШ/3` share this
-/// one sort, so `setof` and `СОРТИРОВКА` cannot disagree about what «sorted»
-/// means.
+/// the repeats dropped or kept.  `МНОЖЕСТВО/2`, `СОРТИРОВКА/2`, `/3` and
+/// `МНОРЕШ/3` share this one sort, so `setof` and the two sort predicates cannot
+/// disagree about what «sorted» means.
 std::vector<Term> sortedTerms(Engine& engine, std::vector<Term> elements, bool ascending,
                               bool keepDuplicates);
 

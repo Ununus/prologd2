@@ -105,37 +105,71 @@ def help_sections() -> set[str]:
     return headings
 
 
-def test_every_name_of_the_interpreter_has_a_record(executable: str) -> None:
-    records = load_records()
-    names = listing(executable)
-    known: dict[str, str] = {}  # spelling -> the record's own name
+def arities_of(record: dict, spelling: str) -> list[int]:
+    """The arities `spelling` covers in `record`.
+
+    A record whose predicate is one arity throughout says so with `arities`; the
+    rare spelling that belongs to *part* of a name says which arities it covers in
+    `aliasArities`, as `sort` does: `/2` is `МНОЖЕСТВО` and `/3` is `СОРТИРОВКА`
+    (part 259).
+    """
+    own = record.get("name")
+    per_spelling = record.get("aliasArities") or {}
+    if spelling != own and isinstance(per_spelling, dict):
+        narrowed = per_spelling.get(spelling)
+        if isinstance(narrowed, list):
+            return [int(arity) for arity in narrowed]
+    return [int(arity) for arity in record.get("arities", [])]
+
+
+def spellings_of(records: list[dict]) -> dict[str, list[tuple[dict, list[int]]]]:
+    """spelling -> the records that answer to it, with the arities each covers.
+
+    One spelling may belong to two records, and then the arities must not overlap:
+    a name reaches exactly one function at one arity.
+    """
+    result: dict[str, list[tuple[dict, list[int]]]] = {}
     for record in records:
         own = record.get("name")
         assert isinstance(own, str) and own, f"a record has no name: {record!r}"
         for spelling in [own, *record.get("aliases", [])]:
-            assert spelling not in known, (
-                f"{spelling!r} is listed by {known.get(spelling)!r} and by {own!r}"
-            )
-            known[spelling] = own
+            result.setdefault(spelling, []).append((record, arities_of(record, spelling)))
+    return result
 
-    missing = sorted(set(names) - set(known))
-    unknown = sorted(set(known) - set(names))
+
+def test_every_name_of_the_interpreter_has_a_record(executable: str) -> None:
+    records = load_records()
+    names = listing(executable)
+    by_spelling = spellings_of(records)
+
+    claimed: dict[tuple[str, int], str] = {}
+    for spelling, entries in by_spelling.items():
+        for record, arities in entries:
+            for arity in arities:
+                key = (spelling, arity)
+                assert key not in claimed, (
+                    f"{spelling}/{arity} is listed by {claimed.get(key)!r} "
+                    f"and by {record['name']!r}"
+                )
+                claimed[key] = record["name"]
+
+    missing = sorted(set(names) - set(by_spelling))
+    unknown = sorted(set(by_spelling) - set(names))
     assert not missing, f"the interpreter has names with no record: {missing}"
     assert not unknown, f"records name things the interpreter does not have: {unknown}"
     print(f"ok: {len(records)} records cover all {len(names)} reserved names")
 
 
 def test_arities_kind_and_variadic_are_the_interpreters(executable: str) -> None:
-    records = load_records()
     names = listing(executable)
     kinds_by_name = kinds(executable)
-    for record in records:
-        own = record["name"]
-        for spelling in [own, *record.get("aliases", [])]:
-            real = names[spelling]
-            assert real["arities"] == sorted(record.get("arities", [])), (
-                f"{spelling}: arities {real['arities']} != {record.get('arities')}"
-            )
+    for spelling, entries in spellings_of(load_records()).items():
+        real = names[spelling]
+        expected = sorted({arity for _, arities in entries for arity in arities})
+        assert real["arities"] == expected, (
+            f"{spelling}: arities {real['arities']} != {expected}"
+        )
+        for record, _ in entries:
             assert real["variadic"] == bool(record.get("variadic", False)), (
                 f"{spelling}: variadic {real['variadic']} != {record.get('variadic')}"
             )
