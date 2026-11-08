@@ -326,6 +326,34 @@ BuiltinResult builtinVersion(Engine& engine, std::span<const Term>) {
   return BuiltinResult::Continue;
 }
 
+/// The reading of `ВРЕМЯ`'s clock in nanoseconds of the steady clock.
+///
+/// `steady_clock` and not `system_clock`: the latter may be stepped by an NTP
+/// correction or by hand, and then a difference of two readings of it is wrong or
+/// negative — the one thing a measurement must never be.  The standard names
+/// `steady_clock` for exactly this.
+///
+/// The conversion is spelled out because `time_point::duration` is
+/// implementation-defined: it is nanoseconds with libstdc++ and microseconds with
+/// libc++ (which is what macOS builds against), so a raw `.count()` would print
+/// numbers a thousand times apart on the two platforms.
+std::int64_t steadyNanos() {
+  return std::chrono::duration_cast<std::chrono::nanoseconds>(
+             std::chrono::steady_clock::now().time_since_epoch())
+      .count();
+}
+
+/// `ВРЕМЯ(Секунды)` — seconds as a real from the start of the program, for
+/// measurements: `?ВРЕМЯ(Т1), алгоритм, ВРЕМЯ(Т2), Д is Т2 - Т1.`  It binds a
+/// different value on every call, like `СЛУЧ`, so a program must not expect the
+/// same reading twice.
+BuiltinResult builtinElapsedTime(Engine& engine, std::span<const Term> args) {
+  const double seconds =
+      static_cast<double>(steadyNanos() - engine.startedAtNanos()) / 1'000'000'000.0;
+  return unifyFloat(engine, args[0], seconds) ? BuiltinResult::Continue
+                                              : BuiltinResult::Fail;
+}
+
 BuiltinResult builtinNot(Engine& engine, std::span<const Term> args) {
   return engine.hasSolution(args[0]) ? BuiltinResult::Fail : BuiltinResult::Continue;
 }
@@ -589,7 +617,8 @@ constexpr std::pair<std::string_view, std::string_view> kEnglishNames[] = {
     {"ЛОЖЬ", "fail"},         {"ИСТИНА", "true"},
     {"ТРАССА", "trace"},
     {"НЕТ_ТРАССЫ", "no_trace"}, {"ТИХО", "quiet"},
-    {"ВЕРСИЯ", "version"},      {"НЕ", "not"},
+    {"ВЕРСИЯ", "version"},      {"ВРЕМЯ", "elapsed"},
+    {"НЕ", "not"},
     {"ДЛЯВСЕХ", "forall"},      {"ПЕРВОЕ", "first"},
     {"РАВНО", "equal"},
     {"ПС", "nl"},            {"ЖДИ", "wait"},
@@ -727,6 +756,7 @@ const BuiltinTable& builtinTable() {
     add("НЕТ_ТРАССЫ", 0, builtinNoTrace);
     add("ТИХО", 0, builtinQuiet);
     add("ВЕРСИЯ", 0, builtinVersion);
+    add("ВРЕМЯ", 1, builtinElapsedTime);
     add("НЕ", 1, builtinNot);
     add("ДЛЯВСЕХ", 2, builtinForall);
     // `ПЕРВОЕ` is variadic and lives in `kVariadicNames`; `ИЛИ` is the same

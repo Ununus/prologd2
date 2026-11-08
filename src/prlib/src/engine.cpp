@@ -1,6 +1,7 @@
 #include "prlib/engine.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <iostream>
 #include <unordered_set>
@@ -723,7 +724,10 @@ void Solver::run(std::span<const Term> goals, const std::function<bool()>& on_so
 
 Engine::Engine()
     : io_(std::make_unique<IoContext>(std::cin, std::cout, std::cerr)),
-      graphics_(std::make_shared<NullGraphicsBackend>()) {}
+      graphics_(std::make_shared<NullGraphicsBackend>()),
+      started_at_nanos_(std::chrono::duration_cast<std::chrono::nanoseconds>(
+                            std::chrono::steady_clock::now().time_since_epoch())
+                            .count()) {}
 
 Engine::~Engine() = default;
 

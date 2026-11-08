@@ -2559,3 +2559,42 @@ lines, and `doc/builtins.json` holds two more records of kind `function`, so the
 reference panel of the window and `test_reference.py` see them.
 
 **Status.** Accepted.
+
+## ADR-076: `ВРЕМЯ/1` reads a monotonic clock, in seconds, from the start of the run
+
+**Context.**  A reader of the project asked for a Prolog `clock`-like predicate: the
+window shows a run's time in its «Система» tab, but a program itself had no way to
+time anything, and the request named the use — comparing algorithms.  The owner
+proposed `std::chrono::system_clock::now().time_since_epoch().count()`, and asked
+which name is better, `ВРЕМЯ` or `ЧАСЫ`.
+
+Two facts sank the proposal.  `time_point::duration` is implementation-defined: it
+is nanoseconds with libstdc++ (this machine prints `1794147891067677269`) and
+**microseconds** with libc++, which is what macOS builds link against — the same
+instant would print a thousand times smaller there, and the project ships a macOS
+build.  And `system_clock` is not monotonic: an NTP correction or a hand-set clock
+can move it, after which a difference of two readings is wrong or negative — the one
+thing a measurement must never be.
+
+**Decision.**  `ВРЕМЯ(Секунды)` (`elapsed`) binds a real number: seconds since the
+engine was created, taken from `std::chrono::steady_clock` and converted with
+`duration_cast` to a fixed unit before it is divided.  `steady_clock` is the clock
+the standard names for intervals, and the zero being the run's own start is what
+makes the value readable — nothing in the dialect can format an epoch second into a
+date, so the epoch would buy nothing and print as noise.
+
+The name is `ВРЕМЯ`: the dialect's getters name the *quantity*, not the device
+(`ВЕРСИЯ`, `ДЛИНА`, `СКОЛЬКО`, `СЛУЧ`), and `ЧАСЫ` would have made the predicate a
+clock rather than a reading.  The English name is `elapsed`, not `get_time`: the
+latter is SWI's and means seconds since 1970, which this is not.  `clock` was the
+other candidate and was rejected because C's `clock()` is *processor* time.
+
+**Consequences.**  A benchmark reads `?ВРЕМЯ(Т1), алгоритм, ВРЕМЯ(Т2), Д is Т2 - Т1.`
+with `Д` around `0.087` for `фиб(20)` here.  The value is new at every call, like
+`СЛУЧ`'s, so §13 says that a program must not expect the same reading twice — which
+is also why the test asserts only what holds on any machine (the kind of the value,
+that a later reading is never smaller, that a 50 ms pause is visible) and never a
+number.  `Engine` carries the start reading as whole nanoseconds, so its header
+stays free of `<chrono>`.
+
+**Status.** Accepted.

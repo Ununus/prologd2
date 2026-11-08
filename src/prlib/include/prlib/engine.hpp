@@ -383,6 +383,12 @@ class Engine {
   [[nodiscard]] std::string_view callingName() const noexcept { return calling_name_; }
   void setCallingName(std::string_view name) { calling_name_ = name; }
 
+  /// The steady clock's reading when this engine was created — the zero of
+  /// `ВРЕМЯ/1` (part 264).  Nanoseconds, because that is the unit the built-in
+  /// subtracts; the clock itself is monotonic, so a difference of two readings
+  /// cannot go backwards when the system clock is corrected.
+  [[nodiscard]] std::int64_t startedAtNanos() const noexcept { return started_at_nanos_; }
+
   /// The question as a program writes it: `?Goal, Goal.` — the `-q` echo of the
   /// command line and the protocol's `printQuestions` (task_46, split out of
   /// `questions` in 2026-10-02).
@@ -408,6 +414,10 @@ class Engine {
   /// Answers a built-in left behind for the solver (task_91); empty between
   /// calls, and consumed by the solver right after the call returns `Yield`.
   std::optional<BuiltinChoice> builtin_choice_;
+  /// The reading of `ВРЕМЯ/1`'s clock when this engine was created, in
+  /// nanoseconds of the steady clock (part 264).  Kept as a number so that this
+  /// header stays free of `<chrono>`; `Engine::startedAtNanos` is the accessor.
+  std::int64_t started_at_nanos_ = 0;
   /// The spelling of the built-in being solved (part 260); empty outside one.
   std::string_view calling_name_;
 

@@ -452,3 +452,38 @@ TEST_CASE("halt takes no argument") {
   REQUIRE_FALSE(wrongArity.loaded);
   REQUIRE(wrongArity.error.find("ЗАВЕРШЕНИЕ не имеет арности 1") != std::string::npos);
 }
+
+TEST_CASE("elapsed/1: seconds of a monotonic clock, counted from the start") {
+  // Part 264: the readings themselves are the machine's, so only what must hold
+  // for any machine is checked here — the kind of the value, that a later reading
+  // is never smaller, and that a pause moves the clock forward.
+  const auto kinds = runProgram("?ВРЕМЯ(Т), ВЕЩ(Т).\n?ВРЕМЯ(Т), АТОМ(Т).\n");
+  REQUIRE(kinds.loaded);
+  // A bound real prints as `Т=<value>`, and the atom check after it fails.
+  REQUIRE(kinds.output.ends_with("НЕТ\n"));
+  REQUIRE(kinds.output.starts_with("Т="));
+
+  // Both properties are stated as goals of their own, so that each answer is a
+  // plain «ДА» and nothing is left to read out of a binding.
+  //
+  // A later reading is never smaller — not «strictly later»: a coarse clock may
+  // answer the same value twice, and that is not a defect.  And a pause of 50 ms
+  // is visible to the clock as at least 40 ms, which leaves room for a host whose
+  // sleep overshoots by less than that.
+  const auto order = runProgram(
+      "порядок :- ВРЕМЯ(Т1), ЖДИ(10), ВРЕМЯ(Т2), Т2 >= Т1.\n"
+      "?порядок.\n");
+  REQUIRE(order.loaded);
+  REQUIRE(order.output == "ДА\n");
+
+  const auto pause = runProgram(
+      "после_паузы :- ВРЕМЯ(Т1), ЖДИ(50), ВРЕМЯ(Т2), Д is Т2 - Т1, Д >= 0.04.\n"
+      "?после_паузы.\n");
+  REQUIRE(pause.loaded);
+  REQUIRE(pause.output == "ДА\n");
+
+  // The argument is unified, not compared: a non-number is simply «НЕТ».
+  const auto notANumber = runProgram("?ВРЕМЯ(молоко).\n");
+  REQUIRE(notANumber.loaded);
+  REQUIRE(notANumber.output == "НЕТ\n");
+}
