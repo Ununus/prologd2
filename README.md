@@ -6,7 +6,7 @@
 
 # Пролог-Д
 
-Интерпретатор языка Пролог-Д, реализованный на C++23: синтаксис, близкий к стандарту ISO, нативная поддержка UTF-8 и встроенные предикаты с русскоязычными именами. Графическая оболочка — на PySide6 (Qt).
+Интерпретатор языка Пролог-Д, реализованный на C++23: синтаксис, близкий к стандарту ISO, нативная поддержка UTF-8 и встроенные предикаты с русскоязычными именами. Графическая оболочка — на PySide6.
 
 </div>
 
@@ -103,6 +103,8 @@ The console interpreter is `build/linux-release/src/cli/prologd` (macOS: the
 `macos-release` preset, the same path with that name; Windows has its own section
 below).
 
+### Start the interpreter
+
 ```sh
 # Run a program file
 ./build/linux-release/src/cli/prologd -s examples/findall.pld
@@ -112,12 +114,12 @@ below).
 ./build/linux-release/src/cli/prologd -h
 ```
 
-Start the GUI:
+### Start the GUI
 ```sh
 python ./src/gui/main.py
 ```
 
-Run the tests:
+### Run the tests
 ```sh
 python3 -m venv .venv
 .venv/bin/pip install -r src/gui/requirements.txt
@@ -127,30 +129,38 @@ export PROLOGD_TEST_EXE=$PWD/build/linux-release/src/cli/prologd
 .venv/bin/python src/gui/tests/protocol_smoke.py
 ```
 
+### Build the `.deb` package
+```sh
+tools/build_deb.sh
+# -> dist/prologd_<version>_amd64.deb
+```
+
+It builds the engine, runs `ctest`, builds the PDFs, freezes the window with
+PyInstaller and lays the tree out in `build/deb-tree`; the version comes from
+`prologd --version`, never from a second copy. Needs `cmake`, `ninja`, `dpkg-deb`,
+`typst` and PyInstaller in `.venv` (`src/gui/requirements-build.txt`).
+
+To repack without repeating the slow steps:
+```sh
+tools/build_deb.sh --skip-tests     # reuse the build tree
+tools/build_deb.sh --skip-docs      # reuse the PDFs already in doc/
+tools/build_deb.sh --skip-freeze    # reuse dist/prologd-gui
+tools/build_deb.sh --no-trim        # keep the Qt files the freeze produced
+```
+
 ### Windows
 
 Prerequisites: Git, CMake 3.24 or newer, and Visual Studio 2026 with the
 "Desktop development with C++" workload. The first configure downloads Catch2
-and CLI11 through CMake FetchContent, so it needs network access. The build and
-the portable package (task_61) require Windows 10 (1903) or newer, 64-bit: the
-UTF-8 manifest element (`<activeCodePage>`) is understood from 1903; the window needs Windows 10
-because of Qt 6 and Python 3.14.
+and CLI11 through CMake FetchContent. The build and the portable package require Windows 10 (1903) or newer, 64-bit.
 
-```powershell
-cmake -S . -B build -G "Visual Studio 18 2026" -A x64
-cmake --build build --config Release
-ctest --test-dir build -C Release --output-on-failure
-```
-
-The same with the bundled presets:
 ```powershell
 cmake --preset windows-msvc
 cmake --build --preset windows-msvc
 ctest --preset windows-msvc
 ```
 
-The executable is `build\src\cli\Release\prologd.exe` for the manual build above and
-`build\windows-msvc\src\cli\Release\prologd.exe` with the preset.
+The executable: `build\windows-msvc\src\cli\Release\prologd.exe`.
 
 The portable package is built by one script:
 ```powershell
