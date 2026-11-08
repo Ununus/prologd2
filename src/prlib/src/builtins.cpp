@@ -103,29 +103,87 @@ namespace {
 /// long term would either wrap it or push the expectation out of view.
 constexpr std::size_t kArgumentTextLimit = 60;
 
-/// An argument as the message shows it.  The engine's printer evaluates `#… #`, so
-/// `БОЛЬШЕ(#1+1#, атом)` names the first argument `2`; an expression that cannot be
-/// evaluated is named, because the printer would show `#_?_#` — a gap that says
-/// nothing at all.
+/// The word a diagnostic calls the kind of a term: `строка "аб"` says what an
+/// answer prints without quotes and cannot say.
+///
+/// A list is named apart from a compound because a list is what half the
+/// built-ins ask for by name; the list functor is `.`/2, so the shape has to be
+/// looked at rather than the name.
+std::string_view kindText(const Term& term) {
+  switch (term.kind) {
+    case TermKind::Var:
+      return "переменная";
+    case TermKind::Int:
+    case TermKind::Float:
+      return "число";
+    case TermKind::Atom:
+      return "атом";
+    case TermKind::String:
+      return "строка";
+    case TermKind::Compound:
+      return isNil(term) || isListCell(term) ? "список" : "составной терм";
+  }
+  return "терм";
+}
+
+/// A string literal as a diagnostic writes it: in the quotes it was typed with,
+/// with the escapes of the literals themselves (section 3.4 of the manual).  The
+/// printer of *answers* leaves strings bare on purpose (§6.1) — one more reason
+/// for a diagnostic to be explicit instead.
+std::string quotedString(const std::string& text) {
+  std::string quoted = "\"";
+  for (const char byte : text) {
+    switch (byte) {
+      case '"':
+        quoted += "\\\"";
+        break;
+      case '\\':
+        quoted += "\\\\";
+        break;
+      case '\n':
+        quoted += "\\n";
+        break;
+      case '\t':
+        quoted += "\\t";
+        break;
+      case '\r':
+        quoted += "\\r";
+        break;
+      default:
+        quoted += byte;
+        break;
+    }
+  }
+  quoted += '"';
+  return quoted;
+}
+
+/// An argument as the message shows it: the word for its kind and the value.
+///
+/// The engine's printer evaluates `#… #`, so `БОЛЬШЕ(#1+1#, атом)` names the
+/// first argument `2`; an expression that cannot be evaluated is named, because
+/// the printer would show `#_?_#` — a gap that says nothing at all.
 std::string argumentText(Engine& engine, const Term& term) {
+  const Term resolved = engine.bindings().deref(term);
   std::string text;
   try {
-    text = engine.format(term);
+    text = resolved.kind == TermKind::String ? quotedString(resolved.text)
+                                             : engine.format(term);
   } catch (const std::exception&) {
     text = "арифметическое выражение";
   }
-  if (utf8Length(text) <= kArgumentTextLimit) {
-    return text;
-  }
-  std::string cut;
-  std::size_t taken = 0;
-  for (const CodePoint code_point : utf8Decode(text)) {
-    if (++taken > kArgumentTextLimit) {
-      break;
+  if (utf8Length(text) > kArgumentTextLimit) {
+    std::string cut;
+    std::size_t taken = 0;
+    for (const CodePoint code_point : utf8Decode(text)) {
+      if (++taken > kArgumentTextLimit) {
+        break;
+      }
+      cut += utf8Encode(code_point);
     }
-    cut += utf8Encode(code_point);
+    text = cut + "…";
   }
-  return cut + "…";
+  return std::string(kindText(resolved)) + " " + text;
 }
 
 bool fitsKind(Engine& engine, const Term& term, ArgKind kind) {
@@ -178,11 +236,20 @@ std::string_view expectedText(ArgKind kind) {
 
 }  // namespace
 
+/// The name a diagnostic uses for the predicate: the spelling the program wrote
+/// (`sort`, `msort`, `МНОЖЕСТВО`) when the solver is running one, and the
+/// built-in's own Russian name when it is called directly (part 260).
+std::string_view spokenName(Engine& engine, std::string_view predicate) {
+  const std::string_view calling = engine.callingName();
+  return calling.empty() ? predicate : calling;
+}
+
 [[noreturn]] void badArgument(Engine& engine, const Term& term, std::string_view predicate,
                               std::size_t index, ArgKind kind, std::string_view expected) {
   const std::string_view wanted = expected.empty() ? expectedText(kind) : expected;
-  std::string message = std::string(predicate) + ": Недопустимый тип аргументов: аргумент " +
-                        std::to_string(index) + " — ";
+  std::string message = std::string(spokenName(engine, predicate)) +
+                        ": Недопустимый тип аргументов: аргумент " + std::to_string(index) +
+                        " — ";
   message += isUnbound(engine, term) ? std::string("несвязанная переменная")
                                      : argumentText(engine, term);
   message += ", нужно ";
@@ -209,7 +276,8 @@ std::string_view expectedText(ArgKind kind) {
     badArgument(engine, args[first_unbound - 1], predicate,
                 index_base + first_unbound - 1, kind, expected);
   }
-  raiseTypeError(engine, std::string(predicate) + ": Недопустимый тип аргументов");
+  raiseTypeError(engine, std::string(spokenName(engine, predicate)) +
+                             ": Недопустимый тип аргументов");
 }
 
 }  // namespace detail

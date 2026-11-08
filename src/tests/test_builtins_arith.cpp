@@ -66,8 +66,8 @@ TEST_CASE("a wrong argument is named, with what was given and what was expected"
   REQUIRE(comparison.loaded);
   REQUIRE(comparison.runtimeError);
   REQUIRE(comparison.error.find(
-              "БОЛЬШЕ: Недопустимый тип аргументов: аргумент 1 — терм(один,2), "
-              "нужно число, текст или список") != std::string::npos);
+              "БОЛЬШЕ: Недопустимый тип аргументов: аргумент 1 — составной терм "
+              "терм(один,2), нужно число, текст или список") != std::string::npos);
 
   // A free variable is not a wrong type — nobody bound it — and the message says
   // that instead of blaming the type.
@@ -83,8 +83,8 @@ TEST_CASE("a wrong argument is named, with what was given and what was expected"
   const auto second = runProgram("?СЛОЖЕНИЕ(1, атом, С).\n");
   REQUIRE(second.loaded);
   REQUIRE(second.runtimeError);
-  REQUIRE(second.error.find("СЛОЖЕНИЕ: Недопустимый тип аргументов: аргумент 2 — атом, "
-                            "нужно число") != std::string::npos);
+  REQUIRE(second.error.find("СЛОЖЕНИЕ: Недопустимый тип аргументов: аргумент 2 — "
+                            "атом атом, нужно число") != std::string::npos);
 }
 
 TEST_CASE("a type error in a rule names the clause it happened in") {

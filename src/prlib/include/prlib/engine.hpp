@@ -375,6 +375,14 @@ class Engine {
   /// Format a term using the current bindings and arithmetic evaluation.
   [[nodiscard]] std::string format(const Term& term) const;
 
+  /// The spelling the program used for the built-in being solved right now —
+  /// `sort`, `msort` or `МНОЖЕСТВО` — so that a diagnostic names the word the
+  /// person typed instead of the Russian original (part 260).  Empty outside a
+  /// built-in call: the built-ins are also called directly by the tests, and a
+  /// message then falls back to the name the built-in passes itself.
+  [[nodiscard]] std::string_view callingName() const noexcept { return calling_name_; }
+  void setCallingName(std::string_view name) { calling_name_ = name; }
+
   /// The question as a program writes it: `?Goal, Goal.` — the `-q` echo of the
   /// command line and the protocol's `printQuestions` (task_46, split out of
   /// `questions` in 2026-10-02).
@@ -400,6 +408,8 @@ class Engine {
   /// Answers a built-in left behind for the solver (task_91); empty between
   /// calls, and consumed by the solver right after the call returns `Yield`.
   std::optional<BuiltinChoice> builtin_choice_;
+  /// The spelling of the built-in being solved (part 260); empty outside one.
+  std::string_view calling_name_;
 
   Term instantiateImpl(const Term& templ, std::unordered_map<VarId, VarId>& mapping);
   /// `path` collects the compound nodes on the way to the term being copied;

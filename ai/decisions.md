@@ -2466,3 +2466,35 @@ its sets with `МНОЖЕСТВО` now, and the examples (`sort.pld`, `stdlib.pl
 predicate.
 
 **Status.** Accepted.
+
+## ADR-073: a type error names the kind of the term and the spelling that was typed
+
+**Context.**  The owner compared our refusal with SWI's and asked for
+`sort("abacb", X): Недопустимый тип аргументов: аргумент 1: ожидался список, найден
+"abacb" (строка)`.  The comparison found a real defect: answers print strings without
+quotes on purpose (§6.1, ADR-067), so the same rule in a diagnostic made a string
+indistinguishable from an atom of the same letters — `МНОЖЕСТВО("abacb", X)` blamed an
+argument that read exactly like `abacb`.  The second defect came with part 259: the
+message named the Russian original, so `?msort("ab", X).` was refused in the name of
+`СОРТИРОВКА`, a word the person never typed.
+
+**Decision.**  The message keeps its shape — one line, compiler style, no full stop —
+and gains two things.  Every argument is named by kind (`число`, `атом`, `строка`,
+`список`, `составной терм`) before its value, and a string is written in the quotes it
+was typed with, escapes included.  Quoting lives in the diagnostic helper only: the
+printer of *answers* stays as it was, because «строка печатается без кавычек» is a
+documented property of the dialect, not an oversight.
+
+The predicate is named the way the program spelled it.  `Solver` sets the spelling on
+the engine for the duration of the call (`Engine::setCallingName`) and restores it
+afterwards, including when the built-in throws; a built-in called directly — by a
+test, or by another built-in's helper — finds the field empty and falls back to the
+Russian name it passes itself.
+
+**Consequences.**  `аргумент 1 — строка "abacb", нужно список` and `msort:
+Недопустимый тип аргументов` are what a reader sees now.  The echo of the whole call
+was rejected: it repeats «аргумент 1», drags an unrelated variable into the line and
+grows without bound.  The «ожидался … найден …» order was rejected because Russian
+agreement would need a gender table where the impersonal «нужно» needs none.
+
+**Status.** Accepted.

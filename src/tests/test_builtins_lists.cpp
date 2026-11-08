@@ -87,7 +87,7 @@ TEST_CASE("the set names the argument that is not a list") {
   // a list, just not a proper one), and that message stays short.
   const auto named = runProgram("?МНОЖЕСТВО(12, С).\n");
   REQUIRE(named.runtimeError);
-  REQUIRE(named.error.find("МНОЖЕСТВО: Недопустимый тип аргументов: аргумент 1 — 12, "
+  REQUIRE(named.error.find("МНОЖЕСТВО: Недопустимый тип аргументов: аргумент 1 — число 12, "
                            "нужно список") != std::string::npos);
 }
 
@@ -119,7 +119,7 @@ TEST_CASE("the sort is the plain check, so an unordered list is refused") {
 TEST_CASE("the sort counts its own arguments when it refuses") {
   const auto named = runProgram("?СОРТИРОВКА(12, С).\n");
   REQUIRE(named.runtimeError);
-  REQUIRE(named.error.find("СОРТИРОВКА: Недопустимый тип аргументов: аргумент 1 — 12, "
+  REQUIRE(named.error.find("СОРТИРОВКА: Недопустимый тип аргументов: аргумент 1 — число 12, "
                            "нужно список") != std::string::npos);
 }
 
@@ -189,11 +189,11 @@ TEST_CASE("sort with an order sign counts its own arguments") {
   // list that is argument 2 is called «аргумент 2», not «1».
   const auto order = runProgram("?СОРТИРОВКА(12, [1], С).\n");
   REQUIRE(order.runtimeError);
-  REQUIRE(order.error.find("СОРТИРОВКА: Недопустимый тип аргументов: аргумент 1 — 12, "
+  REQUIRE(order.error.find("СОРТИРОВКА: Недопустимый тип аргументов: аргумент 1 — число 12, "
                            "нужно @<, @=<, @> или @>=") != std::string::npos);
 
   const auto list = runProgram("?СОРТИРОВКА(@<, 12, С).\n");
   REQUIRE(list.runtimeError);
-  REQUIRE(list.error.find("СОРТИРОВКА: Недопустимый тип аргументов: аргумент 2 — 12, "
+  REQUIRE(list.error.find("СОРТИРОВКА: Недопустимый тип аргументов: аргумент 2 — число 12, "
                           "нужно список") != std::string::npos);
 }

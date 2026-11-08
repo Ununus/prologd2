@@ -578,6 +578,17 @@ bool Solver::resolveGoal(const Term& goal) {
     // bound its first answer when it returns, and a redo must undo exactly that
     // (task_91).
     const std::size_t mark = engine_.bindings().trailMark();
+    // The spelling travels with the call so that a refusal names the word the
+    // program wrote (`sort`, `msort`) and not the Russian original (part 260).
+    // The guard restores it even when the built-in throws, because the same
+    // engine answers the next question afterwards.
+    const std::string_view previous_name = engine_.callingName();
+    engine_.setCallingName(name);
+    struct CallingNameGuard {
+      Engine& engine;
+      std::string_view previous;
+      ~CallingNameGuard() { engine.setCallingName(previous); }
+    } calling_name_guard{engine_, previous_name};
     const BuiltinResult result = builtin(engine_, args);
     switch (result) {
       case BuiltinResult::Continue:

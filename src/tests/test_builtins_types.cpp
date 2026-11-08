@@ -172,12 +172,14 @@ TEST_CASE("atom_string converts both ways and keeps the kinds") {
 TEST_CASE("atom_string refuses what is neither an atom nor a string") {
   // ISO writes these as type errors, not as failures, and so does the dialect:
   // a value of the wrong kind is a mistake in the program, not an answer.
+  // Part 260: the message names the kind of what it found, and a string is quoted
+  // the way it was typed, so `"а"` cannot read as the atom `а`.
   const std::pair<std::string, std::string> cases[] = {
-      {"АТОМСТР(1, С)", "аргумент 1 — 1, нужно атом"},
-      {"АТОМСТР(\"а\", С)", "аргумент 1 — а, нужно атом"},
-      {"АТОМСТР(А, молоко)", "аргумент 2 — молоко, нужно строка"},
+      {"АТОМСТР(1, С)", "аргумент 1 — число 1, нужно атом"},
+      {"АТОМСТР(\"а\", С)", "аргумент 1 — строка \"а\", нужно атом"},
+      {"АТОМСТР(А, молоко)", "аргумент 2 — атом молоко, нужно строка"},
       {"АТОМСТР(А, С)", "аргумент 1 — несвязанная переменная, нужно атом"},
-      {"АТОМСТР(1, молоко)", "аргумент 1 — 1, нужно атом"},
+      {"АТОМСТР(1, молоко)", "аргумент 1 — число 1, нужно атом"},
   };
   for (const auto& one : cases) {
     INFO("goal: " << one.first);

@@ -6,6 +6,7 @@
 
 #include "prlib/engine.hpp"
 #include "prlib/module_loader.hpp"
+#include "test_helpers.hpp"
 
 // task_40: what the interpreter says when something is wrong, with the position
 // a reader can act on.  The subject here is the diagnostic itself — its code,
@@ -434,6 +435,58 @@ TEST_CASE("both branches of a disjunction are checked") {
   REQUIRE(warnings.size() == 1);
   REQUIRE(warnings.front()->message == "не найдено: члеен/2; возможно, член/2");
   REQUIRE(warnings.front()->location.line == 2);
+}
+
+TEST_CASE("a type error names the kind of the term it found") {
+  // Part 260, after SWI's `Type error: list expected, found "abacb" (a string)`.
+  // The dialect prints an *answer* without quotes (§6.1), so `МНОЖЕСТВО("abacb", X)`
+  // used to blame an argument that read exactly like the atom `abacb`; the word for
+  // the kind and the quotes the person typed put that right.  The expectation comes
+  // from the built interpreter, and the shape stays one line.
+  using prologd::test::runProgram;
+  const std::pair<std::string, std::string> cases[] = {
+      {"МНОЖЕСТВО(\"abacb\", X)", "аргумент 1 — строка \"abacb\", нужно список"},
+      {"МНОЖЕСТВО(12, X)", "аргумент 1 — число 12, нужно список"},
+      {"МНОЖЕСТВО(молоко, X)", "аргумент 1 — атом молоко, нужно список"},
+      {"МНОЖЕСТВО(ф(1, 2), X)", "аргумент 1 — составной терм ф(1,2), нужно список"},
+  };
+  for (const auto& one : cases) {
+    INFO("goal: " << one.first);
+    const auto result = runProgram("?" + one.first + ".\n");
+    REQUIRE(result.runtimeError);
+    REQUIRE(result.error.find("МНОЖЕСТВО: Недопустимый тип аргументов: " + one.second) !=
+            std::string::npos);
+  }
+
+  // A result argument is *unified*, so a number in its place is a plain failure and
+  // not a type error — the messages above are about the argument that is checked.
+  const auto result = runProgram("?МНОЖЕСТВО([1, 2], 5).\n");
+  REQUIRE_FALSE(result.runtimeError);
+  REQUIRE(result.output == "НЕТ\n");
+
+  // The quotes carry the escapes of a literal, so a message stays one line even
+  // when the string has a line break of its own.
+  const auto escaped = runProgram("?МНОЖЕСТВО(\"аб\\nв\", X).\n");
+  REQUIRE(escaped.runtimeError);
+  REQUIRE(escaped.error.find("строка \"аб\\nв\"") != std::string::npos);
+}
+
+TEST_CASE("a refusal names the spelling the program wrote, not the Russian original") {
+  // Part 260: `sort/2` is `МНОЖЕСТВО` and `msort/2` is `СОРТИРОВКА` (part 259), so a
+  // message that always said `СОРТИРОВКА` named a word the person never typed.
+  using prologd::test::runProgram;
+  const std::pair<std::string, std::string> cases[] = {
+      {"sort(\"ab\", X)", "sort: Недопустимый тип аргументов"},
+      {"msort(\"ab\", X)", "msort: Недопустимый тип аргументов"},
+      {"МНОЖЕСТВО(\"ab\", X)", "МНОЖЕСТВО: Недопустимый тип аргументов"},
+      {"greater(терм(один, 2), атом)", "greater: Недопустимый тип аргументов"},
+  };
+  for (const auto& one : cases) {
+    INFO("goal: " << one.first);
+    const auto result = runProgram("?" + one.first + ".\n");
+    REQUIRE(result.runtimeError);
+    REQUIRE(result.error.find(one.second) != std::string::npos);
+  }
 }
 
 TEST_CASE("a `;` where a sentence ends says what changed") {
