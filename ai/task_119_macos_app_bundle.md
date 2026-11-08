@@ -156,12 +156,21 @@ Two more facts from the current runners and wheels:
 PrologD.app/Contents/
     Info.plist                    CFBundleIdentifier, version, document types
     MacOS/PrologD                 the frozen window (PyInstaller --onedir)
-    MacOS/prologu, prologd        the engines, beside the window as everywhere
+    MacOS/bin/prologd, prologu    the engines (task 221 moved them into `bin`)
+    MacOS/bin/stdlib/             the library, beside the engine — see below
     MacOS/doc/*.pdf, builtins.json
-    MacOS/examples/, stdlib/
+    MacOS/examples/
     Frameworks/…                  Qt, Python — PyInstaller's own layout
     Resources/PrologD.icns
 ```
+
+`stdlib` is the one folder that does **not** follow the window: the engine looks for it
+beside *itself* (`standardLibraryDirectory(executableDirectory())`), and since the
+engines moved to `bin/` that means `MacOS/bin/stdlib`.  It sat in `MacOS/` — beside the
+window — and the window's welcome program, an untitled buffer started from `/`, failed
+on the released 2.7.0 dmg with «Не найден импортируемый файл 'iso.pld' … Искался в:
+/iso.pld» (part 265).  `examples` and `doc` stay beside the window: the *window* reads
+them through `data_root()`.
 
 `onedir`, not `onefile`: the folder starts faster, `data_root()` is a real directory,
 and the engines are simply copied next to the window.  The old build used onefile and
@@ -212,7 +221,9 @@ jobs:
       - python3 -m venv .venv && pip install -r src/gui/requirements.txt pyinstaller
       - pyinstaller --noconfirm --clean --onedir --windowed --name PrologD \
           --icon build/PrologD.icns --paths src/gui src/gui/main.py
-      - copy prologu, prologd, doc, examples, stdlib into PrologD.app/Contents/MacOS
+      - copy prologd, prologu into PrologD.app/Contents/MacOS/bin, stdlib into the
+        same `bin`, doc and examples into PrologD.app/Contents/MacOS
+      - run an importing program from `/` against the bundle (part 265)
       - iconutil -c icns build/PrologD.iconset -o build/PrologD.icns   (before the freeze)
       - plutil -replace … (version, document types, minimum system)
       - codesign --force --deep --sign - PrologD.app      (ad-hoc; see below)

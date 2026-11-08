@@ -2598,3 +2598,32 @@ number.  `Engine` carries the start reading as whole nanoseconds, so its header
 stays free of `<chrono>`.
 
 **Status.** Accepted.
+
+## ADR-077: a package keeps `stdlib` beside the engine, not beside the window
+
+**Context.**  A reader on macOS 26.3.1 ran the released 2.7.0 `.dmg`: the window came
+up, and the welcome program failed with «Не найден импортируемый файл 'iso.pld'
+(…:1:1). Искался в: /iso.pld».  The search had exactly one candidate — the working
+directory — so the engine's own library was not on the list at all.  The bundle put
+`stdlib` in `Contents/MacOS/`, beside the window, while the engine had moved to
+`Contents/MacOS/bin/` in part 221 (the `PrologD`/`prologd` name clash); the engine looks
+for `stdlib` beside *itself* and found nothing.  The `.deb` (`/opt/prologd`) and the
+Windows folder have the library beside the engine and were never affected.
+
+**Decision.**  The layout follows the engine: `Contents/MacOS/bin/stdlib`.  `doc/` and
+`examples/` stay beside the window, because the *window* reads them through
+`data_root()`.  The engine is not taught to look one level up: that would be a second,
+undocumented rule — `stdlib` beside or above, depending on how deep the engine sits —
+and every future layout would have to guess which one it means.  The rule that exists
+is one sentence and both other platforms already obey it.
+
+**Consequences.**  `paths.py` needed nothing: it mirrors the engine — `Path(interpreter)
+.parent / "stdlib"` — so `F12` on `ИМПОРТ` began working with the same change.
+`macos.yml` now copies the library into `bin` and runs an importing program from `/`
+against the bundle on every push; `release.yml` does the same before signing, and the
+program is exactly the shape of the welcome buffer (an untitled file, a working
+directory of `/` on a Finder launch).  Both checks were dry-run against a simulated
+bundle on Linux, where the rule is proven by the existing unit test of
+`standardLibraryDirectory`.
+
+**Status.** Accepted.

@@ -314,6 +314,16 @@ Tests are written **together with** the feature, never after.
   with a message that looks like a finding.  `->` next to `;` reads as in ISO —
   `(A -> B ; C)` drops `C` once `A` has a solution — so an if-then-else that
   answers «no» where «иначе» was expected is the ISO rule, not a defect.
+* A package keeps `stdlib` beside the **engine**, because that is where the engine
+  looks (`standardLibraryDirectory(executableDirectory())`, the last entry of the
+  `ИМПОРТ` search).  The other folders — `doc/`, `examples/` — follow the *window*,
+  which reads them from `data_root()`.  On macOS the two are one directory apart:
+  the engines live in `Contents/MacOS/bin` (part 221, the `PrologD`/`prologd` name
+  clash), so the library is `Contents/MacOS/bin/stdlib` and not `Contents/MacOS/stdlib`.
+  Part 265 was that mistake: the welcome program of the window is an untitled buffer,
+  a Finder launch runs the engine from `/`, and the import died with «Искался в:
+  /iso.pld».  A package is checked by running an importing program from `/` against
+  it, never by looking at the tree — the tree looked right.
 * Prose avoids the conjunction «а» as a contrast crutch.  «Это А, а не Б» becomes
   «Это А» or splits in two («Это А.  Б здесь нет.»); «а не» also hides the plain
   answer behind a negation.  Parallel contrasts that genuinely need it stay

@@ -101,8 +101,25 @@ jobs:
           # filesystem, and the second copy would be what Finder runs (part 221).
           mkdir -p "$app/bin"
           cp build/macos-release/src/cli/prologd "$app/bin/"
+          # The library travels beside the engine, as it does in the deb and in
+          # the Windows folder; the release workflow lays the bundle out the same
+          # way, and this copy is what lets the check below run on every push
+          # (part 265).
+          cp -R stdlib "$app/bin/"
           codesign --force --deep --sign - dist/PrologD.app
           codesign --verify --deep --strict --verbose=2 dist/PrologD.app
+      - name: Import the library from the bundle
+        # The window's welcome program is an untitled buffer, and a Finder launch
+        # starts the engine from `/` — so the library has to be found beside the
+        # engine and nowhere else.  On the released 2.7.0 dmg this run died with
+        # «Не найден импортируемый файл 'iso.pld' … Искался в: /iso.pld» (part 265).
+        run: |
+          set -e
+          app=$(pwd)/dist/PrologD.app/Contents/MacOS
+          printf '%s\n' ':- ИМПОРТ("iso.pld").' '?length([1, 2, 3], Д).' \
+            > "$RUNNER_TEMP/import-check.pld"
+          imported=$( cd / && "$app/bin/prologd" -s "$RUNNER_TEMP/import-check.pld" )
+          test "$imported" = "Д=3"
       - name: Start the window
         env:
           # The offscreen plugin has no font theme of its own, so Qt asks for its

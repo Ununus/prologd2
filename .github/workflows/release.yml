@@ -194,7 +194,14 @@ jobs:
           cp build/macos-release/src/cli/prologd "$app/bin/"
           mkdir -p "$app/doc"
           cp doc/*.pdf doc/builtins.json doc/help_sections.json "$app/doc/"
-          cp -R examples stdlib "$app/"
+          cp -R examples "$app/"
+          # The library travels beside the *engine*, the way `opt/prologd` of the
+          # deb and the Windows folder keep it — and the engine here is in `bin`
+          # (part 221), so there it goes.  Beside the window it was invisible to
+          # the engine: on the released 2.7.0 dmg the welcome program of the window
+          # died with «Не найден импортируемый файл 'iso.pld' … Искался в:
+          # /iso.pld» (part 265).
+          cp -R stdlib "$app/bin/"
           python3 tools/macos_plist.py dist/PrologD.app/Contents/Info.plist "$version"
           plutil -lint dist/PrologD.app/Contents/Info.plist
           test "$(plutil -extract CFBundleShortVersionString raw dist/PrologD.app/Contents/Info.plist)" = "$version"
@@ -206,9 +213,19 @@ jobs:
       - name: Sign and check
         run: |
           set -e
+          app=$(pwd)/dist/PrologD.app/Contents/MacOS
           codesign --force --deep --sign - dist/PrologD.app
           codesign --verify --deep --strict --verbose=2 dist/PrologD.app
-          dist/PrologD.app/Contents/MacOS/bin/prologd -s examples/lessons/lesson_01.pld >/dev/null
+          "$app/bin/prologd" -s examples/lessons/lesson_01.pld >/dev/null
+          # A program that imports the library, run from a folder that holds
+          # neither the program nor `stdlib`: the engine has to reach its own
+          # library beside itself.  That is the search the window's welcome program
+          # makes — an untitled buffer, started from `/` when Finder launches the
+          # app — and it is the run that failed on the 2.7.0 dmg (part 265).
+          printf '%s\n' ':- ИМПОРТ("iso.pld").' '?length([1, 2, 3], Д).' \
+            > "$RUNNER_TEMP/import-check.pld"
+          imported=$( cd / && "$app/bin/prologd" -s "$RUNNER_TEMP/import-check.pld" )
+          test "$imported" = "Д=3"
       - name: Start the frozen window
         # A bundle can be signed and still die before its window appears — the
         # failure a person sees as a bounce in the dock and nothing else.  The
