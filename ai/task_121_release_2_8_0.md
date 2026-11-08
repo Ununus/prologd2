@@ -1,6 +1,6 @@
 # task_121 — the 2.8.0 release round
 
-**Status:** in progress (2026-11-09)
+**Status:** done (2026-11-09) — published as <https://github.com/Ununus/prologd2/releases/tag/v2.8.0>
 **Depends on:** everything from `v2.7.0` to `main` (10 commits: the sorting split, the
 new diagnostic wording, `atan`/`atan2`, `ВРЕМЯ/1`, the macOS bundle fix, `ФОРМАТ` and
 `ВЫВОДФ`)
@@ -75,3 +75,39 @@ released name does.  The owner agreed to `2.8.0`.
 * 29 scripts of `src/gui/tests` and `protocol_smoke.py` — green.
 * `--target docs` — five PDFs, no empty page; the §13 page looked at.
 * `git ls-files --eol` on every touched file — `w/lf`; the `.iss` still starts with a BOM.
+
+## How it went
+
+1. `main` was pushed before the tag: `ci` (`42532781363`) and `macos` (`42532781305`)
+   on `Версия 2.8.0` — green.  The macOS run is the one that matters this round: the
+   «Import the library from the bundle» step added in part 265 ran on the Mac runner
+   and passed, so the fix was proven before the tag existed.
+2. `v2.8.0` is an annotated tag on `84e12fc` with a Russian message; the pattern of
+   `v2.7.0` is kept.
+3. The tag ran `release.yml` (`42533348467`): Linux `.deb`, Windows portable and
+   installer, macOS `.dmg`, draft release — all four jobs green, no step retried.
+4. The draft was checked before publishing, then the notes were replaced with a
+   hand-written body (build table, «Исправлено», «Новое», «Изменилось», «Замечания»)
+   and the release was published and marked **Latest**.
+
+## Checks on the published assets
+
+* `.deb`: `Version: 2.8.0`; `--version` answers `prologd 2.8.0 (2026-11-09)`; four
+  PDFs and the two JSON files in `doc/`, no `technical.pdf`; `examples/io.pld` is
+  there; through `-I` the library answers `atom_length(пролог, N)` = 6; `?ВЕРСИЯ` is
+  `27.1`; `atan2(1, -1)` = 2.356194490192345, `ВРЕМЯ` binds a real, `ФОРМАТ` gives
+  `2 + 3 = 5`.
+* `.zip`: `prologd.exe`, `prologd-gui.exe`, `_internal`, `doc`, `examples`, `stdlib`;
+  the version string inside `prologd.exe` reads `2.8.0 (2026-11-09)`.
+* `.dmg`: **`PrologD.app/Contents/MacOS/bin/stdlib`** — the library is beside the
+  engine, which is what this release was cut for; `examples` and `doc` stay beside the
+  window; `CFBundleShortVersionString` and `CFBundleVersion` are both `2.8.0`.
+
+## What is still left for a person
+
+1. **The frozen window on a real desktop** — a click-through of the installed package,
+   macOS especially.  The bundle is now checked by a run, not by eye, but no script
+   clicks through the window.
+2. **Known defect, not fixed.**  Under Wayland the window takes a dropped file as text
+   (Qt 6.12 and the desktop portal).  Workaround: `QT_QPA_PLATFORM=xcb`.  It stays in
+   the notes.
