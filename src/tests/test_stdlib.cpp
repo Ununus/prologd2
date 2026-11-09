@@ -154,3 +154,42 @@ TEST_CASE("a copy takes arms as they are and leaves the original alone") {
   // nothing to copy from an unknown name.
   REQUIRE(result.output == "X=а\nX=б\nX=а\nX=б\nНЕТ\n");
 }
+
+TEST_CASE("the knowledge base library reads a predicate and gives its number") {
+  // Part 273: `clause_number` is the question a reader actually asks («под каким
+  // номером лежит это предложение») without the `ТЕРМ(Чё, Части), Части = [Имя | _]`
+  // dance, and `clauses` is the read half of `copy_predicate`.
+  using prologd::test::runProgramWithIncludes;
+  const std::vector<std::filesystem::path> library{PROLOGD_STDLIB_DIR};
+  const auto result = runProgramWithIncludes(
+      ":- ИМПОРТ(\"database.pld\").\n"
+      "ребро(а, б). ребро(б, в). ребро(в, г).\n"
+      "путь(X, Y):-ребро(X, Y).\n"
+      "?clause_number(ребро(б, в), Н).\n"
+      "?clauses(путь, Все).\n"
+      "?clauses(нетакого, Пусто).\n",
+      "", library);
+  REQUIRE(result.loaded);
+  REQUIRE_FALSE(result.runtimeError);
+  REQUIRE(result.output == "Н=2\n"
+                            "Все=[предложение(путь(_1,_2),[ребро(_1,_2)])]\n"
+                            "Пусто=[]\n");
+}
+
+TEST_CASE("the knowledge base library renames and deletes a predicate") {
+  using prologd::test::runProgramWithIncludes;
+  const std::vector<std::filesystem::path> library{PROLOGD_STDLIB_DIR};
+  const auto result = runProgramWithIncludes(
+      ":- ИМПОРТ(\"database.pld\").\n"
+      "ребро(а, б). ребро(б, в).\n"
+      "?rename_predicate(ребро, дубль), СКОЛЬКО(ребро, Стало), СКОЛЬКО(дубль, Цел).\n"
+      "?delete_predicate(дубль), СКОЛЬКО(дубль, Пусто).\n"
+      "?delete_predicate(нетакого).\n"
+      "?copy_predicate(нетакого, Копия).\n",
+      "", library);
+  REQUIRE(result.loaded);
+  REQUIRE_FALSE(result.runtimeError);
+  // The copy is made before the old name goes, so both counters are read at once;
+  // deleting an unknown name is true, copying one is false.
+  REQUIRE(result.output == "Стало=0\nЦел=2\nПусто=0\nДА\nНЕТ\n");
+}

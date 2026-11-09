@@ -2765,3 +2765,42 @@ one thing the check is good at), and running it at call time (a warning after th
 answer, and dead code never checked).
 
 **Status.** Accepted.
+
+## ADR-082: the knowledge-base library stops at what the language can express
+
+**Context.**  With `replace_clause` and `copy_predicate` in `stdlib/database.pld` the
+owner asked what else the file wants.  Four candidates were prototyped in the dialect
+before anything was written: a clause's number by its head, the whole predicate as a
+list, deleting a name across arities, and renaming.  Three ideas that look obvious were
+dropped because the language cannot carry them.
+
+**Decision.**  Four more predicates, all compositions of what exists:
+`clause_number/2` (the number of the first clause whose head fits — the question the
+reader asked, without the `ТЕРМ(Чё, Части), Части = [Имя | _]` dance), `clauses/2` (the
+predicate as `предложение(Голова, Цели)` terms, the read half of `copy_predicate`),
+`delete_predicate/1` (every clause of a name, across arities) and `rename_predicate/2`
+(copy, then delete the old name).  `copy_predicate` now reads through `clauses/2`.
+
+Not added, and why:
+
+* **Saving and loading a base** needs a term *reader*, and the dialect has none:
+  `ВВОДСТР` reads a line of text, so a saved clause could not be parsed back.  This is
+  engine work, not library work.
+* **A snapshot of the whole base / undo** needs a way to list predicate names; `СКОЛЬКО`
+  and `ПРЕДЛ` ask by name.  A built-in such as `ПРЕДИКАТЫ/1` would be the door, and it
+  is a separate decision.
+* **`clause_heads/2`** would need a second documented helper for the recursion, while
+  `clauses/2` plus the reader's own `map` from `lists.pld` says the same thing.
+
+Matching stays by unification, as `УДАЛЕНИЕ/1` and `УДАЛИТЬВСЕ` do, and the library now
+says so in as many words: `replace_clause(путь(а, б), факт(а, б))` replaces the *rule*
+`путь(X, Y) :- ребро(X, Y)`, because its head fits.  The alternative — identity — is not
+expressible: the dialect has no `==`, and adding one for this would be a language change.
+
+**Consequences.**  The file is eight predicates (seven public, one helper) and 70 lines,
+all of them readable as definitions.  `delete_predicate/1` is the one that is genuinely
+awkward by hand: the naive loop fails on the last clause, because after removing it
+`ПРЕДЛ(Имя, 1, …)` is already false.  Its terminating clause is `НЕ(ПРЕДЛ(Имя, 1, _, _))`,
+which is also why it answers «да» for a name with no clauses.
+
+**Status.** Accepted.
