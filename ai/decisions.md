@@ -2662,3 +2662,39 @@ pin.  `format_string` and `format` are the English names; `format` prints, as it
 in SWI, though the place syntax differs — `{}` here, `~w` there.
 
 **Status.** Accepted.
+
+## ADR-079: a free number in `ПРЕДЛ/4` walks the clauses; the number stays a number
+
+**Context.**  A reader working with graphs asked why the number in
+`ПРЕДЛ(Имя, Номер, Голова, Цели)` has to be a bound integer — «нельзя, чтобы Номер
+был переменной, из которой я узнавал бы, под каким номером оно лежит?» — and whether
+that is architecturally hard.  It was not hard, and the refusal was an accident of the
+implementation rather than a decision: the built-in read the number with
+`integerValue`, so an unbound variable fell into `badArgument` and was reported as a
+type error — «аргумент 2 — несвязанная переменная, нужно целое число».
+
+**Decision.**  A free number enumerates.  `?ПРЕДЛ(ребро, Н, ребро(б, в), Ц).`
+answers `Н=2`; `?ПРЕДЛ(ребро, Н, Г, Ц).` answers three times, once per clause, in text
+order; `?НАЙТИВСЕ(Н, ПРЕДЛ(ребро, Н, _, _), Все)` collects `[1,2,3]`.  A bound number
+behaves exactly as before, down to the type error for a number of the wrong kind and
+«НЕТ» for a number outside the list.
+
+The mechanism is the one the collector work put in (ADR-031): the built-in returns
+`BuiltinResult::Yield` and walks the answers through a producer, which is what
+`УДАЛЕНИЕ/1` already does for «первое подходящее, на возврате — следующее».  No new
+machinery, and `ПРЕДЛ` is the third built-in to use it.
+
+Two properties had to be chosen, and both follow the base the manual already
+describes.  The walk is over a **snapshot** taken when the goal was called — the same
+logical update view `УДАЛЕНИЕ/1` promises — because a walk over live positions would
+renumber itself the moment an earlier answer was retracted.  And each answer
+instantiates its clause afresh, so the head and the body of one answer share their
+variables with each other and with nothing else.
+
+**Consequences.**  Nothing existing changed meaning: a program that passes a number
+gets what it got before.  The numbering is the one `СКОЛЬКО`, `УДАЛЕНИЕ/2` and the
+bound form already use — by name, across arities — so the three cannot disagree about
+what «номер 2» means.  `ПРЕДЛ` is not ISO's `clause/2`; SWI's `nth_clause/3` is the
+closest relative, and it enumerates too.
+
+**Status.** Accepted.

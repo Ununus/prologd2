@@ -116,6 +116,69 @@ TEST_CASE("the clause reader numbers clauses from one") {
   REQUIRE(result.output == "НЕТ\nНЕТ\nНЕТ\nНЕТ\nНЕТ\n");
 }
 
+TEST_CASE("the clause reader walks the clauses when the number is free") {
+  // Part 270: a reader working with graphs wanted to learn *under which number* a
+  // clause it recognises by its head lies — `?ПРЕДЛ(ребро, Н, ребро(а, б), _).` —
+  // and a free number used to be a type error.  Now it is an enumeration: one
+  // clause per answer, numbered from one in text order, which is the numbering the
+  // bound form already used.
+  const auto walked = runProgram(
+      "ребро(а, б).\n"
+      "ребро(б, в).\n"
+      "ребро(в, г).\n"
+      "?ПРЕДЛ(ребро, Н, Г, Ц).\n");
+  REQUIRE(walked.loaded);
+  REQUIRE(walked.output == "Н=1\nГ=ребро(а,б)\nЦ=[]\n"
+                            "Н=2\nГ=ребро(б,в)\nЦ=[]\n"
+                            "Н=3\nГ=ребро(в,г)\nЦ=[]\n");
+
+  // The use the reader named: the head is known, the number is the answer.
+  const auto sought = runProgram(
+      "ребро(а, б).\n"
+      "ребро(б, в).\n"
+      "ребро(в, г).\n"
+      "?ПРЕДЛ(ребро, Н, ребро(б, в), Ц).\n");
+  REQUIRE(sought.loaded);
+  REQUIRE(sought.output == "Н=2\nЦ=[]\n");
+
+  // Enumeration composes with the collectors like any other multi-answer goal.
+  const auto collected = runProgram(
+      "ребро(а, б).\n"
+      "ребро(б, в).\n"
+      "?НАЙТИВСЕ(Н, ПРЕДЛ(ребро, Н, ребро(б, в), _), Все).\n"
+      "?ПЕРВОЕ(ПРЕДЛ(ребро, Н, _, _)).\n"
+      "?ПРЕДЛ(нет, Н, Г, Ц).\n");
+  REQUIRE(collected.loaded);
+  // The last goal has no clauses to walk, so it is a plain «НЕТ», not «ДА» with
+  // nothing bound.
+  REQUIRE(collected.output == "Н=_1\nВсе=[2]\nН=1\nНЕТ\n");
+}
+
+TEST_CASE("a walked clause has fresh variables, shared inside itself only") {
+  const auto result = runProgram(
+      "дед(Д, В) :- родитель(Д, Р), родитель(Р, В).\n"
+      "дед(х, у).\n"
+      "?ПРЕДЛ(дед, 1, дед(П, С), [родитель(П, Т), родитель(Т, С)]).\n"
+      "?НАЙТИВСЕ(Г, ПРЕДЛ(дед, _, Г, _), Все).\n");
+  REQUIRE(result.loaded);
+  // The head and the body of one answer are one instance: the pattern above only
+  // matches when they share their variables, and a pattern with variables answers
+  // with them rather than with «ДА».  Different answers are different instances, so
+  // collecting the heads keeps their variables apart.
+  REQUIRE(result.output ==
+          "П=_1\nС=_1\nТ=_1\nГ=_1\nВсе=[дед(_1,_2),дед(х,у)]\n");
+}
+
+TEST_CASE("a bound number still refuses what is not a number") {
+  const auto result = runProgram(
+      "прим(1).\n"
+      "?ПРЕДЛ(прим, молоко, H, B).\n");
+  REQUIRE(result.loaded);
+  REQUIRE(result.runtimeError);
+  REQUIRE(result.error.find("ПРЕДЛ: Недопустимый тип аргументов: аргумент 2") !=
+          std::string::npos);
+}
+
 TEST_CASE("the clause reader checks the head and the body it is given") {
   const auto result = runProgram(
       "прим(1) :- прим(3).\n"
@@ -142,8 +205,9 @@ TEST_CASE("the clause reader renames the variables of the clause") {
 }
 
 TEST_CASE("the clause reader rejects a bad name or number") {
-  for (const std::string goal : {"ПРЕДЛ(5, 1, H, B)", "ПРЕДЛ(прим, X, H, B)",
-                                  "ПРЕДЛ(прим, \"1\", H, B)"}) {
+  // A *free* number is not an error any more — it walks the clauses (part 270) —
+  // so only a number of the wrong kind is refused here.
+  for (const std::string goal : {"ПРЕДЛ(5, 1, H, B)", "ПРЕДЛ(прим, \"1\", H, B)"}) {
     checkBadArguments(goal, "ПРЕДЛ");
   }
   // Дробный номер усекается: 1.0 — это номер 1, а 0.5 — уже ноль, то есть мимо.

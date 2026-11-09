@@ -77,12 +77,71 @@ BuiltinResult builtinClauseCount(Engine& engine, std::span<const Term> args) {
   return *expected == count ? BuiltinResult::Continue : BuiltinResult::Fail;
 }
 
+namespace {
+
+/// The walk over the answers of `ПРЕДЛ` when the number is free (part 270): one
+/// clause per answer, numbered from one in text order — the numbering `СКОЛЬКО`,
+/// `УДАЛЕНИЕ/2` and the bound form of `ПРЕДЛ` already use.
+///
+/// The clauses are a *snapshot* taken when the goal was called, which is the
+/// logical update view the rest of the base keeps: a clause added during the walk
+/// is not seen by it.  A snapshot also keeps the numbers stable — a walk over live
+/// positions would renumber itself the moment an earlier answer was retracted.
+///
+/// Every answer instantiates the clause afresh, so the head and the body of one
+/// answer share variables with each other and with nothing else.
+class ClauseWalk {
+ public:
+  ClauseWalk(Term number, Term head, Term body, std::vector<Clause> clauses)
+      : number_(std::move(number)),
+        head_(std::move(head)),
+        body_(std::move(body)),
+        clauses_(std::move(clauses)) {}
+
+  std::optional<BuiltinAnswer> next(Engine& engine) {
+    if (next_ >= clauses_.size()) {
+      return std::nullopt;
+    }
+    const std::size_t index = next_++;
+    Term head;
+    std::vector<Term> body;
+    engine.instantiateClause(clauses_[index], head, body);
+    const std::int64_t number = static_cast<std::int64_t>(index) + 1;
+    BuiltinAnswer answer;
+    answer.unify.push_back({number_, makeInt(BigInt(number))});
+    answer.unify.push_back({head_, std::move(head)});
+    answer.unify.push_back({body_, makeListFromVector(body)});
+    return answer;
+  }
+
+ private:
+  Term number_;
+  Term head_;
+  Term body_;
+  std::vector<Clause> clauses_;
+  std::size_t next_ = 0;
+};
+
+}  // namespace
+
+/// `ПРЕДЛ(Имя, Номер, Голова, Цели)` (`clause_at`).  A bound number asks for that
+/// one clause, a free number walks all of them — `?ПРЕДЛ(ребро, Н, Г, Ц).` answers
+/// with `Н=1`, then `Н=2`, and so on, which is how a program learns the number of a
+/// clause it recognises by its head.
 BuiltinResult builtinClauseInfo(Engine& engine, std::span<const Term> args) {
   const auto name = asText(engine, args[0]);
-  const auto index = integerValue(engine, args[1]);
   if (!name) {
     badArgument(engine, args[0], "ПРЕДЛ", 1, ArgKind::Text);
   }
+  if (isUnbound(engine, args[1])) {
+    auto walk = std::make_shared<ClauseWalk>(args[1], args[2], args[3],
+                                             engine.database().clausesByName(*name));
+    BuiltinChoice choice;
+    choice.produce = [walk](Engine& inner) { return walk->next(inner); };
+    engine.setBuiltinChoice(std::move(choice));
+    return BuiltinResult::Yield;
+  }
+  const auto index = integerValue(engine, args[1]);
   if (!index) {
     badArgument(engine, args[1], "ПРЕДЛ", 2, ArgKind::Integer);
   }
