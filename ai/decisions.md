@@ -2732,3 +2732,36 @@ and `stdlib/README.md` describe it; `test_stdlib.cpp` now runs it, not only chec
 it is documented.
 
 **Status.** Accepted.
+
+## ADR-081: the load-time name check knows what the program builds at run time
+
+**Context.**  A reader's program copied a graph — `?copy_predicate(ребро, линия),
+линия(А, Б).` — and behaved differently on the two ways of running it: `F5` was
+silent, a click on the query's margin marker reported «не найдено: линия/2».  The
+marker runs the buffer *quietly* (`questions=false`), and the load-time check of
+`checkCallSites` then sees a goal naming a predicate that does not exist *yet*: the
+query that would create it is the very statement the quiet load skipped.  A full run
+hides it, because the query executes during the load, before the check.  The same
+false positive was already there for `examples/database.pld`
+(«не найдено: двойной/2», «не найдено: след/1») — `copy_predicate` only made it
+visible in someone's own program.
+
+**Decision.**  The check asks what the text itself hands to the base, and stays
+silent about those names.  Two sources, both literal and both in the unit's own
+text: a head given to `ДОБ`/`assert`, `ДОБНАЧ`/`asserta`, `ДОБКОН`/`assertz` (name
+and arity), and an atom given to a predicate the unit does not define — a library
+predicate may create the name it is handed, so `copy_predicate(ребро, линия)` covers
+`линия/2`, at any arity, because only the library knows which arity it builds.
+
+Everywhere else the warning stands: a mistyped name beside a created one is still
+reported with its suggestion (`не найдено: следа/1; возможно, след/1`).
+
+**Consequences.**  The two runs now agree, and the check no longer cries wolf about a
+predicate the program builds itself — the whole point of the base being mutable.
+The price is the arity of a handed name: `?copy_predicate(ребро, линия), линия(X)` in
+a program where the copy is `линия/2` goes unreported about the arity.  Rejected
+alternatives: skipping the check on a quiet load (silent about clause bodies too, the
+one thing the check is good at), and running it at call time (a warning after the
+answer, and dead code never checked).
+
+**Status.** Accepted.

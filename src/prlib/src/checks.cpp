@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <functional>
 #include <map>
+#include <set>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -258,7 +259,7 @@ const char* foreignSpellingHint(std::string_view name, std::size_t arity) {
 /// `ВЫП(члены(Х))` and `НАЙТИВСЕ(Х, п(Х), L)` are checked too; `НАЙТИВСЕ`'s
 /// template and the arguments of `ДОБ` are terms, not goals, and stay closed.
 void walkGoal(const Term& goal, const SourceLocation& location,
-              const std::function<void(std::string_view, std::size_t,
+              const std::function<void(const Term&, std::string_view, std::size_t,
                                        const SourceLocation&)>& visit) {
   if (goal.kind == TermKind::Var) {
     return;  // a variable goal is dynamic: nothing can be checked here
@@ -267,7 +268,7 @@ void walkGoal(const Term& goal, const SourceLocation& location,
     if (goal.text == "!") {
       return;  // the cut is answered by the solver, not by any name table
     }
-    visit(goal.text, 0, location);
+    visit(goal, goal.text, 0, location);
     return;
   }
   if (goal.kind != TermKind::Compound || goal.compound == nullptr) {
@@ -289,42 +290,42 @@ void walkGoal(const Term& goal, const SourceLocation& location,
   if ((name == "ВЫП" || name == "call") && arity >= 1) {
     if (arity == 1) {
       walkGoal(args[0], location, visit);
-      visit(name, 1, location);
+      visit(goal, name, 1, location);
       return;
     }
     // `call/N`: the extra arguments are appended to the goal, so what the call
     // reaches is the expanded term — `ВЫП(ф, 1)` calls `ф/1`.
     if (args[0].kind == TermKind::Atom) {
-      visit(args[0].text, arity - 1, location);
+      visit(args[0], args[0].text, arity - 1, location);
     } else if (args[0].kind == TermKind::Compound && args[0].compound != nullptr) {
       std::vector<Term> expanded_args = args[0].compound->args;
       expanded_args.insert(expanded_args.end(), args.begin() + 1, args.end());
       walkGoal(makeCompound(args[0].compound->name, std::move(expanded_args)), location,
                visit);
     }
-    visit(name, arity, location);
+    visit(goal, name, arity, location);
     return;
   }
   if ((name == "НЕ" || name == "not") && arity == 1) {
     walkGoal(args[0], location, visit);
-    visit(name, 1, location);
+    visit(goal, name, 1, location);
     return;
   }
   if ((name == "ДЛЯВСЕХ" || name == "forall") && arity == 2) {
     walkGoal(args[0], location, visit);
     walkGoal(args[1], location, visit);
-    visit(name, 2, location);
+    visit(goal, name, 2, location);
     return;
   }
   if ((name == "ПЕРВОЕ" || name == "first" || name == "ИЛИ") && arity == 2) {
     walkGoal(args[0], location, visit);
     walkGoal(args[1], location, visit);
-    visit(name, 2, location);
+    visit(goal, name, 2, location);
     return;
   }
   if ((name == "НАЙТИВСЕ" || name == "findall") && arity == 3) {
     walkGoal(args[1], location, visit);
-    visit(name, 3, location);
+    visit(goal, name, 3, location);
     return;
   }
   if ((name == "ВСЕРЕШ" || name == "bagof" || name == "МНОРЕШ" || name == "setof") &&
@@ -339,14 +340,14 @@ void walkGoal(const Term& goal, const SourceLocation& location,
       inner = inner.compound->args[1];
     }
     walkGoal(inner, location, visit);
-    visit(name, 3, location);
+    visit(goal, name, 3, location);
     return;
   }
-  visit(name, arity, location);
+  visit(goal, name, arity, location);
 }
 
 void forEachGoal(const ParsedProgram& program,
-                 const std::function<void(std::string_view, std::size_t,
+                 const std::function<void(const Term&, std::string_view, std::size_t,
                                           const SourceLocation&)>& visit) {
   for (const Clause& clause : program.clauses) {
     for (std::size_t i = 0; i < clause.body.size(); ++i) {
@@ -366,12 +367,107 @@ void forEachGoal(const ParsedProgram& program,
   }
 }
 
+/// The names a goal hands to the base as literals, so a goal that names one is not
+/// a misspelling.
+///
+/// The database grows while the program runs, and a predicate built at run time is
+/// not "undefined" — it is defined later.  `?ДОБКОН(двойной(Х, У), [...])` and
+/// `?copy_predicate(ребро, линия)` both make a predicate the text names, and the
+/// load-time check has to know it: `examples/database.pld` and any program that
+/// copies a graph were told «не найдено» about a goal that works, on every quiet
+/// load — the load a click on a margin marker makes — while a full run hid it,
+/// because there the creation had happened before the check (part 272).
+///
+/// Two sources, both visible in the text:
+///
+/// * a literal head given to the assertion predicates — `ДОБ`, `assert`, `ДОБНАЧ`,
+///   `asserta`, `ДОБКОН`, `assertz` — which names the predicate *and* its arity;
+/// * a literal atom handed to a predicate this unit does not define, that is to a
+///   library one: a predicate that receives a name may create it
+///   (`copy_predicate/2`).  The arity is the library's business, so such a name
+///   counts for every arity — a false «не найдено» about a working predicate
+///   teaches a reader to ignore the warning, while a missed typo costs one wrong
+///   answer.
+class CreatedNames {
+ public:
+  CreatedNames(const ParsedProgram& program, const Database& database)
+      : database_(database) {
+    for (const Clause& clause : program.clauses) {
+      if (const std::optional<Functor> head = functorOf(clause.head)) {
+        own_.insert(nameKey(head->name, head->arity));
+      }
+    }
+    forEachGoal(program, [this](const Term& goal, std::string_view name,
+                                std::size_t arity, const SourceLocation&) {
+      if (assertedHeadIndex(name, arity) >= 0) {
+        const std::vector<Term>& args = goal.compound->args;
+        if (const std::optional<Functor> head =
+                functorOf(args[static_cast<std::size_t>(assertedHeadIndex(name, arity))])) {
+          addArity(byName_[head->name], head->arity);
+        }
+        return;
+      }
+      collectHandedNames(goal, name, arity);
+    });
+  }
+
+  bool contains(std::string_view name, std::size_t arity) const {
+    const std::string key(name);
+    if (anyArity_.count(key) != 0) {
+      return true;
+    }
+    const auto it = byName_.find(key);
+    return it != byName_.end() && hasArity(it->second, arity);
+  }
+
+ private:
+  static std::string nameKey(std::string_view name, std::size_t arity) {
+    return std::string(name) + "/" + std::to_string(arity);
+  }
+
+  /// Where the asserted head sits in a call, or -1 when the call is not one of the
+  /// assertion predicates.  `ДОБ` puts it first, the two shorthands too — the
+  /// difference is only that they have no position argument.
+  static int assertedHeadIndex(std::string_view name, std::size_t arity) {
+    if ((name == "ДОБ" || name == "assert") && arity == 3) {
+      return 0;
+    }
+    if ((name == "ДОБНАЧ" || name == "asserta" || name == "ДОБКОН" ||
+         name == "assertz") &&
+        arity >= 1 && arity <= 2) {
+      return 0;
+    }
+    return -1;
+  }
+
+  /// Every literal atom of a call to a predicate of another file is a name that
+  /// call may create.
+  void collectHandedNames(const Term& goal, std::string_view name, std::size_t arity) {
+    if (goal.compound == nullptr) {
+      return;
+    }
+    if (own_.count(nameKey(name, arity)) != 0 || !database_.hasPredicate(name, arity)) {
+      return;  // the unit's own predicate, or a built-in — neither creates anything
+    }
+    for (const Term& argument : goal.compound->args) {
+      if (argument.kind == TermKind::Atom) {
+        anyArity_.insert(argument.text);
+      }
+    }
+  }
+
+  const Database& database_;
+  std::set<std::string> own_;
+  std::map<std::string, NameInfo> byName_;
+  std::set<std::string> anyArity_;
+};
+
 }  // namespace
 
 void checkReservedCalls(const ParsedProgram& program, const Database& database,
                         DiagnosticSink& sink) {
   const std::map<std::string, NameInfo> known = knownNames(program, database);
-  forEachGoal(program, [&](std::string_view name, std::size_t arity,
+  forEachGoal(program, [&](const Term&, std::string_view name, std::size_t arity,
                            const SourceLocation& location) {
     if (const char* message = retiredNameMessage(name, arity); message != nullptr) {
       PrologError error;
@@ -412,8 +508,12 @@ void checkReservedCalls(const ParsedProgram& program, const Database& database,
 void checkCallSites(const ParsedProgram& program, const Database& database,
                     const std::function<void(const PrologError&)>& report) {
   const std::map<std::string, NameInfo> known = knownNames(program, database);
-  forEachGoal(program, [&](std::string_view name, std::size_t arity,
+  const CreatedNames created(program, database);
+  forEachGoal(program, [&](const Term&, std::string_view name, std::size_t arity,
                            const SourceLocation& location) {
+    if (created.contains(name, arity)) {
+      return;
+    }
     const auto it = known.find(std::string(name));
     if (it != known.end() && hasArity(it->second, arity)) {
       return;

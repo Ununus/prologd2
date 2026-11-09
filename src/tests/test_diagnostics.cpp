@@ -1,5 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include <filesystem>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -28,7 +29,14 @@ using prologd::Severity;
 using prologd::SourceLocation;
 
 /// Load a program and collect the diagnostics the engine reported.
-std::vector<PrologError> diagnosticsOf(const std::string& source) {
+///
+/// The loader gets no query runner, so the unit is loaded *quietly* — the way the
+/// window loads a buffer before answering one clicked query.  That is also the
+/// shape in which the load-time checks are most visible: with no questions run,
+/// nothing a program builds at run time exists yet (part 272).
+std::vector<PrologError> diagnosticsOf(
+    const std::string& source,
+    std::vector<std::filesystem::path> include_paths = {}) {
   std::istringstream input;
   std::ostringstream output;
   std::ostringstream error;
@@ -39,7 +47,7 @@ std::vector<PrologError> diagnosticsOf(const std::string& source) {
   engine.setDiagnosticHook([&collected](const PrologError& diagnostic) {
     collected.push_back(diagnostic);
   });
-  ModuleLoader loader(engine);
+  ModuleLoader loader(engine, std::move(include_paths));
   std::string message;
   (void)loader.loadSource(source, "<test>", &message);
   return collected;
@@ -502,4 +510,47 @@ TEST_CASE("a `;` where a sentence ends says what changed") {
   // the twelfth column.
   REQUIRE(error.location.column == 12);
   REQUIRE(error.message == "«;» — дизъюнкция; предложение должно заканчиваться точкой");
+}
+
+TEST_CASE("a predicate the program builds at run time is not a missing name") {
+  // Part 272: `examples/database.pld` and any program that copies a graph create a
+  // predicate while it runs — `ДОБКОН(след(1), [])`, `copy_predicate(ребро, линия)` —
+  // and the goal that calls it was reported as «не найдено» by a quiet load, the
+  // one a click on a margin marker makes.  Running the whole program hid the
+  // warning, because the creation had happened before the check.  The check now
+  // knows the names the text itself hands to the base.
+  const std::vector<PrologError> asserted = diagnosticsOf(
+      "след(0).\n"
+      "?ДОБКОН(след(1), []), след(Ч).\n");
+  REQUIRE(withSeverity(asserted, Severity::Warning).empty());
+
+  const std::vector<PrologError> copied = diagnosticsOf(
+      ":- ИМПОРТ(\"database.pld\").\n"
+      "ребро(а, б).\n"
+      "?copy_predicate(ребро, линия), линия(А, Б).\n",
+      {PROLOGD_STDLIB_DIR});
+  REQUIRE(withSeverity(copied, Severity::Warning).empty());
+}
+
+TEST_CASE("a typo next to a created name is still a warning") {
+  // The exemption is the *name the program hands over*, not everything around it.
+  const std::vector<PrologError> asserted = diagnosticsOf(
+      "след(0).\n"
+      "?ДОБКОН(след(1), []), следа(Ч).\n");
+  const std::vector<const PrologError*> warnings =
+      withSeverity(asserted, Severity::Warning);
+  REQUIRE(warnings.size() == 1);
+  // The suggestion is there too: the name handed over is known, so the near miss
+  // has something to point at.
+  REQUIRE(warnings.front()->message == "не найдено: следа/1; возможно, след/1");
+
+  const std::vector<PrologError> copied = diagnosticsOf(
+      ":- ИМПОРТ(\"database.pld\").\n"
+      "ребро(а, б).\n"
+      "?copy_predicate(ребро, линия), линияя(А, Б).\n",
+      {PROLOGD_STDLIB_DIR});
+  const std::vector<const PrologError*> copy_warnings =
+      withSeverity(copied, Severity::Warning);
+  REQUIRE(copy_warnings.size() == 1);
+  REQUIRE(copy_warnings.front()->message == "не найдено: линияя/2");
 }
