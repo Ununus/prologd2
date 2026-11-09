@@ -9422,3 +9422,30 @@ of the package».  Отдельно: 25 оконных наборов и `protoc
   `delete_predicate` и `copy_predicate` от несуществующего имени.
 * **Проверки.**  `linux-release` -- 467/467, `linux-werror` -- 467/467; все 29
   скриптов окна и `protocol_smoke.py` зелены; `library.pdf` -- 11 страниц, пустых нет.
+
+### 274. Примеры библиотеки базы знаний
+
+Владелец спросил, не сделать ли примеры использования библиотеки в `examples/`.
+Сделаны оба вида: рассказ `examples/clauses.pld` и секция в обзоре
+`examples/stdlib.pld` (ADR-083).
+
+* **Найдено по дороге: имя `database.pld` было занято.**  `examples/database.pld` --
+  демонстрация встроенных, и загрузчик ищет файл сначала рядом с подключающим (так и
+  должно быть), поэтому `:- ИМПОРТ("database.pld").` внутри `examples/` подтягивал
+  *демонстрацию*, а не библиотеку: импорт разрешался, ошибки не было, и все предикаты
+  библиотеки отвечали «не найдено».  Демонстрация переименована в
+  `examples/knowledge.pld` (git mv), обновлены `examples/README.md`, `PINNED`,
+  `checkedExamples`, строки в шапке файла и упоминания в `checks.cpp` и
+  `test_diagnostics.cpp`.
+* **`examples/clauses.pld`** -- сюжет «товары и цены»: `clause_number` (запись и
+  правило), `clauses` (тело правила списком), `replace_clause` на месте с проверкой
+  порядка через `НАЙТИВСЕ`, замена несуществующего (база цела, ответ НЕТ),
+  `copy_predicate` со снимком цен, `rename_predicate` со снятием старого имени,
+  `delete_predicate` на категории.  16 обещаний, сверены с живым прогоном дословно.
+* **Секция в `examples/stdlib.pld`** -- восемь вопросов про фрукты: `clauses`,
+  `clause_number`, `replace_clause`, `copy_predicate`, `rename_predicate`,
+  `delete_predicate`.  Обзор вырос с 83 вопросов до 91, `PINNED` снят `--print`.
+* **Проверки.**  `linux-release` -- 467/467, `linux-werror` -- 467/467 (`clauses.pld`
+  в `checkedExamples`, обещания `stdlib.pld` тоже сверяются); все 29 скриптов окна и
+  `protocol_smoke.py` зелены; все три файла в стандартной форме (`--format soft` даёт
+  пустой diff).

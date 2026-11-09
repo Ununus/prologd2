@@ -95,7 +95,8 @@ CASES: list[tuple[str, str | None]] = [
 #: with `--print` when a lesson gains or loses a question on purpose.
 PINNED: dict[str, int] = {
     "arith.pld": 22,
-    "database.pld": 23,
+    "knowledge.pld": 23,
+    "clauses.pld": 14,
     "drawing.pld": 1,
     "io.pld": 18,
     "findall.pld": 13,
@@ -134,7 +135,7 @@ PINNED: dict[str, int] = {
     "problems/maze/maze.pld": 2,
     "problems/sorting.pld": 8,
     "sort.pld": 15,
-    "stdlib.pld": 83,
+    "stdlib.pld": 91,
     "sub_string.pld": 11,
     "types.pld": 43,
 }

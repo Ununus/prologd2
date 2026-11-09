@@ -373,7 +373,7 @@ void forEachGoal(const ParsedProgram& program,
 /// The database grows while the program runs, and a predicate built at run time is
 /// not "undefined" — it is defined later.  `?ДОБКОН(двойной(Х, У), [...])` and
 /// `?copy_predicate(ребро, линия)` both make a predicate the text names, and the
-/// load-time check has to know it: `examples/database.pld` and any program that
+/// load-time check has to know it: `examples/knowledge.pld` and any program that
 /// copies a graph were told «не найдено» about a goal that works, on every quiet
 /// load — the load a click on a margin marker makes — while a full run hid it,
 /// because there the creation had happened before the check (part 272).

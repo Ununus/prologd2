@@ -9,7 +9,7 @@
 % ISO-имена: assert/3, asserta, assertz, retract/2; у СКОЛЬКО, ПРЕДЛ и ТЕРМ
 % стандартных имён нет.
 %
-% Запуск:  prologd -s examples/database.pld
+% Запуск:  prologd -s examples/knowledge.pld
 
 факт(1).
 

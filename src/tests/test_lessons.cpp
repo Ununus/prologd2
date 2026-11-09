@@ -100,6 +100,7 @@ const std::vector<std::string>& checkedExamples() {
   static const std::vector<std::string> names = {
       "arith.pld",
       "io.pld",
+      "clauses.pld",
       "findall.pld",
       "if_then.pld",
       "order.pld",
@@ -107,7 +108,7 @@ const std::vector<std::string>& checkedExamples() {
       "sort.pld",
       "ground.pld",
       "types.pld",
-      "database.pld",
+      "knowledge.pld",
       "forall.pld",
       "stdlib.pld",
       "problems/sorting.pld",

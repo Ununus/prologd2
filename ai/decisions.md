@@ -2804,3 +2804,24 @@ awkward by hand: the naive loop fails on the last clause, because after removing
 which is also why it answers «да» for a name with no clauses.
 
 **Status.** Accepted.
+
+## ADR-083: an example may not take a library's name
+
+**Context.**  `examples/database.pld` — the demo of the base *built-ins* — is searched
+beside the importing file before any `-I` directory, so `:- ИМПОРТ("database.pld").`
+written inside `examples/` loaded that demo instead of `stdlib/database.pld`.  It failed
+quietly: the import resolved, the check found no missing file, and every library
+predicate came out «не найдено» (part 274).  The order is right — a program's own folder
+must win — but the *name* was wrong for a file that is not the library.
+
+**Decision.**  The demo is `examples/knowledge.pld`; `database.pld` means the library and
+nothing else.  The name also reads better: the built-ins demo is about the base during a
+run, not about a database.
+
+**Consequences.**  Both new usages of the library — `examples/clauses.pld` and the
+section in `examples/stdlib.pld` — now find it with one `-I stdlib`, as the header of
+`stdlib/README.md` says.  The rule for the future: a file in `examples/` must not share a
+name with a file in `stdlib/`, because the loader's first step is the importing file's
+own folder.
+
+**Status.** Accepted.

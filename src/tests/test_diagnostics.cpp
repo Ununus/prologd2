@@ -513,7 +513,7 @@ TEST_CASE("a `;` where a sentence ends says what changed") {
 }
 
 TEST_CASE("a predicate the program builds at run time is not a missing name") {
-  // Part 272: `examples/database.pld` and any program that copies a graph create a
+  // Part 272: `examples/knowledge.pld` and any program that copies a graph create a
   // predicate while it runs — `ДОБКОН(след(1), [])`, `copy_predicate(ребро, линия)` —
   // and the goal that calls it was reported as «не найдено» by a quiet load, the
   // one a click on a margin marker makes.  Running the whole program hid the
