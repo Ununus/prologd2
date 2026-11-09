@@ -2698,3 +2698,37 @@ what «номер 2» means.  `ПРЕДЛ` is not ISO's `clause/2`; SWI's `nth_c
 closest relative, and it enumerates too.
 
 **Status.** Accepted.
+
+## ADR-080: `replace_clause` and `copy_predicate` live in the library, not in the engine
+
+**Context.**  A reader asked for `замена(Старое, Новое)` — remove the clauses whose head
+matches and insert the replacement — and the owner asked where it belongs: a library
+(a knowledge-base one, or a graph one) or the engine.  The whole predicate is five
+goals of the language, and only since part 270: `ПРЕДЛ` enumerating the clauses is what
+makes «find the number of the clause I recognise» expressible at all.
+
+**Decision.**  `stdlib/database.pld`: `replace_clause/2` (replace by a fact),
+`replace_clause/3` (by a rule, the body as a list, as `ДОБ`/`ДОБНАЧ` take it),
+`copy_predicate/2` (all clauses of a name under another name — a snapshot) and
+`copy_clauses/2`, the helper the library documents as «служебный», the way `replace/5`
+and `unique/3` are documented.
+
+Three reasons the engine was not used.  The built-ins of the base are either ISO's
+(`asserta`, `assertz`, `retract`, `retractall`) or readers the language cannot express
+(`СКОЛЬКО`, `ПРЕДЛ`, `ТЕРМ`); `replace_clause` is neither, it composes what already
+exists.  No implementation has the name — `replace_clause`, `replace`, `replace_all`
+and `update_clause` are all absent from SWI 9.2.9 and GNU Prolog 1.5.0 — so a built-in
+would freeze a name of our invention beside `УДАЛЕНИЕ` and look as if it had the same
+standing.  And it carries a *policy* — all matching clauses or one, the old position or
+the front, a fact or a rule — which a library can spell out and a built-in must fix.
+
+**Consequences.**  No graph library.  Its useful part (`вершины/2`, `смежные/3`) is
+homework in lesson 8 and in `examples/problems/maze`, and a ready-made search would
+cancel the exercise.  What a graph program actually needed was one operation on the
+base, and that is this file.  The library is Latin-named like the rest (`head`, `gcd`,
+`replace/4` for strings — hence `replace_clause` and not `replace/2`), it is imported
+with one directive, and it travels in every package unchanged.  `doc/library.typ` §8
+and `stdlib/README.md` describe it; `test_stdlib.cpp` now runs it, not only checks that
+it is documented.
+
+**Status.** Accepted.

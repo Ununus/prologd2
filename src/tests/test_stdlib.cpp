@@ -6,6 +6,9 @@
 #include <set>
 #include <sstream>
 #include <string>
+#include <vector>
+
+#include "test_helpers.hpp"
 
 namespace {
 
@@ -97,4 +100,57 @@ TEST_CASE("the library document names every predicate the library defines") {
   }
   REQUIRE(files >= 5);
   REQUIRE(checked >= 80);
+}
+
+TEST_CASE("the knowledge base library replaces in place and copies a predicate") {
+  // Part 271: the library had no way to *change* the base — only the engine's
+  // primitives, each acting on one clause.  `replace_clause` keeps the position
+  // (the order of clauses is the order of answers, which a graph search depends
+  // on) and `copy_predicate` is what a snapshot of a graph is.
+  using prologd::test::runProgramWithIncludes;
+  const std::vector<std::filesystem::path> library{PROLOGD_STDLIB_DIR};
+  const auto result = runProgramWithIncludes(
+      ":- ИМПОРТ(\"database.pld\").\n"
+      "ребро(а, б). ребро(б, в). ребро(в, г).\n"
+      "?replace_clause(ребро(б, в), ребро(б, д)), ребро(X, Y).\n",
+      "", library);
+  REQUIRE(result.loaded);
+  REQUIRE_FALSE(result.runtimeError);
+  // The replacement stands where the old clause stood: б-д between а-б and в-г.
+  REQUIRE(result.output == "X=а\nY=б\nX=б\nY=д\nX=в\nY=г\n");
+}
+
+TEST_CASE("a replacement of what is not there changes nothing") {
+  using prologd::test::runProgramWithIncludes;
+  const std::vector<std::filesystem::path> library{PROLOGD_STDLIB_DIR};
+  const auto result = runProgramWithIncludes(
+      ":- ИМПОРТ(\"database.pld\").\n"
+      "ребро(а, б).\n"
+      "?replace_clause(ребро(а, з), ребро(а, д)).\n"
+      "?replace_clause(ребро(чужой, б), ребро(а, д)).\n"
+      "?ПРЕДЛ(ребро, Н, Г, Ц).\n",
+      "", library);
+  REQUIRE(result.loaded);
+  REQUIRE_FALSE(result.runtimeError);
+  // The head does not answer to the first pattern, so both replacements fail and
+  // the single fact is untouched: no clause was added where none was removed.
+  REQUIRE(result.output == "НЕТ\nНЕТ\nН=1\nГ=ребро(а,б)\nЦ=[]\n");
+}
+
+TEST_CASE("a copy takes arms as they are and leaves the original alone") {
+  using prologd::test::runProgramWithIncludes;
+  const std::vector<std::filesystem::path> library{PROLOGD_STDLIB_DIR};
+  const auto result = runProgramWithIncludes(
+      ":- ИМПОРТ(\"database.pld\").\n"
+      "длинная(а). длинная(б).\n"
+      "путь(X):-длинная(X).\n"
+      "?copy_predicate(путь, дорога), дорога(X).\n"
+      "?replace_clause(дорога(а), дорога(я)), путь(X).\n"
+      "?copy_predicate(нетТакого, ничто).\n",
+      "", library);
+  REQUIRE(result.loaded);
+  REQUIRE_FALSE(result.runtimeError);
+  // The copy carries the body it had, the original still answers «а», and there is
+  // nothing to copy from an unknown name.
+  REQUIRE(result.output == "X=а\nX=б\nX=а\nX=б\nНЕТ\n");
 }
