@@ -56,7 +56,7 @@ class Statement:
 def _statement(template: str) -> Statement:
     """Reads a template written with `|` where the caret goes.
 
-    `':- ИМПОРТ("|").'` says both things at once — the text and the caret — and
+    `:- ИМПОРТ('|').` says both things at once — the text and the caret — and
     needs no arithmetic when the caret is not right after the `(`.  No statement
     has a `|` in it, so the mark cannot be mistaken for the language.
     """
@@ -68,8 +68,8 @@ def _statement(template: str) -> Statement:
 #: `ИМПОРТ`'s quotes (the string completes to a file, task_104) and before
 #: `ХОЛСТ`'s comma.
 STATEMENT_TEMPLATES = {
-    "ИМПОРТ": _statement(':- ИМПОРТ("|").'),
-    "import": _statement(':- import("|").'),
+    "ИМПОРТ": _statement(":- ИМПОРТ('|')."),
+    "import": _statement(":- import('|')."),
     "ХОЛСТ": _statement(":- ХОЛСТ(|, )."),
     "canvas": _statement(":- canvas(|, )."),
 }
@@ -420,7 +420,7 @@ class CompletionModel:
 def at_statement_start(text: str, position: int, prefix: str = "") -> bool:
     """True when only whitespace stands between the line start and the typed word.
 
-    What a directive needs (task_105): `:- ИМПОРТ("…").` is a statement of its own,
+    What a directive needs (task_105): `:- ИМПОРТ('…').` is a statement of its own,
     and offering it in the middle of a body would be offering a syntax error.
     `prefix` is the word being typed — the caret stands after it, so the question is
     about what comes *before* the word.

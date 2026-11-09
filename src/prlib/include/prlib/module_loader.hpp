@@ -36,7 +36,8 @@ std::filesystem::path standardLibraryDirectory(const std::filesystem::path& dire
 ///
 /// Replaces the old textual preprocessor: imports are resolved relative to the
 /// importing file and the configured include directories, each file is loaded
-/// once, cycles are detected and paths cannot escape the optional root.
+/// once, cycles are detected and paths cannot escape the optional root.  A name
+/// without an extension also names `<name>.pld` (ADR-084).
 class ModuleLoader {
  public:
   using QueryRunner = std::function<void(const Query&)>;

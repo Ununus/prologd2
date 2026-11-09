@@ -170,11 +170,11 @@ def test_reserved_names_variables_and_atoms() -> None:
     # The three kinds of reserved word are told apart.
     assert kinds("mod") == [(OPERATOR, "mod")]
     assert kinds("div") == [(OPERATOR, "div")]
-    assert kinds(":- ИМПОРТ(\"a.pld\").") == [
+    assert kinds(":- ИМПОРТ('a.pld').") == [
         (PUNCTUATION, ":-"),
         (DIRECTIVE, "ИМПОРТ"),
         (PUNCTUATION, "("),
-        (STRING, '"a.pld"'),
+        (QUOTED_ATOM, "'a.pld'"),
         (PUNCTUATION, ")"),
         (PUNCTUATION, "."),
     ]

@@ -471,12 +471,23 @@ TEST_CASE("parser builds lists and arithmetic expressions") {
 }
 
 TEST_CASE("parser records imports") {
-  DiagnosticSink sink;
-  const auto program = parse(":- ИМПОРТ(\"other.pld\").\nfoo.\n", sink);
-  REQUIRE_FALSE(sink.hasErrors());
-  REQUIRE(program.imports.size() == 1);
-  REQUIRE(program.imports[0].path == "other.pld");
-  REQUIRE(program.clauses.size() == 1);
+  // One name, three spellings: a quoted atom is how it is written now, a bare atom
+  // works when there are no special characters in it, and the string form is still
+  // read because programs were written that way before ADR-085.
+  const std::pair<std::string, std::string> spellings[] = {
+      {":- ИМПОРТ('other.pld').\nfoo.\n", "other.pld"},
+      {":- ИМПОРТ(other).\nfoo.\n", "other"},
+      {":- ИМПОРТ(\"other.pld\").\nfoo.\n", "other.pld"},
+  };
+  for (const auto& [source, expected] : spellings) {
+    INFO(source);
+    DiagnosticSink sink;
+    const auto program = parse(source, sink);
+    REQUIRE_FALSE(sink.hasErrors());
+    REQUIRE(program.imports.size() == 1);
+    REQUIRE(program.imports[0].path == expected);
+    REQUIRE(program.clauses.size() == 1);
+  }
 }
 
 TEST_CASE("parser reports syntax errors") {

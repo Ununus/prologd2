@@ -110,7 +110,7 @@ TEST_CASE("an import reaches the standard library beside the program") {
   fs::create_directories(dir.path() / "stdlib");
   dir.write("stdlib/lists.pld", "длина_списка([], 0).\n");
   dir.write("программа.pld",
-            ":- ИМПОРТ(\"lists.pld\").\n"
+            ":- ИМПОРТ('lists.pld').\n"
             "?длина_списка([], N).\n");
   // What the CLI hands the loader: the interpreter's own `stdlib`, last.
   const LoadOutcome outcome =
@@ -122,8 +122,8 @@ TEST_CASE("an import reaches the standard library beside the program") {
 TEST_CASE("import loads a module once") {  TempDir dir;
   dir.write("base.pld", "факт(1).\nфакт(2).\n");
   dir.write("main.pld",
-            ":- ИМПОРТ(\"base.pld\").\n"
-            ":- ИМПОРТ(\"base.pld\").\n"
+            ":- ИМПОРТ('base.pld').\n"
+            ":- ИМПОРТ('base.pld').\n"
             "?СКОЛЬКО(факт, N).\n"
             "?факт(X).\n");
   const LoadOutcome outcome = load(dir.path() / "main.pld");
@@ -139,7 +139,7 @@ TEST_CASE("a directive import brings the definitions and leaves the questions al
             "пометка(да).\n"
             "?ВЫВОДПС(\"из библиотеки\").\n");
   dir.write("main.pld",
-            ":- ИМПОРТ(\"lib.pld\").\n"
+            ":- ИМПОРТ('lib.pld').\n"
             "?пометка(X).\n");
   const LoadOutcome outcome = load(dir.path() / "main.pld");
   REQUIRE(outcome.ok);
@@ -147,7 +147,7 @@ TEST_CASE("a directive import brings the definitions and leaves the questions al
 }
 
 TEST_CASE("the question form of the import keeps its splice") {
-  // `?ИМПОРТ("lib.pld").` is how the previous version wrote an import: the file
+  // `?ИМПОРТ('lib.pld').` is how the previous version wrote an import: the file
   // was spliced in where the line stood, questions and all.  Old programs keep
   // that behaviour, and a program that wants a quiet library writes `:-` instead.
   TempDir dir;
@@ -155,7 +155,7 @@ TEST_CASE("the question form of the import keeps its splice") {
             "пометка(да).\n"
             "?ВЫВОДПС(\"из библиотеки\").\n");
   dir.write("main.pld",
-            "?ИМПОРТ(\"lib.pld\").\n"
+            "?ИМПОРТ('lib.pld').\n"
             "?пометка(X).\n");
   const LoadOutcome outcome = load(dir.path() / "main.pld");
   REQUIRE(outcome.ok);
@@ -168,7 +168,7 @@ TEST_CASE("import resolves relative to the importing file") {
   fs::create_directories(dir.path() / "sub");
   dir.write("sub/helper.pld", "помощь(да).\n");
   dir.write("main.pld",
-            ":- ИМПОРТ(\"sub/helper.pld\").\n"
+            ":- ИМПОРТ('sub/helper.pld').\n"
             "?помощь(X).\n");
   const LoadOutcome outcome = load(dir.path() / "main.pld");
   REQUIRE(outcome.ok);
@@ -179,7 +179,7 @@ TEST_CASE("import finds modules on the include path") {
   TempDir dir;
   dir.write("lib.pld", "библиотека(ок).\n");
   dir.write("main.pld",
-            ":- ИМПОРТ(\"lib.pld\").\n"
+            ":- ИМПОРТ('lib.pld').\n"
             "?библиотека(X).\n");
   const LoadOutcome outcome =
       load(dir.path() / "main.pld", {dir.path()}, dir.path());
@@ -187,10 +187,63 @@ TEST_CASE("import finds modules on the include path") {
   REQUIRE(outcome.output == "X=ок\n");
 }
 
+TEST_CASE("an import name without an extension names the .pld file") {
+  // ADR-084: `ИМПОРТ('lib')` is `ИМПОРТ('lib.pld')`, the way `consult(foo)` means
+  // `foo.pl` in SWI.  The dialect has a single source extension, so the guess is
+  // exact -- one name, not a list of alternatives.
+  TempDir dir;
+  dir.write("lib.pld", "библиотека(да).\n");
+  dir.write("main.pld",
+            ":- ИМПОРТ('lib').\n"
+            "?библиотека(X).\n");
+  const LoadOutcome outcome = load(dir.path() / "main.pld");
+  REQUIRE(outcome.ok);
+  REQUIRE(outcome.output == "X=да\n");
+}
+
+TEST_CASE("a file named exactly like the import wins over its .pld") {
+  // The suffixed name is the second half of the search, never the first: a file
+  // carrying that exact name is still what `ИМПОРТ('lib')` means.
+  TempDir dir;
+  dir.write("lib", "библиотека(точное).\n");
+  dir.write("lib.pld", "библиотека(расширение).\n");
+  dir.write("main.pld",
+            ":- ИМПОРТ('lib').\n"
+            "?библиотека(X).\n");
+  const LoadOutcome outcome = load(dir.path() / "main.pld");
+  REQUIRE(outcome.ok);
+  REQUIRE(outcome.output == "X=точное\n");
+}
+
+TEST_CASE("an import name with an extension is not suffixed") {
+  // `.pld` is added only to a name with no extension at all: `lib.txt` means
+  // `lib.txt`, and a stray `lib.txt.pld` is not picked up behind its back.
+  TempDir dir;
+  dir.write("lib.txt.pld", "библиотека(да).\n");
+  dir.write("main.pld", ":- ИМПОРТ('lib.txt').\n");
+  const LoadOutcome outcome = load(dir.path() / "main.pld");
+  REQUIRE_FALSE(outcome.ok);
+  REQUIRE(outcome.error.find("Не найден импортируемый файл") != std::string::npos);
+}
+
+TEST_CASE("an extensionless import finds the .pld file on the include path") {
+  // The whole search runs again for the suffixed name, so a library that is not
+  // next to the importing file is still found in an `-I` directory.
+  TempDir dir;
+  TempDir shared;
+  shared.write("общая.pld", "библиотека(ок).\n");
+  dir.write("main.pld",
+            ":- ИМПОРТ('общая').\n"
+            "?библиотека(X).\n");
+  const LoadOutcome outcome = load(dir.path() / "main.pld", {shared.path()});
+  REQUIRE(outcome.ok);
+  REQUIRE(outcome.output == "X=ок\n");
+}
+
 TEST_CASE("import detects cycles") {
   TempDir dir;
-  dir.write("a.pld", ":- ИМПОРТ(\"b.pld\").\nа(1).\n");
-  dir.write("b.pld", ":- ИМПОРТ(\"a.pld\").\nб(2).\n");
+  dir.write("a.pld", ":- ИМПОРТ('b.pld').\nа(1).\n");
+  dir.write("b.pld", ":- ИМПОРТ('a.pld').\nб(2).\n");
   const LoadOutcome outcome = load(dir.path() / "a.pld");
   REQUIRE_FALSE(outcome.ok);
   REQUIRE(outcome.error.find("Циклический импорт") != std::string::npos);
@@ -201,7 +254,7 @@ TEST_CASE("import rejects paths outside the root") {
   TempDir outside;
   outside.write("secret.pld", "секрет(1).\n");
   dir.write("main.pld",
-            ":- ИМПОРТ(\"../" + outside.path().filename().string() + "/secret.pld\").\n");
+            ":- ИМПОРТ('../" + outside.path().filename().string() + "/secret.pld').\n");
   const LoadOutcome outcome = load(dir.path() / "main.pld", {}, dir.path());
   REQUIRE_FALSE(outcome.ok);
   // A candidate that exists but is rejected must say why, not just disappear.
@@ -210,7 +263,7 @@ TEST_CASE("import rejects paths outside the root") {
 
 TEST_CASE("import reports a missing file") {
   TempDir dir;
-  dir.write("main.pld", ":- ИМПОРТ(\"nope.pld\").\n");
+  dir.write("main.pld", ":- ИМПОРТ('nope.pld').\n");
   const LoadOutcome outcome = load(dir.path() / "main.pld");
   REQUIRE_FALSE(outcome.ok);
   REQUIRE(outcome.error.find("nope.pld") != std::string::npos);
@@ -219,7 +272,7 @@ TEST_CASE("import reports a missing file") {
 TEST_CASE("a missing import names the directories that were tried") {
   TempDir dir;
   TempDir shared;
-  dir.write("main.pld", ":- ИМПОРТ(\"нет.pld\").\n");
+  dir.write("main.pld", ":- ИМПОРТ('нет.pld').\n");
   const LoadOutcome outcome = load(dir.path() / "main.pld", {shared.path()});
   REQUIRE_FALSE(outcome.ok);
   REQUIRE(outcome.error.find("Искался в:") != std::string::npos);
@@ -247,7 +300,7 @@ TEST_CASE("a missing import names the directories that were tried") {
 TEST_CASE("a directory named like the import is reported as a directory") {
   TempDir dir;
   fs::create_directories(dir.path() / fromUtf8Path("модуль.pld"));
-  dir.write("main.pld", ":- ИМПОРТ(\"модуль.pld\").\n");
+  dir.write("main.pld", ":- ИМПОРТ('модуль.pld').\n");
   const LoadOutcome outcome = load(dir.path() / "main.pld");
   REQUIRE_FALSE(outcome.ok);
   REQUIRE(outcome.error.find("(это каталог)") != std::string::npos);
@@ -257,7 +310,7 @@ TEST_CASE("import works with UTF-8 file names") {
   TempDir dir;
   dir.write("модуль.pld", "привет(мир).\n");
   dir.write("main.pld",
-            ":- ИМПОРТ(\"модуль.pld\").\n"
+            ":- ИМПОРТ('модуль.pld').\n"  // the string form is still read
             "?привет(X).\n");
   const LoadOutcome outcome = load(dir.path() / "main.pld");
   REQUIRE(outcome.ok);
@@ -278,7 +331,7 @@ TEST_CASE("a Cyrillic path names the program and the directory its imports come 
   }
   {
     std::ofstream program(program_dir / fromUtf8Path("программа.pld"), std::ios::binary);
-    program << "?ИМПОРТ(\"книги.pld\").\n?удвоить(21, Д).\n";
+    program << "?ИМПОРТ('книги.pld').\n?удвоить(21, Д).\n";
   }
   const LoadOutcome outcome = load(program_dir / fromUtf8Path("программа.pld"));
   REQUIRE(outcome.ok);
@@ -295,7 +348,7 @@ TEST_CASE("an include directory with a Cyrillic name is searched") {
     library << "привет(мир).\n";
   }
   dir.write("main.pld",
-            "?ИМПОРТ(\"книги.pld\").\n"
+            "?ИМПОРТ('книги.pld').\n"
             "?привет(X).\n");
   const LoadOutcome outcome = load(dir.path() / "main.pld", {include_dir});
   REQUIRE(outcome.ok);
@@ -328,8 +381,8 @@ TEST_CASE("two imported files that define one name are reported") {
   dir.write("first.pld", "член(X, [X|_]).\n");
   dir.write("second.pld", "член(X, [_|T]) :- член(X, T).\n");
   dir.write("main.pld",
-            ":- ИМПОРТ(\"first.pld\").\n"
-            ":- ИМПОРТ(\"second.pld\").\n"
+            ":- ИМПОРТ('first.pld').\n"
+            ":- ИМПОРТ('second.pld').\n"
             "?член(X, [1, 2]).\n");
   const LoadOutcome outcome = load(dir.path() / "main.pld");
   REQUIRE(outcome.ok);
@@ -347,7 +400,7 @@ TEST_CASE("a file that extends an imported predicate is not a clash") {
   TempDir dir;
   dir.write("base.pld", "фрукт(яблоко).\n");
   dir.write("main.pld",
-            ":- ИМПОРТ(\"base.pld\").\n"
+            ":- ИМПОРТ('base.pld').\n"
             "фрукт(груша).\n"
             "?фрукт(X).\n");
   const LoadOutcome outcome = load(dir.path() / "main.pld");

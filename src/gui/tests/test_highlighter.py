@@ -143,7 +143,7 @@ def test_a_directive_is_bold_like_any_reserved_name() -> None:
     plain keyword, and the `ready` event says `directive`.  The colour was the same
     either way, but the bold mark was not — it disappeared after the first run.
     """
-    line = ':- ИМПОРТ("файл.pld").'
+    line = ":- ИМПОРТ('файл.pld')."
     with_kinds = Coloured(line, keywords=TABLE)
     without = Coloured(line, keywords=Keywords([{"name": "ИМПОРТ", "arities": []}]))
     bold = int(QFont.Weight.Bold)

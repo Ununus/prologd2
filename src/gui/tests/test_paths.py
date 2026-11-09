@@ -452,6 +452,24 @@ def test_the_import_name_is_resolved_the_way_the_interpreter_resolves_it() -> No
                                     interpreter_path=None) == str(absolute)
         assert paths.resolve_import("nowhere.pld", source_dir=folder, directories=[],
                                     interpreter_path=None) is None
+
+        # A name without an extension also names its `.pld` (ADR-084), and the
+        # suffixed name is searched only after the name as written.
+        found = paths.resolve_import("lib", source_dir=folder / "near",
+                                    directories=[], interpreter_path=None)
+        assert found == str(folder / "near" / "lib.pld"), found
+        (folder / "near" / "bare").write_text("факт(5).\n", encoding="utf-8")
+        found = paths.resolve_import("bare", source_dir=folder / "near",
+                                    directories=[], interpreter_path=None)
+        assert found == str(folder / "near" / "bare"), found
+        # A name that has an extension is taken literally, `.pld` or not.
+        (folder / "near" / "data.txt.pld").write_text("факт(6).\n", encoding="utf-8")
+        assert paths.resolve_import("data.txt", source_dir=folder / "near",
+                                    directories=[], interpreter_path=None) is None
+        # An absolute name is guessed the same way.
+        assert paths.resolve_import(str(folder / "near" / "lib"), source_dir=None,
+                                    directories=[], interpreter_path=None) == str(
+                                        folder / "near" / "lib.pld")
     print("ok: an import name resolves in the order the engine uses")
 
 

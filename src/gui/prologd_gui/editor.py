@@ -1137,7 +1137,7 @@ class CodeEditor(ZoomablePlainTextEdit):
         self._offers = self._completion.candidates(prefix)
         if not completion.at_statement_start(text, position, prefix):
             # A directive is a statement of its own (task_105): inside a body the
-            # popup offers names, not `:- ИМПОРТ("…").`.
+            # popup offers names, not `:- ИМПОРТ('…').`.
             self._offers = [offer for offer in self._offers if not offer.directive]
         if not self._offers:
             self._hide_completion()

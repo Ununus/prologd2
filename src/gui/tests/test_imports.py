@@ -20,7 +20,7 @@ from prologd_gui import imports  # noqa: E402
 
 def test_a_directive_names_its_file_in_both_spellings() -> None:
     text = (
-        ":- ИМПОРТ(\"библиотека.pld\").\n"
+        ":- ИМПОРТ('библиотека.pld').\n"
         ":- import('lib/ещё.pld').\n"
         ":- ИМПОРТ(голое_имя).\n"
     )
@@ -41,10 +41,10 @@ def test_the_argument_is_read_where_it_stands_quotes_and_all() -> None:
     called `'iso.pld'` (part 243).
     """
     for line, expected in (
-        (':- ИМПОРТ("iso.pld").', 'iso.pld'),
+        (':- ИМПОРТ("iso.pld").', 'iso.pld'),  # the older spelling, still read
         (":- ИМПОРТ('iso.pld').", 'iso.pld'),
         (':- ИМПОРТ(iso).', 'iso'),
-        (':- import("lib/x.pld").', 'lib/x.pld'),
+        (":- import('lib/x.pld').", 'lib/x.pld'),
     ):
         found = imports.directive_arguments(line)
         assert len(found) == 1, (line, found)
@@ -64,10 +64,10 @@ def test_the_argument_is_read_where_it_stands_quotes_and_all() -> None:
 
 def test_a_directive_in_a_comment_or_a_string_names_nothing() -> None:
     text = (
-        "% :- ИМПОРТ(\"нет.pld\").\n"
-        "факт('ИМПОРТ(\"тоже_нет.pld\")').\n"
+        "% :- ИМПОРТ('нет.pld').\n"
+        "факт('ИМПОРТ(тоже_нет.pld)').\n"
         ":- ВЫВОД(\"и это не импорт\").\n"
-        ":- ИМПОРТ(\"да.pld\").   % а это импорт\n"
+        ":- ИМПОРТ('да.pld').   % а это импорт\n"
     )
     assert imports.directive_names(text) == ["да.pld"], imports.directive_names(text)
     print("ok: a commented or a quoted directive names nothing")
@@ -84,7 +84,7 @@ def test_a_directive_is_found_whatever_kind_its_name_arrives_as() -> None:
     """
     from prologd_gui.keywords import Keywords
 
-    text = ':- ИМПОРТ("iso.pld").\n?length([1, 2, 3], Д).\n'
+    text = ":- ИМПОРТ('iso.pld').\n?length([1, 2, 3], Д).\n"
     plain = Keywords([{"name": "ИМПОРТ", "arities": []}])
     with_kinds = Keywords([{"name": "ИМПОРТ", "kind": "directive", "arities": []}])
     assert imports.directive_names(text, plain) == ["iso.pld"]
@@ -97,10 +97,10 @@ def test_a_directive_is_found_whatever_kind_its_name_arrives_as() -> None:
 
 def test_the_walk_is_recursive_and_survives_a_cycle() -> None:
     disk = {
-        "a.pld": ":- ИМПОРТ(\"b.pld\").\nа(1).\n",
-        "b.pld": ":- ИМПОРТ(\"c.pld\").\nб(1).\n",
+        "a.pld": ":- ИМПОРТ('b.pld').\nа(1).\n",
+        "b.pld": ":- ИМПОРТ('c.pld').\nб(1).\n",
         # Back to `a` — the engine tolerates a cycle, and so must the walk.
-        "c.pld": ":- ИМПОРТ(\"a.pld\").\nв(1).\n:- ИМПОРТ(\"пропавший.pld\").\n",
+        "c.pld": ":- ИМПОРТ('a.pld').\nв(1).\n:- ИМПОРТ('пропавший.pld').\n",
     }
     files = imports.ImportedFiles(read=disk.get)
 
@@ -111,7 +111,7 @@ def test_the_walk_is_recursive_and_survives_a_cycle() -> None:
         ["a.pld"], resolve=resolve, directories=(), interpreter_path=None
     )
     assert list(found) == ["a.pld", "b.pld", "c.pld"], list(found)
-    assert found["c.pld"].startswith(":- ИМПОРТ(\"a.pld\")"), found["c.pld"]
+    assert found["c.pld"].startswith(":- ИМПОРТ('a.pld')"), found["c.pld"]
     print("ok: the walk is recursive, sees a file once, and ignores a missing one")
 
 
@@ -123,7 +123,7 @@ def test_the_files_are_found_through_the_engine_s_order() -> None:
         (root / "библиотеки").mkdir()
         (root / "проект" / "своё.pld").write_text("своё(1).\n", encoding="utf-8")
         (root / "библиотеки" / "общее.pld").write_text(
-            ':- ИМПОРТ("рядом.pld").\nобщее(1).\n', encoding="utf-8"
+            ":- ИМПОРТ('рядом.pld').\nобщее(1).\n", encoding="utf-8"
         )
         # Imported by `общее.pld`, so it is looked for beside it — not beside the
         # buffer the walk started from.

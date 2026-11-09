@@ -13,7 +13,7 @@
 %
 % Запуск:  prologd -I stdlib -s examples/clauses.pld
 
-:- ИМПОРТ("database.pld").
+:- ИМПОРТ('database.pld').
 
 товар(хлеб, 40).
 товар(молоко, 80).

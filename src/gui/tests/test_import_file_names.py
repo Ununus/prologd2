@@ -19,19 +19,20 @@ FOLDERS = [pathlib.Path("C:/проект"), pathlib.Path("C:/библиотек�
 
 
 def test_the_caret_inside_the_directive_names_what_is_typed() -> None:
-    text = ':- ИМПОРТ("lib/is"), ВЫВОД(1).\n'
+    text = ":- ИМПОРТ('lib/is'), ВЫВОД(1).\n"
     caret = text.index("is") + 2
     assert imports.import_argument_at(text, caret) == ("lib/", "is"), (
         imports.import_argument_at(text, caret)
     )
     # The name alone: no folder part yet, and the English spelling counts too.
+    # The string form of the argument is the older one; it completes like the rest.
     alone = ':- import("is'
     assert imports.import_argument_at(alone, len(alone)) == ("", "is")
     # A quoted atom is the same argument to the parser, so it completes too.
     quoted = ":- ИМПОРТ('is"
     assert imports.import_argument_at(quoted, len(quoted)) == ("", "is")
     # Right after a slash the folder is the whole answer, the name is empty.
-    fresh = ':- ИМПОРТ("lib/'
+    fresh = ":- ИМПОРТ('lib/"
     assert imports.import_argument_at(fresh, len(fresh)) == ("lib/", "")
     print("ok: the caret inside the directive's string knows what is typed")
 
@@ -40,20 +41,20 @@ def test_the_caret_anywhere_else_asks_nothing() -> None:
     ordinary = ':- ВЫВОД("is'
     assert imports.import_argument_at(ordinary, len(ordinary)) is None
     # A directive in a comment is not a directive.
-    commented = '% :- ИМПОРТ("is'
+    commented = "% :- ИМПОРТ('is"
     assert imports.import_argument_at(commented, len(commented)) is None
     # Before the opening quote and past the closing one there is nothing to offer.
-    text = ':- ИМПОРТ("iso.pld").'
+    text = ":- ИМПОРТ('iso.pld')."
     assert imports.import_argument_at(text, text.index("(")) is None
     assert imports.import_argument_at(text, len(text)) is None
     # Another line entirely.
-    two_lines = ':- ИМПОРТ("iso.pld").\nцель :- ВЫВОД(1).'
+    two_lines = ":- ИМПОРТ('iso.pld').\nцель :- ВЫВОД(1)."
     assert imports.import_argument_at(two_lines, len(two_lines)) is None
     print("ok: an ordinary string, a comment and the code around get nothing")
 
 
 def test_the_entries_are_folders_first_then_files() -> None:
-    text = ':- ИМПОРТ("'
+    text = ":- ИМПОРТ('"
     typed = imports.import_argument_at(text, len(text))
     assert typed == ("", ""), typed
 

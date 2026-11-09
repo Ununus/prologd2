@@ -574,7 +574,7 @@ if(NOT exit_code EQUAL 0)
 endif()
 
 # --- a question that is a directive still answers ----------------------------
-# `?ИМПОРТ("…")` and `?ХОЛСТ(…)` are carried out by the loader while the text is
+# `?ИМПОРТ('…')` and `?ХОЛСТ(…)` are carried out by the loader while the text is
 # read, so they never reach the query runner: the session used to send no `result`
 # at all, and a front-end waited for one forever (part 246).  The imported file
 # here asks nothing, which is the worst case — nothing else could have answered.

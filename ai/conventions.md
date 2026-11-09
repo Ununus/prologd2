@@ -339,6 +339,16 @@ Tests are written **together with** the feature, never after.
   `technical.typ`, `gui.typ` and `style.typ` still carry it and are cleaned as they
   are touched.
 
+## Prose and samples
+
+* `ИМПОРТ` names its file with an **atom**: `:- ИМПОРТ('lists.pld').`, or a bare one
+  when the name has no special characters (`:- ИМПОРТ(lists).` -- ADR-084 fills in
+  `.pld`).  Double quotes (`:- ИМПОРТ("lists.pld").`) still parse and a few tests pin
+  that they do, but nothing new is written that way: in ISO double quotes are a
+  sequence of character codes and in SWI a type of their own, so the habit breaks
+  outside this dialect (ADR-085).  The window's statement template, the file
+  completion and `doc/builtins.json` follow the same rule.
+
 ## The original material
 
 The previous implementation of PrologD (the CP1251 sources, the user help, the

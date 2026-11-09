@@ -100,7 +100,7 @@ if(TARGET prologd)
     PASS_REGULAR_EXPRESSION "Дважды=42")
 
   # Part 133: a name of a file is UTF-8 — on the command line, in `-I` and in
-  # `?ИМПОРТ("…")` — so a Cyrillic path is taken as it was typed.  The directory and
+  # `?ИМПОРТ('…')` — so a Cyrillic path is taken as it was typed.  The directory and
   # the programs are written here, at configure time; the needles are ASCII on
   # purpose, because CMake decodes a child's output with the code page of the build's
   # console (`cli_diagnostics.cmake` says the same in its own comment).
@@ -112,7 +112,7 @@ if(TARGET prologd)
   file(WRITE "${prologd_cyrillic}/библиотеки/библиотека.pld"
        "удвоить(Ч, Д):-УМНОЖЕНИЕ(Ч, 2, Д).\n")
   file(WRITE "${prologd_cyrillic}/импорт.pld"
-       "?ИМПОРТ(\"библиотека.pld\").\n?удвоить(21, Д).\n")
+       "?ИМПОРТ('библиотека.pld').\n?удвоить(21, Д).\n")
 
   add_test(NAME cli_cyrillic_path
     COMMAND prologd -s "${prologd_cyrillic}/программа.pld")

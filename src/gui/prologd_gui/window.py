@@ -78,7 +78,7 @@ from .settings import OUTPUT_FONT_SIZE, Settings
 STOP_GRACE_MS = 500
 
 WELCOME_TEXT = """\
-:- ИМПОРТ('iso.pld'). % подключает стандартные предикаты ISO
+:- ИМПОРТ(iso). % подключает стандартные предикаты ISO
 % F12 над ИМПОРТ откроет файл
 % F12 над символом откроет первое определение
 ?length([1, 2, 3], Д).\n
@@ -2245,10 +2245,11 @@ class MainWindow(QMainWindow):
         """The file named by the `ИМПОРТ` line under the caret, if that is the line.
 
         The line is read with the editor's own tokenizer, so it may be written any way
-        the language allows — `:- ИМПОРТ("lib/x.pld").`, `:- ИМПОРТ('x.pld').` and
-        `:- import("x.pld").` all do.  The three spellings of the argument are read
-        in one place, `imports.directive_arguments`, so this key and the popup
-        cannot disagree about what the line brings in.
+        the language allows — `:- ИМПОРТ('lib/x.pld').`, `:- ИМПОРТ(iso).` and
+        `:- import("x.pld").` (the string form is accepted for older programs) all do.
+        The three spellings of the argument are read in one place,
+        `imports.directive_arguments`, so this key and the popup cannot disagree
+        about what the line brings in.
         """
         pane = self.active_pane() if self._panes else None
         view = pane.current_view() if pane is not None else None

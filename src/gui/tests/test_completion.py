@@ -298,7 +298,7 @@ def test_a_comment_above_the_first_clause_is_carried_with_the_name() -> None:
 
 
 def test_a_directive_is_offered_as_the_whole_statement() -> None:
-    """`ИМ` gives `:- ИМПОРТ("").` with the caret inside the quotes (task_105).
+    """`ИМ` gives `:- ИМПОРТ('').` with the caret inside the quotes (task_105).
 
     A directive is not a goal: the skeleton is the statement, and the string it
     opens is the one that completes to a file name (task_104).  `ХОЛСТ` follows the
@@ -317,11 +317,11 @@ def test_a_directive_is_offered_as_the_whole_statement() -> None:
     model = completion.CompletionModel(reserved)
     model.update("")
     offers = model.candidates("ИМП")
-    assert [offer.label for offer in offers] == [':- ИМПОРТ("").'], offers
-    assert offers[0].call_form == (':- ИМПОРТ("").', 11), offers[0].call_form
+    assert [offer.label for offer in offers] == [":- ИМПОРТ('')."], offers
+    assert offers[0].call_form == (":- ИМПОРТ('').", 11), offers[0].call_form
     assert offers[0].directive is True
     # The English spelling has a skeleton of its own.
-    assert [offer.label for offer in model.candidates("im")] == [':- import("").'], (
+    assert [offer.label for offer in model.candidates("im")] == [":- import('')."], (
         model.candidates("im")
     )
     # `ХОЛСТ` names the height and the width, so the caret meets the comma.

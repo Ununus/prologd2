@@ -1608,21 +1608,21 @@ def test_a_question_that_is_a_directive_answers_instead_of_hanging(
     )
     program = directory / "программа.pld"
     program.write_text(
-        ':- ИМПОРТ("справка.pld").\n'
+        ":- ИМПОРТ('справка.pld').\n"
         "?подсказка(_Х).\n"
-        '?ИМПОРТ("справка.pld").\n',
+        "?ИМПОРТ('справка.pld').\n",
         encoding="utf-8",
         newline="\n",
     )
     window = empty_window(executable)
     try:
         assert window.open_path(str(program)), program
-        ask_from_the_margin(window, '?ИМПОРТ("справка.pld").')
+        ask_from_the_margin(window, "?ИМПОРТ('справка.pld').")
         assert "решени" in window.status_text(), window.status_text()
 
         # The goal line sends the same statement, and the base is loaded by now: the
         # answer comes straight from the session.
-        window._query_line.setText('?ИМПОРТ("справка.pld").')
+        window._query_line.setText("?ИМПОРТ('справка.pld').")
         window._run_query()
         wait_for_the_run(window)
         assert "решени" in window.status_text(), window.status_text()
@@ -2316,7 +2316,7 @@ def test_the_settings_dialog_changes_the_window_without_a_restart(executable: st
 def test_the_shared_folder_reaches_the_interpreter(executable: str) -> None:
     """«Дополнительные каталоги ИМПОРТ» is what makes `ИМПОРТ` work everywhere.
 
-    An untitled buffer has no folder of its own, so `ИМПОРТ("library.pld")`
+    An untitled buffer has no folder of its own, so `ИМПОРТ('library.pld')`
     fails until a search folder is set — and works in every tab afterwards.
     """
     library = pathlib.Path(__file__).resolve().parents[3] / "examples" / "lib"
@@ -2332,7 +2332,7 @@ def test_the_shared_folder_reaches_the_interpreter(executable: str) -> None:
             # the process (the CLI exits 2) instead of answering «выполнено».
             return window._actions["run"].isEnabled()
 
-        window.editor().setPlainText(':- ИМПОРТ("library.pld").\n')
+        window.editor().setPlainText(":- ИМПОРТ('library.pld').\n")
         window.run_program()
         assert pump(window, concluded), ascii(window.problems_text())
         assert "Не найден" in window.problems_text(), ascii(window.problems_text())
@@ -2844,7 +2844,7 @@ def test_a_diagnostic_from_an_imported_file_opens_it(executable: str, directory)
     module = directory / "модуль.pld"
     module.write_text("ок(1).\nсломано(1.\n", encoding="utf-8")
     main = directory / "главная.pld"
-    main.write_text(':- ИМПОРТ("модуль.pld").\n?ок(1).\n', encoding="utf-8")
+    main.write_text(":- ИМПОРТ('модуль.pld').\n?ок(1).\n", encoding="utf-8")
 
     window = empty_window(executable)
     try:
@@ -2879,7 +2879,7 @@ def test_a_runtime_error_in_an_imported_file_opens_it(executable: str, directory
     module = directory / "модуль.pld"
     module.write_text("ок(1).\nдели(Х) :- БОЛЬШЕ(1, #1/0#).\n", encoding="utf-8")
     main = directory / "главная.pld"
-    main.write_text(':- ИМПОРТ("модуль.pld").\n?дели(1).\n', encoding="utf-8")
+    main.write_text(":- ИМПОРТ('модуль.pld').\n?дели(1).\n", encoding="utf-8")
 
     window = empty_window(executable)
     try:
@@ -2919,7 +2919,7 @@ def test_the_problems_are_a_table_a_double_click_opens_the_line(
     module = directory / "модуль.pld"
     module.write_text("ок(1).\nсломано(1.\n", encoding="utf-8")
     main = directory / "главная.pld"
-    main.write_text(':- ИМПОРТ("модуль.pld").\n?ок(1).\n', encoding="utf-8")
+    main.write_text(":- ИМПОРТ('модуль.pld').\n?ок(1).\n", encoding="utf-8")
 
     window = empty_window(executable)
     try:
@@ -3864,7 +3864,7 @@ def test_an_imported_file_reaches_the_popup(executable: str, files: pathlib.Path
         # folder before a run, or the interpreter never hears of `-I` (task_61).
         window.apply_settings()
         view = window.editor()
-        view.setPlainText(':- ИМПОРТ("библиотека.pld").\nчлен_с')
+        view.setPlainText(":- ИМПОРТ('библиотека.pld').\nчлен_с")
         cursor = view.textCursor()
         cursor.movePosition(QTextCursor.MoveOperation.End)
         view.setTextCursor(cursor)
@@ -3890,11 +3890,11 @@ def test_an_imported_file_reaches_the_popup(executable: str, files: pathlib.Path
         # instead of a plain keyword.  Once the directive stopped being recognised
         # there, the popup lost every imported name — the owner saw `length` vanish
         # from it after the first `F5`.
-        view.setPlainText(':- ИМПОРТ("библиотека.pld").\n?член_списка(1, [1]).\n')
+        view.setPlainText(":- ИМПОРТ('библиотека.pld').\n?член_списка(1, [1]).\n")
         assert window.run_program() is True
         wait_for_result(window)
         assert window.problems_text() == "", window.problems_text()
-        view.setPlainText(':- ИМПОРТ("библиотека.pld").\nчлен_с')
+        view.setPlainText(":- ИМПОРТ('библиотека.pld').\nчлен_с")
         cursor = view.textCursor()
         cursor.movePosition(QTextCursor.MoveOperation.End)
         view.setTextCursor(cursor)
@@ -3928,7 +3928,7 @@ def test_f12_goes_to_the_first_clause_of_a_name(
     try:
         program = directory / "программа.pld"
         program.write_text(
-            ':- ИМПОРТ("библиотека.pld").\n'
+            ":- ИМПОРТ('библиотека.pld').\n"
             "цель :- член(2, [1, 2]), правило(1).\n"
             "\n"
             "% Правило ниже определено в этом же файле\n"
@@ -4004,7 +4004,7 @@ def test_f12_opens_the_file_however_its_name_is_written(
     window = empty_window(executable)
     try:
         spellings = (
-            (':- ИМПОРТ("iso.pld").', "iso.pld"),
+            (':- ИМПОРТ("iso.pld").', "iso.pld"),  # the string form is still read
             (":- ИМПОРТ('iso.pld').", "iso.pld"),
             (":- ИМПОРТ(bare).", "bare"),
         )
@@ -4048,7 +4048,7 @@ def test_f12_opens_the_file_however_its_name_is_written(
 def test_the_import_string_completes_to_a_file_name(
     executable: str, files: pathlib.Path
 ) -> None:
-    """Inside `ИМПОРТ("…")` the popup offers files, not predicates (task_104).
+    """Inside `ИМПОРТ('…')` the popup offers files, not predicates (task_104).
 
     The one string in the language that is a path: the folders are the ones the
     run would search, a name is offered after one letter, and accepting writes the
@@ -4062,7 +4062,7 @@ def test_the_import_string_completes_to_a_file_name(
     try:
         window._settings.import_paths = [str(files)]
         view = window.editor()
-        view.setPlainText(':- ИМПОРТ("is").\n')
+        view.setPlainText(":- ИМПОРТ('is').\n")
         cursor = view.textCursor()
         cursor.setPosition(view.toPlainText().index("is") + 2)
         view.setTextCursor(cursor)
@@ -4073,9 +4073,9 @@ def test_the_import_string_completes_to_a_file_name(
             assert "iso.pld" in labels, labels
             assert "иное.pld" not in labels, labels
             assert view._accept_completion() is True
-            assert view.toPlainText() == ':- ИМПОРТ("iso.pld").\n', ascii(view.toPlainText())
+            assert view.toPlainText() == ":- ИМПОРТ('iso.pld').\n", ascii(view.toPlainText())
             # The caret stays inside the quotes, right after the name.
-            assert view.textCursor().position() == view.toPlainText().index('").'), (
+            assert view.textCursor().position() == view.toPlainText().index("')."), (
                 view.textCursor().position()
             )
         finally:
@@ -4094,7 +4094,7 @@ def test_the_import_string_completes_to_a_file_name(
 
 
 def test_the_directive_is_inserted_as_a_whole_statement(executable: str) -> None:
-    """`ИМ` on a line of its own gives `:- ИМПОРТ("").` (task_105).
+    """`ИМ` on a line of its own gives `:- ИМПОРТ('').` (task_105).
 
     A directive is a statement, not a goal: the popup offers the text that has to
     be written, with the caret between the quotes — where the file name goes, and
@@ -4120,14 +4120,14 @@ def test_the_directive_is_inserted_as_a_whole_statement(executable: str) -> None
         try:
             assert not any(label.startswith(":- ИМЕНА") for label in labels), labels
             row = next(
-                (index for index, label in enumerate(labels) if label.startswith(":- ИМПОРТ(")),
+                (index for index, label in enumerate(labels) if label.startswith(":- ИМПОРТ('")),
                 None,
             )
             assert row is not None, labels
             view._completer.popup().setCurrentIndex(view._offer_list.index(row, 0))
             assert view._accept_completion() is True
-            assert view.toPlainText() == ':- ИМПОРТ("").', ascii(view.toPlainText())
-            assert view.textCursor().position() == len(':- ИМПОРТ("'), (
+            assert view.toPlainText() == ":- ИМПОРТ('').", ascii(view.toPlainText())
+            assert view.textCursor().position() == len(":- ИМПОРТ('"), (
                 view.textCursor().position()
             )
         finally:
@@ -4149,7 +4149,7 @@ def test_the_directive_is_inserted_as_a_whole_statement(executable: str) -> None
         # A directive is a statement wherever a statement can start, first line or
         # not.
         labels = complete_from("цель.\nИМ")
-        assert any(label.startswith(":- ИМПОРТ(") for label in labels), labels
+        assert any(label.startswith(":- ИМПОРТ('") for label in labels), labels
         view._hide_completion()
 
         # The same word inside a body: ordinary names are still offered, but the
@@ -5440,7 +5440,7 @@ def test_f12_opens_the_file_of_an_import_directive(executable: str, directory: p
         library = directory / "library.pld"
         library.write_text("факт(1).\n", encoding="utf-8", newline="\n")
         program = directory / "program.pld"
-        program.write_text(':- ИМПОРТ("library.pld").\n?факт(1).\n', encoding="utf-8",
+        program.write_text(":- ИМПОРТ('library.pld').\n?факт(1).\n", encoding="utf-8",
                            newline="\n")
         assert window.open_path(str(program))
         view = window.active_pane().current_view()

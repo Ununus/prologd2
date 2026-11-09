@@ -74,7 +74,7 @@ TEST_CASE("the hard shape leaves a directive and a query on their line") {
   // so its goals stay beside `?` too — the window runs a question from a *line*
   // (task_36), and a question split in two cannot be clicked (task_47).
   const std::string source =
-      ":- ИМПОРТ(\"lib.pld\").\n"
+      ":- ИМПОРТ('lib.pld').\n"
       ":- РАВНО(Х, 1).\n"
       "?цель(Х), другая(Х).\n"
       "факт(1).\n";
@@ -185,13 +185,13 @@ TEST_CASE("an arrow rule formats like a colon-dash rule") {
 TEST_CASE("a directive keeps its space and a query stays glued") {
   const std::string source =
       "?ВЕРСИЯ.\n"
-      ":- ИМПОРТ(\"library.pld\").\n"
+      ":- ИМПОРТ('library.pld').\n"
       "%? НЕ(ЛОЖЬ).\n";
   const FormatResult result = format(source, hard());
   REQUIRE(result.ok());
   REQUIRE(result.text ==
           "?ВЕРСИЯ.\n"
-          ":- ИМПОРТ(\"library.pld\").\n"
+          ":- ИМПОРТ('library.pld').\n"
           "%? НЕ(ЛОЖЬ).\n");
 }
 

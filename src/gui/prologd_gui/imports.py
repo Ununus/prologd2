@@ -51,9 +51,9 @@ def directive_arguments(line: str, keywords=None) -> list[tuple[int, int, str]]:
     tokenizer, so a directive inside a comment or a string names nothing, and both
     spellings of the name count.
 
-    Three ways to write the argument are allowed and all three are read here,
-    because the parser takes all three — a string (`ИМПОРТ("x.pld")`), a quoted
-    atom (`ИМПОРТ('x.pld')`) and a bare one (`ИМПОРТ(x)`);
+    The argument is written as an atom — quoted (`ИМПОРТ('x.pld')`) or bare when it
+    has no special characters (`ИМПОРТ(x)`) — and a string (`ИМПОРТ("x.pld")`) is
+    read too, because older programs were written that way;
     `tokens.literal_text` unwraps the quotes the tokenizer keeps (part 243).
     """
     found: list[tuple[int, int, str]] = []

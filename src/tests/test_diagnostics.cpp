@@ -318,7 +318,7 @@ TEST_CASE("a module and a rational are told they do not exist") {
   REQUIRE(module.front().code == ErrorCode::UnknownPredicate);
   REQUIRE(module.front().message ==
           "не найдено: module/1; модулей в Пролог-Д нет: файл подключают "
-          "директивой «ИМПОРТ(\"файл.pld\")»");
+          "директивой «ИМПОРТ('файл.pld')»");
 
   const std::vector<PrologError> rational = diagnosticsOf("?rational(1).\n");
   REQUIRE(rational.size() == 1);
@@ -525,7 +525,7 @@ TEST_CASE("a predicate the program builds at run time is not a missing name") {
   REQUIRE(withSeverity(asserted, Severity::Warning).empty());
 
   const std::vector<PrologError> copied = diagnosticsOf(
-      ":- ИМПОРТ(\"database.pld\").\n"
+      ":- ИМПОРТ('database.pld').\n"
       "ребро(а, б).\n"
       "?copy_predicate(ребро, линия), линия(А, Б).\n",
       {PROLOGD_STDLIB_DIR});
@@ -545,7 +545,7 @@ TEST_CASE("a typo next to a created name is still a warning") {
   REQUIRE(warnings.front()->message == "не найдено: следа/1; возможно, след/1");
 
   const std::vector<PrologError> copied = diagnosticsOf(
-      ":- ИМПОРТ(\"database.pld\").\n"
+      ":- ИМПОРТ('database.pld').\n"
       "ребро(а, б).\n"
       "?copy_predicate(ребро, линия), линияя(А, Б).\n",
       {PROLOGD_STDLIB_DIR});

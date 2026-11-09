@@ -110,7 +110,7 @@ TEST_CASE("the knowledge base library replaces in place and copies a predicate")
   using prologd::test::runProgramWithIncludes;
   const std::vector<std::filesystem::path> library{PROLOGD_STDLIB_DIR};
   const auto result = runProgramWithIncludes(
-      ":- ИМПОРТ(\"database.pld\").\n"
+      ":- ИМПОРТ('database.pld').\n"
       "ребро(а, б). ребро(б, в). ребро(в, г).\n"
       "?replace_clause(ребро(б, в), ребро(б, д)), ребро(X, Y).\n",
       "", library);
@@ -124,7 +124,7 @@ TEST_CASE("a replacement of what is not there changes nothing") {
   using prologd::test::runProgramWithIncludes;
   const std::vector<std::filesystem::path> library{PROLOGD_STDLIB_DIR};
   const auto result = runProgramWithIncludes(
-      ":- ИМПОРТ(\"database.pld\").\n"
+      ":- ИМПОРТ('database.pld').\n"
       "ребро(а, б).\n"
       "?replace_clause(ребро(а, з), ребро(а, д)).\n"
       "?replace_clause(ребро(чужой, б), ребро(а, д)).\n"
@@ -141,7 +141,7 @@ TEST_CASE("a copy takes arms as they are and leaves the original alone") {
   using prologd::test::runProgramWithIncludes;
   const std::vector<std::filesystem::path> library{PROLOGD_STDLIB_DIR};
   const auto result = runProgramWithIncludes(
-      ":- ИМПОРТ(\"database.pld\").\n"
+      ":- ИМПОРТ('database.pld').\n"
       "длинная(а). длинная(б).\n"
       "путь(X):-длинная(X).\n"
       "?copy_predicate(путь, дорога), дорога(X).\n"
@@ -162,7 +162,7 @@ TEST_CASE("the knowledge base library reads a predicate and gives its number") {
   using prologd::test::runProgramWithIncludes;
   const std::vector<std::filesystem::path> library{PROLOGD_STDLIB_DIR};
   const auto result = runProgramWithIncludes(
-      ":- ИМПОРТ(\"database.pld\").\n"
+      ":- ИМПОРТ('database.pld').\n"
       "ребро(а, б). ребро(б, в). ребро(в, г).\n"
       "путь(X, Y):-ребро(X, Y).\n"
       "?clause_number(ребро(б, в), Н).\n"
@@ -180,7 +180,7 @@ TEST_CASE("the knowledge base library renames and deletes a predicate") {
   using prologd::test::runProgramWithIncludes;
   const std::vector<std::filesystem::path> library{PROLOGD_STDLIB_DIR};
   const auto result = runProgramWithIncludes(
-      ":- ИМПОРТ(\"database.pld\").\n"
+      ":- ИМПОРТ('database.pld').\n"
       "ребро(а, б). ребро(б, в).\n"
       "?rename_predicate(ребро, дубль), СКОЛЬКО(ребро, Стало), СКОЛЬКО(дубль, Цел).\n"
       "?delete_predicate(дубль), СКОЛЬКО(дубль, Пусто).\n"

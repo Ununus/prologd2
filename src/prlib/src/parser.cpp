@@ -66,7 +66,7 @@ constexpr const char* kEmptyIfThen = "после «->» нужна цель";
 /// get «непарные скобки» about a bracket that is perfectly matched.
 constexpr const char* kModuleRefused =
     "«:- module(…)» в Пролог-Д нет: файл подключают директивой "
-    "«ИМПОРТ(\"файл.pld\")» (раздел 8)";
+    "«ИМПОРТ('файл.pld')» (раздел 8)";
 
 /// `1 rdiv 3` — ISO's rationals.  `rdiv` is an ordinary name here, so the parse
 /// stops right before it with «предложение должно заканчиваться точкой»; that
@@ -1146,7 +1146,7 @@ bool Parser::parseQueryOrDirective(ParsedProgram& out) {
     return false;
   }
 
-  // `ИМПОРТ("file")` is a directive, not a runtime goal.  Where it was written as a
+  // `ИМПОРТ('file')` is a directive, not a runtime goal.  Where it was written as a
   // question (`?ИМПОРТ(...)`) it also carries that file's own questions, the way an
   // include splices a file in; a `:-` directive does not.
   if (goals.size() == 1 && goals[0].kind == TermKind::Compound &&

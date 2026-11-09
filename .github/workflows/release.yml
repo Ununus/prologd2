@@ -222,7 +222,7 @@ jobs:
           # library beside itself.  That is the search the window's welcome program
           # makes — an untitled buffer, started from `/` when Finder launches the
           # app — and it is the run that failed on the 2.7.0 dmg (part 265).
-          printf '%s\n' ':- ИМПОРТ("iso.pld").' '?length([1, 2, 3], Д).' \
+          printf '%s\n' ":- ИМПОРТ('iso.pld')." '?length([1, 2, 3], Д).' \
             > "$RUNNER_TEMP/import-check.pld"
           imported=$( cd / && "$app/bin/prologd" -s "$RUNNER_TEMP/import-check.pld" )
           test "$imported" = "Д=3"

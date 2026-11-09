@@ -2825,3 +2825,56 @@ name with a file in `stdlib/`, because the loader's first step is the importing 
 own folder.
 
 **Status.** Accepted.
+
+## ADR-084: a name without an extension also names `<name>.pld`
+
+**Context.**  `ModuleLoader::resolve` used the name exactly as written: no extension was
+ever appended, so `:- ИМПОРТ(iso).` looked for a file called `iso` and failed even with
+`iso.pld` beside it.  Every real import in the repository spells the extension out, which
+makes the reader's habit the opposite one: `consult(foo)` in SWI reads `foo.pl`, and
+`[foo]` in GNU Prolog does the same (part 275).
+
+**Decision.**  When the name has no extension at all, the same name with `.pld` is
+searched *after* it.  The search runs twice in the engine's existing order: the name as
+written in the importing file's folder, every `-I` directory and `stdlib`, then the
+suffixed name in the same order.  A file carrying the exact name wins over its `.pld`
+anywhere; a name that has an extension (`lib.txt`) is taken literally and never
+supplemented.  Only `.pld` is guessed — the dialect has one source extension, so the
+guess is a name, not a list of alternatives, unlike SWI's `.pl`/`.pro` chain.
+
+**Consequences.**  No existing program changes meaning: every import that resolved before
+names a file with an extension and is untouched; the guess only turns a failure into a
+success.  The failed-import message now lists both candidates per folder, which teaches
+the rule but doubles the entries — the five-entry cap bites sooner for extensionless
+names.  The window repeats the rule in `paths.resolve_import`, because `F12` must open
+what the run would load (ADR-026, task_69).  Names that are meant to be paths stay paths:
+the rule adds no aliasing, no module names and no search of the library by a short name
+alone.
+
+**Status.** Accepted.
+
+## ADR-085: an import name is written as an atom, not as a string
+
+**Context.**  Every sample wrote `:- ИМПОРТ("lists.pld").` because the parser takes a
+string, a quoted atom and a bare atom alike.  The habit is dialect-local: in ISO a
+double-quoted text is a sequence of character codes, and SWI has made it a type of its
+own, so a reader who learns `ИМПОРТ("…")` here carries a mistake out of the dialect
+(part 276).  A name is an atom everywhere else in Prolog.
+
+**Decision.**  Documentation, examples, the library headers, the workflows and the
+window's statement template write the name as an atom: `:- ИМПОРТ('lists.pld').`, or
+bare (`:- ИМПОРТ(lists).`) when it holds no special characters — the extension is then
+supplied by ADR-084.  The string form keeps parsing, because programs were written that
+way; the manual says so in a warning box and calls it the older spelling, and one test
+in each suite pins that it still works.
+
+**Consequences.**  Nothing in the language changed — only what we write and teach.  The
+completion template inserts `:- ИМПОРТ('').` with the caret inside the single quotes,
+which the file-name completion already reads.  Two traps are worth remembering: a shell
+word that carries the directive must switch to double quotes (`"…ИМПОРТ('x.pld')…"`),
+or the shell glues the pieces into a bare atom with a dot in it; and the user-facing
+hints (`module/1` refusal, the `F1` variants) are part of the same rule, so they were
+rewritten too.  The journal in `ai/` is a record of what was written then and is not
+rewritten.
+
+**Status.** Accepted.

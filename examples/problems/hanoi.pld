@@ -13,7 +13,7 @@
 
 :- ХОЛСТ(380, 620).
 
-:- ИМПОРТ("graphics.pld").
+:- ИМПОРТ('graphics.pld').
 
 hanoi(N):-begin(N,A,B,C), move(N,1,3,2,A,B,C,_,_,_).
 move(1,X,Y,_,A,B,C,D,E,F):-make(X,Y,A,B,C,D,E,F).

@@ -105,33 +105,45 @@ std::optional<std::filesystem::path> ModuleLoader::resolve(
     return std::nullopt;
   }
   const std::filesystem::path requested = fromUtf8Path(name);
-  std::vector<std::filesystem::path> candidates;
-  if (requested.is_absolute()) {
-    candidates.push_back(requested);
-  } else {
-    // The importing file's own directory first, then every `-I` directory in
-    // the order the user gave them: a local module wins over a shared one.
-    candidates.push_back(importer / requested);
-    for (const auto& directory : include_paths_) {
-      candidates.push_back(directory / requested);
-    }
+  // A name without an extension also names `<name>.pld` (ADR-084).  The whole
+  // search runs twice: once for the name as written, once for the suffixed one,
+  // so a file literally called `iso` still wins over `iso.pld` anywhere.
+  std::vector<std::filesystem::path> names;
+  names.push_back(requested);
+  if (requested.extension().empty()) {
+    std::filesystem::path suffixed = requested;
+    suffixed += ".pld";
+    names.push_back(suffixed);
   }
-  for (const auto& candidate : candidates) {
-    std::error_code code;
-    if (!std::filesystem::exists(candidate, code) || code) {
-      steps->push_back(SearchStep{candidate, SearchOutcome::Missing});
-      continue;
+  for (const auto& variant : names) {
+    std::vector<std::filesystem::path> candidates;
+    if (variant.is_absolute()) {
+      candidates.push_back(variant);
+    } else {
+      // The importing file's own directory first, then every `-I` directory in
+      // the order the user gave them: a local module wins over a shared one.
+      candidates.push_back(importer / variant);
+      for (const auto& directory : include_paths_) {
+        candidates.push_back(directory / variant);
+      }
     }
-    if (!std::filesystem::is_regular_file(candidate, code) || code) {
-      steps->push_back(SearchStep{candidate, SearchOutcome::NotAFile});
-      continue;
+    for (const auto& candidate : candidates) {
+      std::error_code code;
+      if (!std::filesystem::exists(candidate, code) || code) {
+        steps->push_back(SearchStep{candidate, SearchOutcome::Missing});
+        continue;
+      }
+      if (!std::filesystem::is_regular_file(candidate, code) || code) {
+        steps->push_back(SearchStep{candidate, SearchOutcome::NotAFile});
+        continue;
+      }
+      if (!withinRoot(candidate)) {
+        steps->push_back(SearchStep{candidate, SearchOutcome::OutsideRoot});
+        continue;
+      }
+      steps->push_back(SearchStep{candidate, SearchOutcome::Found});
+      return std::filesystem::weakly_canonical(candidate, code);
     }
-    if (!withinRoot(candidate)) {
-      steps->push_back(SearchStep{candidate, SearchOutcome::OutsideRoot});
-      continue;
-    }
-    steps->push_back(SearchStep{candidate, SearchOutcome::Found});
-    return std::filesystem::weakly_canonical(candidate, code);
   }
   return std::nullopt;
 }

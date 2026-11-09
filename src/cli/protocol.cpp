@@ -491,7 +491,7 @@ class Session {
       emit(Json{{"event", "loaded"}});
     }
     // A `query` request is never left unanswered, and a statement that is not a goal
-    // has nothing to answer with: `?ИМПОРТ("…").` and `?ХОЛСТ(…).` are directives
+    // has nothing to answer with: `?ИМПОРТ('…').` and `?ХОЛСТ(…).` are directives
     // the *loader* carries out while the text is read, so they never reach
     // `runQuery`.  The imported file's own questions do reach it (each with
     // its own `result`), and a file that asks none — or one that was loaded before,

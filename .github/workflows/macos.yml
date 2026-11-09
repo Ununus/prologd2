@@ -116,7 +116,7 @@ jobs:
         run: |
           set -e
           app=$(pwd)/dist/PrologD.app/Contents/MacOS
-          printf '%s\n' ':- ИМПОРТ("iso.pld").' '?length([1, 2, 3], Д).' \
+          printf '%s\n' ":- ИМПОРТ('iso.pld')." '?length([1, 2, 3], Д).' \
             > "$RUNNER_TEMP/import-check.pld"
           imported=$( cd / && "$app/bin/prologd" -s "$RUNNER_TEMP/import-check.pld" )
           test "$imported" = "Д=3"
