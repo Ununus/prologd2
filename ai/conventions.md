@@ -341,6 +341,13 @@ Tests are written **together with** the feature, never after.
 
 ## Prose and samples
 
+* A library predicate is named by whoever gave it the name: an ISO name stays as the
+  standard spells it (`member`, `nth1`), the dialect's own additions are Russian
+  (`коды_в_знаки`, `красный`), and `database.pld` sits in the SWI family
+  (`replace_clause` beside `assert`/`retract`).  A library name has **one** spelling:
+  the built-in pairs (`УДАЛЕНИЕ`/`retract`) have no library analogue, so «the library
+  is Latin-named» is wrong twice over -- Latin is an alphabet and a third of the
+  library speaks Russian (part 277).
 * `ИМПОРТ` names its file with an **atom**: `:- ИМПОРТ('lists.pld').`, or a bare one
   when the name has no special characters (`:- ИМПОРТ(lists).` -- ADR-084 fills in
   `.pld`).  Double quotes (`:- ИМПОРТ("lists.pld").`) still parse and a few tests pin
